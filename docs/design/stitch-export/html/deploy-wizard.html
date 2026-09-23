@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console — Relay Deploy Wizard Showcase</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-surface": "#e4e1ed",
+            "on-surface-variant": "#c7c4d7",
+            "surface-container-lowest": "#0d0d15",
+            "on-secondary-fixed": "#0f0069",
+            "status-red": "#EF4444",
+            "inverse-surface": "#e4e1ed",
+            "on-error": "#690005",
+            "secondary-fixed": "#e2dfff",
+            "error": "#ffb4ab",
+            "surface-variant": "#34343d",
+            "surface": "#13131b",
+            "on-tertiary-fixed-variant": "#703700",
+            "inverse-on-surface": "#303038",
+            "secondary-fixed-dim": "#c3c0ff",
+            "surface-container-low": "#1b1b23",
+            "tertiary-fixed-dim": "#ffb783",
+            "surface-dim": "#13131b",
+            "surface-dark": "#090A0F",
+            "on-secondary-container": "#b3b1ff",
+            "on-primary": "#1000a9",
+            "on-tertiary-fixed": "#301400",
+            "background": "#13131b",
+            "secondary": "#c3c0ff",
+            "primary-container": "#8083ff",
+            "inverse-primary": "#494bd6",
+            "on-background": "#e4e1ed",
+            "tertiary-container": "#d97721",
+            "surface-bright": "#393841",
+            "surface-container-high": "#292932",
+            "status-grey": "#6B7280",
+            "on-primary-fixed": "#07006c",
+            "tertiary": "#ffb783",
+            "surface-container-highest": "#34343d",
+            "tertiary-fixed": "#ffdcc5",
+            "surface-tint": "#c0c1ff",
+            "surface-container": "#1f1f27",
+            "error-container": "#93000a",
+            "primary": "#c0c1ff",
+            "on-tertiary": "#4f2500",
+            "outline": "#908fa0",
+            "primary-fixed": "#e1e0ff",
+            "status-green": "#22C55E",
+            "border-subtle": "#27272A",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "primary-fixed-dim": "#c0c1ff",
+            "status-amber": "#F59E0B",
+            "outline-variant": "#464554",
+            "surface-elevated": "#12131A",
+            "on-error-container": "#ffdad6",
+            "secondary-container": "#3626ce",
+            "on-secondary": "#1d00a5",
+            "on-primary-container": "#0d0096",
+            "on-secondary-fixed-variant": "#3323cc",
+            "on-tertiary-container": "#452000"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "gutter": "1rem",
+            "space-xs": "0.25rem",
+            "margin": "1.5rem",
+            "space-sm": "0.5rem",
+            "space-lg": "1.5rem",
+            "space-md": "1rem",
+            "space-xl": "2rem"
+          },
+          "fontFamily": {
+            "body": ["Inter"],
+            "section": ["Inter"],
+            "metric": ["JetBrains Mono"],
+            "table": ["Inter"],
+            "meta": ["Inter"],
+            "table-mono": ["JetBrains Mono"],
+            "page-title": ["Inter"]
+          },
+          "fontSize": {
+            "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "section": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "metric": ["32px", { "lineHeight": "38px", "fontWeight": "500" }],
+            "table": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "meta": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "table-mono": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "page-title": ["20px", { "lineHeight": "28px", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface font-body text-body text-on-surface antialiased min-h-screen flex flex-col selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated border-r border-border-subtle flex flex-col justify-between h-full p-space-sm w-60">
+<div class="flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm px-space-sm py-space-sm">
+<div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary-container font-bold">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">hub</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</span>
+<span class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</span>
+</div>
+</div>
+<nav class="flex flex-col gap-space-xs mt-space-sm">
+<div class="flex items-center gap-space-sm px-space-md py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span class="font-body text-body">Overview</span>
+</div>
+<div class="flex items-center gap-space-sm px-space-md py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none">
+<span class="material-symbols-outlined text-lg">alt_route</span>
+<span class="font-body text-body">Gateway</span>
+</div>
+<div class="flex items-center gap-space-sm px-space-md py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none">
+<span class="material-symbols-outlined text-lg">hub</span>
+<span class="font-body text-body">Providers</span>
+</div>
+<div class="flex items-center gap-space-sm px-space-md py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none">
+<span class="material-symbols-outlined text-lg">monitoring</span>
+<span class="font-body text-body">Traffic</span>
+</div>
+<div class="flex items-center gap-space-sm px-space-md py-space-sm bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 cursor-pointer active:opacity-90 select-none">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">lan</span>
+<span class="font-body text-body">Network</span>
+</div>
+<div class="flex items-center gap-space-sm px-space-md py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none">
+<span class="material-symbols-outlined text-lg">extension</span>
+<span class="font-body text-body">Integrations</span>
+</div>
+<div class="flex items-center gap-space-sm px-space-md py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none">
+<span class="material-symbols-outlined text-lg">settings</span>
+<span class="font-body text-body">Settings</span>
+</div>
+</nav>
+</div>
+<div class="flex flex-col gap-space-xs pt-space-md border-t border-border-subtle">
+<div class="flex items-center gap-space-sm px-space-md py-space-xs text-on-surface-variant hover:text-on-surface cursor-pointer">
+<span class="material-symbols-outlined text-base">menu_book</span>
+<span class="font-meta text-meta">Docs</span>
+</div>
+<div class="flex items-center justify-between px-space-md py-space-xs text-on-surface-variant">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-base text-status-green" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-meta text-meta">System Status</span>
+</div>
+<div class="w-2 h-2 rounded-full bg-status-green"></div>
+</div>
+</div>
+</aside>
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin pl-64">
+<div class="flex items-center gap-space-md">
+<span class="font-page-title text-page-title text-on-surface dark:text-on-surface font-semibold">Relay Deploy Wizard Showcase</span>
+<span class="bg-surface-container px-space-sm py-0.5 rounded text-meta font-table-mono text-primary border border-border-subtle">v2.4.1-proxy</span>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2.5 text-on-surface-variant text-base">search</span>
+<input class="bg-surface-container border border-border-subtle rounded text-meta pl-8 pr-3 py-1 text-on-surface placeholder-on-surface-variant focus:outline-none focus:border-primary w-64" placeholder="Search gateways, routes, logs..." type="text"/>
+</div>
+<div class="flex items-center gap-space-sm border-l border-border-subtle pl-space-md">
+<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-lg">notifications</span>
+</button>
+<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-lg">light_mode</span>
+</button>
+<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-lg">help</span>
+</button>
+<div class="w-7 h-7 rounded-full bg-surface-container-high border border-border-subtle flex items-center justify-center text-meta font-medium ml-1">
+<img class="w-full h-full rounded-full object-cover" data-alt="A detailed headshot portrait of a software engineer avatar with short dark hair, wearing a neutral gray technical hoodie, set against a dark gradient backdrop with subtle blue lighting accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB37ZRSoXNd856CG0cv5UDhtTzy56l5rBD46Ndn1gqcdn1b29bMmaV2p2fZmLMMkIkrqk-AeligFGmS-gi9C9XFrcunbXJxc7LiluCtK6oSaKSSg6POyOdB9hK-rtpubcMxPqivunWhsar3--LDr1vqFwySveab2LUVfdGwLSRYgitx2CVvhJaDpSp78fFx-Vpfxc_q5-fODiQ_FnCHavf8x9b7CF3jMMJ7mPDvf5aDdHKVPbGasMbc6KQSrS5ytHxRf1IU0ZWbc7A"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pl-60 flex-1 flex flex-col p-margin gap-margin bg-surface opacity-95">
+<!-- Backdrop Context Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md bg-surface-elevated border border-border-subtle p-space-lg rounded-lg relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-transparent pointer-events-none"></div>
+<div class="flex flex-col gap-space-xs z-10">
+<div class="flex items-center gap-space-sm">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold uppercase bg-status-green/10 text-status-green border border-status-green/20">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green mr-1.5 animate-pulse"></span>
+            Active Console Stream
+          </span>
+<span class="text-on-surface-variant">•</span>
+<span class="font-table-mono text-meta text-on-surface-variant">ID: rly_deploy_wiz_9841x</span>
+</div>
+<h1 class="font-page-title text-page-title text-on-surface font-bold tracking-tight">Relay Deploy Wizard Multi-Step Showcase</h1>
+<p class="text-body text-on-surface-variant max-w-2xl">
+          Simultaneous rendering of all deployment steps, interactive edge target selection, secure credential handling, active build progression, and dual terminal end states (Success &amp; Failure).
+        </p>
+</div>
+<div class="flex items-center gap-space-sm z-10">
+<button class="bg-surface-container border border-border-subtle hover:bg-surface-bright px-space-md py-2 rounded text-body font-medium flex items-center gap-space-sm transition-colors">
+<span class="material-symbols-outlined text-base">restart_alt</span>
+          Reset Wizard State
+        </button>
+<button class="bg-primary text-on-primary hover:bg-primary-container px-space-md py-2 rounded text-body font-medium flex items-center gap-space-sm transition-colors">
+<span class="material-symbols-outlined text-base">play_arrow</span>
+          Run Live Pipeline
+        </button>
+</div>
+</div>
+<!-- Wizard Showcase Grid (Bento/Asymmetric Layout) -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-margin">
+<!-- Step 1: Choose Platform -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-lg flex flex-col gap-space-md">
+<div class="flex items-center justify-between border-b border-border-subtle pb-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="w-6 h-6 rounded-full bg-primary-container/20 text-primary flex items-center justify-center text-meta font-bold">1</span>
+<h2 class="font-section text-section text-on-surface">Choose Platform</h2>
+</div>
+<span class="text-meta font-table-mono text-status-green bg-status-green/10 px-2 py-0.5 rounded">Selected</span>
+</div>
+<p class="text-meta text-on-surface-variant">Select the edge infrastructure provider for your proxy runtime instance.</p>
+<div class="flex flex-col gap-space-sm">
+<!-- Vercel Card (Active) -->
+<div class="border border-primary bg-surface-container-high rounded p-space-md flex items-start gap-space-md cursor-pointer relative">
+<div class="absolute top-2 right-2 text-primary">
+<span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="w-10 h-10 rounded bg-surface border border-border-subtle flex items-center justify-center shrink-0 text-on-surface">
+<span class="material-symbols-outlined text-xl">bolt</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-body font-semibold text-on-surface">Vercel Edge Functions</span>
+<span class="text-meta text-on-surface-variant mt-0.5">Global low-latency serverless deployment with automatic region routing.</span>
+</div>
+</div>
+<!-- Cloudflare Card -->
+<div class="border border-border-subtle bg-surface-container hover:border-outline transition-colors rounded p-space-md flex items-start gap-space-md cursor-pointer">
+<div class="w-10 h-10 rounded bg-surface border border-border-subtle flex items-center justify-center shrink-0 text-amber-400">
+<span class="material-symbols-outlined text-xl">cloud</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-body font-semibold text-on-surface">Cloudflare Workers</span>
+<span class="text-meta text-on-surface-variant mt-0.5">V8 isolate architecture deployed instantly across 300+ edge cities.</span>
+</div>
+</div>
+<!-- Deno Deploy Card -->
+<div class="border border-border-subtle bg-surface-container hover:border-outline transition-colors rounded p-space-md flex items-start gap-space-md cursor-pointer">
+<div class="w-10 h-10 rounded bg-surface border border-border-subtle flex items-center justify-center shrink-0 text-cyan-400">
+<span class="material-symbols-outlined text-xl">code</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-body font-semibold text-on-surface">Deno Deploy</span>
+<span class="text-meta text-on-surface-variant mt-0.5">TypeScript-native serverless execution engine with built-in security.</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Step 2: Access Token -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-lg flex flex-col gap-space-md">
+<div class="flex items-center justify-between border-b border-border-subtle pb-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="w-6 h-6 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center text-meta font-bold">2</span>
+<h2 class="font-section text-section text-on-surface">Access Token</h2>
+</div>
+<span class="text-meta font-table-mono text-status-amber bg-status-amber/10 px-2 py-0.5 rounded">Required</span>
+</div>
+<p class="text-meta text-on-surface-variant">Provide authentication credentials for automated deployment provisioning.</p>
+<div class="flex flex-col gap-space-md mt-space-sm">
+<div class="flex flex-col gap-space-xs">
+<label class="font-meta text-meta font-medium text-on-surface">Vercel Bearer / API Token</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-base">key</span>
+<input class="bg-surface-container border border-border-subtle rounded font-table-mono text-body pl-9 pr-10 py-2 text-on-surface w-full focus:outline-none focus:border-primary" type="password" value="vcl_live_9983a7bc419082fd319a00fe"/>
+<button class="absolute right-3 text-on-surface-variant hover:text-on-surface">
+<span class="material-symbols-outlined text-base">visibility_off</span>
+</button>
+</div>
+<p class="text-meta text-on-surface-variant text-[12px] leading-relaxed mt-1">
+              Token is transmitted securely once for deployment and never stored on disk or logs.
+            </p>
+</div>
+<div class="bg-surface-container border border-border-subtle rounded p-space-md flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-on-surface-variant">Scope Permissions</span>
+<span class="text-status-green font-table-mono text-[11px]">Valid 4/4</span>
+</div>
+<div class="grid grid-cols-2 gap-2 mt-1">
+<div class="flex items-center gap-space-xs text-meta text-on-surface">
+<span class="material-symbols-outlined text-status-green text-sm" style="font-variation-settings: 'FILL' 1;">check</span>
+<span>projects:write</span>
+</div>
+<div class="flex items-center gap-space-xs text-meta text-on-surface">
+<span class="material-symbols-outlined text-status-green text-sm" style="font-variation-settings: 'FILL' 1;">check</span>
+<span>deployments:create</span>
+</div>
+<div class="flex items-center gap-space-xs text-meta text-on-surface">
+<span class="material-symbols-outlined text-status-green text-sm" style="font-variation-settings: 'FILL' 1;">check</span>
+<span>domains:read</span>
+</div>
+<div class="flex items-center gap-space-xs text-meta text-on-surface">
+<span class="material-symbols-outlined text-status-green text-sm" style="font-variation-settings: 'FILL' 1;">check</span>
+<span>env:manage</span>
+</div>
+</div>
+</div>
+<div class="mt-auto pt-space-sm flex justify-end">
+<button class="bg-primary text-on-primary hover:bg-primary-container px-space-md py-2 rounded text-body font-medium flex items-center gap-space-sm w-full justify-center transition-colors">
+<span>Authorize &amp; Continue</span>
+<span class="material-symbols-outlined text-base">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Step 3: Deploy Progress -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-lg flex flex-col gap-space-md">
+<div class="flex items-center justify-between border-b border-border-subtle pb-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center text-meta font-bold">3</span>
+<h2 class="font-section text-section text-on-surface">Deploy Progress</h2>
+</div>
+<div class="flex items-center gap-space-xs font-table-mono text-meta text-primary bg-primary/10 px-2.5 py-0.5 rounded border border-primary/20">
+<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+<span>00:42 / 120s</span>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex justify-between text-meta">
+<span class="text-on-surface-variant font-table-mono">Building WebAssembly runtime</span>
+<span class="text-primary font-table-mono">68%</span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden border border-border-subtle">
+<div class="bg-primary h-full w-[68%] transition-all duration-300"></div>
+</div>
+</div>
+<!-- Milestones list -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between bg-surface-container px-space-md py-2 rounded border border-border-subtle">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-status-green text-base" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-table-mono text-table text-on-surface">1. Creating edge instance</span>
+</div>
+<span class="text-[11px] font-table-mono text-status-green bg-status-green/10 px-2 py-0.5 rounded uppercase">Completed</span>
+</div>
+<div class="flex items-center justify-between bg-surface-container px-space-md py-2 rounded border border-border-subtle">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-status-green text-base" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-table-mono text-table text-on-surface">2. Uploading proxy bundle</span>
+</div>
+<span class="text-[11px] font-table-mono text-status-green bg-status-green/10 px-2 py-0.5 rounded uppercase">Completed</span>
+</div>
+<div class="flex items-center justify-between bg-surface-container-high px-space-md py-2 rounded border border-primary/50 shadow-sm">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-base animate-spin">refresh</span>
+<span class="font-table-mono text-table text-on-surface font-medium">3. Building WebAssembly runtime</span>
+</div>
+<span class="text-[11px] font-table-mono text-primary bg-primary/10 px-2 py-0.5 rounded uppercase font-semibold">In Progress</span>
+</div>
+<div class="flex items-center justify-between bg-surface-container px-space-md py-2 rounded border border-border-subtle opacity-60">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-on-surface-variant text-base">radio_button_unchecked</span>
+<span class="font-table-mono text-table text-on-surface-variant">4. Health probe ready</span>
+</div>
+<span class="text-[11px] font-table-mono text-on-surface-variant bg-surface-bright px-2 py-0.5 rounded uppercase">Pending</span>
+</div>
+</div>
+<!-- Terminal Log Box -->
+<div class="bg-surface-dark border border-border-subtle rounded p-space-sm font-table-mono text-[12px] h-36 overflow-y-auto flex flex-col gap-1 text-on-surface-variant shadow-inner">
+<div class="flex items-center gap-2 text-on-surface-variant/60 border-b border-border-subtle pb-1 mb-1">
+<span class="w-2 h-2 rounded-full bg-status-red"></span>
+<span class="w-2 h-2 rounded-full bg-status-amber"></span>
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span class="text-[11px] ml-2">aigate-proxy-builder-v2.log</span>
+</div>
+<div><span class="text-primary">[00:01]</span> Initializing worker sandbox environment...</div>
+<div><span class="text-primary">[00:12]</span> Validating proxy manifest schema... OK</div>
+<div><span class="text-primary">[00:24]</span> Uploading 4.2MB bundle to regional edge storage... Done</div>
+<div><span class="text-primary">[00:35]</span> Compiling Rust core modules to WASM target...</div>
+<div class="text-on-surface flex items-center gap-1">
+<span class="text-primary">[00:41]</span> Optimizing memory allocation tables... <span class="inline-block w-1.5 h-3 bg-primary animate-pulse"></span>
+</div>
+</div>
+</div>
+</div>
+<!-- End States Section: Success & Failure Panels -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-margin mt-space-sm">
+<!-- 4. Success State Panel -->
+<div class="bg-surface-elevated border border-status-green/30 rounded-lg p-space-lg flex flex-col gap-space-md relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-status-green/5 rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex items-center justify-between border-b border-border-subtle pb-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="w-8 h-8 rounded-full bg-status-green/10 text-status-green flex items-center justify-center font-bold">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">check</span>
+</span>
+<div class="flex flex-col">
+<h3 class="font-section text-section text-on-surface">Deployment Success State Panel</h3>
+<span class="font-meta text-meta text-status-green">Relay successfully provisioned and active</span>
+</div>
+</div>
+<span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-semibold uppercase bg-status-green/10 text-status-green border border-status-green/20">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green mr-1.5"></span>
+            Healthy
+          </span>
+</div>
+<p class="text-meta text-on-surface-variant">
+          Your AI gateway relay has been deployed to the edge network. Upstream proxy routing is now active.
+        </p>
+<!-- Mono Copy Field -->
+<div class="flex flex-col gap-space-xs">
+<label class="font-meta text-meta font-medium text-on-surface">Production Relay Endpoint URL</label>
+<div class="flex items-center gap-space-sm bg-surface-container border border-border-subtle rounded p-2">
+<span class="material-symbols-outlined text-primary text-base">link</span>
+<span class="font-table-mono text-body text-on-surface select-all truncate">https://proxy-us-east.aigate.internal/v1</span>
+<button class="ml-auto bg-surface-container-high border border-border-subtle hover:bg-surface-bright px-3 py-1.5 rounded text-meta font-medium flex items-center gap-space-xs text-on-surface shrink-0 transition-colors" onclick="this.innerHTML='&lt;span class=\'material-symbols-outlined text-base\'&gt;done&lt;/span&gt; Copied'; setTimeout(() =&gt; this.innerHTML='&lt;span class=\'material-symbols-outlined text-base\'&gt;content_copy&lt;/span&gt; Copy', 2000)">
+<span class="material-symbols-outlined text-base">content_copy</span>
+              Copy
+            </button>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-space-sm pt-space-xs">
+<div class="bg-surface-container p-space-sm rounded border border-border-subtle flex flex-col">
+<span class="text-meta text-on-surface-variant">Edge Region</span>
+<span class="font-table-mono text-body font-semibold text-on-surface mt-0.5">iad1 (US East)</span>
+</div>
+<div class="bg-surface-container p-space-sm rounded border border-border-subtle flex flex-col">
+<span class="text-meta text-on-surface-variant">Latency</span>
+<span class="font-table-mono text-body font-semibold text-status-green mt-0.5">14ms p99</span>
+</div>
+<div class="bg-surface-container p-space-sm rounded border border-border-subtle flex flex-col">
+<span class="text-meta text-on-surface-variant">SSL Cert</span>
+<span class="font-table-mono text-body font-semibold text-on-surface mt-0.5">Valid (Let's Encrypt)</span>
+</div>
+</div>
+</div>
+<!-- 5. Failure State Panel -->
+<div class="bg-surface-elevated border border-status-red/30 rounded-lg p-space-lg flex flex-col gap-space-md relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-status-red/5 rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex items-center justify-between border-b border-border-subtle pb-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="w-8 h-8 rounded-full bg-status-red/10 text-status-red flex items-center justify-center font-bold">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">error</span>
+</span>
+<div class="flex flex-col">
+<h3 class="font-section text-section text-on-surface">Deployment Failure State Panel</h3>
+<span class="font-meta text-meta text-status-red font-table-mono">ERR_UPSTREAM_TIMEOUT</span>
+</div>
+</div>
+<span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-semibold uppercase bg-status-red/10 text-status-red border border-status-red/20">
+<span class="w-1.5 h-1.5 rounded-full bg-status-red mr-1.5"></span>
+            Failed
+          </span>
+</div>
+<!-- Warning Banner -->
+<div class="border-l-2 border-status-red bg-status-red/5 p-space-sm rounded-r flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-status-red text-base mt-0.5">warning</span>
+<div class="flex flex-col text-meta">
+<span class="font-medium text-on-surface">Upstream Handshake Timeout (Error Code: ERR_UPSTREAM_TIMEOUT)</span>
+<span class="text-on-surface-variant">The edge node failed to establish a secure TLS handshake with the upstream model provider within the 30s threshold.</span>
+</div>
+</div>
+<!-- Terminal Log Box (Visible) -->
+<div class="bg-surface-dark border border-border-subtle rounded p-space-sm font-table-mono text-[12px] h-28 overflow-y-auto flex flex-col gap-1 text-on-surface-variant shadow-inner">
+<div class="flex items-center justify-between border-b border-border-subtle pb-1 mb-1 text-on-surface-variant/60">
+<span class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-status-red"></span>
+<span class="w-2 h-2 rounded-full bg-status-amber"></span>
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span class="text-[11px] ml-2">aigate-proxy-builder-v2.log</span>
+</span>
+<span class="text-status-red font-table-mono text-[11px]">EXIT CODE 1</span>
+</div>
+<div><span class="text-primary">[00:28]</span> Connecting to upstream proxy registry api.upstream.ai:443...</div>
+<div><span class="text-primary">[00:58]</span> TLS ClientHello transmitted successfully...</div>
+<div class="text-status-red"><span class="text-primary">[01:28]</span> CRITICAL: TCP connection dropped by upstream peer (ERR_UPSTREAM_TIMEOUT)</div>
+<div class="text-status-red font-semibold">[01:28] ABORTED: Deployment rolled back successfully. No state persisted.</div>
+</div>
+<!-- Actions -->
+<div class="flex items-center justify-end gap-space-sm mt-auto pt-space-xs">
+<button class="bg-surface-container border border-border-subtle hover:bg-surface-bright px-space-md py-2 rounded text-body font-medium flex items-center gap-space-sm transition-colors">
+<span class="material-symbols-outlined text-base">download</span>
+            Download Full Diagnostics
+          </button>
+<button class="bg-status-red text-white hover:bg-status-red/90 px-space-md py-2 rounded text-body font-medium flex items-center gap-space-sm transition-colors shadow-lg shadow-status-red/20">
+<span class="material-symbols-outlined text-base">refresh</span>
+            Destructive Retry
+          </button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

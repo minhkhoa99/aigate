@@ -1,0 +1,268 @@
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "primary-fixed-dim": "#c0c1ff",
+            "tertiary-container": "#d97721",
+            "on-tertiary": "#4f2500",
+            "on-tertiary-container": "#452000",
+            "border-subtle": "#27272A",
+            "surface-container-low": "#1b1b23",
+            "on-error": "#690005",
+            "on-secondary-container": "#b3b1ff",
+            "on-error-container": "#ffdad6",
+            "surface-container-high": "#292932",
+            "surface-tint": "#c0c1ff",
+            "status-red": "#EF4444",
+            "on-background": "#e4e1ed",
+            "on-secondary-fixed-variant": "#3323cc",
+            "on-surface": "#e4e1ed",
+            "surface-dark": "#090A0F",
+            "outline-variant": "#464554",
+            "on-tertiary-fixed": "#301400",
+            "surface-elevated": "#12131A",
+            "inverse-primary": "#494bd6",
+            "tertiary": "#ffb783",
+            "on-tertiary-fixed-variant": "#703700",
+            "on-surface-variant": "#c7c4d7",
+            "inverse-surface": "#303038",
+            "outline": "#908fa0",
+            "status-grey": "#6B7280",
+            "surface-container": "#1f1f27",
+            "secondary-fixed": "#e2dfff",
+            "secondary": "#c3c0ff",
+            "on-primary-container": "#0d0096",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "surface-dim": "#13131b",
+            "surface-bright": "#393841",
+            "on-secondary": "#1d00a5",
+            "on-primary-fixed": "#07006c",
+            "surface-container-lowest": "#0d0d15",
+            "inverse-surface": "#e4e1ed",
+            "status-amber": "#F59E0B",
+            "on-primary": "#1000a9",
+            "status-green": "#22C55E",
+            "surface-container-highest": "#34343d",
+            "primary-fixed": "#e1e0ff",
+            "surface": "#13131b",
+            "error-container": "#93000a",
+            "primary": "#c0c1ff",
+            "error": "#ffb4ab",
+            "tertiary-fixed": "#ffdcc5",
+            "secondary-container": "#3626ce",
+            "tertiary-fixed-dim": "#ffb783",
+            "primary-container": "#8083ff",
+            "on-secondary-fixed": "#0f0069",
+            "surface-variant": "#34343d",
+            "secondary-fixed-dim": "#c3c0ff",
+            "background": "#13131b"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "margin": "1.5rem",
+            "gutter": "1rem",
+            "space-lg": "1.5rem",
+            "space-xs": "0.25rem",
+            "space-sm": "0.5rem",
+            "space-xl": "2rem",
+            "space-md": "1rem"
+          },
+          "fontFamily": {
+            "table": ["Inter"],
+            "page-title": ["Inter"],
+            "section": ["Inter"],
+            "metric": ["JetBrains Mono"],
+            "meta": ["Inter"],
+            "table-mono": ["JetBrains Mono"],
+            "body": ["Inter"]
+          },
+          "fontSize": {
+            "table": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "page-title": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+            "section": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+            "metric": ["32px", {"lineHeight": "38px", "fontWeight": "500"}],
+            "meta": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+            "table-mono": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "body": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface font-body text-on-surface min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary-container">
+<!-- Top Brand Header -->
+<header class="flex items-center justify-between px-margin h-14 border-b border-border-subtle bg-surface-dark w-full">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary" data-icon="hub">hub</span>
+<span class="font-section text-section font-semibold text-on-surface">AIGate Console</span>
+</div>
+<span class="bg-surface-container-high text-on-surface-variant font-meta text-meta px-space-sm py-0.5 rounded border border-border-subtle">v2.4.1 • Production</span>
+</div>
+<div class="flex items-center gap-space-md">
+<span class="font-meta text-meta text-on-surface-variant">Onboarding Wizard</span>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 max-w-7xl w-full mx-auto p-space-xl flex flex-col gap-space-xl">
+<!-- Horizontal 5-Step Progress Indicator -->
+<nav class="flex items-center justify-between bg-surface-elevated border border-border-subtle p-space-md rounded-lg w-full">
+<!-- Step 1: Completed -->
+<div class="flex items-center gap-space-sm opacity-75">
+<div class="w-6 h-6 rounded-full bg-status-green/10 text-status-green flex items-center justify-center border border-status-green/30">
+<span class="material-symbols-outlined text-xs" data-icon="check">check</span>
+</div>
+<span class="font-body text-body font-medium">1. Set password</span>
+</div>
+<div class="h-[1px] flex-1 bg-border-subtle mx-space-md"></div>
+<!-- Step 2: Completed -->
+<div class="flex items-center gap-space-sm opacity-75">
+<div class="w-6 h-6 rounded-full bg-status-green/10 text-status-green flex items-center justify-center border border-status-green/30">
+<span class="material-symbols-outlined text-xs" data-icon="check">check</span>
+</div>
+<span class="font-body text-body font-medium">2. Connect a provider</span>
+</div>
+<div class="h-[1px] flex-1 bg-border-subtle mx-space-md"></div>
+<!-- Step 3: Completed -->
+<div class="flex items-center gap-space-sm opacity-75">
+<div class="w-6 h-6 rounded-full bg-status-green/10 text-status-green flex items-center justify-center border border-status-green/30">
+<span class="material-symbols-outlined text-xs" data-icon="check">check</span>
+</div>
+<span class="font-body text-body font-medium">3. Create an API key</span>
+</div>
+<div class="h-[1px] flex-1 bg-border-subtle mx-space-md"></div>
+<!-- Step 4: Completed -->
+<div class="flex items-center gap-space-sm opacity-75">
+<div class="w-6 h-6 rounded-full bg-status-green/10 text-status-green flex items-center justify-center border border-status-green/30">
+<span class="material-symbols-outlined text-xs" data-icon="check">check</span>
+</div>
+<span class="font-body text-body font-medium">4. Connect a tool</span>
+</div>
+<div class="h-[1px] flex-1 bg-border-subtle mx-space-md"></div>
+<!-- Step 5: Active (#6366f1 accent styling adapted via primary-container / primary tokens) -->
+<div class="flex items-center gap-space-sm">
+<div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-xs shadow-sm">
+          5
+        </div>
+<span class="font-body text-body font-semibold text-primary">Send a test request</span>
+</div>
+</nav>
+<!-- Main Card Area: Step 5 Focus -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-space-lg flex-1">
+<!-- Left side: Request configuration panel -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-lg flex flex-col justify-between">
+<div class="flex flex-col gap-space-md">
+<div class="flex items-center justify-between border-b border-border-subtle pb-space-md">
+<div>
+<h2 class="font-section text-section font-semibold">Request Configuration</h2>
+<p class="font-meta text-meta text-on-surface-variant">Configure test payload routed directly through local proxy</p>
+</div>
+<span class="font-table-mono text-xs bg-surface-container px-space-sm py-1 rounded text-primary border border-border-subtle">POST /v1/chat/completions</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<label class="font-meta text-meta text-on-surface-variant">Target Model Selector</label>
+<div class="flex items-center justify-between bg-surface-container border border-border-subtle px-space-md py-space-sm rounded">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="neurology">neurology</span>
+<span class="font-body text-body font-medium">claude-3-5-sonnet</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<div class="flex flex-col gap-space-sm flex-1">
+<label class="font-meta text-meta text-on-surface-variant">Payload JSON Editor</label>
+<div class="bg-surface-container-lowest border border-border-subtle rounded p-space-md font-table-mono text-table text-on-surface-variant h-48 overflow-y-auto">
+<pre class="text-primary-fixed-dim">{
+  <span class="text-primary">"model"</span>: <span class="text-tertiary">"claude-3-5-sonnet"</span>,
+  <span class="text-primary">"stream"</span>: <span class="text-status-green">true</span>,
+  <span class="text-primary">"messages"</span>: [
+    {
+      <span class="text-primary">"role"</span>: <span class="text-tertiary">"user"</span>,
+      <span class="text-primary">"content"</span>: <span class="text-tertiary">"Ping from AIGate local onboarding. Verify proxy pipeline connectivity."</span>
+    }
+  ],
+  <span class="text-primary">"max_tokens"</span>: <span class="text-status-amber">64</span>
+}</pre>
+</div>
+</div>
+</div>
+<div class="pt-space-md mt-space-md border-t border-border-subtle flex items-center justify-between">
+<div class="flex items-center gap-space-sm text-on-surface-variant font-meta text-meta">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span>Proxy daemon active on :8080</span>
+</div>
+<button class="bg-primary text-on-primary hover:opacity-90 font-medium px-space-lg py-2 rounded transition-opacity flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-sm" data-icon="play_arrow">play_arrow</span>
+<span>Run Live Request</span>
+</button>
+</div>
+</div>
+<!-- Right side: Live streaming terminal panel -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-lg flex flex-col justify-between font-table-mono">
+<div class="flex flex-col gap-space-md h-full">
+<div class="flex items-center justify-between border-b border-border-subtle pb-space-md font-sans">
+<div>
+<h2 class="font-section text-section font-semibold">Live Terminal Output</h2>
+<p class="font-meta text-meta text-on-surface-variant">Real-time token generation stream</p>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="w-2 h-2 rounded-full bg-status-green animate-pulse"></span>
+<span class="font-meta text-xs text-status-green">Connected</span>
+</div>
+</div>
+<!-- Terminal Stream Box -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded p-space-md text-xs text-on-surface-variant flex-1 overflow-y-auto flex flex-col gap-1">
+<div class="text-outline"># [09:41:12.042] Initiating outbound connection to upstream provider...</div>
+<div class="text-outline"># [09:41:12.108] Handshake established via TLS v1.3</div>
+<div class="text-primary">data: {"id":"chatcmpl-99A1","object":"chat.completion.chunk","created":1710927672,"model":"claude-3-5-sonnet","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}</div>
+<div class="text-primary">data: {"id":"chatcmpl-99A1","object":"chat.completion.chunk","created":1710927672,"model":"claude-3-5-sonnet","choices":[{"index":0,"delta":{"content":"Pong"},"finish_reason":null}]}</div>
+<div class="text-primary">data: {"id":"chatcmpl-99A1","object":"chat.completion.chunk","created":1710927672,"model":"claude-3-5-sonnet","choices":[{"index":0,"delta":{"content":" received"},"finish_reason":null}]}</div>
+<div class="text-primary">data: {"id":"chatcmpl-99A1","object":"chat.completion.chunk","created":1710927672,"model":"claude-3-5-sonnet","choices":[{"index":0,"delta":{"content":" successfully"},"finish_reason":null}]}</div>
+<div class="text-primary">data: {"id":"chatcmpl-99A1","object":"chat.completion.chunk","created":1710927672,"model":"claude-3-5-sonnet","choices":[{"index":0,"delta":{"content":"."},"finish_reason":null}]}</div>
+<div class="text-primary">data: {"id":"chatcmpl-99A1","object":"chat.completion.chunk","created":1710927672,"model":"claude-3-5-sonnet","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}</div>
+<div class="text-outline">data: [DONE]</div>
+</div>
+<!-- Green Success Panel -->
+<div class="bg-status-green/10 border border-status-green/30 rounded p-space-md flex items-center justify-between font-sans">
+<div class="flex items-center gap-space-md">
+<div class="w-8 h-8 rounded-full bg-status-green/20 text-status-green flex items-center justify-center">
+<span class="material-symbols-outlined text-sm" data-icon="check_circle">check_circle</span>
+</div>
+<div>
+<div class="font-section text-sm font-semibold text-status-green">Status: 200 OK</div>
+<div class="font-meta text-xs text-on-surface-variant">42 tokens • 312ms • Onboarding Complete</div>
+</div>
+</div>
+<button class="bg-status-green text-surface-dark font-medium px-space-md py-1.5 rounded text-xs hover:opacity-90 transition-opacity flex items-center gap-space-xs">
+<span>Open Console Dashboard</span>
+<span class="material-symbols-outlined text-xs" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer Callout -->
+<footer class="border-t border-border-subtle bg-surface-dark py-space-md px-margin text-center">
+<p class="font-meta text-meta text-on-surface-variant">
+      Onboarding completes only when a real request has successfully resolved through the local proxy, not when steps are skipped.
+    </p>
+</footer>
+</body></html>

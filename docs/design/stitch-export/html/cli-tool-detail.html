@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console — Claude Code CLI Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-error": "#690005",
+          "on-secondary": "#1d00a5",
+          "secondary": "#c3c0ff",
+          "tertiary-container": "#d97721",
+          "on-primary-fixed": "#07006c",
+          "secondary-fixed-dim": "#c3c0ff",
+          "surface-container-highest": "#34343d",
+          "surface-container-high": "#292932",
+          "status-green": "#22C55E",
+          "tertiary": "#ffb783",
+          "on-primary-fixed-variant": "#2f2ebe",
+          "on-primary-container": "#0d0096",
+          "on-secondary-fixed": "#0f0069",
+          "error-container": "#93000a",
+          "primary": "#c0c1ff",
+          "surface-container-low": "#1b1b23",
+          "status-amber": "#F59E0B",
+          "on-background": "#e4e1ed",
+          "status-red": "#EF4444",
+          "primary-fixed": "#e1e0ff",
+          "surface-variant": "#34343d",
+          "on-tertiary-fixed-variant": "#703700",
+          "surface-container-lowest": "#0d0d15",
+          "on-surface": "#e4e1ed",
+          "on-secondary-container": "#b3b1ff",
+          "primary-container": "#8083ff",
+          "inverse-on-surface": "#303038",
+          "surface-tint": "#c0c1ff",
+          "error": "#ffb4ab",
+          "surface-dark": "#090A0F",
+          "secondary-container": "#3626ce",
+          "on-tertiary-container": "#452000",
+          "on-error-container": "#ffdad6",
+          "background": "#13131b",
+          "on-tertiary-fixed": "#301400",
+          "border-subtle": "#27272A",
+          "on-surface-variant": "#c7c4d7",
+          "inverse-primary": "#494bd6",
+          "surface-bright": "#393841",
+          "tertiary-fixed": "#ffdcc5",
+          "on-secondary-fixed-variant": "#3323cc",
+          "surface": "#13131b",
+          "surface-elevated": "#12131A",
+          "on-primary": "#1000a9",
+          "tertiary-fixed-dim": "#ffb783",
+          "on-tertiary": "#4f2500",
+          "primary-fixed-dim": "#c0c1ff",
+          "outline": "#908fa0",
+          "status-grey": "#6B7280",
+          "surface-dim": "#13131b",
+          "secondary-fixed": "#e2dfff",
+          "outline-variant": "#464554",
+          "inverse-surface": "#e4e1ed",
+          "surface-container": "#1f1f27"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "gutter": "1rem",
+          "space-md": "1rem",
+          "space-lg": "1.5rem",
+          "margin": "1.5rem",
+          "space-xl": "2rem",
+          "space-xs": "0.25rem",
+          "space-sm": "0.5rem"
+        },
+        "fontFamily": {
+          "section": ["Inter"],
+          "body": ["Inter"],
+          "table-mono": ["JetBrains Mono"],
+          "meta": ["Inter"],
+          "metric": ["JetBrains Mono"],
+          "table": ["Inter"],
+          "page-title": ["Inter"]
+        },
+        "fontSize": {
+          "section": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+          "body": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+          "table-mono": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+          "meta": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+          "metric": ["32px", {"lineHeight": "38px", "fontWeight": "500"}],
+          "table": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+          "page-title": ["20px", {"lineHeight": "28px", "fontWeight": "600"}]
+        }
+      }
+    }
+  }
+</script>
+</head>
+<body class="bg-background text-on-background font-body antialiased min-h-screen flex flex-col">
+<!-- SideNavBar -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated border-r border-border-subtle flex flex-col justify-between p-space-sm select-none">
+<div class="flex flex-col space-y-space-md">
+<!-- Brand Header -->
+<div class="flex items-center space-x-space-sm px-space-xs py-space-sm">
+<div class="w-7 h-7 bg-primary rounded flex items-center justify-center text-on-primary font-bold text-section">AI</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</span>
+<span class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</span>
+</div>
+</div>
+<!-- Navigation Items -->
+<nav class="flex flex-col space-y-0.5">
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span class="font-body text-body">Overview</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-lg">alt_route</span>
+<span class="font-body text-body">Gateway</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-lg">hub</span>
+<span class="font-body text-body">Providers</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-lg">monitoring</span>
+<span class="font-body text-body">Traffic</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-lg">lan</span>
+<span class="font-body text-body">Network</span>
+</a>
+<!-- Active Integration Tab -->
+<a class="flex items-center space-x-space-sm px-space-sm py-2 bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-lg">extension</span>
+<span class="font-body text-body">Integrations</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-lg">settings</span>
+<span class="font-body text-body">Settings</span>
+</a>
+</nav>
+</div>
+<!-- Footer Nav -->
+<div class="flex flex-col space-y-1 border-t border-border-subtle pt-space-sm">
+<a class="flex items-center space-x-space-sm px-space-sm py-1.5 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-base">menu_book</span>
+<span class="font-meta text-meta">Docs</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-1.5 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-base">check_circle</span>
+<span class="font-meta text-meta">System Status</span>
+</a>
+</div>
+</aside>
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin pl-64">
+<div class="flex items-center space-x-space-md">
+<div class="flex items-center space-x-2 text-on-surface-variant font-meta text-meta">
+<span>integrations</span>
+<span class="material-symbols-outlined text-xs">chevron_right</span>
+<span>cli tools</span>
+<span class="material-symbols-outlined text-xs">chevron_right</span>
+<span class="text-on-surface font-medium">claude-code</span>
+</div>
+</div>
+<div class="flex items-center space-x-space-md">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2 text-on-surface-variant text-sm">search</span>
+<input class="bg-surface-container border border-border-subtle rounded text-meta text-on-surface pl-8 pr-3 py-1 focus:outline-none focus:border-primary w-60" placeholder="Search commands, configs..." type="text"/>
+</div>
+<div class="flex items-center space-x-space-sm text-on-surface-variant">
+<button aria-label="Notifications" class="p-1 hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">notifications</span>
+</button>
+<button aria-label="Toggle theme" class="p-1 hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">light_mode</span>
+</button>
+<button aria-label="Help" class="p-1 hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">help</span>
+</button>
+</div>
+<div class="h-4 w-px bg-border-subtle"></div>
+<span class="font-table-mono text-meta text-primary bg-surface-container px-2 py-0.5 rounded">v2.4.1-proxy</span>
+<div class="w-7 h-7 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface font-semibold text-meta border border-border-subtle cursor-pointer" title="Engineer Avatar Profile">
+      EA
+    </div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 pl-60 flex flex-col bg-background">
+<div class="max-w-[1100px] w-full mx-auto p-margin flex flex-col space-y-space-xl">
+<!-- Page Header -->
+<div class="flex flex-col space-y-space-xs">
+<div class="flex items-center space-x-space-sm">
+<h1 class="font-page-title text-page-title text-on-surface font-semibold">Claude Code CLI Integration</h1>
+<div class="flex items-center space-x-1.5 px-2 py-0.5 rounded bg-status-green/12 text-status-green font-meta uppercase text-[11px] font-semibold tracking-wider">
+<span class="w-2 h-2 rounded-full bg-status-green inline-block"></span>
+<span>INSTALLED</span>
+</div>
+</div>
+<p class="font-body text-body text-on-surface-variant max-w-3xl">
+        Manage local environment bindings, automatic proxy environment hooks, and upstream target overrides for Anthropic Claude Code.
+      </p>
+</div>
+<!-- Current-State & Path Panel -->
+<section class="bg-surface-elevated border border-border-subtle rounded-xl p-space-lg flex flex-col space-y-space-lg shadow-sm">
+<!-- Top info bar inside panel -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md pb-space-md border-b border-border-subtle">
+<div class="flex flex-col space-y-1">
+<span class="font-meta text-meta text-on-surface-variant uppercase tracking-wider">Target Configuration Path</span>
+<div class="flex items-center space-x-space-sm">
+<code class="font-table-mono text-table-mono bg-surface-container px-2 py-1 rounded text-primary border border-border-subtle">~/.claude/config.json</code>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded bg-surface-container border border-border-subtle transition-colors cursor-pointer text-xs flex items-center space-x-1" onclick="navigator.clipboard.writeText('~/.claude/config.json'); showCopied(this);">
+<span class="material-symbols-outlined text-sm">content_copy</span>
+<span>Copy</span>
+</button>
+</div>
+</div>
+<div class="flex items-center space-x-space-md">
+<div class="flex items-center space-x-2 bg-surface-container px-3 py-1.5 rounded border border-border-subtle">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span class="font-meta text-meta text-on-surface">Pointing at AIGate (127.0.0.1:8305)</span>
+</div>
+<button class="bg-primary hover:bg-primary-container text-on-primary px-4 py-2 rounded font-section text-section transition-all cursor-pointer flex items-center space-x-2 shadow-sm" id="auto-config-btn" onclick="triggerAutoConfigure()">
+<span class="material-symbols-outlined text-base">auto_fix_high</span>
+<span>Auto-configure</span>
+</button>
+</div>
+</div>
+<!-- Diff View Card -->
+<div class="flex flex-col space-y-space-sm">
+<div class="flex items-center justify-between">
+<span class="font-section text-section text-on-surface">Configuration Diff Preview</span>
+<span class="font-meta text-meta text-on-surface-variant">Comparing current local file vs. AIGate managed profile</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md border border-border-subtle rounded bg-surface-container-lowest overflow-hidden font-table-mono text-table-mono">
+<!-- Left: Before -->
+<div class="flex flex-col border-r border-border-subtle">
+<div class="bg-surface-container px-3 py-2 border-b border-border-subtle flex items-center justify-between text-meta text-on-surface-variant font-body">
+<span>Original (~/.claude/config.json)</span>
+<span class="text-status-red">-2 lines</span>
+</div>
+<pre class="p-3 text-on-surface-variant overflow-x-auto leading-relaxed"><code>{
+  "theme": "dark",
+  <span class="bg-status-red/20 text-status-red block">- "apiEndpoint": "https://api.anthropic.com",</span>
+  <span class="bg-status-red/20 text-status-red block">- "maxTokens": 4096,</span>
+  "telemetry": false
+}</code></pre>
+</div>
+<!-- Right: After -->
+<div class="flex flex-col">
+<div class="bg-surface-container px-3 py-2 border-b border-border-subtle flex items-center justify-between text-meta text-on-surface-variant font-body">
+<span>Managed by AIGate (Proposed)</span>
+<span class="text-status-green">+3 lines</span>
+</div>
+<pre class="p-3 text-on-surface overflow-x-auto leading-relaxed"><code>{
+  "theme": "dark",
+  <span class="bg-status-green/20 text-status-green block">+ "apiEndpoint": "http://127.0.0.1:8305/v1",</span>
+  <span class="bg-status-green/20 text-status-green block">+ "proxyHeaders": { "X-AIGate-Route": "default" },</span>
+  <span class="bg-status-green/20 text-status-green block">+ "upstreamTimeout": 600,</span>
+  "telemetry": false
+}</code></pre>
+</div>
+</div>
+</div>
+<!-- Apply Changes & Destructive Actions -->
+<div class="flex items-center justify-between pt-space-xs">
+<button class="border border-status-red/30 bg-status-red/10 hover:bg-status-red/20 text-status-red px-4 py-2 rounded font-section text-section transition-colors cursor-pointer flex items-center space-x-2" onclick="openDestructiveModal()">
+<span class="material-symbols-outlined text-base">restore</span>
+<span>Remove configuration</span>
+</button>
+<button class="bg-primary hover:bg-primary-container text-on-primary px-6 py-2 rounded font-section text-section transition-colors cursor-pointer flex items-center space-x-2 shadow-sm" onclick="applyChanges()">
+<span class="material-symbols-outlined text-base">check</span>
+<span>Apply Changes</span>
+</button>
+</div>
+</section>
+<!-- Manual Instructions Block (Collapsible Accordion) -->
+<section class="bg-surface-elevated border border-border-subtle rounded-xl overflow-hidden shadow-sm">
+<button class="w-full px-space-lg py-space-md flex items-center justify-between bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer" onclick="toggleAccordion()">
+<div class="flex items-center space-x-space-sm">
+<span class="material-symbols-outlined text-primary text-xl">terminal</span>
+<span class="font-section text-section text-on-surface">Manual Setup Instructions (Advanced)</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant transition-transform duration-200" id="accordion-icon">expand_more</span>
+</button>
+<div class="hidden p-space-lg flex flex-col space-y-space-md border-t border-border-subtle bg-surface-elevated" id="accordion-content">
+<p class="font-body text-body text-on-surface-variant">
+          If you prefer configuring environment variables or config files manually without AIGate touching your filesystem, execute the following commands in your shell:
+        </p>
+<div class="flex flex-col space-y-2">
+<span class="font-meta text-meta text-on-surface font-semibold">1. Set environmental proxy endpoint overrides</span>
+<div class="relative bg-surface-container-lowest border border-border-subtle rounded p-3 font-table-mono text-table-mono text-primary flex items-center justify-between">
+<span>export ANTHROPIC_BASE_URL="http://127.0.0.1:8305/v1"</span>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded bg-surface-container border border-border-subtle transition-colors cursor-pointer text-xs flex items-center space-x-1" onclick="navigator.clipboard.writeText('export ANTHROPIC_BASE_URL=&quot;http://127.0.0.1:8305/v1&quot;'); showCopied(this);">
+<span class="material-symbols-outlined text-sm">content_copy</span>
+<span>Copy</span>
+</button>
+</div>
+</div>
+<div class="flex flex-col space-y-2">
+<span class="font-meta text-meta text-on-surface font-semibold">2. Configure local config JSON manually</span>
+<div class="relative bg-surface-container-lowest border border-border-subtle rounded p-3 font-table-mono text-table-mono text-on-surface flex items-center justify-between">
+<span>mkdir -p ~/.claude &amp;&amp; echo '{"apiEndpoint":"http://127.0.0.1:8305/v1"}' &gt; ~/.claude/config.json</span>
+<button 127.0.0.1:8305="" apiendpoint\":\"http:="" onclick="navigator.clipboard.writeText('mkdir -p ~/.claude &amp;&amp; echo \'{\" v1\"}\'=""> ~/.claude/config.json'); showCopied(this);" class="text-on-surface-variant hover:text-on-surface p-1 rounded bg-surface-container border border-border-subtle transition-colors cursor-pointer text-xs flex items-center space-x-1"&gt;
+              <span class="material-symbols-outlined text-sm">content_copy</span>
+<span>Copy</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Destructive Action Modal -->
+<div class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4" id="confirm-modal">
+<div class="bg-surface-elevated border border-border-subtle rounded-xl max-w-md w-full p-space-lg flex flex-col space-y-space-md shadow-2xl">
+<div class="flex items-center space-x-space-sm text-status-red">
+<span class="material-symbols-outlined text-2xl">warning</span>
+<h3 class="font-section text-section text-on-surface font-semibold">Remove Configuration Confirmation</h3>
+</div>
+<p class="font-body text-body text-on-surface-variant">
+      This action will revert <code class="font-table-mono text-table-mono text-primary bg-surface-container px-1 rounded">~/.claude/config.json</code> back to its backup state and disconnect Claude Code from AIGate.
+    </p>
+<div class="flex flex-col space-y-1">
+<label class="font-meta text-meta text-on-surface-variant">Type <strong class="text-on-surface">~/.claude/config.json</strong> to confirm:</label>
+<input class="bg-surface-container border border-border-subtle rounded px-3 py-2 font-table-mono text-table-mono text-on-surface focus:outline-none focus:border-primary" id="confirm-input" oninput="validateConfirmInput(this)" placeholder="~/.claude/config.json" type="text"/>
+</div>
+<div class="flex items-center justify-end space-x-space-sm pt-space-sm">
+<button class="px-4 py-2 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-section text-section transition-colors cursor-pointer" onclick="closeDestructiveModal()">
+        Cancel
+      </button>
+<button class="px-4 py-2 rounded bg-status-red text-white font-section text-section transition-opacity cursor-pointer opacity-50 cursor-not-allowed" disabled="" id="modal-delete-btn" onclick="executeDestructiveAction()">
+        Remove Configuration
+      </button>
+</div>
+</div>
+</div>
+<!-- Toast Notification -->
+<div class="fixed bottom-6 right-6 z-50 bg-surface-elevated border border-border-subtle text-on-surface px-4 py-3 rounded-xl shadow-lg flex items-center space-x-space-sm transform translate-y-20 opacity-0 transition-all duration-300" id="toast">
+<span class="material-symbols-outlined text-status-green" id="toast-icon">check_circle</span>
+<span class="font-body text-body" id="toast-message">Configuration applied successfully</span>
+</div>
+<script>
+  function toggleAccordion() {
+    const content = document.getElementById('accordion-content');
+    const icon = document.getElementById('accordion-icon');
+    content.classList.toggle('hidden');
+    icon.style.transform = content.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+  }
+
+  function showCopied(btn) {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="material-symbols-outlined text-sm text-status-green">done</span><span>Copied</span>';
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+    }, 2000);
+  }
+
+  function triggerAutoConfigure() {
+    const btn = document.getElementById('auto-config-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">progress_activity</span><span>Configuring...</span>';
+    setTimeout(() => {
+      btn.innerHTML = '<span class="material-symbols-outlined text-base">check</span><span>Configured</span>';
+      showToast('Claude Code automatically bound to AIGate proxy', 'success');
+    }, 1200);
+  }
+
+  function applyChanges() {
+    showToast('Configuration diff applied successfully to ~/.claude/config.json', 'success');
+  }
+
+  function openDestructiveModal() {
+    document.getElementById('confirm-modal').classList.remove('hidden');
+    document.getElementById('confirm-input').value = '';
+    document.getElementById('modal-delete-btn').disabled = true;
+    document.getElementById('modal-delete-btn').classList.add('opacity-50', 'cursor-not-allowed');
+  }
+
+  function closeDestructiveModal() {
+    document.getElementById('confirm-modal').classList.add('hidden');
+  }
+
+  function validateConfirmInput(input) {
+    const deleteBtn = document.getElementById('modal-delete-btn');
+    if (input.value === '~/.claude/config.json') {
+      deleteBtn.disabled = false;
+      deleteBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else {
+      deleteBtn.disabled = true;
+      deleteBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+  }
+
+  function executeDestructiveAction() {
+    closeDestructiveModal();
+    showToast('Configuration removed and restored from backup', 'success');
+  }
+
+  function showToast(message, type) {
+    const toast = document.getElementById('toast');
+    const msgEl = document.getElementById('toast-message');
+    const iconEl = document.getElementById('toast-icon');
+    
+    msgEl.textContent = message;
+    if(type === 'success') {
+      iconEl.textContent = 'check_circle';
+      iconEl.className = 'material-symbols-outlined text-status-green';
+    } else {
+      iconEl.textContent = 'error';
+      iconEl.className = 'material-symbols-outlined text-status-red';
+    }
+
+    toast.classList.remove('translate-y-20', 'opacity-0');
+    setTimeout(() => {
+      toast.classList.add('translate-y-20', 'opacity-0');
+    }, 3000);
+  }
+</script>
+</body></html>

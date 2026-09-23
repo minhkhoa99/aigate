@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console - CLI Tools</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-surface": "#e4e1ed",
+            "on-background": "#e4e1ed",
+            "tertiary-container": "#d97721",
+            "status-amber": "#F59E0B",
+            "surface-dark": "#090A0F",
+            "on-tertiary-fixed-variant": "#703700",
+            "on-error-container": "#ffdad6",
+            "secondary-container": "#3626ce",
+            "surface-container-low": "#1b1b23",
+            "status-green": "#22C55E",
+            "error-container": "#93000a",
+            "outline-variant": "#464554",
+            "surface-container-high": "#292932",
+            "on-error": "#690005",
+            "on-secondary-fixed-variant": "#3323cc",
+            "on-secondary": "#1d00a5",
+            "primary-fixed": "#e1e0ff",
+            "on-primary": "#1000a9",
+            "surface": "#13131b",
+            "on-secondary-container": "#b3b1ff",
+            "tertiary": "#ffb783",
+            "surface-bright": "#393841",
+            "status-grey": "#6B7280",
+            "primary-container": "#8083ff",
+            "on-tertiary-container": "#452000",
+            "inverse-surface": "#e4e1ed",
+            "inverse-primary": "#494bd6",
+            "outline": "#908fa0",
+            "on-primary-container": "#0d0096",
+            "primary-fixed-dim": "#c0c1ff",
+            "status-red": "#EF4444",
+            "secondary": "#c3c0ff",
+            "on-surface-variant": "#c7c4d7",
+            "surface-container-highest": "#34343d",
+            "on-tertiary-fixed": "#301400",
+            "secondary-fixed": "#e2dfff",
+            "surface-container-lowest": "#0d0d15",
+            "error": "#ffb4ab",
+            "surface-variant": "#34343d",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "border-subtle": "#27272A",
+            "primary": "#c0c1ff",
+            "surface-elevated": "#12131A",
+            "tertiary-fixed-dim": "#ffb783",
+            "on-secondary-fixed": "#0f0069",
+            "inverse-on-surface": "#303038",
+            "surface-tint": "#c0c1ff",
+            "on-tertiary": "#4f2500",
+            "on-primary-fixed": "#07006c",
+            "background": "#13131b",
+            "surface-container": "#1f1f27",
+            "secondary-fixed-dim": "#c3c0ff",
+            "surface-dim": "#13131b",
+            "tertiary-fixed": "#ffdcc5"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-sm": "0.5rem",
+            "space-lg": "1.5rem",
+            "space-xl": "2rem",
+            "space-xs": "0.25rem",
+            "margin": "1.5rem",
+            "space-md": "1rem",
+            "gutter": "1rem"
+          },
+          "fontFamily": {
+            "table": ["Inter"],
+            "body": ["Inter"],
+            "page-title": ["Inter"],
+            "metric": ["JetBrains Mono"],
+            "meta": ["Inter"],
+            "section": ["Inter"],
+            "table-mono": ["JetBrains Mono"]
+          },
+          "fontSize": {
+            "table": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "body": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "page-title": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+            "metric": ["32px", {"lineHeight": "38px", "fontWeight": "500"}],
+            "meta": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+            "section": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+            "table-mono": ["13px", {"lineHeight": "20px", "fontWeight": "400"}]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-surface text-on-surface font-body antialiased min-h-screen flex selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<aside class="hidden md:flex fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated border-r border-border-subtle flex-col justify-between p-space-sm">
+<div class="flex flex-col gap-space-md">
+<!-- Header -->
+<div class="flex items-center gap-space-sm px-space-xs py-space-sm">
+<div class="w-7 h-7 bg-surface-container-high rounded flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-sm">hub</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</span>
+<span class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</span>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-space-md px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span class="font-body text-body">Overview</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">alt_route</span>
+<span class="font-body text-body">Gateway</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">hub</span>
+<span class="font-body text-body">Providers</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">monitoring</span>
+<span class="font-body text-body">Traffic</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">lan</span>
+<span class="font-body text-body">Network</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">extension</span>
+<span class="font-body text-body">Integrations</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">settings</span>
+<span class="font-body text-body">Settings</span>
+</a>
+</nav>
+</div>
+<!-- Footer -->
+<div class="flex flex-col gap-1 pt-space-md border-t border-border-subtle">
+<a class="flex items-center gap-space-md px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-base">menu_book</span>
+<span class="font-meta text-meta">Docs</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-base text-status-green">check_circle</span>
+<span class="font-meta text-meta">System Status</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col md:pl-60 min-w-0">
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-sm font-meta text-meta text-on-surface-variant">
+<span class="hover:text-on-surface cursor-pointer">integrations</span>
+<span>/</span>
+<span class="text-on-surface font-medium">cli tools</span>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-outline">search</span>
+<input class="bg-surface-container border border-border-subtle text-on-surface text-meta rounded pl-8 pr-3 py-1 focus:outline-none focus:border-primary w-48 transition-all" placeholder="Quick search tools..." type="text"/>
+</div>
+<div class="flex items-center gap-space-xs text-on-surface-variant">
+<button class="p-1.5 hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-base">notifications</span>
+</button>
+<button class="p-1.5 hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-base">light_mode</span>
+</button>
+<button class="p-1.5 hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-base">help</span>
+</button>
+</div>
+<div class="h-4 w-[1px] bg-border-subtle"></div>
+<span class="font-meta text-meta text-primary bg-surface-container px-2 py-0.5 rounded border border-border-subtle">v2.4.1-proxy</span>
+</div>
+</header>
+<!-- Canvas Area -->
+<main class="flex-1 p-margin md:p-space-xl max-w-7xl w-full mx-auto flex flex-col gap-space-lg">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md pb-space-md border-b border-border-subtle">
+<div class="flex flex-col gap-space-xs">
+<h1 class="font-page-title text-page-title text-on-surface">CLI Tools &amp; Ecosystem</h1>
+<p class="font-body text-body text-on-surface-variant">Manage local CLI agent integrations, proxy environment variables, and active client pointings.</p>
+</div>
+<div>
+<button class="flex items-center gap-space-sm bg-primary text-on-primary-container px-space-md py-2 rounded font-body text-body font-medium hover:opacity-90 transition-opacity cursor-pointer shadow-sm">
+<span class="material-symbols-outlined text-base">terminal</span>
+<span>Global CLI Setup</span>
+</button>
+</div>
+</div>
+<!-- Grid of 13 Tool Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-space-md">
+<!-- 1. Claude Code -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">smart_toy</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">Claude Code</span>
+<span class="font-meta text-meta text-on-surface-variant">Anthropic CLI Agent</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">Proxy (Port 8040)</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">api.anthropic.com</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 2. Codex -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">code</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">Codex</span>
+<span class="font-meta text-meta text-on-surface-variant">OpenAI CLI Utility</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">Proxy (Port 8040)</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">api.openai.com</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 3. Cursor -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">pixel_4_4xl_4a_5_5a_5g</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">Cursor</span>
+<span class="font-meta text-meta text-on-surface-variant">AI-First IDE Client</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">Direct Override</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">localhost:8040</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 4. Gemini CLI -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">auto_awesome</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">Gemini CLI</span>
+<span class="font-meta text-meta text-on-surface-variant">Google AI Assistant</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">Proxy (Port 8040)</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">generativelanguage.googleapis</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 5. Aider -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">terminal</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">Aider</span>
+<span class="font-meta text-meta text-on-surface-variant">AI Pair Programming</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">ENV Hook (.env)</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">localhost:8040</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 6. Cline -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">extension</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">Cline</span>
+<span class="font-meta text-meta text-on-surface-variant">Autonomous Coding Agent</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">Custom Base URL</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">localhost:8040/v1</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 7. Continue -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">play_arrow</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">Continue</span>
+<span class="font-meta text-meta text-on-surface-variant">Open Source AI Assistant</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">config.json</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">localhost:8040</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 8. Zed -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">bolt</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">Zed</span>
+<span class="font-meta text-meta text-on-surface-variant">High-Performance Editor</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">settings.json</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">localhost:8040</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 9. Windsurf -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">waves</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">Windsurf</span>
+<span class="font-meta text-meta text-on-surface-variant">Agentic IDE</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">Proxy (Port 8040)</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">localhost:8040</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 10. OpenCode -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">terminal</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">OpenCode</span>
+<span class="font-meta text-meta text-on-surface-variant">CLI Interpreter</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">ENV Hook (.env)</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">localhost:8040</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 11. Roo -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">pets</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">Roo</span>
+<span class="font-meta text-meta text-on-surface-variant">Developer Assistant</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">Proxy (Port 8040)</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">localhost:8040</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 12. Kilo -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md hover:border-outline-variant transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">speed</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface font-semibold">Kilo</span>
+<span class="font-meta text-meta text-on-surface-variant">Lightweight Runner</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-green/10 text-status-green px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+              Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Routing Mode:</span>
+<span class="text-primary font-table-mono">Proxy (Port 8040)</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-on-surface-variant">Upstream Target:</span>
+<span class="text-on-surface font-table-mono">localhost:8040</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-green flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+              Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Configure</button>
+</div>
+</div>
+<!-- 13. Goose (Not installed / grey state) -->
+<div class="bg-surface-elevated/50 border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-space-md opacity-75 hover:opacity-100 transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded bg-surface-container border border-border-subtle flex items-center justify-center text-status-grey">
+<span class="material-symbols-outlined text-xl">flight</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface-variant font-semibold">Goose</span>
+<span class="font-meta text-meta text-status-grey">Autonomous Agent</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-status-grey/10 text-status-grey px-2 py-0.5 rounded font-meta text-[11px] uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-status-grey"></span>
+              Not Installed
+            </div>
+</div>
+<div class="flex flex-col gap-2 py-2 border-y border-border-subtle">
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-status-grey">Routing Mode:</span>
+<span class="text-status-grey font-table-mono">Unconfigured</span>
+</div>
+<div class="flex items-center justify-between font-meta text-meta">
+<span class="text-status-grey">Upstream Target:</span>
+<span class="text-status-grey font-table-mono">None</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-status-grey flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">cancel</span>
+              Not Pointing at AIGate
+            </span>
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded font-meta text-meta border border-border-subtle transition-colors cursor-pointer">Install</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

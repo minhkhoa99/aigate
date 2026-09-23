@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console - API Requests</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "outline-variant": "#464554",
+            "error": "#ffb4ab",
+            "on-primary": "#1000a9",
+            "surface-dark": "#090A0F",
+            "border-subtle": "#27272A",
+            "surface-container": "#1f1f27",
+            "surface-elevated": "#12131A",
+            "primary": "#c0c1ff",
+            "on-primary-container": "#0d0096",
+            "on-secondary-fixed": "#0f0069",
+            "primary-fixed": "#e1e0ff",
+            "secondary-fixed": "#e2dfff",
+            "tertiary": "#ffb783",
+            "status-grey": "#6B7280",
+            "tertiary-container": "#d97721",
+            "status-amber": "#F59E0B",
+            "surface-dim": "#13131b",
+            "surface-bright": "#393841",
+            "on-tertiary": "#4f2500",
+            "status-green": "#22C55E",
+            "on-secondary-fixed-variant": "#3323cc",
+            "inverse-primary": "#494bd6",
+            "on-background": "#e4e1ed",
+            "surface-container-low": "#1b1b23",
+            "secondary-container": "#3626ce",
+            "on-error": "#690005",
+            "on-surface": "#e4e1ed",
+            "outline": "#908fa0",
+            "on-surface-variant": "#c7c4d7",
+            "on-secondary": "#1d00a5",
+            "tertiary-fixed-dim": "#ffb783",
+            "surface-variant": "#34343d",
+            "inverse-on-surface": "#303038",
+            "primary-container": "#8083ff",
+            "surface-container-lowest": "#0d0d15",
+            "inverse-surface": "#e4e1ed",
+            "background": "#13131b",
+            "on-secondary-container": "#b3b1ff",
+            "status-red": "#EF4444",
+            "surface-tint": "#c0c1ff",
+            "secondary-fixed-dim": "#c3c0ff",
+            "on-primary-fixed": "#07006c",
+            "on-tertiary-container": "#452000",
+            "on-tertiary-fixed-variant": "#703700",
+            "surface": "#13131b",
+            "error-container": "#93000a",
+            "tertiary-fixed": "#ffdcc5",
+            "on-tertiary-fixed": "#301400",
+            "surface-container-high": "#292932",
+            "on-error-container": "#ffdad6",
+            "secondary": "#c3c0ff",
+            "primary-fixed-dim": "#c0c1ff",
+            "surface-container-highest": "#34343d",
+            "on-primary-fixed-variant": "#2f2ebe"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-sm": "0.5rem",
+            "space-md": "1rem",
+            "space-xl": "2rem",
+            "gutter": "1rem",
+            "margin": "1.5rem",
+            "space-xs": "0.25rem",
+            "space-lg": "1.5rem"
+          },
+          "fontFamily": {
+            "table-mono": ["JetBrains Mono"],
+            "page-title": ["Inter"],
+            "section": ["Inter"],
+            "body": ["Inter"],
+            "table": ["Inter"],
+            "metric": ["JetBrains Mono"],
+            "meta": ["Inter"]
+          },
+          "fontSize": {
+            "table-mono": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "page-title": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "section": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "table": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "metric": ["32px", { "lineHeight": "38px", "fontWeight": "500" }],
+            "meta": ["12px", { "lineHeight": "16px", "fontWeight": "400" }]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface text-on-surface font-body antialiased min-h-screen flex">
+<!-- SideNavBar Component -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated border-r border-border-subtle flex flex-col justify-between p-space-sm">
+<div class="flex flex-col gap-space-md">
+<!-- Header / Logo -->
+<div class="flex items-center gap-space-sm px-space-xs py-space-xs">
+<div class="w-7 h-7 bg-primary-container rounded flex items-center justify-center text-on-primary-container font-bold text-body">AI</div>
+<div>
+<h1 class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</h1>
+<p class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-space-md px-space-sm py-2 font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none">
+<span class="material-symbols-outlined" style="font-size: 20px;">dashboard</span>
+<span>Overview</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none">
+<span class="material-symbols-outlined" style="font-size: 20px;">alt_route</span>
+<span>Gateway</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none">
+<span class="material-symbols-outlined" style="font-size: 20px;">hub</span>
+<span>Providers</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 font-body text-body text-primary dark:text-primary font-medium rounded-DEFAULT bg-surface-container-high transition-colors duration-150 cursor-pointer select-none">
+<span class="material-symbols-outlined" style="font-size: 20px; font-variation-settings: 'FILL' 1;">monitoring</span>
+<span>Traffic</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none">
+<span class="material-symbols-outlined" style="font-size: 20px;">lan</span>
+<span>Network</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none">
+<span class="material-symbols-outlined" style="font-size: 20px;">extension</span>
+<span>Integrations</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-2 font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none">
+<span class="material-symbols-outlined" style="font-size: 20px;">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Footer Links -->
+<div class="flex flex-col gap-1 border-t border-border-subtle pt-space-sm">
+<a class="flex items-center gap-space-md px-space-sm py-1.5 font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none">
+<span class="material-symbols-outlined" style="font-size: 18px;">menu_book</span>
+<span>Docs</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-1.5 font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none">
+<span class="material-symbols-outlined" style="font-size: 18px; color: #22C55E;">check_circle</span>
+<span>System Status</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col ml-60 min-w-0">
+<!-- TopNavBar Component -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin">
+<!-- Breadcrumb / Search on left -->
+<div class="flex items-center gap-2 font-meta text-meta text-on-surface dark:text-on-surface">
+<span class="text-on-surface-variant">gateway</span>
+<span class="text-on-surface-variant">/</span>
+<span class="text-on-surface-variant">traffic</span>
+<span class="text-on-surface-variant">/</span>
+<span class="text-on-surface font-medium">requests</span>
+</div>
+<!-- Actions on right -->
+<div class="flex items-center gap-space-md">
+<span class="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-meta font-table-mono">v2.4.1-proxy</span>
+<div class="flex items-center gap-1">
+<button class="p-1.5 hover:bg-surface-container rounded-DEFAULT text-on-surface-variant hover:text-on-surface transition-colors duration-150 cursor-pointer" title="Notifications">
+<span class="material-symbols-outlined" style="font-size: 18px;">notifications</span>
+</button>
+<button class="p-1.5 hover:bg-surface-container rounded-DEFAULT text-on-surface-variant hover:text-on-surface transition-colors duration-150 cursor-pointer" title="Theme">
+<span class="material-symbols-outlined" style="font-size: 18px;">light_mode</span>
+</button>
+<button class="p-1.5 hover:bg-surface-container rounded-DEFAULT text-on-surface-variant hover:text-on-surface transition-colors duration-150 cursor-pointer" title="Help">
+<span class="material-symbols-outlined" style="font-size: 18px;">help</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Page Body -->
+<main class="flex-1 p-margin flex flex-col gap-space-lg max-w-[1440px] w-full mx-auto">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div>
+<h2 class="font-page-title text-page-title text-on-surface font-semibold tracking-tight">API Requests</h2>
+<p class="font-body text-body text-on-surface-variant">Real-time granular stream of gateway proxy requests, latency breakdowns, and payload tokens.</p>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container hover:bg-surface-container-high border border-border-subtle rounded text-body font-medium transition-colors cursor-pointer">
+<span class="material-symbols-outlined" style="font-size: 16px;">download</span>
+<span>Export CSV</span>
+</button>
+<button class="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-on-primary hover:opacity-90 rounded text-body font-medium transition-colors cursor-pointer">
+<span class="material-symbols-outlined" style="font-size: 16px;">refresh</span>
+<span>Live Feed</span>
+</button>
+</div>
+</div>
+<!-- Filter Chips Bar -->
+<div class="flex flex-wrap items-center gap-space-sm bg-surface-elevated p-3 border border-border-subtle rounded-lg">
+<div class="relative flex-1 min-w-[240px]">
+<span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined" style="font-size: 18px;">search</span>
+</span>
+<input class="w-full bg-surface-container border border-border-subtle rounded pl-9 pr-3 py-1.5 text-body text-on-surface focus:outline-none focus:border-primary" placeholder="Search request ID, prompt hash, or upstream IP..." type="text"/>
+</div>
+<div class="flex flex-wrap items-center gap-2">
+<button class="flex items-center gap-1 px-2.5 py-1.5 bg-surface-container hover:bg-surface-container-high border border-border-subtle rounded text-meta text-on-surface-variant transition-colors cursor-pointer">
+<span>Errors Only</span>
+<span class="w-2 h-2 rounded-full bg-status-red ml-1"></span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-container hover:bg-surface-container-high border border-border-subtle rounded text-meta text-on-surface-variant transition-colors cursor-pointer">
+<span>Provider: All</span>
+<span class="material-symbols-outlined" style="font-size: 14px;">expand_more</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-container hover:bg-surface-container-high border border-border-subtle rounded text-meta text-on-surface-variant transition-colors cursor-pointer">
+<span>Model: All</span>
+<span class="material-symbols-outlined" style="font-size: 14px;">expand_more</span>
+</button>
+<button class="flex items-center gap-1 px-2.5 py-1.5 bg-surface-container hover:bg-surface-container-high border border-border-subtle rounded text-meta text-on-surface-variant transition-colors cursor-pointer">
+<span>Had Fallback</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-container hover:bg-surface-container-high border border-border-subtle rounded text-meta text-on-surface-variant transition-colors cursor-pointer">
+<span>Status: Any</span>
+<span class="material-symbols-outlined" style="font-size: 14px;">expand_more</span>
+</button>
+</div>
+</div>
+<!-- Dense Table Container -->
+<div class="border border-border-subtle rounded-lg bg-surface-elevated overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-border-subtle bg-surface-container-low font-meta text-on-surface-variant text-[12px] uppercase tracking-wider">
+<th class="py-2.5 px-3 font-medium">Timestamp</th>
+<th class="py-2.5 px-3 font-medium">Model ID</th>
+<th class="py-2.5 px-3 font-medium">Provider</th>
+<th class="py-2.5 px-3 font-medium">Account Label</th>
+<th class="py-2.5 px-3 font-medium">Status</th>
+<th class="py-2.5 px-3 font-medium text-right">TTFT</th>
+<th class="py-2.5 px-3 font-medium text-right">Latency</th>
+<th class="py-2.5 px-3 font-medium text-right">Tokens (In / Out)</th>
+<th class="py-2.5 px-3 font-medium text-right">Cost</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle font-table text-table">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-3 font-table-mono text-on-surface-variant whitespace-nowrap">14:22:01.042</td>
+<td class="py-2 px-3 font-table-mono text-primary font-medium">claude-3-5-sonnet</td>
+<td class="py-2 px-3 text-on-surface">Anthropic</td>
+<td class="py-2 px-3 text-on-surface-variant truncate max-w-[120px]">prod-us-east-1</td>
+<td class="py-2 px-3 whitespace-nowrap">
+<span class="inline-flex items-center justify-center px-2 h-[20px] rounded text-[11px] font-semibold uppercase bg-status-green/12 text-status-green">200 OK</span>
+</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">240ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">1,210ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface-variant">1,240 / 450</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">$0.0213</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-3 font-table-mono text-on-surface-variant whitespace-nowrap">14:21:58.810</td>
+<td class="py-2 px-3 font-table-mono text-primary font-medium">gpt-4o</td>
+<td class="py-2 px-3 text-on-surface">OpenAI</td>
+<td class="py-2 px-3 text-on-surface-variant truncate max-w-[120px]">fallback-pool-2</td>
+<td class="py-2 px-3 whitespace-nowrap">
+<span class="inline-flex items-center justify-center px-2 h-[20px] rounded text-[11px] font-semibold uppercase bg-status-green/12 text-status-green">200 OK</span>
+</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">180ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">890ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface-variant">820 / 128</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">$0.0074</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-3 font-table-mono text-on-surface-variant whitespace-nowrap">14:21:55.331</td>
+<td class="py-2 px-3 font-table-mono text-primary font-medium">llama-3.1-70b</td>
+<td class="py-2 px-3 text-on-surface">Groq</td>
+<td class="py-2 px-3 text-on-surface-variant truncate max-w-[120px]">dev-sandbox</td>
+<td class="py-2 px-3 whitespace-nowrap">
+<span class="inline-flex items-center justify-center px-2 h-[20px] rounded text-[11px] font-semibold uppercase bg-status-red/12 text-status-red">429 Rate</span>
+</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">—</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">45ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface-variant">340 / 0</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">$0.0000</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-3 font-table-mono text-on-surface-variant whitespace-nowrap">14:21:52.190</td>
+<td class="py-2 px-3 font-table-mono text-primary font-medium">claude-3-5-sonnet</td>
+<td class="py-2 px-3 text-on-surface">Anthropic</td>
+<td class="py-2 px-3 text-on-surface-variant truncate max-w-[120px]">prod-us-east-1</td>
+<td class="py-2 px-3 whitespace-nowrap">
+<span class="inline-flex items-center justify-center px-2 h-[20px] rounded text-[11px] font-semibold uppercase bg-status-green/12 text-status-green">200 OK</span>
+</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">310ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">1,450ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface-variant">2,100 / 612</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">$0.0345</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-3 font-table-mono text-on-surface-variant whitespace-nowrap">14:21:48.012</td>
+<td class="py-2 px-3 font-table-mono text-primary font-medium">gemini-1.5-pro</td>
+<td class="py-2 px-3 text-on-surface">Vertex AI</td>
+<td class="py-2 px-3 text-on-surface-variant truncate max-w-[120px]">vertex-eu-west</td>
+<td class="py-2 px-3 whitespace-nowrap">
+<span class="inline-flex items-center justify-center px-2 h-[20px] rounded text-[11px] font-semibold uppercase bg-status-amber/12 text-status-amber">502 Bad</span>
+</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">—</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">3,020ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface-variant">450 / 0</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">$0.0000</td>
+</tr>
+<!-- Row 6 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-3 font-table-mono text-on-surface-variant whitespace-nowrap">14:21:44.955</td>
+<td class="py-2 px-3 font-table-mono text-primary font-medium">gpt-4o-mini</td>
+<td class="py-2 px-3 text-on-surface">OpenAI</td>
+<td class="py-2 px-3 text-on-surface-variant truncate max-w-[120px]">prod-us-west</td>
+<td class="py-2 px-3 whitespace-nowrap">
+<span class="inline-flex items-center justify-center px-2 h-[20px] rounded text-[11px] font-semibold uppercase bg-status-green/12 text-status-green">200 OK</span>
+</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">110ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">430ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface-variant">150 / 85</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">$0.0008</td>
+</tr>
+<!-- Row 7 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-3 font-table-mono text-on-surface-variant whitespace-nowrap">14:21:40.420</td>
+<td class="py-2 px-3 font-table-mono text-primary font-medium">claude-3-haiku</td>
+<td class="py-2 px-3 text-on-surface">Anthropic</td>
+<td class="py-2 px-3 text-on-surface-variant truncate max-w-[120px]">prod-us-east-1</td>
+<td class="py-2 px-3 whitespace-nowrap">
+<span class="inline-flex items-center justify-center px-2 h-[20px] rounded text-[11px] font-semibold uppercase bg-status-green/12 text-status-green">200 OK</span>
+</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">95ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">310ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface-variant">920 / 310</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">$0.0019</td>
+</tr>
+<!-- Row 8 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-3 font-table-mono text-on-surface-variant whitespace-nowrap">14:21:37.112</td>
+<td class="py-2 px-3 font-table-mono text-primary font-medium">gpt-4o</td>
+<td class="py-2 px-3 text-on-surface">OpenAI</td>
+<td class="py-2 px-3 text-on-surface-variant truncate max-w-[120px]">primary-account</td>
+<td class="py-2 px-3 whitespace-nowrap">
+<span class="inline-flex items-center justify-center px-2 h-[20px] rounded text-[11px] font-semibold uppercase bg-status-red/12 text-status-red">504 Time</span>
+</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">—</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">15,000ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface-variant">4,200 / 0</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">$0.0000</td>
+</tr>
+<!-- Row 9 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-3 font-table-mono text-on-surface-variant whitespace-nowrap">14:21:32.880</td>
+<td class="py-2 px-3 font-table-mono text-primary font-medium">deepseek-chat</td>
+<td class="py-2 px-3 text-on-surface">DeepSeek</td>
+<td class="py-2 px-3 text-on-surface-variant truncate max-w-[120px]">ds-secondary</td>
+<td class="py-2 px-3 whitespace-nowrap">
+<span class="inline-flex items-center justify-center px-2 h-[20px] rounded text-[11px] font-semibold uppercase bg-status-green/12 text-status-green">200 OK</span>
+</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">190ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">750ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface-variant">1,150 / 410</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">$0.0024</td>
+</tr>
+<!-- Row 10 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-3 font-table-mono text-on-surface-variant whitespace-nowrap">14:21:29.504</td>
+<td class="py-2 px-3 font-table-mono text-primary font-medium">claude-3-5-sonnet</td>
+<td class="py-2 px-3 text-on-surface">Anthropic</td>
+<td class="py-2 px-3 text-on-surface-variant truncate max-w-[120px]">prod-us-east-1</td>
+<td class="py-2 px-3 whitespace-nowrap">
+<span class="inline-flex items-center justify-center px-2 h-[20px] rounded text-[11px] font-semibold uppercase bg-status-green/12 text-status-green">200 OK</span>
+</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">220ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">1,120ms</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface-variant">980 / 340</td>
+<td class="py-2 px-3 font-table-mono text-right text-on-surface">$0.0162</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Cursor Pagination -->
+<div class="flex items-center justify-center gap-space-md pb-space-xl">
+<button class="flex items-center gap-1.5 px-4 py-2 bg-surface-container text-on-surface-variant opacity-50 cursor-not-allowed rounded text-body font-medium border border-border-subtle" disabled="">
+<span class="material-symbols-outlined" style="font-size: 16px;">arrow_upward</span>
+<span>Load Newer</span>
+</button>
+<button class="flex items-center gap-1.5 px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded text-body font-medium border border-border-subtle transition-colors cursor-pointer">
+<span>Load Older</span>
+<span class="material-symbols-outlined" style="font-size: 16px;">arrow_downward</span>
+</button>
+</div>
+</main>
+</div>
+</body></html>

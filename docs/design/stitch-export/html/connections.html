@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console - Connections</title>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+              "on-tertiary": "#4f2500",
+              "tertiary": "#ffb783",
+              "outline-variant": "#464554",
+              "surface-elevated": "#12131A",
+              "on-surface": "#e4e1ed",
+              "secondary-fixed-dim": "#c3c0ff",
+              "on-tertiary-fixed": "#301400",
+              "on-error-container": "#ffdad6",
+              "primary": "#c0c1ff",
+              "secondary-container": "#3626ce",
+              "surface-container-highest": "#34343d",
+              "surface": "#13131b",
+              "inverse-primary": "#494bd6",
+              "primary-fixed": "#e1e0ff",
+              "surface-tint": "#c0c1ff",
+              "tertiary-container": "#d97721",
+              "on-surface-variant": "#c7c4d7",
+              "surface-dark": "#090A0F",
+              "on-secondary-fixed-variant": "#3323cc",
+              "primary-fixed-dim": "#c0c1ff",
+              "surface-container-low": "#1b1b23",
+              "status-red": "#EF4444",
+              "on-error": "#690005",
+              "on-tertiary-container": "#452000",
+              "outline": "#908fa0",
+              "on-primary-fixed-variant": "#2f2ebe",
+              "surface-container-high": "#292932",
+              "status-grey": "#6B7280",
+              "on-tertiary-fixed-variant": "#703700",
+              "on-primary": "#1000a9",
+              "error-container": "#93000a",
+              "on-primary-container": "#0d0096",
+              "surface-dim": "#13131b",
+              "background": "#13131b",
+              "surface-variant": "#34343d",
+              "surface-container-lowest": "#0d0d15",
+              "primary-container": "#8083ff",
+              "on-secondary": "#1d00a5",
+              "tertiary-fixed": "#ffdcc5",
+              "on-secondary-container": "#b3b1ff",
+              "inverse-on-surface": "#303038",
+              "surface-bright": "#393841",
+              "surface-container": "#1f1f27",
+              "secondary-fixed": "#e2dfff",
+              "on-background": "#e4e1ed",
+              "status-green": "#22C55E",
+              "on-secondary-fixed": "#0f0069",
+              "tertiary-fixed-dim": "#ffb783",
+              "status-amber": "#F59E0B",
+              "secondary": "#c3c0ff",
+              "error": "#ffb4ab",
+              "on-primary-fixed": "#07006c",
+              "border-subtle": "#27272A",
+              "inverse-surface": "#e4e1ed"
+            },
+            "borderRadius": {
+              "DEFAULT": "0.125rem",
+              "lg": "0.25rem",
+              "xl": "0.5rem",
+              "full": "0.75rem"
+            },
+            "spacing": {
+              "space-xl": "2rem",
+              "space-md": "1rem",
+              "space-xs": "0.25rem",
+              "space-sm": "0.5rem",
+              "space-lg": "1.5rem",
+              "margin": "1.5rem",
+              "gutter": "1rem"
+            },
+            "fontFamily": {
+              "meta": ["Inter"],
+              "table-mono": ["JetBrains Mono"],
+              "section": ["Inter"],
+              "body": ["Inter"],
+              "page-title": ["Inter"],
+              "table": ["Inter"],
+              "metric": ["JetBrains Mono"]
+            },
+            "fontSize": {
+              "meta": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+              "table-mono": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+              "section": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+              "body": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+              "page-title": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+              "table": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+              "metric": ["32px", {"lineHeight": "38px", "fontWeight": "500"}]
+            }
+          }
+        }
+      }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body min-h-screen flex flex-col antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar (Expanded Desktop Variant) -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated border-r border-border-subtle flex flex-col justify-between p-space-sm">
+<div class="flex flex-col gap-space-md">
+<!-- Header -->
+<div class="flex items-center gap-space-sm px-space-xs py-space-sm">
+<div class="w-7 h-7 bg-primary-container rounded flex items-center justify-center text-on-primary-container font-bold text-sm">AI</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</span>
+<span class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</span>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="flex flex-col gap-space-xs">
+<!-- Overview -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-xl">dashboard</span>
+<span>Overview</span>
+</a>
+<!-- Gateway -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-xl">alt_route</span>
+<span>Gateway</span>
+</a>
+<!-- Providers (Active Section, Connections sub-context) -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm font-body text-body bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">hub</span>
+<span>Providers</span>
+</a>
+<!-- Traffic -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-xl">monitoring</span>
+<span>Traffic</span>
+</a>
+<!-- Network -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-xl">lan</span>
+<span>Network</span>
+</a>
+<!-- Integrations -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-xl">extension</span>
+<span>Integrations</span>
+</a>
+<!-- Settings -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm font-body text-body text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-xl">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Footer Links -->
+<div class="flex flex-col gap-space-xs pt-space-md border-t border-border-subtle">
+<a class="flex items-center gap-space-md px-space-md py-space-sm font-body text-body text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-xl">menu_book</span>
+<span>Docs</span>
+</a>
+<a class="flex items-center gap-space-md px-space-md py-space-sm font-body text-body text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-xl">check_circle</span>
+<span>System Status</span>
+</a>
+</div>
+</aside>
+<!-- Main Wrapper Offset by Sidebar -->
+<div class="pl-60 flex flex-col flex-1">
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin">
+<div class="flex items-center gap-space-md">
+<span class="font-page-title text-page-title text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</span>
+<span class="text-outline">/</span>
+<div class="flex items-center gap-space-xs font-meta text-meta text-on-surface-variant">
+<span>gateway</span>
+<span>/</span>
+<span>providers</span>
+<span>/</span>
+<span class="text-on-surface font-medium">connections</span>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<!-- Search -->
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2.5 text-outline text-lg">search</span>
+<input class="bg-surface-container border border-border-subtle rounded-lg pl-8 pr-3 py-1 font-meta text-meta text-on-surface placeholder:text-outline w-64 focus:outline-none focus:border-primary transition-colors" placeholder="Search models, keys, pools... (⌘K)" type="text"/>
+</div>
+<div class="h-4 w-[1px] bg-border-subtle"></div>
+<!-- Action / Status Icons -->
+<div class="flex items-center gap-space-sm">
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors relative cursor-pointer" title="Notifications">
+<span class="material-symbols-outlined text-xl">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 bg-status-red rounded-full"></span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors cursor-pointer" title="Toggle Theme">
+<span class="material-symbols-outlined text-xl">light_mode</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors cursor-pointer" title="Help &amp; Docs">
+<span class="material-symbols-outlined text-xl">help</span>
+</button>
+</div>
+<div class="h-4 w-[1px] bg-border-subtle"></div>
+<!-- Secondary Version Pill & Profile -->
+<div class="flex items-center gap-space-sm">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-surface-container text-on-surface-variant rounded border border-border-subtle">v2.4.1-proxy</span>
+<div class="w-7 h-7 rounded-full bg-surface-container-high border border-border-subtle flex items-center justify-center overflow-hidden cursor-pointer">
+<img class="w-full h-full object-cover" data-alt="A professional headshot avatar of a male software engineer with short dark hair, wearing a dark grey hoodie, set against a neutral studio background with soft lighting, high detail corporate-tech aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCi7iv89c0aGiJJwptRc2UBosNPjBOJB9cS9z2tSnwvarh5zVvoOlqlEw_n_Nhy4UgVWF3qhme-llqqkSv6Me-JLYsIrB15KEAJAvB_3cBrjnxLNJdcRt-rdS46yPDLP1LVjCANqsDeGkcP4riXDcNeB1GJJBiE0jbdlICKy47pZ-4hjKxmKzW-hJrl13O96gmOffoCZkuL3zGr9jYY6tdei5ZsettmMu5LAyMyjJ2IE_UIcM8feOwtMvnj2v5GkRrQKgzjvBv89Sg"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 p-space-xl flex flex-col gap-space-lg max-w-[1400px] w-full mx-auto">
+<!-- Page Header Row -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md">
+<h1 class="font-page-title text-page-title text-on-surface font-bold tracking-tight">Connections</h1>
+<span class="px-2.5 py-0.5 rounded-full bg-surface-container border border-border-subtle font-table-mono text-xs text-on-surface-variant">37 total connections</span>
+</div>
+<div class="flex items-center gap-space-md">
+<!-- Progress Bar Component for 'Test All' -->
+<div class="flex items-center gap-space-md bg-surface-container border border-border-subtle px-space-md py-2 rounded-lg">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-center text-xs font-meta gap-space-xl">
+<span class="text-on-surface-variant flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-status-amber animate-pulse"></span>
+                                    Testing 14 of 37
+                                </span>
+<span class="font-table-mono text-primary">37%</span>
+</div>
+<div class="w-36 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[37%] rounded-full"></div>
+</div>
+</div>
+<button class="text-xs font-medium text-on-surface-variant hover:text-on-surface px-2 py-1 rounded bg-surface-container-high border border-border-subtle transition-colors cursor-pointer">
+                            Cancel
+                        </button>
+</div>
+<!-- Primary Action -->
+<button class="bg-primary hover:bg-primary-fixed text-on-primary px-space-md py-2 rounded-lg font-medium text-body flex items-center gap-space-sm transition-colors cursor-pointer shadow-sm">
+<span class="material-symbols-outlined text-lg">add</span>
+<span>Add Connection</span>
+</button>
+</div>
+</div>
+<!-- Filter Chips Bar -->
+<div class="flex items-center gap-space-sm overflow-x-auto pb-1">
+<button class="px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface font-medium text-meta border border-border-subtle flex items-center gap-space-xs cursor-pointer">
+<span>All</span>
+<span class="px-1.5 py-0.2 bg-surface text-outline rounded text-[11px] font-table-mono">37</span>
+</button>
+<button class="px-3 py-1.5 rounded-lg bg-surface-container text-on-surface-variant hover:text-on-surface font-medium text-meta border border-border-subtle flex items-center gap-space-xs cursor-pointer transition-colors">
+<span class="w-2 h-2 rounded-full bg-status-amber"></span>
+<span>Expiring Soon</span>
+<span class="px-1.5 py-0.2 bg-surface-container-high text-outline rounded text-[11px] font-table-mono">3</span>
+</button>
+<button class="px-3 py-1.5 rounded-lg bg-surface-container text-on-surface-variant hover:text-on-surface font-medium text-meta border border-border-subtle flex items-center gap-space-xs cursor-pointer transition-colors">
+<span class="w-2 h-2 rounded-full bg-status-red"></span>
+<span>Failing</span>
+<span class="px-1.5 py-0.2 bg-surface-container-high text-outline rounded text-[11px] font-table-mono">2</span>
+</button>
+<button class="px-3 py-1.5 rounded-lg bg-surface-container text-on-surface-variant hover:text-on-surface font-medium text-meta border border-border-subtle flex items-center gap-space-xs cursor-pointer transition-colors">
+<span class="w-2 h-2 rounded-full bg-outline"></span>
+<span>Locked</span>
+<span class="px-1.5 py-0.2 bg-surface-container-high text-outline rounded text-[11px] font-table-mono">1</span>
+</button>
+<button class="px-3 py-1.5 rounded-lg bg-surface-container text-on-surface-variant hover:text-on-surface font-medium text-meta border border-border-subtle flex items-center gap-space-xs cursor-pointer transition-colors">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span>Healthy</span>
+<span class="px-1.5 py-0.2 bg-surface-container-high text-outline rounded text-[11px] font-table-mono">31</span>
+</button>
+</div>
+<!-- Credentials Table Container -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl overflow-hidden shadow-sm">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-border-subtle bg-surface-container text-on-surface-variant font-meta text-meta uppercase tracking-wider">
+<th class="py-3 px-space-md font-medium">Provider / Model</th>
+<th class="py-3 px-space-md font-medium">Connection Label</th>
+<th class="py-3 px-space-md font-medium">Credential Type</th>
+<th class="py-3 px-space-md font-medium">Status</th>
+<th class="py-3 px-space-md font-medium">Quota / Usage</th>
+<th class="py-3 px-space-md font-medium">Expiry / Last Used</th>
+<th class="py-3 px-space-md font-medium">Proxy Pool</th>
+<th class="py-3 px-space-md font-medium text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle font-table text-table text-on-surface">
+<!-- Row 1: OpenAI (Active) -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[48px]">
+<td class="py-2.5 px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-6 h-6 rounded bg-surface-container-high flex items-center justify-center font-bold text-xs text-on-surface">o</div>
+<div class="flex flex-col">
+<span class="font-medium text-on-surface">OpenAI</span>
+<span class="font-table-mono text-[11px] text-outline">gpt-4o-mini-2024</span>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md font-table-mono text-xs text-on-surface-variant">prod-us-openai-01</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-surface-container text-on-surface rounded border border-border-subtle">Bearer Token</span>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-status-green/12 text-status-green font-meta text-[11px] font-semibold uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+                                        ACTIVE
+                                    </span>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs">$842.50 / $1,000</span>
+<div class="w-24 h-1 bg-surface-container-highest rounded-full mt-1">
+<div class="bg-status-green h-full w-[84%] rounded-full"></div>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs text-on-surface">in 14 days</span>
+<span class="font-meta text-[11px] text-outline">2m ago</span>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-secondary-container/20 text-secondary-fixed-dim rounded border border-secondary-container/30">us-east-pool</span>
+</td>
+<td class="py-2.5 px-space-md text-right">
+<div class="flex items-center justify-end gap-space-md text-on-surface-variant">
+<button class="hover:text-primary transition-colors cursor-pointer" title="Test Connection"><span class="material-symbols-outlined text-lg">bolt</span></button>
+<button class="hover:text-primary transition-colors cursor-pointer" title="Refresh Key"><span class="material-symbols-outlined text-lg">refresh</span></button>
+<button class="hover:text-status-red transition-colors cursor-pointer" title="Delete"><span class="material-symbols-outlined text-lg">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 2: Anthropic (Active, Expiring Soon) -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[48px]">
+<td class="py-2.5 px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-6 h-6 rounded bg-surface-container-high flex items-center justify-center font-bold text-xs text-on-surface">a</div>
+<div class="flex flex-col">
+<span class="font-medium text-on-surface">Anthropic</span>
+<span class="font-table-mono text-[11px] text-outline">claude-3-5-sonnet</span>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md font-table-mono text-xs text-on-surface-variant">eu-claude-backup</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-surface-container text-on-surface rounded border border-border-subtle">API Key (SK)</span>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-status-amber/12 text-status-amber font-meta text-[11px] font-semibold uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-status-amber"></span>
+                                        EXPIRING
+                                    </span>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs">$1,420 / $1,500</span>
+<div class="w-24 h-1 bg-surface-container-highest rounded-full mt-1">
+<div class="bg-status-amber h-full w-[94%] rounded-full"></div>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs text-status-amber">in 2 hours</span>
+<span class="font-meta text-[11px] text-outline">12m ago</span>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-secondary-container/20 text-secondary-fixed-dim rounded border border-secondary-container/30">global-fallback</span>
+</td>
+<td class="py-2.5 px-space-md text-right">
+<div class="flex items-center justify-end gap-space-md text-on-surface-variant">
+<button class="hover:text-primary transition-colors cursor-pointer" title="Test Connection"><span class="material-symbols-outlined text-lg">bolt</span></button>
+<button class="hover:text-primary transition-colors cursor-pointer" title="Refresh Key"><span class="material-symbols-outlined text-lg">refresh</span></button>
+<button class="hover:text-status-red transition-colors cursor-pointer" title="Delete"><span class="material-symbols-outlined text-lg">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 3: Google Vertex (Degraded) -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[48px]">
+<td class="py-2.5 px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-6 h-6 rounded bg-surface-container-high flex items-center justify-center font-bold text-xs text-on-surface">g</div>
+<div class="flex flex-col">
+<span class="font-medium text-on-surface">Google Vertex</span>
+<span class="font-table-mono text-[11px] text-outline">gemini-1.5-pro</span>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md font-table-mono text-xs text-on-surface-variant">vertex-apac-primary</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-surface-container text-on-surface rounded border border-border-subtle">Service Acc</span>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-status-amber/12 text-status-amber font-meta text-[11px] font-semibold uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-status-amber"></span>
+                                        DEGRADED
+                                    </span>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs">$310 / $5,000</span>
+<div class="w-24 h-1 bg-surface-container-highest rounded-full mt-1">
+<div class="bg-status-amber h-full w-[12%] rounded-full"></div>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs text-on-surface">in 45 days</span>
+<span class="font-meta text-[11px] text-outline">1m ago</span>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-secondary-container/20 text-secondary-fixed-dim rounded border border-secondary-container/30">apac-edge-pool</span>
+</td>
+<td class="py-2.5 px-space-md text-right">
+<div class="flex items-center justify-end gap-space-md text-on-surface-variant">
+<button class="hover:text-primary transition-colors cursor-pointer" title="Test Connection"><span class="material-symbols-outlined text-lg">bolt</span></button>
+<button class="hover:text-primary transition-colors cursor-pointer" title="Refresh Key"><span class="material-symbols-outlined text-lg">refresh</span></button>
+<button class="hover:text-status-red transition-colors cursor-pointer" title="Delete"><span class="material-symbols-outlined text-lg">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 4: DeepSeek (Failing) -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[48px]">
+<td class="py-2.5 px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-6 h-6 rounded bg-surface-container-high flex items-center justify-center font-bold text-xs text-on-surface">d</div>
+<div class="flex flex-col">
+<span class="font-medium text-on-surface">DeepSeek</span>
+<span class="font-table-mono text-[11px] text-outline">deepseek-chat</span>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md font-table-mono text-xs text-on-surface-variant">ds-v3-inference</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-surface-container text-on-surface rounded border border-border-subtle">API Key (SK)</span>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-status-red/12 text-status-red font-meta text-[11px] font-semibold uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-status-red"></span>
+                                        FAILING
+                                    </span>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs">$95.00 / $200</span>
+<div class="w-24 h-1 bg-surface-container-highest rounded-full mt-1">
+<div class="bg-status-red h-full w-[47%] rounded-full"></div>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs text-status-red">Expired</span>
+<span class="font-meta text-[11px] text-outline">4h ago</span>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-secondary-container/20 text-secondary-fixed-dim rounded border border-secondary-container/30">us-east-pool</span>
+</td>
+<td class="py-2.5 px-space-md text-right">
+<div class="flex items-center justify-end gap-space-md text-on-surface-variant">
+<button class="hover:text-primary transition-colors cursor-pointer" title="Test Connection"><span class="material-symbols-outlined text-lg">bolt</span></button>
+<button class="hover:text-primary transition-colors cursor-pointer" title="Refresh Key"><span class="material-symbols-outlined text-lg">refresh</span></button>
+<button class="hover:text-status-red transition-colors cursor-pointer" title="Delete"><span class="material-symbols-outlined text-lg">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 5: Mistral (Locked) -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[48px]">
+<td class="py-2.5 px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-6 h-6 rounded bg-surface-container-high flex items-center justify-center font-bold text-xs text-on-surface">m</div>
+<div class="flex flex-col">
+<span class="font-medium text-on-surface">Mistral</span>
+<span class="font-table-mono text-[11px] text-outline">mistral-large-latest</span>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md font-table-mono text-xs text-on-surface-variant">mistral-core-prod</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-surface-container text-on-surface rounded border border-border-subtle">OAuth 2.0</span>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-status-grey/12 text-status-grey font-meta text-[11px] font-semibold uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-status-grey"></span>
+                                        LOCKED
+                                    </span>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs">$0.00 / $500</span>
+<div class="w-24 h-1 bg-surface-container-highest rounded-full mt-1">
+<div class="bg-status-grey h-full w-[0%] rounded-full"></div>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs text-on-surface">Never</span>
+<span class="font-meta text-[11px] text-outline">2d ago</span>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-secondary-container/20 text-secondary-fixed-dim rounded border border-secondary-container/30">eu-central-pool</span>
+</td>
+<td class="py-2.5 px-space-md text-right">
+<div class="flex items-center justify-end gap-space-md text-on-surface-variant">
+<button class="hover:text-primary transition-colors cursor-pointer" title="Test Connection"><span class="material-symbols-outlined text-lg">bolt</span></button>
+<button class="hover:text-primary transition-colors cursor-pointer" title="Refresh Key"><span class="material-symbols-outlined text-lg">refresh</span></button>
+<button class="hover:text-status-red transition-colors cursor-pointer" title="Delete"><span class="material-symbols-outlined text-lg">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 6: Cohere (Healthy) -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[48px]">
+<td class="py-2.5 px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-6 h-6 rounded bg-surface-container-high flex items-center justify-center font-bold text-xs text-on-surface">c</div>
+<div class="flex flex-col">
+<span class="font-medium text-on-surface">Cohere</span>
+<span class="font-table-mono text-[11px] text-outline">command-r-plus</span>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md font-table-mono text-xs text-on-surface-variant">cohere-embed-prod</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-surface-container text-on-surface rounded border border-border-subtle">API Key (SK)</span>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-status-green/12 text-status-green font-meta text-[11px] font-semibold uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green"></span>
+                                        ACTIVE
+                                    </span>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs">$124.80 / $300</span>
+<div class="w-24 h-1 bg-surface-container-highest rounded-full mt-1">
+<div class="bg-status-green h-full w-[41%] rounded-full"></div>
+</div>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<div class="flex flex-col">
+<span class="font-table-mono text-xs text-on-surface">in 89 days</span>
+<span class="font-meta text-[11px] text-outline">30m ago</span>
+</div>
+</td>
+<td class="py-2.5 px-space-md">
+<span class="font-table-mono text-[11px] px-2 py-0.5 bg-secondary-container/20 text-secondary-fixed-dim rounded border border-secondary-container/30">us-east-pool</span>
+</td>
+<td class="py-2.5 px-space-md text-right">
+<div class="flex items-center justify-end gap-space-md text-on-surface-variant">
+<button class="hover:text-primary transition-colors cursor-pointer" title="Test Connection"><span class="material-symbols-outlined text-lg">bolt</span></button>
+<button class="hover:text-primary transition-colors cursor-pointer" title="Refresh Key"><span class="material-symbols-outlined text-lg">refresh</span></button>
+<button class="hover:text-status-red transition-colors cursor-pointer" title="Delete"><span class="material-symbols-outlined text-lg">delete</span></button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer Pagination / Count Info -->
+<div class="flex items-center justify-between px-space-md py-3 bg-surface-container border-t border-border-subtle font-meta text-meta text-on-surface-variant">
+<span>Showing 1-6 of 37 connections</span>
+<div class="flex items-center gap-space-sm">
+<button class="px-3 py-1 bg-surface-elevated border border-border-subtle rounded text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer disabled:opacity-50" disabled="">Previous</button>
+<button class="px-3 py-1 bg-surface-elevated border border-border-subtle rounded text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer">Next</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

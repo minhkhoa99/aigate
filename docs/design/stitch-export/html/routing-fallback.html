@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console - Routing &amp; Fallback</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "primary-container": "#8083ff",
+            "surface": "#13131b",
+            "surface-container-lowest": "#0d0d15",
+            "on-secondary": "#1d00a5",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "tertiary-fixed-dim": "#ffb783",
+            "surface-dim": "#13131b",
+            "secondary-fixed-dim": "#c3c0ff",
+            "secondary-fixed": "#e2dfff",
+            "surface-bright": "#393841",
+            "on-tertiary-fixed": "#301400",
+            "status-amber": "#F59E0B",
+            "on-background": "#e4e1ed",
+            "surface-variant": "#34343d",
+            "inverse-surface": "#e4e1ed",
+            "status-grey": "#6B7280",
+            "error-container": "#93000a",
+            "outline-variant": "#464554",
+            "on-secondary-fixed": "#0f0069",
+            "status-green": "#22C55E",
+            "tertiary-container": "#d97721",
+            "tertiary-fixed": "#ffdcc5",
+            "on-error-container": "#ffdad6",
+            "tertiary": "#ffb783",
+            "border-subtle": "#27272A",
+            "on-secondary-fixed-variant": "#3323cc",
+            "on-surface-variant": "#c7c4d7",
+            "on-error": "#690005",
+            "surface-elevated": "#12131A",
+            "secondary": "#c3c0ff",
+            "on-tertiary-container": "#452000",
+            "surface-container-low": "#1b1b23",
+            "surface-container": "#1f1f27",
+            "primary-fixed": "#e1e0ff",
+            "primary-fixed-dim": "#c0c1ff",
+            "on-secondary-container": "#b3b1ff",
+            "on-primary": "#1000a9",
+            "error": "#ffb4ab",
+            "inverse-primary": "#494bd6",
+            "on-tertiary": "#4f2500",
+            "on-primary-container": "#0d0096",
+            "secondary-container": "#3626ce",
+            "primary": "#c0c1ff",
+            "background": "#13131b",
+            "status-red": "#EF4444",
+            "surface-container-high": "#292932",
+            "outline": "#908fa0",
+            "on-surface": "#e4e1ed",
+            "on-tertiary-fixed-variant": "#703700",
+            "on-primary-fixed": "#07006c",
+            "surface-tint": "#c0c1ff",
+            "surface-container-highest": "#34343d",
+            "surface-dark": "#090A0F",
+            "inverse-on-surface": "#303038"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-sm": "0.5rem",
+            "margin": "1.5rem",
+            "gutter": "1rem",
+            "space-md": "1rem",
+            "space-lg": "1.5rem",
+            "space-xs": "0.25rem",
+            "space-xl": "2rem"
+          },
+          "fontFamily": {
+            "table-mono": ["JetBrains Mono"],
+            "table": ["Inter"],
+            "page-title": ["Inter"],
+            "body": ["Inter"],
+            "metric": ["JetBrains Mono"],
+            "section": ["Inter"],
+            "meta": ["Inter"]
+          },
+          "fontSize": {
+            "table-mono": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "table": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "page-title": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "metric": ["32px", { "lineHeight": "38px", "fontWeight": "500" }],
+            "section": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "meta": ["12px", { "lineHeight": "16px", "fontWeight": "400" }]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-surface text-on-surface font-body min-h-screen flex flex-col antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated flex flex-col justify-between p-space-sm border-r border-border-subtle select-none">
+<div class="flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm px-2 py-1">
+<div class="w-6 h-6 rounded bg-primary flex items-center justify-center text-on-primary font-bold text-meta">AI</div>
+<div>
+<h1 class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</h1>
+<p class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</p>
+</div>
+</div>
+<nav class="flex flex-col gap-1 mt-2">
+<a class="flex items-center gap-space-sm px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+<span class="font-body text-body">Overview</span>
+</a>
+<a class="flex items-center gap-space-sm px-3 py-2 bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT cursor-pointer" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="alt_route" style="font-variation-settings: 'FILL' 1;">alt_route</span>
+<span class="font-body text-body">Gateway</span>
+</a>
+<div class="pl-8 flex flex-col gap-1 my-1">
+<a class="px-2 py-1.5 text-meta text-on-surface-variant hover:text-on-surface rounded-DEFAULT transition-colors" href="#">Routes</a>
+<a class="px-2 py-1.5 text-meta text-primary font-medium bg-surface-container rounded-DEFAULT transition-colors" href="#">Routing &amp; Fallback</a>
+<a class="px-2 py-1.5 text-meta text-on-surface-variant hover:text-on-surface rounded-DEFAULT transition-colors" href="#">Rate Limits</a>
+</div>
+<a class="flex items-center gap-space-sm px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="hub">hub</span>
+<span class="font-body text-body">Providers</span>
+</a>
+<a class="flex items-center gap-space-sm px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="monitoring">monitoring</span>
+<span class="font-body text-body">Traffic</span>
+</a>
+<a class="flex items-center gap-space-sm px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="lan">lan</span>
+<span class="font-body text-body">Network</span>
+</a>
+<a class="flex items-center gap-space-sm px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="extension">extension</span>
+<span class="font-body text-body">Integrations</span>
+</a>
+<a class="flex items-center gap-space-sm px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+<span class="font-body text-body">Settings</span>
+</a>
+</nav>
+</div>
+<div class="flex flex-col gap-1 border-t border-border-subtle pt-2">
+<a class="flex items-center gap-space-sm px-3 py-2 text-on-surface-variant hover:bg-surface-container rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="menu_book">menu_book</span>
+<span class="font-meta text-meta">Docs</span>
+</a>
+<a class="flex items-center gap-space-sm px-3 py-2 text-on-surface-variant hover:bg-surface-container rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px] text-status-green" data-icon="check_circle">check_circle</span>
+<span class="font-meta text-meta">System Status</span>
+</a>
+</div>
+</aside>
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin pl-64">
+<div class="flex items-center gap-3">
+<div class="relative w-64">
+<span class="absolute inset-y-0 left-0 flex items-center pl-2.5 text-on-surface-variant pointer-events-none">
+<span class="material-symbols-outlined text-[16px]" data-icon="search">search</span>
+</span>
+<input class="w-full bg-surface-container border border-border-subtle rounded-DEFAULT pl-8 pr-3 py-1 font-table-mono text-table-mono text-on-surface focus:outline-none focus:border-primary" placeholder="gateway / routing &amp; fallback..." type="text"/>
+</div>
+<span class="font-meta text-meta text-on-surface-variant">/ gateway / routing &amp; fallback</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-table-mono text-meta px-2 py-0.5 rounded bg-surface-container border border-border-subtle text-on-surface-variant">v2.4.1-proxy</span>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[18px]" data-icon="notifications">notifications</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[18px]" data-icon="light_mode">light_mode</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[18px]" data-icon="help">help</span>
+</button>
+<div class="w-7 h-7 rounded-full bg-surface-container-high border border-border-subtle flex items-center justify-center overflow-hidden ml-2">
+<img class="w-full h-full object-cover" data-alt="A professional headshot avatar of a software engineer with dark hair, wearing a sleek minimalist dark hoodie against a neutral grey studio background, captured with crisp soft studio lighting and a shallow depth of field." src="https://lh3.googleusercontent.com/aida-public/AB6AXuALKp15Ehz2gevvmZVADAi-mnGOG1D4sfHiuo89AtjQWx1UGHa155KFNXrIOm_ne589y44WgO88ZMAfqvU4zcT7Ae4o-eaojD6SeJnLFB6UfvCWZ6TiyncneeGhcBXi-T4xtbeINXcra3V5N4nxshX_Tm6eaiQ841cLye8qEOsRR4AbsrmfFTMZ8y5b7RVPWy_8Whvjut1Qi9VW872WhgoGHDMn4hw9NdmPE7VNYlC4mriGi5A0Z1vKB8efKO9742mY5JGlJhEga3c"/>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="ml-60 flex-1 p-margin flex flex-col gap-margin max-w-[calc(100vw-15rem)]">
+<!-- 1. Page Header -->
+<div class="flex items-center justify-between border-b border-border-subtle pb-4">
+<div>
+<h2 class="font-page-title text-page-title text-on-surface font-semibold tracking-tight">Routing &amp; Fallback</h2>
+<p class="font-body text-body text-on-surface-variant mt-0.5">Manage model combos, deterministic failovers, capacity adapters, and dry-run testing environments.</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 bg-surface-container hover:bg-surface-container-high border border-border-subtle rounded-DEFAULT text-body font-medium transition-colors flex items-center gap-1.5 cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="history">history</span>
+<span>Audit Logs</span>
+</button>
+<button class="px-3 py-1.5 bg-primary text-on-primary hover:opacity-90 rounded-DEFAULT text-body font-medium transition-opacity flex items-center gap-1.5 cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="add">add</span>
+<span>Create Combo</span>
+</button>
+</div>
+</div>
+<!-- 2. Four top-level tabs -->
+<div class="flex border-b border-border-subtle gap-6">
+<button class="pb-2.5 font-body text-body font-medium text-primary border-b-2 border-primary flex items-center gap-2 cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="layers">layers</span>
+<span>Combo</span>
+</button>
+<button class="pb-2.5 font-body text-body font-medium text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-2 cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="swap_horiz">swap_horiz</span>
+<span>Fallback</span>
+</button>
+<button class="pb-2.5 font-body text-body font-medium text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-2 cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="bolt">bolt</span>
+<span>Capacity Adapter</span>
+</button>
+<button class="pb-2.5 font-body text-body font-medium text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-2 cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="science">science</span>
+<span>Simulate</span>
+</button>
+</div>
+<!-- Combo Tab Content: Master/Detail Split -->
+<div class="grid grid-cols-12 gap-space-lg">
+<!-- Left side: Combos List -->
+<div class="col-span-4 flex flex-col gap-2">
+<div class="flex items-center justify-between mb-1">
+<span class="font-meta text-meta uppercase tracking-wider text-on-surface-variant font-semibold">Active Routes (4)</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant cursor-pointer" data-icon="filter_list">filter_list</span>
+</div>
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-3 cursor-pointer hover:border-primary transition-all border-l-4 border-l-primary">
+<div class="flex items-center justify-between mb-1">
+<span class="font-table-mono text-table-mono font-medium text-on-surface">claude-3.5-smart-router</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-table-mono bg-status-green bg-opacity-10 text-status-green uppercase font-semibold">Active</span>
+</div>
+<p class="font-meta text-meta text-on-surface-variant">Fusion Mode • 3 models • 200ms grace</p>
+</div>
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-3 cursor-pointer hover:border-border-subtle transition-all opacity-80 hover:opacity-100">
+<div class="flex items-center justify-between mb-1">
+<span class="font-table-mono text-table-mono font-medium text-on-surface">gpt4-fallback-tier</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-table-mono bg-surface-container text-on-surface-variant uppercase">Standby</span>
+</div>
+<p class="font-meta text-meta text-on-surface-variant">Fill-first • 2 models • 500ms grace</p>
+</div>
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-3 cursor-pointer hover:border-border-subtle transition-all opacity-80 hover:opacity-100">
+<div class="flex items-center justify-between mb-1">
+<span class="font-table-mono text-table-mono font-medium text-on-surface">deepseek-fast-lane</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-table-mono bg-status-green bg-opacity-10 text-status-green uppercase font-semibold">Active</span>
+</div>
+<p class="font-meta text-meta text-on-surface-variant">Round-robin • 4 models • 120ms grace</p>
+</div>
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-3 cursor-pointer hover:border-border-subtle transition-all opacity-80 hover:opacity-100">
+<div class="flex items-center justify-between mb-1">
+<span class="font-table-mono text-table-mono font-medium text-on-surface">multimodal-fusion-pool</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-table-mono bg-status-amber bg-opacity-10 text-status-amber uppercase font-semibold">Degraded</span>
+</div>
+<p class="font-meta text-meta text-on-surface-variant">Fusion Mode • 5 models • 300ms grace</p>
+</div>
+</div>
+<!-- Right side: Selected Combo Detail -->
+<div class="col-span-8 flex flex-col gap-space-md">
+<!-- Amber warning banner -->
+<div class="bg-surface-elevated border border-border-subtle border-l-4 border-l-status-amber p-3.5 rounded-lg flex items-start gap-3">
+<span class="material-symbols-outlined text-status-amber text-[20px]" data-icon="warning">warning</span>
+<div class="flex-1">
+<p class="font-body text-body text-on-surface">No member of this combo can satisfy the vision capability, so the vision adapter pool will take over.</p>
+<p class="font-meta text-meta text-on-surface-variant mt-0.5">Route ID: <span class="font-table-mono">rt_998124019</span> • Fallback triggered 14 times in last hour.</p>
+</div>
+</div>
+<!-- Controls Card -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-md flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="font-section text-section text-on-surface font-semibold">claude-3.5-smart-router</h3>
+<p class="font-meta text-meta text-on-surface-variant">Configured execution strategy &amp; member weights</p>
+</div>
+<!-- Three-way segmented control -->
+<div class="flex bg-surface-container p-0.5 rounded-lg border border-border-subtle">
+<button class="px-3 py-1 rounded font-body text-meta text-on-surface-variant hover:text-on-surface transition-colors">Fallback</button>
+<button class="px-3 py-1 rounded font-body text-meta text-on-surface-variant hover:text-on-surface transition-colors">Round-robin</button>
+<button class="px-3 py-1 rounded font-body text-meta bg-surface-container-high text-primary font-medium shadow-sm">Fusion</button>
+</div>
+</div>
+<!-- Drag-reorderable list of member models -->
+<div class="flex flex-col gap-2">
+<span class="font-meta text-meta text-on-surface-variant uppercase tracking-wide">Member Models</span>
+<div class="flex items-center justify-between bg-surface-container border border-border-subtle px-3 py-2.5 rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant cursor-grab text-[18px]" data-icon="drag_indicator">drag_indicator</span>
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span class="font-table-mono text-table-mono font-medium text-on-surface">claude-3-5-sonnet</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded text-[11px] bg-primary-container bg-opacity-10 text-primary font-medium">Chat</span>
+<span class="px-2 py-0.5 rounded text-[11px] bg-secondary-container bg-opacity-20 text-secondary font-medium">Vision</span>
+<span class="px-2 py-0.5 rounded text-[11px] bg-tertiary-container bg-opacity-20 text-tertiary font-medium">Tools</span>
+<button class="text-on-surface-variant hover:text-status-red ml-2 cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="close">close</span>
+</button>
+</div>
+</div>
+<div class="flex items-center justify-between bg-surface-container border border-border-subtle px-3 py-2.5 rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant cursor-grab text-[18px]" data-icon="drag_indicator">drag_indicator</span>
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span class="font-table-mono text-table-mono font-medium text-on-surface">gpt-4o</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded text-[11px] bg-primary-container bg-opacity-10 text-primary font-medium">Chat</span>
+<span class="px-2 py-0.5 rounded text-[11px] bg-secondary-container bg-opacity-20 text-secondary font-medium">Vision</span>
+<button class="text-on-surface-variant hover:text-status-red ml-2 cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="close">close</span>
+</button>
+</div>
+</div>
+<div class="flex items-center justify-between bg-surface-container border border-border-subtle px-3 py-2.5 rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant cursor-grab text-[18px]" data-icon="drag_indicator">drag_indicator</span>
+<span class="w-2 h-2 rounded-full bg-status-amber"></span>
+<span class="font-table-mono text-table-mono font-medium text-on-surface">deepseek-chat</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded text-[11px] bg-primary-container bg-opacity-10 text-primary font-medium">Chat</span>
+<button class="text-on-surface-variant hover:text-status-red ml-2 cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="close">close</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Fusion mode extra fields -->
+<div class="border-t border-border-subtle pt-4 grid grid-cols-2 gap-4">
+<div class="flex flex-col gap-1.5">
+<label class="font-meta text-meta text-on-surface-variant">Minimum Panel Size</label>
+<input class="bg-surface-container border border-border-subtle rounded-DEFAULT px-3 py-1.5 font-table-mono text-table-mono text-on-surface focus:outline-none focus:border-primary" type="number" value="3"/>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-meta text-meta text-on-surface-variant">Judge Model Select</label>
+<select class="bg-surface-container border border-border-subtle rounded-DEFAULT px-3 py-1.5 font-table-mono text-table-mono text-on-surface focus:outline-none focus:border-primary">
+<option>claude-3-5-sonnet (Primary)</option>
+<option>gpt-4o (Secondary)</option>
+<option>deepseek-coder (Fast)</option>
+</select>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-meta text-meta text-on-surface-variant">Straggler Grace (ms)</label>
+<input class="bg-surface-container border border-border-subtle rounded-DEFAULT px-3 py-1.5 font-table-mono text-table-mono text-on-surface focus:outline-none focus:border-primary" type="number" value="250"/>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-meta text-meta text-on-surface-variant">Hard Timeout (ms)</label>
+<input class="bg-surface-container border border-border-subtle rounded-DEFAULT px-3 py-1.5 font-table-mono text-table-mono text-on-surface focus:outline-none focus:border-primary" type="number" value="2000"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Below the split: The other three sections -->
+<div class="flex flex-col gap-space-lg mt-4 border-t border-border-subtle pt-margin">
+<!-- 1. Fallback Section -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-md flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="font-section text-section text-on-surface font-semibold">Fallback Engine Controls</h3>
+<p class="font-meta text-meta text-on-surface-variant">Global rules for account lockout recovery and retry prioritization.</p>
+</div>
+<div class="flex items-center gap-6">
+<!-- Radio pair -->
+<div class="flex items-center gap-4">
+<label class="flex items-center gap-1.5 font-body text-body text-on-surface cursor-pointer">
+<input checked="" class="text-primary focus:ring-0 bg-surface-container border-border-subtle" name="fallback_mode" type="radio"/>
+<span>Fill-first</span>
+</label>
+<label class="flex items-center gap-1.5 font-body text-body text-on-surface cursor-pointer">
+<input class="text-primary focus:ring-0 bg-surface-container border-border-subtle" name="fallback_mode" type="radio"/>
+<span>Round-robin</span>
+</label>
+</div>
+<!-- Sticky toggle switch -->
+<div class="flex items-center gap-2 border-l border-border-subtle pl-6">
+<span class="font-body text-body text-on-surface">Sticky Locks</span>
+<button class="w-9 h-5 bg-primary rounded-full relative transition-colors cursor-pointer flex items-center px-0.5">
+<div class="w-4 h-4 rounded-full bg-surface-dark translate-x-4 transition-transform"></div>
+</button>
+</div>
+</div>
+</div>
+<!-- Table of active account locks -->
+<div class="border border-border-subtle rounded-lg overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container border-b border-border-subtle font-meta text-meta text-on-surface-variant">
+<th class="py-2.5 px-4 font-medium">Account</th>
+<th class="py-2.5 px-4 font-medium">Model</th>
+<th class="py-2.5 px-4 font-medium">Reason</th>
+<th class="py-2.5 px-4 font-medium text-right">Release Countdown</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle font-table-mono text-table-mono">
+<tr class="hover:bg-surface-container-low transition-colors h-[36px]">
+<td class="py-2 px-4 text-on-surface">acc_anthropic_prod_01</td>
+<td class="py-2 px-4 text-on-surface-variant">claude-3-5-sonnet</td>
+<td class="py-2 px-4 text-status-amber">Rate limit 429 (Quota exceeded)</td>
+<td class="py-2 px-4 text-right text-primary font-semibold">03:42</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors h-[36px]">
+<td class="py-2 px-4 text-on-surface">acc_openai_eu_west</td>
+<td class="py-2 px-4 text-on-surface-variant">gpt-4o</td>
+<td class="py-2 px-4 text-status-red">Upstream timeout (504 Gateway)</td>
+<td class="py-2 px-4 text-right text-primary font-semibold">01:15</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors h-[36px]">
+<td class="py-2 px-4 text-on-surface">acc_deepseek_vip</td>
+<td class="py-2 px-4 text-on-surface-variant">deepseek-chat</td>
+<td class="py-2 px-4 text-status-amber">Concurrency threshold reached</td>
+<td class="py-2 px-4 text-right text-primary font-semibold">00:29</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- 2. Capacity Adapter Section -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-md flex flex-col gap-space-md">
+<div>
+<h3 class="font-section text-section text-on-surface font-semibold">Capacity Adapter Pools</h3>
+<p class="font-meta text-meta text-on-surface-variant">Fallback adapters for non-standard payloads (Vision, PDF, Audio, Video).</p>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<!-- Vision Panel -->
+<div class="border border-border-subtle rounded-lg p-3.5 bg-surface-container-low flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="visibility">visibility</span>
+<span class="font-body text-body font-semibold text-on-surface">Vision Adapter Pool</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-meta text-meta text-on-surface-variant">Round-robin</span>
+<button class="w-8 h-4 bg-surface-bright rounded-full relative cursor-pointer flex items-center px-0.5">
+<div class="w-3 h-3 rounded-full bg-on-surface-variant translate-x-0"></div>
+</button>
+<span class="font-meta text-meta text-status-green font-medium">Enabled</span>
+</div>
+</div>
+<div class="flex flex-col gap-1.5 font-table-mono text-table-mono">
+<div class="flex items-center justify-between bg-surface-container p-2 rounded border border-border-subtle">
+<span>1. claude-3-5-sonnet</span>
+<span class="text-status-green text-meta">Healthy</span>
+</div>
+<div class="flex items-center justify-between bg-surface-container p-2 rounded border border-border-subtle">
+<span>2. gpt-4o</span>
+<span class="text-status-green text-meta">Healthy</span>
+</div>
+</div>
+</div>
+<!-- PDF Panel -->
+<div class="border border-border-subtle rounded-lg p-3.5 bg-surface-container-low flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="picture_as_pdf">picture_as_pdf</span>
+<span class="font-body text-body font-semibold text-on-surface">PDF Parsing Pool</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-meta text-meta text-on-surface-variant">Round-robin</span>
+<button class="w-8 h-4 bg-primary rounded-full relative cursor-pointer flex items-center px-0.5">
+<div class="w-3 h-3 rounded-full bg-surface-dark translate-x-4"></div>
+</button>
+<span class="font-meta text-meta text-status-green font-medium">Enabled</span>
+</div>
+</div>
+<div class="flex flex-col gap-1.5 font-table-mono text-table-mono">
+<div class="flex items-center justify-between bg-surface-container p-2 rounded border border-border-subtle">
+<span>1. claude-3-opus</span>
+<span class="text-status-green text-meta">Healthy</span>
+</div>
+<div class="flex items-center justify-between bg-surface-container p-2 rounded border border-border-subtle">
+<span>2. mistral-large</span>
+<span class="text-status-amber text-meta">Degraded</span>
+</div>
+</div>
+</div>
+<!-- Audio Input Panel -->
+<div class="border border-border-subtle rounded-lg p-3.5 bg-surface-container-low flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="mic">mic</span>
+<span class="font-body text-body font-semibold text-on-surface">Audio Input Pool</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-meta text-meta text-on-surface-variant">Round-robin</span>
+<button class="w-8 h-4 bg-primary rounded-full relative cursor-pointer flex items-center px-0.5">
+<div class="w-3 h-3 rounded-full bg-surface-dark translate-x-4"></div>
+</button>
+<span class="font-meta text-meta text-status-green font-medium">Enabled</span>
+</div>
+</div>
+<div class="flex flex-col gap-1.5 font-table-mono text-table-mono">
+<div class="flex items-center justify-between bg-surface-container p-2 rounded border border-border-subtle">
+<span>1. whisper-large-v3</span>
+<span class="text-status-green text-meta">Healthy</span>
+</div>
+</div>
+</div>
+<!-- Video Input Panel -->
+<div class="border border-border-subtle rounded-lg p-3.5 bg-surface-container-low flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="videocam">videocam</span>
+<span class="font-body text-body font-semibold text-on-surface">Video Input Pool</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-meta text-meta text-on-surface-variant">Round-robin</span>
+<button class="w-8 h-4 bg-surface-bright rounded-full relative cursor-pointer flex items-center px-0.5">
+<div class="w-3 h-3 rounded-full bg-on-surface-variant translate-x-0"></div>
+</button>
+<span class="font-meta text-meta text-status-grey font-medium">Disabled</span>
+</div>
+</div>
+<div class="flex flex-col gap-1.5 font-table-mono text-table-mono">
+<div class="flex items-center justify-between bg-surface-container p-2 rounded border border-border-subtle opacity-50">
+<span>1. gemini-1.5-pro</span>
+<span class="text-status-grey text-meta">Inactive</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. Simulate Section -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-md flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="font-section text-section text-on-surface font-semibold">Router Dry-Run Simulation</h3>
+<p class="font-meta text-meta text-on-surface-variant">Test request dispatch rules against active models, candidates, and accounts.</p>
+</div>
+<button class="px-3 py-1.5 bg-secondary-container text-on-secondary-container rounded-DEFAULT text-body font-medium hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="play_arrow">play_arrow</span>
+<span>Run Simulation</span>
+</button>
+</div>
+<div class="grid grid-cols-12 gap-4">
+<!-- JSON request editor -->
+<div class="col-span-5 bg-surface-container-low border border-border-subtle rounded-lg p-3 font-table-mono text-table-mono flex flex-col gap-2">
+<div class="flex items-center justify-between border-b border-border-subtle pb-2">
+<span class="text-on-surface-variant">Payload Request JSON</span>
+<span class="text-primary text-meta">POST /v1/chat/completions</span>
+</div>
+<pre class="text-on-surface overflow-x-auto text-[12px] leading-relaxed py-1"><span class="text-primary-container">{</span>
+  <span class="text-secondary">"model"</span>: <span class="text-tertiary">"claude-3.5-smart-router"</span>,
+  <span class="text-secondary">"messages"</span>: [
+    {<span class="text-secondary">"role"</span>: <span class="text-tertiary">"user"</span>, <span class="text-secondary">"content"</span>: <span class="text-tertiary">"Analyze trend"</span>}
+  ],
+  <span class="text-secondary">"temperature"</span>: <span class="text-primary">0.2</span>,
+  <span class="text-secondary">"stream"</span>: <span class="text-primary">false</span>
+<span class="text-primary-container">}</span></pre>
+</div>
+<!-- Rendered decision tree -->
+<div class="col-span-7 bg-surface-container-low border border-border-subtle rounded-lg p-4 flex flex-col gap-3 justify-center">
+<span class="font-meta text-meta text-on-surface-variant uppercase tracking-wider">Decision Tree Resolution</span>
+<div class="flex flex-col gap-2 font-table-mono text-table-mono">
+<!-- Node 1 -->
+<div class="flex items-center gap-3 bg-surface-container p-2.5 rounded border border-border-subtle">
+<div class="w-6 h-6 rounded bg-primary bg-opacity-20 text-primary flex items-center justify-center font-bold text-meta">1</div>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<span class="text-on-surface font-semibold">Model: claude-3.5-smart-router</span>
+<span class="text-status-green text-meta">Selected</span>
+</div>
+<span class="text-meta text-on-surface-variant">Matched primary route rule definition (weight 100%)</span>
+</div>
+</div>
+<!-- Connecting Line -->
+<div class="w-0.5 h-3 bg-border-subtle ml-6"></div>
+<!-- Node 2 (Candidate) -->
+<div class="flex items-center gap-3 bg-surface-container p-2.5 rounded border border-border-subtle">
+<div class="w-6 h-6 rounded bg-primary bg-opacity-20 text-primary flex items-center justify-center font-bold text-meta">2</div>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<span class="text-on-surface font-semibold">Candidate: claude-3-5-sonnet</span>
+<span class="text-status-green text-meta">Passed Check</span>
+</div>
+<span class="text-meta text-on-surface-variant">Lowest latency variant in fusion pool (124ms avg)</span>
+</div>
+</div>
+<!-- Connecting Line -->
+<div class="w-0.5 h-3 bg-border-subtle ml-6"></div>
+<!-- Node 3 (Account) -->
+<div class="flex items-center gap-3 bg-surface-container p-2.5 rounded border border-border-subtle">
+<div class="w-6 h-6 rounded bg-primary bg-opacity-20 text-primary flex items-center justify-center font-bold text-meta">3</div>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<span class="text-on-surface font-semibold">Account: acc_anthropic_prod_02</span>
+<span class="text-status-green text-meta">Dispatched</span>
+</div>
+<span class="text-meta text-on-surface-variant">Active lock bypassed on acc_01 due to quota limit</span>
+</div>
+</div>
+<!-- Rejected branch (greyed out) -->
+<div class="flex items-center gap-3 bg-surface-container p-2 rounded border border-border-subtle opacity-40 mt-1">
+<div class="w-6 h-6 rounded bg-status-red bg-opacity-20 text-status-red flex items-center justify-center font-bold text-meta">×</div>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<span class="text-on-surface line-through">Candidate: gpt-4o</span>
+<span class="text-status-red text-meta">Rejected</span>
+</div>
+<span class="text-meta text-status-red">Rejected by policy: regional residency restriction</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

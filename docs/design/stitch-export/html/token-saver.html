@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console - Token Saver</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "primary-fixed-dim": "#c0c1ff",
+            "on-tertiary": "#4f2500",
+            "tertiary-fixed-dim": "#ffb783",
+            "on-primary": "#1000a9",
+            "status-grey": "#6B7280",
+            "surface-variant": "#34343d",
+            "status-red": "#EF4444",
+            "status-amber": "#F59E0B",
+            "inverse-on-surface": "#303038",
+            "on-error": "#690005",
+            "surface": "#13131b",
+            "surface-container-low": "#1b1b23",
+            "surface-dim": "#13131b",
+            "secondary": "#c3c0ff",
+            "primary": "#c0c1ff",
+            "on-secondary-fixed": "#0f0069",
+            "on-primary-container": "#0d0096",
+            "secondary-container": "#3626ce",
+            "on-background": "#e4e1ed",
+            "surface-container": "#1f1f27",
+            "on-error-container": "#ffdad6",
+            "surface-elevated": "#12131A",
+            "background": "#13131b",
+            "secondary-fixed-dim": "#c3c0ff",
+            "inverse-primary": "#494bd6",
+            "secondary-fixed": "#e2dfff",
+            "error": "#ffb4ab",
+            "primary-fixed": "#e1e0ff",
+            "inverse-surface": "#e4e1ed",
+            "on-secondary-container": "#b3b1ff",
+            "surface-container-lowest": "#0d0d15",
+            "error-container": "#93000a",
+            "surface-bright": "#393841",
+            "on-tertiary-container": "#452000",
+            "surface-dark": "#090A0F",
+            "on-primary-fixed": "#07006c",
+            "on-tertiary-fixed-variant": "#703700",
+            "on-surface": "#e4e1ed",
+            "status-green": "#22C55E",
+            "surface-container-highest": "#34343d",
+            "tertiary-fixed": "#ffdcc5",
+            "primary-container": "#8083ff",
+            "surface-tint": "#c0c1ff",
+            "outline-variant": "#464554",
+            "on-tertiary-fixed": "#301400",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "border-subtle": "#27272A",
+            "on-secondary-fixed-variant": "#3323cc",
+            "on-secondary": "#1d00a5",
+            "tertiary-container": "#d97721",
+            "tertiary": "#ffb783",
+            "on-surface-variant": "#c7c4d7",
+            "outline": "#908fa0",
+            "surface-container-high": "#292932"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-xs": "0.25rem",
+            "space-md": "1rem",
+            "space-xl": "2rem",
+            "space-sm": "0.5rem",
+            "margin": "1.5rem",
+            "space-lg": "1.5rem",
+            "gutter": "1rem"
+          },
+          "fontFamily": {
+            "body": ["Inter"],
+            "section": ["Inter"],
+            "meta": ["Inter"],
+            "table-mono": ["JetBrains Mono"],
+            "table": ["Inter"],
+            "page-title": ["Inter"],
+            "metric": ["JetBrains Mono"]
+          },
+          "fontSize": {
+            "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "section": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "meta": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "table-mono": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "table": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "page-title": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "metric": ["32px", { "lineHeight": "38px", "fontWeight": "500" }]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-background text-on-surface font-body min-h-screen flex antialiased">
+<!-- SideNavBar -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated flex flex-col justify-between h-full p-space-sm w-60 border-r border-border-subtle">
+<div>
+<div class="flex items-center gap-space-sm px-space-sm py-space-md mb-space-sm">
+<div class="w-7 h-7 bg-primary-container rounded flex items-center justify-center text-on-primary-container font-semibold">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">hub</span>
+</div>
+<div>
+<h1 class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</h1>
+<p class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</p>
+</div>
+</div>
+<nav class="space-y-space-xs">
+<a class="flex items-center gap-space-md px-space-sm py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span class="font-body text-body">Overview</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-space-sm bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">alt_route</span>
+<span class="font-body text-body">Gateway</span>
+</a>
+<!-- Sub navigation item for Gateway -->
+<div class="pl-8 pr-space-xs space-y-space-xs py-1">
+<a class="flex items-center gap-space-sm px-space-sm py-1.5 bg-surface-container text-primary rounded-DEFAULT text-xs font-medium" href="#">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+            Token Saver
+          </a>
+<a class="flex items-center gap-space-sm px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT text-xs" href="#">
+            Route Rules
+          </a>
+<a class="flex items-center gap-space-sm px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT text-xs" href="#">
+            Upstreams
+          </a>
+</div>
+<a class="flex items-center gap-space-md px-space-sm py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">hub</span>
+<span class="font-body text-body">Providers</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">monitoring</span>
+<span class="font-body text-body">Traffic</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">lan</span>
+<span class="font-body text-body">Network</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">extension</span>
+<span class="font-body text-body">Integrations</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-space-sm text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">settings</span>
+<span class="font-body text-body">Settings</span>
+</a>
+</nav>
+</div>
+<div class="border-t border-border-subtle pt-space-sm space-y-space-xs">
+<a class="flex items-center gap-space-md px-space-sm py-space-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-lg">menu_book</span>
+<span class="font-body text-body">Docs</span>
+</a>
+<a class="flex items-center gap-space-md px-space-sm py-space-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-body text-body">System Status</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col pl-60">
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin">
+<div class="flex items-center gap-space-md">
+<span class="font-page-title text-page-title text-on-surface font-semibold tracking-tight">gateway / token-saver</span>
+<div class="relative w-64">
+<span class="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">search</span>
+</span>
+<input class="w-full bg-surface-container border border-border-subtle rounded-DEFAULT pl-8 pr-3 py-1 text-meta text-on-surface focus:outline-none focus:border-primary" placeholder="Search parameters, rules..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<span class="px-2 py-0.5 rounded bg-surface-container text-meta font-table-mono text-on-surface-variant border border-border-subtle">v2.4.1-proxy</span>
+<div class="flex items-center gap-space-xs">
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-lg">notifications</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-lg">light_mode</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-lg">help</span>
+</button>
+</div>
+<div class="flex items-center gap-space-sm pl-2 border-l border-border-subtle">
+<img class="w-7 h-7 rounded-full object-cover border border-border-subtle" data-alt="Close up professional portrait of an AI backend infrastructure engineer with short dark hair, wearing a minimal dark grey collar shirt, smiling slightly against a neutral dark studio background with soft rim lighting, high-end tech corporate profile avatar style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAe-F7Meia2iFcbKyigVWl9OCtVHyl1AjxRwMMlZBSAZMa07agSpo9uEuVqQcHFI9UKCZ2o0cluiq-WFx50RUKF6r8drsTShR_2L3DHDOTxi7bDvLhkqw5CBHtlZxth-aazUBedjQZM3_92NIq2PL8HnTsKy59huydFPevRI_t536wSrZCX7pVeV-w3-8jYX7bM8U5F_PdeT-CHBEIdfV7qtTrfhzVwXSbS278_xEL8r9TuvVax844o4Q4EzlQu6mlAin8ku-umB2A"/>
+<span class="font-meta text-meta font-medium">DevOps-01</span>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<main class="flex-1 p-margin space-y-space-xl max-w-[1400px] w-full mx-auto">
+<!-- Top Section: Three summary metric cards -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-space-md">
+<!-- Card 1 -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-md flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<p class="font-meta text-meta text-on-surface-variant">Tokens Saved (7d)</p>
+<h3 class="font-metric text-metric text-on-surface mt-1 font-table-mono">248.4M</h3>
+</div>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium font-table-mono bg-status-green bg-opacity-12 text-status-green">
+              +14.2%
+            </span>
+</div>
+<div class="mt-4 pt-3 border-t border-border-subtle flex items-end justify-between">
+<span class="text-xs text-on-surface-variant">vs previous 7 days</span>
+<!-- Sparkline visualization representation -->
+<div class="flex items-end gap-0.5 h-6">
+<div class="w-1.5 bg-primary opacity-40 h-2 rounded-t"></div>
+<div class="w-1.5 bg-primary opacity-60 h-3.5 rounded-t"></div>
+<div class="w-1.5 bg-primary opacity-50 h-3 rounded-t"></div>
+<div class="w-1.5 bg-primary opacity-80 h-5 rounded-t"></div>
+<div class="w-1.5 bg-primary opacity-70 h-4 rounded-t"></div>
+<div class="w-1.5 bg-primary opacity-90 h-6 rounded-t"></div>
+<div class="w-1.5 bg-primary h-5 rounded-t"></div>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-md flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<p class="font-meta text-meta text-on-surface-variant">Average Reduction</p>
+<h3 class="font-metric text-metric text-on-surface mt-1 font-table-mono">28.4%</h3>
+</div>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium font-table-mono bg-status-amber bg-opacity-12 text-status-amber">
+              -2.1%
+            </span>
+</div>
+<div class="mt-4 pt-3 border-t border-border-subtle flex items-center justify-between text-xs text-on-surface-variant">
+<span>Payload efficiency ratio</span>
+<span class="font-table-mono text-on-surface">Optimal &gt; 25%</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-md flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<p class="font-meta text-meta text-on-surface-variant">Requests Skipped</p>
+<h3 class="font-metric text-metric text-on-surface mt-1 font-table-mono">412,890</h3>
+</div>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium font-table-mono bg-primary bg-opacity-12 text-primary">
+              Active
+            </span>
+</div>
+<div class="mt-4 pt-3 border-t border-border-subtle flex items-center justify-between text-xs text-on-surface-variant">
+<span>Via token pruning &amp; cache hits</span>
+<span class="font-table-mono text-on-surface">99.8% uptime</span>
+</div>
+</div>
+</section>
+<!-- Middle Section: Horizontal Pipeline Diagram -->
+<section class="bg-surface-elevated border border-border-subtle rounded-lg p-space-lg space-y-space-md">
+<div>
+<h2 class="font-section text-section text-on-surface font-semibold">Optimization Pipeline Stages</h2>
+<p class="font-body text-body text-on-surface-variant mt-0.5">Sequential payload preprocessing &amp; compression stages in execution order.</p>
+</div>
+<!-- Pipeline stages grid/flow -->
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 pt-space-sm relative">
+<!-- Stage 1: RTK -->
+<div class="bg-surface-container border border-border-subtle rounded-lg p-4 flex flex-col justify-between relative">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="font-table-mono text-xs font-semibold px-2 py-0.5 rounded bg-surface-elevated text-primary border border-border-subtle">01 • RTK</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<h4 class="font-semibold text-body text-on-surface">Route Token Killer</h4>
+<p class="font-meta text-meta text-on-surface-variant mt-1">Removes boilerplate system instructions and redundant context.</p>
+</div>
+<div class="mt-4 pt-3 border-t border-border-subtle space-y-2">
+<div class="flex justify-between text-xs">
+<span class="text-on-surface-variant">Saved:</span>
+<span class="font-table-mono font-medium text-primary">84.2M tokens</span>
+</div>
+<div class="flex justify-between items-center text-xs">
+<span class="text-on-surface-variant text-[11px]">skipped 1,420 times after errors</span>
+<a class="text-primary hover:underline text-[11px]" href="#">Configure</a>
+</div>
+</div>
+</div>
+<!-- Stage 2: Headroom -->
+<div class="bg-surface-container border border-border-subtle rounded-lg p-4 flex flex-col justify-between relative">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="font-table-mono text-xs font-semibold px-2 py-0.5 rounded bg-surface-elevated text-primary border border-border-subtle">02 • Headroom</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<h4 class="font-semibold text-body text-on-surface">Headroom</h4>
+<p class="font-meta text-meta text-on-surface-variant mt-1">Dynamic context sliding window truncation based on active token budget.</p>
+</div>
+<div class="mt-4 pt-3 border-t border-border-subtle space-y-2">
+<div class="flex justify-between text-xs">
+<span class="text-on-surface-variant">Saved:</span>
+<span class="font-table-mono font-medium text-primary">64.1M tokens</span>
+</div>
+<div class="flex justify-between items-center text-xs">
+<span class="text-on-surface-variant text-[11px]">skipped 890 times after errors</span>
+<a class="text-primary hover:underline text-[11px]" href="#">Configure</a>
+</div>
+</div>
+</div>
+<!-- Stage 3: Caveman -->
+<div class="bg-surface-container border border-border-subtle rounded-lg p-4 flex flex-col justify-between relative opacity-80">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="font-table-mono text-xs font-semibold px-2 py-0.5 rounded bg-surface-elevated text-on-surface-variant border border-border-subtle">03 • Caveman</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<h4 class="font-semibold text-body text-on-surface">Caveman</h4>
+<p class="font-meta text-meta text-on-surface-variant mt-1">Strips polite filler, markdown noise, and verbose conversational phrasing.</p>
+</div>
+<div class="mt-4 pt-3 border-t border-border-subtle space-y-2">
+<div class="flex justify-between text-xs">
+<span class="text-on-surface-variant">Saved:</span>
+<span class="font-table-mono font-medium text-on-surface-variant">42.8M tokens</span>
+</div>
+<div class="flex justify-between items-center text-xs">
+<span class="text-on-surface-variant text-[11px]">skipped 3,120 times after errors</span>
+<a class="text-primary hover:underline text-[11px]" href="#">Configure</a>
+</div>
+</div>
+</div>
+<!-- Stage 4: Ponytail -->
+<div class="bg-surface-container border border-border-subtle rounded-lg p-4 flex flex-col justify-between relative">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="font-table-mono text-xs font-semibold px-2 py-0.5 rounded bg-surface-elevated text-primary border border-border-subtle">04 • Ponytail</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<h4 class="font-semibold text-body text-on-surface">Ponytail</h4>
+<p class="font-meta text-meta text-on-surface-variant mt-1">Semantic deduplication of repeated chunked prompt embeddings.</p>
+</div>
+<div class="mt-4 pt-3 border-t border-border-subtle space-y-2">
+<div class="flex justify-between text-xs">
+<span class="text-on-surface-variant">Saved:</span>
+<span class="font-table-mono font-medium text-primary">57.3M tokens</span>
+</div>
+<div class="flex justify-between items-center text-xs">
+<span class="text-on-surface-variant text-[11px]">skipped 412 times after errors</span>
+<a class="text-primary hover:underline text-[11px]" href="#">Configure</a>
+</div>
+</div>
+</div>
+<!-- Stage 5: PXPIPE -->
+<div class="bg-surface-container border border-border-subtle rounded-lg p-4 flex flex-col justify-between relative">
+<div>
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<span class="font-table-mono text-xs font-semibold px-2 py-0.5 rounded bg-surface-elevated text-primary border border-border-subtle">05 • PXPIPE</span>
+<!-- Green status pill style: 20px tall, 11px uppercase, status color at 12% background -->
+<span class="inline-flex items-center h-[20px] px-2 rounded font-table-mono text-[11px] uppercase font-semibold bg-status-green bg-opacity-12 text-status-green">loaded</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<h4 class="font-semibold text-body text-on-surface">PXPIPE</h4>
+<p class="font-meta text-meta text-on-surface-variant mt-1">Custom WebAssembly binary token stream compression filter.</p>
+</div>
+<div class="mt-4 pt-3 border-t border-border-subtle space-y-2">
+<div class="grid grid-cols-2 gap-2 text-xs">
+<div class="bg-surface-elevated p-1 rounded border border-border-subtle">
+<span class="block text-[10px] text-on-surface-variant">Chunk Size</span>
+<span class="font-table-mono font-medium text-on-surface">4096</span>
+</div>
+<div class="bg-surface-elevated p-1 rounded border border-border-subtle">
+<span class="block text-[10px] text-on-surface-variant">Compression</span>
+<span class="font-table-mono font-medium text-on-surface">Level 3</span>
+</div>
+</div>
+<div class="flex justify-between items-center text-xs pt-1">
+<span class="text-on-surface-variant text-[11px]">skipped 0 times after errors</span>
+<a class="text-primary hover:underline text-[11px]" href="#">Configure</a>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Bottom Section: 'Try it' Live Simulation Panel -->
+<section class="bg-surface-elevated border border-border-subtle rounded-lg p-space-lg space-y-space-md">
+<div class="flex items-center justify-between">
+<div>
+<h2 class="font-section text-section text-on-surface font-semibold">'Try it' Live Simulation Panel</h2>
+<p class="font-body text-body text-on-surface-variant mt-0.5">Test real-time optimization pipelines against custom JSON payloads.</p>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-xs text-on-surface-variant font-table-mono">Endpoint: /v1/chat/completions</span>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-space-md">
+<!-- Left: Payload textarea -->
+<div class="flex flex-col space-y-2">
+<div class="flex justify-between items-center">
+<label class="font-meta text-meta text-on-surface-variant font-medium">Input JSON Payload</label>
+<span class="text-xs text-on-surface-variant font-table-mono">1,420 tokens</span>
+</div>
+<div class="relative flex-1">
+<textarea class="w-full bg-surface-container border border-border-subtle rounded-lg p-3 font-table-mono text-table-mono text-on-surface focus:outline-none focus:border-primary resize-none" rows="12">{
+  "model": "gpt-4-turbo",
+  "temperature": 0.7,
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an exceptionally polite, detailed, and comprehensive AI assistant. Please make sure to carefully explain every single step of your reasoning process thoroughly, using rich markdown formatting, explicit bullet lists, and friendly conversational filler."
+    },
+    {
+      "role": "user",
+      "content": "Analyze this log snippet for root cause errors: [ERROR] 2023-10-24 14:22:01 - Proxy upstream timeout on connection pool slot #4. Please review details carefully."
+    }
+  ]
+}</textarea>
+</div>
+<div class="flex justify-end pt-1">
+<button class="px-4 py-2 bg-primary text-on-primary font-section text-body rounded-DEFAULT hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-space-xs font-medium">
+<span class="material-symbols-outlined text-sm">play_arrow</span>
+                Run Simulation
+              </button>
+</div>
+</div>
+<!-- Right: Side-by-side diff view -->
+<div class="flex flex-col space-y-2">
+<div class="flex justify-between items-center">
+<label class="font-meta text-meta text-on-surface-variant font-medium">Pipeline Output &amp; Diff View</label>
+<div class="flex items-center gap-2">
+<span class="text-xs font-table-mono text-status-green">814 tokens (42.7% reduction)</span>
+</div>
+</div>
+<div class="bg-surface-container border border-border-subtle rounded-lg p-3 font-table-mono text-table-mono text-on-surface h-[284px] overflow-y-auto space-y-2 select-text">
+<div class="text-on-surface-variant text-xs pb-2 border-b border-border-subtle flex justify-between">
+<span>Active Filters: RTK, Headroom, Ponytail</span>
+<span>Diff Mode: Inline</span>
+</div>
+<div class="text-on-surface leading-relaxed text-xs">
+<span class="bg-surface-elevated text-on-surface-variant">model</span>: <span class="text-primary">"gpt-4-turbo"</span>,<br/>
+<span class="bg-surface-elevated text-on-surface-variant">temperature</span>: <span class="text-primary">0.7</span>,<br/>
+<span class="bg-surface-elevated text-on-surface-variant">messages</span>: [<br/>
+                  {<br/>
+                    <span class="bg-surface-elevated text-on-surface-variant">role</span>: <span class="text-primary">"system"</span>,<br/>
+                    <span class="bg-surface-elevated text-on-surface-variant">content</span>: <span class="text-on-surface">"You are an AI assistant.</span> <span class="bg-status-red bg-opacity-20 text-error line-through">Please make sure to carefully explain every single step of your reasoning process thoroughly, using rich markdown formatting, explicit bullet lists, and friendly conversational filler.</span><span class="text-on-surface">"</span><br/>
+                  },<br/>
+                  {<br/>
+                    <span class="bg-surface-elevated text-on-surface-variant">role</span>: <span class="text-primary">"user"</span>,<br/>
+                    <span class="bg-surface-elevated text-on-surface-variant">content</span>: <span class="text-on-surface">"Analyze log: [ERROR] Proxy upstream timeout slot #4."</span><br/>
+                  }<br/>
+                ]
+              </div>
+</div>
+<div class="flex justify-between items-center pt-1 text-xs text-on-surface-variant font-table-mono">
+<span>Latency overhead: +1.4ms</span>
+<span>Saved 606 tokens on this request</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+</div>
+</body></html>

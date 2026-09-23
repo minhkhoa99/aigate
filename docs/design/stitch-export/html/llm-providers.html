@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console - LLM Providers</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "primary-fixed": "#e1e0ff",
+          "surface-container": "#1f1f27",
+          "surface-container-lowest": "#0d0d15",
+          "primary-container": "#8083ff",
+          "error-container": "#93000a",
+          "on-tertiary-container": "#452000",
+          "on-tertiary": "#4f2500",
+          "status-green": "#22C55E",
+          "on-surface-variant": "#c7c4d7",
+          "surface-tint": "#c0c1ff",
+          "surface-dark": "#090A0F",
+          "status-red": "#EF4444",
+          "primary": "#c0c1ff",
+          "status-amber": "#F59E0B",
+          "on-background": "#e4e1ed",
+          "tertiary-container": "#d97721",
+          "surface-bright": "#393841",
+          "status-grey": "#6B7280",
+          "surface": "#13131b",
+          "on-primary": "#1000a9",
+          "error": "#ffb4ab",
+          "surface-dim": "#13131b",
+          "on-tertiary-fixed-variant": "#703700",
+          "on-secondary-container": "#b3b1ff",
+          "outline-variant": "#464554",
+          "on-secondary-fixed-variant": "#3323cc",
+          "inverse-primary": "#494bd6",
+          "surface-container-highest": "#34343d",
+          "secondary-container": "#3626ce",
+          "on-tertiary-fixed": "#301400",
+          "secondary-fixed-dim": "#c3c0ff",
+          "secondary": "#c3c0ff",
+          "tertiary": "#ffb783",
+          "primary-fixed-dim": "#c0c1ff",
+          "on-primary-fixed": "#07006c",
+          "border-subtle": "#27272A",
+          "on-surface": "#e4e1ed",
+          "on-primary-container": "#0d0096",
+          "secondary-fixed": "#e2dfff",
+          "on-secondary": "#1d00a5",
+          "on-primary-fixed-variant": "#2f2ebe",
+          "surface-container-low": "#1b1b23",
+          "background": "#13131b",
+          "tertiary-fixed": "#ffdcc5",
+          "surface-container-high": "#292932",
+          "outline": "#908fa0",
+          "on-secondary-fixed": "#0f0069",
+          "on-error": "#690005",
+          "surface-elevated": "#12131A",
+          "on-error-container": "#ffdad6",
+          "tertiary-fixed-dim": "#ffb783",
+          "surface-variant": "#34343d",
+          "inverse-surface": "#e4e1ed",
+          "inverse-on-surface": "#303038"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "space-xl": "2rem",
+          "space-sm": "0.5rem",
+          "space-md": "1rem",
+          "space-lg": "1.5rem",
+          "gutter": "1rem",
+          "space-xs": "0.25rem",
+          "margin": "1.5rem"
+        },
+        "fontFamily": {
+          "section": ["Inter"],
+          "table": ["Inter"],
+          "body": ["Inter"],
+          "page-title": ["Inter"],
+          "metric": ["JetBrains Mono"],
+          "table-mono": ["JetBrains Mono"],
+          "meta": ["Inter"]
+        },
+        "fontSize": {
+          "section": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+          "table": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+          "body": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+          "page-title": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+          "metric": ["32px", {"lineHeight": "38px", "fontWeight": "500"}],
+          "table-mono": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+          "meta": ["12px", {"lineHeight": "16px", "fontWeight": "400"}]
+        }
+      }
+    }
+  }
+</script>
+</head>
+<body class="bg-background text-on-background font-body min-h-screen flex flex-col antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated border-r border-border-subtle flex flex-col justify-between p-space-sm">
+<div class="flex flex-col gap-space-md">
+<!-- Header / Logo -->
+<div class="flex items-center gap-space-sm px-space-sm py-space-sm">
+<div class="w-7 h-7 bg-primary-container rounded flex items-center justify-center text-on-primary-container font-bold text-sm">AI</div>
+<div>
+<div class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</div>
+<div class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</div>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="flex flex-col gap-1">
+<!-- Overview -->
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span class="font-body text-body">Overview</span>
+</a>
+<!-- Gateway -->
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">alt_route</span>
+<span class="font-body text-body">Gateway</span>
+</a>
+<!-- Providers (ACTIVE) -->
+<a class="flex items-center gap-space-sm px-space-sm py-2 bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">hub</span>
+<span class="font-body text-body">Providers</span>
+</a>
+<!-- Traffic -->
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">monitoring</span>
+<span class="font-body text-body">Traffic</span>
+</a>
+<!-- Network -->
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">lan</span>
+<span class="font-body text-body">Network</span>
+</a>
+<!-- Integrations -->
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">extension</span>
+<span class="font-body text-body">Integrations</span>
+</a>
+<!-- Settings -->
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">settings</span>
+<span class="font-body text-body">Settings</span>
+</a>
+</nav>
+</div>
+<!-- Footer Navigation -->
+<div class="flex flex-col gap-1 pt-space-md border-t border-border-subtle">
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">menu_book</span>
+<span class="font-body text-body">Docs</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-lg">check_circle</span>
+<span class="font-body text-body">System Status</span>
+</a>
+</div>
+</aside>
+<!-- Main Shell Wrapper -->
+<div class="pl-60 flex flex-col flex-1">
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin">
+<div class="flex items-center gap-space-md">
+<div class="font-page-title text-page-title text-on-surface dark:text-on-surface font-semibold flex items-center gap-2">
+<span class="text-on-surface-variant font-normal">gateway</span>
+<span class="text-on-surface-variant font-normal">/</span>
+<span>providers</span>
+</div>
+<div class="flex items-center gap-1.5 bg-surface-container px-2 py-0.5 rounded text-xs border border-border-subtle">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span class="font-table-mono text-table-mono text-on-surface-variant">RTT 24ms</span>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<!-- Search bar trigger / ⌘K -->
+<div class="flex items-center gap-2 bg-surface-container px-3 py-1 rounded border border-border-subtle text-on-surface-variant cursor-pointer hover:border-outline transition-colors">
+<span class="material-symbols-outlined text-sm">search</span>
+<span class="text-meta">Search gateway...</span>
+<kbd class="bg-surface-container-high px-1.5 py-0.5 rounded text-[10px] font-table-mono border border-border-subtle">⌘K</kbd>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="font-table-mono text-meta text-on-surface-variant bg-surface-container px-2 py-1 rounded border border-border-subtle">v2.4.1-proxy</span>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">notifications</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">light_mode</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">help</span>
+</button>
+<div class="w-7 h-7 rounded-full bg-surface-container-high border border-border-subtle flex items-center justify-center overflow-hidden ml-1">
+<img class="w-full h-full object-cover" data-alt="A professional engineer avatar profile photo showing a person in a dark minimalist workspace with cool blue ambient backlighting, sharp focus, professional tech aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkX8DjWjieNMhHxsq-Xx3iUHyzni6-hH2yUjeNu90RGPyu9F0Qy4W7MUMgd1FShUEAP2AzWUtU8badwbR8qcIFX1CKan_Jl2Dktwnaf2XOPxREkfudElGRlgoHbvEC72RUBdiGUEITHQMdPEGviqccDYqC3BIEfqgqKlk3oBZw9vhVnWSoXBwUPAF2pWDVi7jC-mc-Ld977NEiGmGc2-LVs7jiAtsx0Dd1yGKhVp3vbAPErpw7y2SeT2ySn07WCQDojB_bpP7rRq8"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 p-space-xl flex flex-col gap-space-lg max-w-[1600px] w-full mx-auto">
+<!-- Page Header -->
+<div class="flex items-center justify-between">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-3">
+<h1 class="font-page-title text-page-title font-semibold text-on-surface">LLM Providers</h1>
+<span class="bg-surface-container-high text-on-surface-variant text-meta font-table-mono px-2 py-0.5 rounded border border-border-subtle">123 providers available</span>
+</div>
+<p class="font-body text-body text-on-surface-variant">Configure, monitor, and route upstream traffic across connected foundational and fine-tuned model providers.</p>
+</div>
+<button class="bg-primary-container text-on-primary-container font-semibold px-4 py-2 rounded-lg text-body flex items-center gap-2 hover:opacity-90 active:opacity-95 transition-all shadow-sm cursor-pointer select-none">
+<span class="material-symbols-outlined text-lg">add</span>
+<span>Add Provider</span>
+</button>
+</div>
+<!-- Filter Row -->
+<div class="flex flex-wrap items-center justify-between gap-space-md bg-surface-container-low p-space-md rounded-xl border border-border-subtle">
+<div class="flex flex-wrap items-center gap-space-sm flex-1">
+<!-- Search input -->
+<div class="relative flex-1 min-w-[280px]">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-base">search</span>
+<input class="w-full bg-surface-container border border-border-subtle rounded-lg pl-9 pr-4 py-1.5 text-body text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary transition-colors" placeholder="Search providers, models, or endpoints..." type="text"/>
+</div>
+<!-- Auth Type Dropdown Chip -->
+<div class="flex items-center gap-1 bg-surface-container px-3 py-1.5 rounded-lg border border-border-subtle text-body text-on-surface-variant cursor-pointer hover:border-outline transition-colors">
+<span>Auth: All</span>
+<span class="material-symbols-outlined text-sm">expand_more</span>
+</div>
+<!-- Connected Only Toggle Chip -->
+<div class="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-lg border border-border-subtle text-body text-on-surface cursor-pointer hover:border-outline transition-colors select-none">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span>Connected Only</span>
+<span class="material-symbols-outlined text-sm text-on-surface-variant">check</span>
+</div>
+<!-- Has OAuth Chip -->
+<div class="flex items-center gap-1 bg-surface-container px-3 py-1.5 rounded-lg border border-border-subtle text-body text-on-surface-variant cursor-pointer hover:border-outline transition-colors">
+<span>Has OAuth</span>
+</div>
+<!-- Free Tier Chip -->
+<div class="flex items-center gap-1 bg-surface-container px-3 py-1.5 rounded-lg border border-border-subtle text-body text-on-surface-variant cursor-pointer hover:border-outline transition-colors">
+<span>Free Tier</span>
+</div>
+</div>
+<!-- Capabilities Filter Pills -->
+<div class="flex items-center gap-1.5 border-l border-border-subtle pl-space-md">
+<span class="text-meta text-on-surface-variant mr-1">Capability:</span>
+<button class="bg-primary-container text-on-primary-container px-2.5 py-1 rounded text-meta font-medium cursor-pointer">Chat</button>
+<button class="bg-surface-container text-on-surface-variant px-2.5 py-1 rounded text-meta hover:text-on-surface cursor-pointer">Embeddings</button>
+<button class="bg-surface-container text-on-surface-variant px-2.5 py-1 rounded text-meta hover:text-on-surface cursor-pointer">Vision</button>
+<button class="bg-surface-container text-on-surface-variant px-2.5 py-1 rounded text-meta hover:text-on-surface cursor-pointer">Audio</button>
+</div>
+</div>
+<!-- Provider Grid (Dense 5-Column Grid) -->
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-space-md">
+<!-- Card 1: OpenAI -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-primary text-base">bolt</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">OpenAI</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">api.openai.com</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-green shrink-0 mt-1" title="Healthy"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">API Key</span>
+<span class="text-meta font-table-mono text-on-surface-variant">3 accounts</span>
+</div>
+</div>
+<!-- Card 2: Anthropic -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-tertiary text-base">psychology</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">Anthropic</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">api.anthropic.com</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-green shrink-0 mt-1" title="Healthy"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">API Key</span>
+<span class="text-meta font-table-mono text-on-surface-variant">2 accounts</span>
+</div>
+</div>
+<!-- Card 3: Google Vertex -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-primary-container text-base">cloud</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">Google Vertex</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">us-central1.ai.gcp</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-green shrink-0 mt-1" title="Healthy"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">IAM</span>
+<span class="text-meta font-table-mono text-on-surface-variant">5 accounts</span>
+</div>
+</div>
+<!-- Card 4: DeepSeek -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-secondary text-base">visibility</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">DeepSeek</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">api.deepseek.com</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-green shrink-0 mt-1" title="Healthy"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">API Key</span>
+<span class="text-meta font-table-mono text-on-surface-variant">1 account</span>
+</div>
+</div>
+<!-- Card 5: Mistral -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-tertiary-container text-base">air</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">Mistral AI</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">api.mistral.ai</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-green shrink-0 mt-1" title="Healthy"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">API Key</span>
+<span class="text-meta font-table-mono text-on-surface-variant">2 accounts</span>
+</div>
+</div>
+<!-- Card 6: Cohere -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-primary text-base">hub</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">Cohere</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">api.cohere.ai</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-amber shrink-0 mt-1" title="Degraded"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">OAuth2</span>
+<span class="text-meta font-table-mono text-on-surface-variant">1 account</span>
+</div>
+</div>
+<!-- Card 7: Groq -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-status-green text-base">speed</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">Groq</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">api.groq.com</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-green shrink-0 mt-1" title="Healthy"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">API Key</span>
+<span class="text-meta font-table-mono text-on-surface-variant">4 accounts</span>
+</div>
+</div>
+<!-- Card 8: Together AI -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-secondary text-base">group</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">Together AI</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">api.together.xyz</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-green shrink-0 mt-1" title="Healthy"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">API Key</span>
+<span class="text-meta font-table-mono text-on-surface-variant">1 account</span>
+</div>
+</div>
+<!-- Card 9: Replicate -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-primary text-base">content_copy</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">Replicate</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">api.replicate.com</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-green shrink-0 mt-1" title="Healthy"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">API Key</span>
+<span class="text-meta font-table-mono text-on-surface-variant">2 accounts</span>
+</div>
+</div>
+<!-- Card 10: Fireworks -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-tertiary text-base">local_fire_department</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">Fireworks</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">api.fireworks.ai</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-grey shrink-0 mt-1" title="Offline"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">API Key</span>
+<span class="text-meta font-table-mono text-on-surface-variant">1 account</span>
+</div>
+</div>
+<!-- Card 11: Perplexity -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-secondary text-base">public</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">Perplexity</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">api.perplexity.ai</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-green shrink-0 mt-1" title="Healthy"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">API Key</span>
+<span class="text-meta font-table-mono text-on-surface-variant">3 accounts</span>
+</div>
+</div>
+<!-- Card 12: OpenRouter -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 hover:border-primary transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-on-surface border border-border-subtle">
+<span class="material-symbols-outlined text-primary-container text-base">alt_route</span>
+</div>
+<div>
+<h3 class="font-section text-section text-on-surface group-hover:text-primary transition-colors">OpenRouter</h3>
+<span class="text-[11px] font-table-mono text-on-surface-variant">openrouter.ai/api</span>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-green shrink-0 mt-1" title="Healthy"></span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/50">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[11px] font-table-mono text-on-surface-variant border border-border-subtle">OAuth2</span>
+<span class="text-meta font-table-mono text-on-surface-variant">6 accounts</span>
+</div>
+</div>
+<!-- Loading Skeleton Card 1 -->
+<div class="bg-surface-container-low/50 border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 animate-pulse">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container"></div>
+<div class="flex flex-col gap-1.5">
+<div class="w-20 h-4 bg-surface-container rounded"></div>
+<div class="w-28 h-3 bg-surface-container rounded"></div>
+</div>
+</div>
+<div class="w-2 h-2 rounded-full bg-surface-container"></div>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/30">
+<div class="w-12 h-4 bg-surface-container rounded"></div>
+<div class="w-14 h-3 bg-surface-container rounded"></div>
+</div>
+</div>
+<!-- Loading Skeleton Card 2 -->
+<div class="bg-surface-container-low/50 border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 animate-pulse">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container"></div>
+<div class="flex flex-col gap-1.5">
+<div class="w-24 h-4 bg-surface-container rounded"></div>
+<div class="w-20 h-3 bg-surface-container rounded"></div>
+</div>
+</div>
+<div class="w-2 h-2 rounded-full bg-surface-container"></div>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/30">
+<div class="w-12 h-4 bg-surface-container rounded"></div>
+<div class="w-14 h-3 bg-surface-container rounded"></div>
+</div>
+</div>
+<!-- Loading Skeleton Card 3 -->
+<div class="bg-surface-container-low/50 border border-border-subtle rounded-xl p-space-md flex flex-col justify-between gap-3 animate-pulse">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container"></div>
+<div class="flex flex-col gap-1.5">
+<div class="w-16 h-4 bg-surface-container rounded"></div>
+<div class="w-24 h-3 bg-surface-container rounded"></div>
+</div>
+</div>
+<div class="w-2 h-2 rounded-full bg-surface-container"></div>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-border-subtle/30">
+<div class="w-12 h-4 bg-surface-container rounded"></div>
+<div class="w-14 h-3 bg-surface-container rounded"></div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

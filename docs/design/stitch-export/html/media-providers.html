@@ -1,0 +1,530 @@
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface-container-lowest": "#0d0d15",
+            "on-secondary-fixed": "#0f0069",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "on-surface": "#e4e1ed",
+            "status-red": "#EF4444",
+            "outline": "#908fa0",
+            "primary-container": "#8083ff",
+            "on-tertiary-container": "#452000",
+            "on-primary": "#1000a9",
+            "primary-fixed-dim": "#c0c1ff",
+            "surface-container-highest": "#34343d",
+            "border-subtle": "#27272A",
+            "tertiary-fixed-dim": "#ffb783",
+            "status-amber": "#F59E0B",
+            "surface-tint": "#c0c1ff",
+            "surface-bright": "#393841",
+            "error-container": "#93000a",
+            "surface-dark": "#090A0F",
+            "secondary": "#c3c0ff",
+            "outline-variant": "#464554",
+            "on-error": "#690005",
+            "on-secondary": "#1d00a5",
+            "status-green": "#22C55E",
+            "background": "#13131b",
+            "on-secondary-fixed-variant": "#3323cc",
+            "on-secondary-container": "#b3b1ff",
+            "on-tertiary": "#4f2500",
+            "error": "#ffb4ab",
+            "secondary-container": "#3626ce",
+            "primary": "#c0c1ff",
+            "tertiary-container": "#d97721",
+            "surface-elevated": "#12131A",
+            "tertiary": "#ffb783",
+            "on-tertiary-fixed-variant": "#703700",
+            "surface-dim": "#13131b",
+            "secondary-fixed": "#e2dfff",
+            "on-background": "#e4e1ed",
+            "surface-container": "#1f1f27",
+            "tertiary-fixed": "#ffdcc5",
+            "surface-container-low": "#1b1b23",
+            "inverse-surface": "#e4e1ed",
+            "inverse-on-surface": "#303038",
+            "on-primary-container": "#0d0096",
+            "surface-variant": "#34343d",
+            "primary-fixed": "#e1e0ff",
+            "on-tertiary-fixed": "#301400",
+            "on-surface-variant": "#c7c4d7",
+            "inverse-primary": "#494bd6",
+            "surface-container-high": "#292932",
+            "on-primary-fixed": "#07006c",
+            "status-grey": "#6B7280",
+            "surface": "#13131b",
+            "secondary-fixed-dim": "#c3c0ff",
+            "on-error-container": "#ffdad6"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-xl": "2rem",
+            "space-xs": "0.25rem",
+            "space-sm": "0.5rem",
+            "margin": "1.5rem",
+            "gutter": "1rem",
+            "space-md": "1rem",
+            "space-lg": "1.5rem"
+          },
+          "fontFamily": {
+            "table-mono": ["JetBrains Mono"],
+            "table": ["Inter"],
+            "page-title": ["Inter"],
+            "body": ["Inter"],
+            "section": ["Inter"],
+            "metric": ["JetBrains Mono"],
+            "meta": ["Inter"]
+          },
+          "fontSize": {
+            "table-mono": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "table": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "page-title": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "section": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "metric": ["32px", { "lineHeight": "38px", "fontWeight": "500" }],
+            "meta": ["12px", { "lineHeight": "16px", "fontWeight": "400" }]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-background text-on-surface font-body antialiased min-h-screen flex flex-col selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated flex flex-col justify-between h-full p-space-sm w-60 border-r border-border-subtle">
+<div class="flex flex-col gap-space-md">
+<!-- Header -->
+<div class="flex items-center gap-space-sm px-space-sm py-space-sm">
+<div class="w-7 h-7 bg-primary-container rounded flex items-center justify-center text-on-primary-container font-bold text-meta">AI</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</span>
+<span class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</span>
+</div>
+</div>
+<!-- Navigation -->
+<nav class="flex flex-col gap-space-xs mt-space-sm">
+<div class="text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none flex items-center gap-space-sm px-space-sm py-1.5 font-body text-body">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span>Overview</span>
+</div>
+<div class="text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none flex items-center gap-space-sm px-space-sm py-1.5 font-body text-body">
+<span class="material-symbols-outlined text-lg">alt_route</span>
+<span>Gateway</span>
+</div>
+<!-- Active Nav Item with Submenu -->
+<div class="flex flex-col">
+<div class="bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none flex items-center justify-between px-space-sm py-1.5 font-body text-body">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-lg">hub</span>
+<span>Providers</span>
+</div>
+<span class="material-symbols-outlined text-sm">expand_more</span>
+</div>
+<!-- Submenu -->
+<div class="flex flex-col ml-6 pl-2 border-l border-border-subtle gap-1 mt-1">
+<div class="text-on-surface-variant hover:text-on-surface cursor-pointer py-1 px-2 text-meta rounded transition-colors">API Endpoints</div>
+<div class="bg-surface-container text-primary font-medium cursor-pointer py-1 px-2 text-meta rounded transition-colors">Media Providers</div>
+<div class="text-on-surface-variant hover:text-on-surface cursor-pointer py-1 px-2 text-meta rounded transition-colors">Upstream Pools</div>
+<div class="text-on-surface-variant hover:text-on-surface cursor-pointer py-1 px-2 text-meta rounded transition-colors">Rate Limiting</div>
+</div>
+</div>
+<div class="text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none flex items-center gap-space-sm px-space-sm py-1.5 font-body text-body">
+<span class="material-symbols-outlined text-lg">monitoring</span>
+<span>Traffic</span>
+</div>
+<div class="text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none flex items-center gap-space-sm px-space-sm py-1.5 font-body text-body">
+<span class="material-symbols-outlined text-lg">lan</span>
+<span>Network</span>
+</div>
+<div class="text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none flex items-center gap-space-sm px-space-sm py-1.5 font-body text-body">
+<span class="material-symbols-outlined text-lg">extension</span>
+<span>Integrations</span>
+</div>
+<div class="text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none flex items-center gap-space-sm px-space-sm py-1.5 font-body text-body">
+<span class="material-symbols-outlined text-lg">settings</span>
+<span>Settings</span>
+</div>
+</nav>
+</div>
+<!-- Footer -->
+<div class="flex flex-col gap-1 pt-space-sm border-t border-border-subtle">
+<div class="flex items-center justify-between text-on-surface-variant hover:text-on-surface px-space-sm py-1 cursor-pointer rounded text-meta transition-colors">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-sm">menu_book</span>
+<span>Docs</span>
+</div>
+<span class="material-symbols-outlined text-xs">open_in_new</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant hover:text-on-surface px-space-sm py-1 cursor-pointer rounded text-meta transition-colors">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-sm text-status-green">check_circle</span>
+<span>System Status</span>
+</div>
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+</div>
+</div>
+</aside>
+<!-- Main Wrapper -->
+<div class="pl-60 flex flex-col flex-1">
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs text-meta font-table-mono text-on-surface-variant">
+<span class="hover:text-on-surface cursor-pointer">gateway</span>
+<span>/</span>
+<span class="hover:text-on-surface cursor-pointer">providers</span>
+<span>/</span>
+<span class="hover:text-on-surface cursor-pointer">media</span>
+<span>/</span>
+<span class="text-on-surface font-semibold">tts</span>
+</div>
+<div class="relative hidden lg:block">
+<span class="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">search</span>
+</span>
+<input class="bg-surface-container border border-border-subtle text-on-surface text-meta rounded pl-8 pr-3 py-1 w-64 focus:outline-none focus:border-primary" placeholder="Search routes, providers, voices..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<span class="bg-surface-container text-on-surface-variant px-2 py-0.5 rounded text-meta font-table-mono border border-border-subtle">v2.4.1-proxy</span>
+<div class="flex items-center gap-space-sm text-on-surface-variant">
+<button class="hover:text-on-surface p-1 rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">notifications</span>
+</button>
+<button class="hover:text-on-surface p-1 rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">light_mode</span>
+</button>
+<button class="hover:text-on-surface p-1 rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">help</span>
+</button>
+</div>
+<div class="flex items-center gap-space-xs pl-2 border-l border-border-subtle cursor-pointer">
+<div class="w-7 h-7 rounded-full bg-surface-container-highest flex items-center justify-center text-meta font-semibold text-primary">EA</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 p-space-xl flex flex-col gap-space-xl max-w-[1400px] w-full mx-auto">
+<!-- 1. Page Header -->
+<div class="flex items-start justify-between">
+<div class="flex flex-col gap-1">
+<h1 class="font-page-title text-page-title text-on-surface tracking-tight">Media Providers</h1>
+<p class="text-body text-on-surface-variant max-w-3xl">Configure, monitor, and route upstream traffic across connected media and specialized capability providers.</p>
+</div>
+<button class="bg-primary hover:bg-primary-container text-on-primary font-medium text-body px-4 py-2 rounded flex items-center gap-space-xs transition-colors cursor-pointer shadow-sm">
+<span class="material-symbols-outlined text-lg">add</span>
+<span>Add Provider</span>
+</button>
+</div>
+<!-- 2. Tab strip across nine media/service kinds -->
+<div class="flex items-center gap-2 overflow-x-auto pb-2 border-b border-border-subtle">
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container text-on-surface-variant rounded-DEFAULT cursor-pointer text-body transition-colors">
+<span class="material-symbols-outlined text-base">image</span>
+<span>Image</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container text-on-surface-variant opacity-60 rounded-DEFAULT cursor-pointer text-body transition-colors">
+<span class="material-symbols-outlined text-base">videocam</span>
+<span>Video</span>
+<span class="bg-surface-container-highest text-status-grey text-[10px] px-1.5 py-0.2 rounded font-table-mono uppercase">not configured</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-high text-primary font-medium rounded-DEFAULT cursor-pointer text-body shadow-sm border border-border-subtle">
+<span class="material-symbols-outlined text-base">record_voice_over</span>
+<span>TTS</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container text-on-surface-variant rounded-DEFAULT cursor-pointer text-body transition-colors">
+<span class="material-symbols-outlined text-base">keyboard_voice</span>
+<span>STT</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container text-on-surface-variant rounded-DEFAULT cursor-pointer text-body transition-colors">
+<span class="material-symbols-outlined text-base">data_object</span>
+<span>Embedding</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container text-on-surface-variant rounded-DEFAULT cursor-pointer text-body transition-colors">
+<span class="material-symbols-outlined text-base">document_scanner</span>
+<span>Image→Text</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container text-on-surface-variant rounded-DEFAULT cursor-pointer text-body transition-colors">
+<span class="material-symbols-outlined text-base">globe</span>
+<span>Web Search</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container text-on-surface-variant rounded-DEFAULT cursor-pointer text-body transition-colors">
+<span class="material-symbols-outlined text-base">download</span>
+<span>Web Fetch</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container text-on-surface-variant opacity-60 rounded-DEFAULT cursor-pointer text-body transition-colors">
+<span class="material-symbols-outlined text-base">music_note</span>
+<span>Music</span>
+<span class="bg-surface-container-highest text-status-grey text-[10px] px-1.5 py-0.2 rounded font-table-mono uppercase">not configured</span>
+</div>
+</div>
+<!-- 3. Endpoint Configuration Card -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-lg flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary">api</span>
+<span class="font-section text-section text-on-surface">Base API Endpoint Path</span>
+</div>
+<span class="bg-surface-container text-status-green font-table-mono text-meta px-2 py-0.5 rounded border border-border-subtle">Operational</span>
+</div>
+<p class="text-body text-on-surface-variant">Route requests directly to downstream TTS providers using the unified OpenAI-compatible endpoint schema.</p>
+<div class="flex items-center justify-between bg-surface-container-lowest border border-border-subtle px-4 py-2.5 rounded font-table-mono text-table-mono text-on-surface">
+<div class="flex items-center gap-space-sm">
+<span class="text-primary font-semibold">POST</span>
+<span>https://api.aigate.internal/v1/audio/speech</span>
+</div>
+<button class="bg-surface-container hover:bg-surface-container-high text-on-surface text-meta px-2.5 py-1 rounded border border-border-subtle flex items-center gap-1 transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">content_copy</span>
+<span>Copy URL</span>
+</button>
+</div>
+</div>
+<!-- 4. Connected Providers & Connections Table -->
+<div class="flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<h2 class="font-section text-section text-on-surface">Active TTS Connections (3)</h2>
+<div class="flex items-center gap-2">
+<span class="text-meta text-on-surface-variant">Pool:</span>
+<span class="bg-surface-container-high text-primary font-table-mono text-meta px-2.5 py-1 rounded border border-border-subtle">us-east-pool</span>
+</div>
+</div>
+<div class="bg-surface-elevated border border-border-subtle rounded-lg overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-border-subtle bg-surface-container-low text-on-surface-variant font-table text-table-mono">
+<th class="py-2.5 px-4 font-medium">Provider / Model</th>
+<th class="py-2.5 px-4 font-medium">Connection Label</th>
+<th class="py-2.5 px-4 font-medium">Credential Type</th>
+<th class="py-2.5 px-4 font-medium">Status</th>
+<th class="py-2.5 px-4 font-medium">Quota Usage</th>
+<th class="py-2.5 px-4 font-medium">Last Used</th>
+<th class="py-2.5 px-4 font-medium text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle text-table font-table">
+<!-- Row 1 -->
+<tr class="h-[36px] hover:bg-surface-container/50 transition-colors">
+<td class="py-2 px-4 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span class="font-medium text-on-surface">OpenAI</span>
+<span class="text-on-surface-variant font-table-mono text-meta">/ tts-1</span>
+</td>
+<td class="py-2 px-4 text-on-surface-variant font-table-mono">prod-openai-tts-primary</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container px-2 py-0.5 rounded text-meta text-on-surface border border-border-subtle font-table-mono">API Key</span>
+</td>
+<td class="py-2 px-4">
+<span class="bg-status-green/12 text-status-green text-[11px] font-semibold px-2 py-0.5 rounded uppercase">ACTIVE</span>
+</td>
+<td class="py-2 px-4">
+<div class="flex items-center gap-2 w-36">
+<div class="flex-1 bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[68%]"></div>
+</div>
+<span class="font-table-mono text-meta text-on-surface-variant">68%</span>
+</div>
+</td>
+<td class="py-2 px-4 text-on-surface-variant font-table-mono text-meta">2m ago</td>
+<td class="py-2 px-4 text-right">
+<div class="flex items-center justify-end gap-1 text-on-surface-variant">
+<button class="p-1 hover:text-on-surface rounded hover:bg-surface-container transition-colors" title="Test Connection"><span class="material-symbols-outlined text-sm">bolt</span></button>
+<button class="p-1 hover:text-on-surface rounded hover:bg-surface-container transition-colors" title="Refresh Credentials"><span class="material-symbols-outlined text-sm">refresh</span></button>
+<button class="p-1 hover:text-status-red rounded hover:bg-surface-container transition-colors" title="Delete"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="h-[36px] hover:bg-surface-container/50 transition-colors">
+<td class="py-2 px-4 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-status-amber"></span>
+<span class="font-medium text-on-surface">ElevenLabs</span>
+<span class="text-on-surface-variant font-table-mono text-meta">/ multilingual-v2</span>
+</td>
+<td class="py-2 px-4 text-on-surface-variant font-table-mono">eu-elevenlabs-backup</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container px-2 py-0.5 rounded text-meta text-on-surface border border-border-subtle font-table-mono">API Key</span>
+</td>
+<td class="py-2 px-4">
+<span class="bg-status-amber/12 text-status-amber text-[11px] font-semibold px-2 py-0.5 rounded uppercase">EXPIRES SOON</span>
+</td>
+<td class="py-2 px-4">
+<div class="flex items-center gap-2 w-36">
+<div class="flex-1 bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-status-amber h-full w-[91%]"></div>
+</div>
+<span class="font-table-mono text-meta text-on-surface-variant">91%</span>
+</div>
+</td>
+<td class="py-2 px-4 text-on-surface-variant font-table-mono text-meta">14m ago</td>
+<td class="py-2 px-4 text-right">
+<div class="flex items-center justify-end gap-1 text-on-surface-variant">
+<button class="p-1 hover:text-on-surface rounded hover:bg-surface-container transition-colors" title="Test Connection"><span class="material-symbols-outlined text-sm">bolt</span></button>
+<button class="p-1 hover:text-on-surface rounded hover:bg-surface-container transition-colors" title="Refresh Credentials"><span class="material-symbols-outlined text-sm">refresh</span></button>
+<button class="p-1 hover:text-status-red rounded hover:bg-surface-container transition-colors" title="Delete"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="h-[36px] hover:bg-surface-container/50 transition-colors">
+<td class="py-2 px-4 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span class="font-medium text-on-surface">Cartesia</span>
+<span class="text-on-surface-variant font-table-mono text-meta">/ sonic-english</span>
+</td>
+<td class="py-2 px-4 text-on-surface-variant font-table-mono">cartesia-sonic-edge</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container px-2 py-0.5 rounded text-meta text-on-surface border border-border-subtle font-table-mono">OAuth 2.0</span>
+</td>
+<td class="py-2 px-4">
+<span class="bg-status-green/12 text-status-green text-[11px] font-semibold px-2 py-0.5 rounded uppercase">ACTIVE</span>
+</td>
+<td class="py-2 px-4">
+<div class="flex items-center gap-2 w-36">
+<div class="flex-1 bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[34%]"></div>
+</div>
+<span class="font-table-mono text-meta text-on-surface-variant">34%</span>
+</div>
+</td>
+<td class="py-2 px-4 text-on-surface-variant font-table-mono text-meta">1h ago</td>
+<td class="py-2 px-4 text-right">
+<div class="flex items-center justify-end gap-1 text-on-surface-variant">
+<button class="p-1 hover:text-on-surface rounded hover:bg-surface-container transition-colors" title="Test Connection"><span class="material-symbols-outlined text-sm">bolt</span></button>
+<button class="p-1 hover:text-on-surface rounded hover:bg-surface-container transition-colors" title="Refresh Credentials"><span class="material-symbols-outlined text-sm">refresh</span></button>
+<button class="p-1 hover:text-status-red rounded hover:bg-surface-container transition-colors" title="Delete"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- 5. Voice Browser (specific to TTS) -->
+<div class="flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<h2 class="font-section text-section text-on-surface">Voice Browser</h2>
+<p class="text-meta text-on-surface-variant">Explore available generative voices across connected upstream TTS providers.</p>
+</div>
+<!-- Filter Controls -->
+<div class="flex items-center gap-2">
+<select class="bg-surface-container border border-border-subtle text-on-surface text-meta rounded px-2.5 py-1.5 focus:outline-none focus:border-primary">
+<option>Language: All</option>
+<option>English</option>
+<option>Spanish</option>
+</select>
+<select class="bg-surface-container border border-border-subtle text-on-surface text-meta rounded px-2.5 py-1.5 focus:outline-none focus:border-primary">
+<option>Region: All</option>
+<option>US</option>
+<option>UK</option>
+<option>Global</option>
+</select>
+<select class="bg-surface-container border border-border-subtle text-on-surface text-meta rounded px-2.5 py-1.5 focus:outline-none focus:border-primary">
+<option>Gender: All</option>
+<option>Female</option>
+<option>Male</option>
+<option>Neutral</option>
+</select>
+</div>
+</div>
+<!-- Voice Grid Table -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-border-subtle bg-surface-container-low text-on-surface-variant font-table text-table-mono">
+<th class="py-2.5 px-4 font-medium">Voice Name</th>
+<th class="py-2.5 px-4 font-medium">Provider Source</th>
+<th class="py-2.5 px-4 font-medium">Locale Place</th>
+<th class="py-2.5 px-4 font-medium">Sample Badge</th>
+<th class="py-2.5 px-4 font-medium text-right">Preview Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle text-table font-table">
+<!-- Voice 1 -->
+<tr class="h-[36px] hover:bg-surface-container/50 transition-colors">
+<td class="py-2 px-4 font-medium text-on-surface font-table-mono">Aria</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container text-primary font-table-mono text-meta px-2 py-0.5 rounded border border-border-subtle">OpenAI</span>
+</td>
+<td class="py-2 px-4 text-on-surface-variant">United States — English</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container-high text-on-surface text-[11px] px-2 py-0.5 rounded border border-border-subtle font-table-mono">Standard HD</span>
+</td>
+<td class="py-2 px-4 text-right">
+<button class="bg-surface-container hover:bg-surface-container-high text-primary text-meta px-3 py-1 rounded border border-border-subtle inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">graphic_eq</span>
+<span>Play Preview</span>
+</button>
+</td>
+</tr>
+<!-- Voice 2 -->
+<tr class="h-[36px] hover:bg-surface-container/50 transition-colors">
+<td class="py-2 px-4 font-medium text-on-surface font-table-mono">Roger</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container text-primary font-table-mono text-meta px-2 py-0.5 rounded border border-border-subtle">ElevenLabs</span>
+</td>
+<td class="py-2 px-4 text-on-surface-variant">United Kingdom — English</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container-high text-on-surface text-[11px] px-2 py-0.5 rounded border border-border-subtle font-table-mono">Multilingual v2</span>
+</td>
+<td class="py-2 px-4 text-right">
+<button class="bg-surface-container hover:bg-surface-container-high text-primary text-meta px-3 py-1 rounded border border-border-subtle inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">graphic_eq</span>
+<span>Play Preview</span>
+</button>
+</td>
+</tr>
+<!-- Voice 3 -->
+<tr class="h-[36px] hover:bg-surface-container/50 transition-colors">
+<td class="py-2 px-4 font-medium text-on-surface font-table-mono">Sarah</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container text-primary font-table-mono text-meta px-2 py-0.5 rounded border border-border-subtle">OpenAI</span>
+</td>
+<td class="py-2 px-4 text-on-surface-variant">United States — English</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container-high text-on-surface text-[11px] px-2 py-0.5 rounded border border-border-subtle font-table-mono">Standard HD</span>
+</td>
+<td class="py-2 px-4 text-right">
+<button class="bg-surface-container hover:bg-surface-container-high text-primary text-meta px-3 py-1 rounded border border-border-subtle inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">graphic_eq</span>
+<span>Play Preview</span>
+</button>
+</td>
+</tr>
+<!-- Voice 4 -->
+<tr class="h-[36px] hover:bg-surface-container/50 transition-colors">
+<td class="py-2 px-4 font-medium text-on-surface font-table-mono">Liam</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container text-primary font-table-mono text-meta px-2 py-0.5 rounded border border-border-subtle">Cartesia</span>
+</td>
+<td class="py-2 px-4 text-on-surface-variant">Global — English</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container-high text-on-surface text-[11px] px-2 py-0.5 rounded border border-border-subtle font-table-mono">Sonic English</span>
+</td>
+<td class="py-2 px-4 text-right">
+<button class="bg-surface-container hover:bg-surface-container-high text-primary text-meta px-3 py-1 rounded border border-border-subtle inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">graphic_eq</span>
+<span>Play Preview</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</main>
+</div>
+</body></html>

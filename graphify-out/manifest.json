@@ -1,0 +1,37 @@
+{
+  "docs/superpowers/specs/2026-09-22-aigate-design.md": {
+    "mtime": 1790061904.424618,
+    "ast_hash": "0daaa5c3015a7821b1632a9cc85bac5f",
+    "semantic_hash": "0daaa5c3015a7821b1632a9cc85bac5f"
+  },
+  "docs/superpowers/plans/2026-09-22-m1-discovery.md": {
+    "mtime": 1790065307.8219812,
+    "ast_hash": "b6e7cbdc88b482da270c7f26c17e60f6",
+    "semantic_hash": "b6e7cbdc88b482da270c7f26c17e60f6"
+  },
+  "docs/governance/rules.md": {
+    "mtime": 1790061879.9869454,
+    "ast_hash": "fd0883d7f311d589f4a382fca0e6e48a",
+    "semantic_hash": "fd0883d7f311d589f4a382fca0e6e48a"
+  },
+  "docs/governance/behavioral.md": {
+    "mtime": 1790061880.0167954,
+    "ast_hash": "8d260e36fabfcf308388d40e2546045a",
+    "semantic_hash": "8d260e36fabfcf308388d40e2546045a"
+  },
+  "docs/design/stitch-briefs.md": {
+    "mtime": 1790066127.6917994,
+    "ast_hash": "41589beb69ba8c1a57e8b6e108c64386",
+    "semantic_hash": "41589beb69ba8c1a57e8b6e108c64386"
+  },
+  "docs/design/DESIGN.md": {
+    "mtime": 1790066455.8348658,
+    "ast_hash": "f1e72ca90ab8664eb775a559a19a9ae2",
+    "semantic_hash": "f1e72ca90ab8664eb775a559a19a9ae2"
+  },
+  "docs/design/stitch-audit.md": {
+    "mtime": 1790070301.8460517,
+    "ast_hash": "96aa81bf9be6f51b2a5eaa074833bac2",
+    "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
+  }
+}

@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console - MITM Network</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-fixed-variant": "#3323cc",
+            "status-amber": "#F59E0B",
+            "primary-fixed-dim": "#c0c1ff",
+            "primary": "#c0c1ff",
+            "outline": "#908fa0",
+            "tertiary": "#ffb783",
+            "surface-container-lowest": "#0d0d15",
+            "on-primary": "#1000a9",
+            "secondary": "#c3c0ff",
+            "secondary-fixed-dim": "#c3c0ff",
+            "surface-container": "#1f1f27",
+            "surface-dim": "#13131b",
+            "on-secondary-container": "#b3b1ff",
+            "on-error-container": "#ffdad6",
+            "status-red": "#EF4444",
+            "surface-elevated": "#12131A",
+            "surface-tint": "#c0c1ff",
+            "on-secondary-fixed": "#0f0069",
+            "on-tertiary-fixed": "#301400",
+            "surface-dark": "#090A0F",
+            "inverse-surface": "#e4e1ed",
+            "tertiary-fixed": "#ffdcc5",
+            "on-tertiary": "#4f2500",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "background": "#13131b",
+            "surface-container-high": "#292932",
+            "secondary-fixed": "#e2dfff",
+            "outline-variant": "#464554",
+            "tertiary-container": "#d97721",
+            "on-tertiary-fixed-variant": "#703700",
+            "surface": "#13131b",
+            "status-green": "#22C55E",
+            "tertiary-fixed-dim": "#ffb783",
+            "on-tertiary-container": "#452000",
+            "on-primary-fixed": "#07006c",
+            "surface-variant": "#34343d",
+            "inverse-primary": "#494bd6",
+            "surface-container-low": "#1b1b23",
+            "on-background": "#e4e1ed",
+            "secondary-container": "#3626ce",
+            "error-container": "#93000a",
+            "border-subtle": "#27272A",
+            "on-secondary": "#1d00a5",
+            "on-primary-container": "#0d0096",
+            "surface-bright": "#393841",
+            "primary-container": "#8083ff",
+            "error": "#ffb4ab",
+            "on-error": "#690005",
+            "primary-fixed": "#e1e0ff",
+            "on-surface": "#e4e1ed",
+            "surface-container-highest": "#34343d",
+            "inverse-on-surface": "#303038",
+            "status-grey": "#6B7280",
+            "on-surface-variant": "#c7c4d7"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-xs": "0.25rem",
+            "space-lg": "1.5rem",
+            "gutter": "1rem",
+            "margin": "1.5rem",
+            "space-md": "1rem",
+            "space-xl": "2rem",
+            "space-sm": "0.5rem"
+          },
+          "fontFamily": {
+            "table-mono": ["JetBrains Mono"],
+            "page-title": ["Inter"],
+            "body": ["Inter"],
+            "meta": ["Inter"],
+            "table": ["Inter"],
+            "metric": ["JetBrains Mono"],
+            "section": ["Inter"]
+          },
+          "fontSize": {
+            "table-mono": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "page-title": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+            "body": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "meta": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+            "table": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "metric": ["32px", {"lineHeight": "38px", "fontWeight": "500"}],
+            "section": ["16px", {"lineHeight": "24px", "fontWeight": "600"}]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-background text-on-background font-body antialiased min-h-screen flex flex-col selection:bg-primary selection:text-on-primary">
+<!-- SideNavBar -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated border-r border-border-subtle flex flex-col justify-between h-full p-space-sm w-60 border-r border-border-subtle">
+<div class="flex flex-col gap-space-md">
+<!-- Header -->
+<div class="flex items-center gap-space-sm px-space-sm py-space-sm">
+<div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary font-bold">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</span>
+<span class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</span>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="flex flex-col gap-space-xs">
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body text-body">Overview</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined" data-icon="alt_route">alt_route</span>
+<span class="font-body text-body">Gateway</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+<span class="font-body text-body">Providers</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="font-body text-body">Traffic</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined" data-icon="lan" style="font-variation-settings: 'FILL' 1;">lan</span>
+<span class="font-body text-body">Network</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined" data-icon="extension">extension</span>
+<span class="font-body text-body">Integrations</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body text-body">Settings</span>
+</a>
+</nav>
+</div>
+<!-- Footer Links -->
+<div class="flex flex-col gap-space-xs pt-space-md border-t border-border-subtle">
+<a class="flex items-center gap-space-sm px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface rounded-DEFAULT text-meta" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="menu_book">menu_book</span>
+        Docs
+      </a>
+<a class="flex items-center gap-space-sm px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface rounded-DEFAULT text-meta" href="#">
+<span class="material-symbols-outlined text-sm text-status-green" data-icon="check_circle">check_circle</span>
+        System Status
+      </a>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="pl-60 flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin w-full">
+<div class="flex items-center gap-space-md">
+<span class="font-page-title text-page-title text-on-surface dark:text-on-surface font-semibold">Network / MITM</span>
+</div>
+<div class="flex items-center gap-space-md">
+<span class="font-meta text-meta text-on-surface-variant">v2.4.1-proxy</span>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-lg" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-lg" data-icon="light_mode">light_mode</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-lg" data-icon="help">help</span>
+</button>
+<div class="w-7 h-7 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional studio portrait of a backend software engineer with short dark hair, wearing a minimal charcoal gray t-shirt, posed against a dark moody background with subtle atmospheric blue rim lighting highlighting the profile." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1FMGEx1esgkn3Q7j3YpV489hG_bC1d2-ZP4ptPpPsSgP0BYh-TdTAl8C0_OZgobTIC8OVbwSPunvCW8IM4DrBnhxHWafq8wecHVXYIGrv5LSa_jG2Abi1WHYhPstu9nbqqvfjWjnbOCAUGJIUhijYitwgTCqN43L0aWQ0c_yJOsVE3yMQ2J6AX5V0Jo7YOatCln0yLsa5adYLS7ftvwgNM5rdciZNH1bSHWQmoR1BAxD3PhWTO7HmOr5V_aqwFVxg-15XMCWboC0"/>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<main class="flex-1 p-margin max-w-5xl w-full flex flex-col gap-space-lg">
+<!-- Page Header -->
+<div class="flex flex-col gap-space-xs">
+<h1 class="font-page-title text-page-title font-semibold text-on-surface">Man-in-the-Middle (MITM) Interception</h1>
+<p class="font-body text-body text-on-surface-variant">Configure local SSL/TLS decryption certificates and managed hostname redirection rules for local LLM proxy traffic inspection.</p>
+</div>
+<!-- Persistent Red-Bordered Warning Banner -->
+<div class="bg-error-container/10 border-l-2 border-status-red p-space-md rounded-lg flex items-start gap-space-md">
+<span class="material-symbols-outlined text-status-red mt-0.5" data-icon="warning">warning</span>
+<div class="flex flex-col gap-space-xs">
+<span class="font-section text-section text-on-surface font-medium">Security &amp; System Modification Notice</span>
+<p class="font-body text-body text-on-surface-variant">
+            This feature installs a root certificate into the operating system trust store and modifies the hosts file. Proceed with caution as unauthorized modifications can compromise system security and network routing integrity.
+          </p>
+</div>
+</div>
+<!-- Status Checklist Section -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-md flex flex-col gap-space-md">
+<h2 class="font-section text-section text-on-surface font-semibold">System Readiness &amp; Status</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<!-- Row 1: CA Generated -->
+<div class="flex items-center justify-between p-space-sm bg-surface-container-low rounded border border-border-subtle">
+<div class="flex items-center gap-space-sm">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span class="font-body text-body text-on-surface">CA Generated</span>
+</div>
+<span class="px-space-xs py-0.5 text-meta uppercase bg-status-green/10 text-status-green rounded font-medium">Healthy</span>
+</div>
+<!-- Row 2: CA Installed -->
+<div class="flex items-center justify-between p-space-sm bg-surface-container-low rounded border border-border-subtle">
+<div class="flex items-center gap-space-sm">
+<span class="w-2 h-2 rounded-full bg-status-amber"></span>
+<span class="font-body text-body text-on-surface">CA Installed</span>
+</div>
+<span class="px-space-xs py-0.5 text-meta uppercase bg-status-amber/10 text-status-amber rounded font-medium">Warning</span>
+</div>
+<!-- Row 3: Proxy Running -->
+<div class="flex items-center justify-between p-space-sm bg-surface-container-low rounded border border-border-subtle">
+<div class="flex items-center gap-space-sm">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span class="font-body text-body text-on-surface">Proxy Running</span>
+</div>
+<span class="px-space-xs py-0.5 text-meta uppercase bg-status-green/10 text-status-green rounded font-medium">Active</span>
+</div>
+<!-- Row 4: Hosts Modified -->
+<div class="flex items-center justify-between p-space-sm bg-surface-container-low rounded border border-border-subtle">
+<div class="flex items-center gap-space-sm">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span class="font-body text-body text-on-surface">Hosts Modified</span>
+</div>
+<span class="px-space-xs py-0.5 text-meta uppercase bg-status-green/10 text-status-green rounded font-medium">Synced</span>
+</div>
+</div>
+</div>
+<!-- Action Buttons Row -->
+<div class="flex items-center gap-space-md py-space-xs">
+<button class="px-4 py-2 bg-primary text-on-primary rounded font-medium text-body hover:opacity-90 transition-opacity cursor-pointer">
+          Generate CA
+        </button>
+<button class="px-4 py-2 bg-surface-container-high border border-outline-variant text-on-surface rounded font-medium text-body hover:bg-surface-bright transition-colors cursor-pointer">
+          Install CA
+        </button>
+<button class="px-4 py-2 bg-error-container text-on-error-container rounded font-medium text-body hover:opacity-90 transition-opacity cursor-pointer" onclick="document.getElementById('remove-modal').classList.remove('hidden')">
+          Remove CA
+        </button>
+</div>
+<!-- Redirected Hosts Table Section -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg flex flex-col overflow-hidden">
+<div class="p-space-md border-b border-border-subtle flex items-center justify-between">
+<div class="flex flex-col">
+<h2 class="font-section text-section text-on-surface font-semibold">Redirected Hostnames</h2>
+<span class="font-meta text-meta text-on-surface-variant">Active domain overrides mapped to the local proxy instance</span>
+</div>
+<button class="px-3 py-1.5 bg-surface-container-high border border-outline-variant text-on-surface rounded text-meta font-medium hover:bg-surface-bright transition-colors cursor-pointer flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+            Add Host
+          </button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-border-subtle bg-surface-container-low text-on-surface-variant font-meta text-meta uppercase tracking-wider">
+<th class="py-3 px-margin font-medium">Hostname</th>
+<th class="py-3 px-margin font-medium">Enabled Toggle</th>
+<th class="py-3 px-margin font-medium">Source</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle font-table text-table text-on-surface">
+<tr class="hover:bg-surface-container/50 transition-colors">
+<td class="py-3 px-margin font-table-mono text-primary">api.openai.com</td>
+<td class="py-3 px-margin">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</td>
+<td class="py-3 px-margin">
+<span class="px-1.5 py-0.5 text-meta uppercase bg-surface-container-high text-on-surface-variant rounded">default</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container/50 transition-colors">
+<td class="py-3 px-margin font-table-mono text-primary">api.anthropic.com</td>
+<td class="py-3 px-margin">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</td>
+<td class="py-3 px-margin">
+<span class="px-1.5 py-0.5 text-meta uppercase bg-surface-container-high text-on-surface-variant rounded">default</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container/50 transition-colors">
+<td class="py-3 px-margin font-table-mono text-primary">api.cohere.ai</td>
+<td class="py-3 px-margin">
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</td>
+<td class="py-3 px-margin">
+<span class="px-1.5 py-0.5 text-meta uppercase bg-tertiary-container/20 text-tertiary rounded font-medium">user-added</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Windows Note Block -->
+<div class="bg-surface-container-low border border-border-subtle p-space-md rounded-lg flex items-start gap-space-md">
+<span class="material-symbols-outlined text-primary mt-0.5" data-icon="info">info</span>
+<div class="flex flex-col gap-space-xs">
+<span class="font-section text-section text-on-surface font-medium">Windows Administrator Requirements</span>
+<p class="font-body text-body text-on-surface-variant">
+            Administrator rights are required to modify the system trust store and local hosts file. A User Account Control (UAC) prompt will appear when performing installation or removal operations.
+          </p>
+</div>
+</div>
+</main>
+</div>
+<!-- Type-to-Confirm Modal Overlay for 'Remove CA' -->
+<div class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-space-md" id="remove-modal">
+<div class="bg-surface-elevated border border-border-subtle rounded-lg max-w-md w-full p-space-lg flex flex-col gap-space-md shadow-2xl">
+<div class="flex items-center justify-between">
+<h3 class="font-section text-section text-on-surface font-semibold flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-status-red" data-icon="error">error</span>
+          Confirm Certificate Removal
+        </h3>
+<button class="text-on-surface-variant hover:text-on-surface" onclick="document.getElementById('remove-modal').classList.add('hidden')">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</div>
+<p class="font-body text-body text-on-surface-variant">
+        This action will permanently delete the active root Certificate Authority from your system trust store. To confirm, please type <code class="font-table-mono text-primary bg-surface-container px-1.5 py-0.5 rounded">aigate-root-ca</code> below:
+      </p>
+<div class="flex flex-col gap-space-xs">
+<input class="w-full bg-surface-container border border-outline-variant rounded p-space-sm text-on-surface font-table-mono text-table focus:border-primary focus:outline-none" id="confirm-input" placeholder="Type aigate-root-ca to confirm" type="text"/>
+</div>
+<div class="flex items-center justify-end gap-space-sm pt-space-sm border-t border-border-subtle">
+<button class="px-4 py-2 bg-surface-container-high border border-outline-variant text-on-surface rounded text-body hover:bg-surface-bright transition-colors cursor-pointer" onclick="document.getElementById('remove-modal').classList.add('hidden')">
+          Cancel
+        </button>
+<button class="px-4 py-2 bg-error text-on-error rounded text-body font-medium opacity-50 cursor-not-allowed transition-opacity" disabled="" id="confirm-remove-btn">
+          Remove CA
+        </button>
+</div>
+</div>
+</div>
+<script>
+    // Simple verification script for type-to-confirm modal
+    const input = document.getElementById('confirm-input');
+    const btn = document.getElementById('confirm-remove-btn');
+    if(input && btn) {
+      input.addEventListener('input', (e) => {
+        if(e.target.value === 'aigate-root-ca') {
+          btn.removeAttribute('disabled');
+          btn.classList.remove('opacity-50', 'cursor-not-allowed');
+          btn.classList.add('cursor-pointer', 'hover:opacity-90');
+        } else {
+          btn.setAttribute('disabled', 'true');
+          btn.classList.add('opacity-50', 'cursor-not-allowed');
+          btn.classList.remove('cursor-pointer', 'hover:opacity-90');
+        }
+      });
+    }
+  </script>
+</body></html>

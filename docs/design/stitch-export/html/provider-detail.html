@@ -1,0 +1,323 @@
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface": "#13131b",
+            "surface-elevated": "#12131A",
+            "surface-dark": "#090A0F",
+            "tertiary-container": "#d97721",
+            "on-secondary-fixed": "#0f0069",
+            "inverse-primary": "#494bd6",
+            "background": "#13131b",
+            "on-background": "#e4e1ed",
+            "inverse-surface": "#e4e1ed",
+            "primary": "#c0c1ff",
+            "error-container": "#93000a",
+            "secondary-fixed-dim": "#c3c0ff",
+            "primary-fixed": "#e1e0ff",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "tertiary": "#ffb783",
+            "on-surface": "#e4e1ed",
+            "surface-tint": "#c0c1ff",
+            "status-green": "#22C55E",
+            "status-red": "#EF4444",
+            "on-primary-fixed": "#07006c",
+            "surface-dim": "#13131b",
+            "on-primary-container": "#0d0096",
+            "secondary-container": "#3626ce",
+            "surface-container-highest": "#34343d",
+            "surface-container-low": "#1b1b23",
+            "on-tertiary-container": "#452000",
+            "on-error": "#690005",
+            "on-primary": "#1000a9",
+            "tertiary-fixed-dim": "#ffb783",
+            "surface-container-high": "#292932",
+            "surface-variant": "#34343d",
+            "secondary": "#c3c0ff",
+            "on-tertiary-fixed-variant": "#703700",
+            "on-secondary-container": "#b3b1ff",
+            "inverse-on-surface": "#303038",
+            "surface-container": "#1f1f27",
+            "status-grey": "#6B7280",
+            "primary-fixed-dim": "#c0c1ff",
+            "border-subtle": "#27272A",
+            "tertiary-fixed": "#ffdcc5",
+            "on-error-container": "#ffdad6",
+            "on-surface-variant": "#c7c4d7",
+            "outline": "#908fa0",
+            "error": "#ffb4ab",
+            "on-secondary": "#1d00a5",
+            "secondary-fixed": "#e2dfff",
+            "on-tertiary": "#4f2500",
+            "surface-container-lowest": "#0d0d15",
+            "status-amber": "#F59E0B",
+            "on-secondary-fixed-variant": "#3323cc",
+            "outline-variant": "#464554",
+            "on-tertiary-fixed": "#301400",
+            "primary-container": "#8083ff",
+            "surface-bright": "#393841"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-sm": "0.5rem",
+            "space-lg": "1.5rem",
+            "space-md": "1rem",
+            "margin": "1.5rem",
+            "space-xs": "0.25rem",
+            "space-xl": "2rem",
+            "gutter": "1rem"
+          },
+          "fontFamily": {
+            "table": ["Inter"],
+            "section": ["Inter"],
+            "page-title": ["Inter"],
+            "metric": ["JetBrains Mono"],
+            "meta": ["Inter"],
+            "body": ["Inter"],
+            "table-mono": ["JetBrains Mono"]
+          },
+          "fontSize": {
+            "table": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "section": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+            "page-title": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+            "metric": ["32px", {"lineHeight": "38px", "fontWeight": "500"}],
+            "meta": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+            "body": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "table-mono": ["13px", {"lineHeight": "20px", "fontWeight": "400"}]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface text-on-surface font-body antialiased min-h-screen flex flex-col">
+<!-- SideNavBar -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated flex flex-col justify-between h-full p-space-sm w-60 border-r border-border-subtle">
+<div class="flex flex-col space-y-space-md">
+<div class="flex items-center space-x-space-sm px-space-sm py-space-xs">
+<div class="w-7 h-7 bg-primary-container rounded flex items-center justify-center text-on-primary-container font-bold">AI</div>
+<div>
+<h1 class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</h1>
+<p class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</p>
+</div>
+</div>
+<nav class="flex flex-col space-y-1">
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span class="font-body text-body">Overview</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">alt_route</span>
+<span class="font-body text-body">Gateway</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-2 bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">hub</span>
+<span class="font-body text-body">Providers</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">monitoring</span>
+<span class="font-body text-body">Traffic</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">lan</span>
+<span class="font-body text-body">Network</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">extension</span>
+<span class="font-body text-body">Integrations</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none" href="#">
+<span class="material-symbols-outlined text-lg">settings</span>
+<span class="font-body text-body">Settings</span>
+</a>
+</nav>
+</div>
+<div class="flex flex-col space-y-1 pt-space-md border-t border-border-subtle">
+<a class="flex items-center space-x-space-sm px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface text-xs rounded-DEFAULT cursor-pointer" href="#">
+<span class="material-symbols-outlined text-base">menu_book</span>
+<span>Docs</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface text-xs rounded-DEFAULT cursor-pointer" href="#">
+<span class="material-symbols-outlined text-base text-status-green">check_circle</span>
+<span>System Status</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="pl-60 flex flex-col flex-1 min-h-screen">
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin">
+<div class="flex items-center space-x-4">
+<span class="font-page-title text-page-title text-on-surface dark:text-on-surface font-semibold">AIGate Console</span>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-2 text-outline text-sm">search</span>
+<input class="bg-surface-container border border-border-subtle rounded text-xs pl-8 pr-4 py-1.5 text-on-surface focus:outline-none focus:border-primary w-64 placeholder-outline" placeholder="Search gateways, models, providers..." type="text"/>
+</div>
+</div>
+<div class="flex items-center space-x-3">
+<span class="text-xs font-mono text-on-surface-variant bg-surface-container px-2 py-1 rounded border border-border-subtle">v2.4.1-proxy</span>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">notifications</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">light_mode</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-lg">help</span>
+</button>
+<div class="w-7 h-7 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-xs cursor-pointer ml-2">
+          EA
+        </div>
+</div>
+</header>
+<!-- Page Body -->
+<main class="flex-1 p-margin flex flex-col space-y-space-lg max-w-7xl w-full mx-auto">
+<!-- Breadcrumb -->
+<div class="flex items-center space-x-2 text-xs text-on-surface-variant">
+<a class="hover:text-on-surface" href="#">gateway</a>
+<span>/</span>
+<a class="hover:text-on-surface" href="#">providers</a>
+<span>/</span>
+<span class="text-on-surface font-medium">anthropic</span>
+<span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-surface-container border border-border-subtle text-status-green">RTT 24ms</span>
+</div>
+<!-- Provider Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between bg-surface-container-low p-space-lg rounded border border-border-subtle gap-4">
+<div class="flex items-center space-x-space-md">
+<div class="w-12 h-12 bg-surface-container-highest border border-border-subtle rounded-xl flex items-center justify-center text-on-surface font-bold text-xl shadow-inner">
+<span class="material-symbols-outlined text-2xl text-primary">psychology</span>
+</div>
+<div>
+<div class="flex items-center space-x-3">
+<h2 class="font-section text-section text-on-surface text-xl">Anthropic</h2>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono uppercase bg-status-green/10 text-status-green border border-status-green/20">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green mr-1.5 animate-pulse"></span>
+                Operational
+              </span>
+<span class="px-2 py-0.5 text-xs bg-surface-container border border-border-subtle rounded text-on-surface-variant">API Key</span>
+</div>
+<p class="text-xs text-on-surface-variant mt-1">Upstream proxy routing for Claude 3.5 Sonnet, Opus, and Haiku model families.</p>
+</div>
+</div>
+<div class="flex items-center space-x-3">
+<button class="bg-primary hover:bg-primary/90 text-on-primary px-3.5 py-1.5 rounded text-xs font-medium flex items-center space-x-1.5 cursor-pointer transition-colors shadow-sm">
+<span class="material-symbols-outlined text-sm">bolt</span>
+<span>Test Connection</span>
+</button>
+<a class="bg-surface-container hover:bg-surface-container-high border border-border-subtle text-on-surface px-3 py-1.5 rounded text-xs font-medium flex items-center space-x-1 transition-colors" href="https://docs.anthropic.com" target="_blank">
+<span>Docs</span>
+<span class="material-symbols-outlined text-sm">open_in_new</span>
+</a>
+</div>
+</div>
+<!-- Four Tabs Header -->
+<div class="border-b border-border-subtle flex space-x-8">
+<button class="pb-3 text-xs font-medium text-primary border-b-2 border-primary flex items-center space-x-1.5 cursor-pointer">
+<span class="material-symbols-outlined text-base">key</span>
+<span>Accounts</span>
+<span class="ml-1 px-1.5 py-0.2 bg-primary/20 text-primary rounded-full text-[10px]">2</span>
+</button>
+<button class="pb-3 text-xs font-medium text-on-surface-variant hover:text-on-surface flex items-center space-x-1.5 cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-base">smart_toy</span>
+<span>Models</span>
+</button>
+<button class="pb-3 text-xs font-medium text-on-surface-variant hover:text-on-surface flex items-center space-x-1.5 cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-base">tune</span>
+<span>Config</span>
+</button>
+<button class="pb-3 text-xs font-medium text-on-surface-variant hover:text-on-surface flex items-center space-x-1.5 cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-base">analytics</span>
+<span>Activity</span>
+</button>
+</div>
+<!-- Accounts Tab Content -->
+<div class="flex flex-col space-y-space-md">
+<!-- Section Bar -->
+<div class="flex items-center justify-between">
+<h3 class="font-section text-section text-on-surface">Connected Accounts (2 active)</h3>
+<button class="bg-surface-container-high hover:bg-surface-container-highest border border-border-subtle text-on-surface px-3 py-1.5 rounded text-xs font-medium flex items-center space-x-1 cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-sm">add</span>
+<span>Add Account</span>
+</button>
+</div>
+<!-- Dense Table -->
+<div class="bg-surface-container-low border border-border-subtle rounded overflow-hidden">
+<table class="w-full text-left border-collapse font-table">
+<thead>
+<tr class="bg-surface-container border-b border-border-subtle text-on-surface-variant text-[11px] font-semibold uppercase tracking-wider">
+<th class="py-2.5 px-4">Label / Identifier</th>
+<th class="py-2.5 px-4">Credential Type</th>
+<th class="py-2.5 px-4">Status</th>
+<th class="py-2.5 px-4">Quota / Usage</th>
+<th class="py-2.5 px-4">Token Expiry</th>
+<th class="py-2.5 px-4">Proxy Pool</th>
+<th class="py-2.5 px-4 text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle text-table-mono">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-4 font-medium text-on-surface flex items-center space-x-2">
+<span class="material-symbols-outlined text-sm text-primary">vpn_key</span>
+<span>production-primary-key</span>
+</td>
+<td class="py-2 px-4 text-on-surface-variant">API Key</td>
+<td class="py-2 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded-[2px] text-[11px] font-mono uppercase bg-status-green/12 text-status-green font-semibold">
+                    ACTIVE
+                  </span>
+</td>
+<td class="py-2 px-4 text-on-surface">48.2M / 100M tokens</td>
+<td class="py-2 px-4 text-on-surface-variant">in 14 days</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container px-2 py-0.5 rounded border border-border-subtle text-xs text-on-surface-variant">us-east-pool</span>
+</td>
+<td class="py-2 px-4 text-right space-x-2">
+<button class="text-primary hover:underline text-xs cursor-pointer">Test</button>
+<button class="text-on-surface-variant hover:text-on-surface text-xs cursor-pointer">Edit</button>
+<button class="text-status-red hover:underline text-xs cursor-pointer">Delete</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container/50 transition-colors h-[36px]">
+<td class="py-2 px-4 font-medium text-on-surface flex items-center space-x-2">
+<span class="material-symbols-outlined text-sm text-status-amber">vpn_key</span>
+<span>failover-backup-key</span>
+</td>
+<td class="py-2 px-4 text-on-surface-variant">API Key</td>
+<td class="py-2 px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded-[2px] text-[11px] font-mono uppercase bg-status-amber/12 text-status-amber font-semibold">
+                    DEGRADED
+                  </span>
+</td>
+<td class="py-2 px-4 text-on-surface">99.8M / 100M tokens</td>
+<td class="py-2 px-4 text-status-amber">in 2 hours</td>
+<td class="py-2 px-4">
+<span class="bg-surface-container px-2 py-0.5 rounded border border-border-subtle text-xs text-on-surface-variant">global-fallback</span>
+</td>
+<td class="py-2 px-4 text-right space-x-2">
+<button class="text-primary hover:underline text-xs cursor-pointer">Test</button>
+<button class="text-on-surface-variant hover:text-on-surface text-xs cursor-pointer">Edit</button>
+<button class="text-status-red hover:underline text-xs cursor-pointer">Delete</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</main>
+</div>
+</body></html>

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console - Gateway Settings Developer</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-tertiary-fixed-variant": "#703700",
+            "tertiary-container": "#d97721",
+            "secondary": "#c3c0ff",
+            "outline-variant": "#464554",
+            "surface-container-low": "#1b1b23",
+            "secondary-container": "#3626ce",
+            "inverse-on-surface": "#303038",
+            "status-green": "#22C55E",
+            "on-secondary-fixed-variant": "#3323cc",
+            "on-secondary": "#1d00a5",
+            "on-tertiary-container": "#452000",
+            "border-subtle": "#27272A",
+            "primary": "#c0c1ff",
+            "primary-fixed-dim": "#c0c1ff",
+            "primary-container": "#8083ff",
+            "outline": "#908fa0",
+            "tertiary": "#ffb783",
+            "surface-container-lowest": "#0d0d15",
+            "on-surface": "#e4e1ed",
+            "secondary-fixed": "#e2dfff",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "error": "#ffb4ab",
+            "tertiary-fixed": "#ffdcc5",
+            "error-container": "#93000a",
+            "on-tertiary-fixed": "#301400",
+            "status-red": "#EF4444",
+            "surface-elevated": "#12131A",
+            "status-grey": "#6B7280",
+            "on-background": "#e4e1ed",
+            "surface-container-highest": "#34343d",
+            "on-secondary-container": "#b3b1ff",
+            "on-error": "#690005",
+            "status-amber": "#F59E0B",
+            "on-secondary-fixed": "#0f0069",
+            "on-primary-fixed": "#07006c",
+            "surface-container": "#1f1f27",
+            "background": "#13131b",
+            "on-tertiary": "#4f2500",
+            "surface": "#13131b",
+            "on-surface-variant": "#c7c4d7",
+            "secondary-fixed-dim": "#c3c0ff",
+            "on-error-container": "#ffdad6",
+            "surface-dark": "#090A0F",
+            "inverse-surface": "#e4e1ed",
+            "surface-container-high": "#292932",
+            "surface-bright": "#393841",
+            "on-primary": "#1000a9",
+            "surface-dim": "#13131b",
+            "tertiary-fixed-dim": "#ffb783",
+            "inverse-primary": "#494bd6",
+            "on-primary-container": "#0d0096",
+            "surface-variant": "#34343d",
+            "primary-fixed": "#e1e0ff",
+            "surface-tint": "#c0c1ff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-lg": "1.5rem",
+            "space-xs": "0.25rem",
+            "margin": "1.5rem",
+            "space-sm": "0.5rem",
+            "space-md": "1rem",
+            "space-xl": "2rem",
+            "gutter": "1rem"
+          },
+          "fontFamily": {
+            "meta": ["Inter"],
+            "page-title": ["Inter"],
+            "body": ["Inter"],
+            "table-mono": ["JetBrains Mono"],
+            "table": ["Inter"],
+            "metric": ["JetBrains Mono"],
+            "section": ["Inter"]
+          },
+          "fontSize": {
+            "meta": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "page-title": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "table-mono": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "table": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "metric": ["32px", { "lineHeight": "38px", "fontWeight": "500" }],
+            "section": ["16px", { "lineHeight": "24px", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-background text-on-surface font-body antialiased min-h-screen flex selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated border-r border-border-subtle flex flex-col justify-between p-space-sm">
+<div class="flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm px-space-sm py-space-sm">
+<div class="w-7 h-7 bg-surface-container-high rounded flex items-center justify-center text-primary font-section font-semibold">
+<span class="material-symbols-outlined text-[18px]">hub</span>
+</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</span>
+<span class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</span>
+</div>
+</div>
+<nav class="flex flex-col gap-space-xs">
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="dashboard">dashboard</span>
+<span class="font-body text-body">Overview</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="alt_route" style="font-variation-settings: 'FILL' 1;">alt_route</span>
+<span class="font-body text-body">Gateway</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="hub">hub</span>
+<span class="font-body text-body">Providers</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="monitoring">monitoring</span>
+<span class="font-body text-body">Traffic</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="lan">lan</span>
+<span class="font-body text-body">Network</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="extension">extension</span>
+<span class="font-body text-body">Integrations</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer select-none" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="settings">settings</span>
+<span class="font-body text-body">Settings</span>
+</a>
+</nav>
+</div>
+<div class="flex flex-col gap-space-xs pt-space-md border-t border-border-subtle">
+<a class="flex items-center gap-space-sm px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface text-meta hover:bg-surface-container rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]" data-icon="menu_book">menu_book</span>
+<span>Docs</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface text-meta hover:bg-surface-container rounded-DEFAULT transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px] text-status-green" data-icon="check_circle">check_circle</span>
+<span>System Status</span>
+</a>
+</div>
+</aside>
+<!-- Main Wrapper -->
+<div class="flex-1 flex flex-col ml-60">
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin">
+<div class="flex items-center gap-space-md">
+<span class="font-page-title text-page-title text-on-surface dark:text-on-surface font-semibold">AIGate Console</span>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2.5 text-outline text-[16px]" data-icon="search">search</span>
+<input class="bg-surface-container-low border border-border-subtle rounded-DEFAULT pl-8 pr-3 py-1 text-meta text-on-surface placeholder-outline focus:outline-none focus:border-primary w-64 transition-colors" placeholder="Search gateways, routes, logs..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="font-meta text-meta text-on-surface-variant px-2 py-0.5 bg-surface-container rounded border border-border-subtle font-table-mono">v2.4.1-proxy</span>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[18px]" data-icon="notifications">notifications</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[18px]" data-icon="light_mode">light_mode</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[18px]" data-icon="help">help</span>
+</button>
+<div class="w-7 h-7 rounded bg-surface-container-high border border-border-subtle flex items-center justify-center overflow-hidden ml-1">
+<img class="w-full h-full object-cover" data-alt="Professional studio portrait headshot of a software engineer developer in dark tones, wearing a minimalist hoodie, soft focused studio lighting, neutral grey background, high resolution crisp detail." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRD2mAw2GEa6sqDwIBK-0LpqZBwm7QxZCiC8mlAtbj-ZILbbL2ylPF0muf-tqR9TGqYt3clhYgitgt6uf5Edmh6QmLEmllYgScWVKYb_-bNlhiVfmHBayQOqvdutHM8nYLA2r86zoTGlFEK7Lu-YzNxQvi8HzsZbYqDFMfKBE4ZBLFL1xp6iZM_hjKXb0WxZ8nRGH4UBE6fXQzzrnErY8kGHRV57hMC4hIifXSoHck1U5G2Z1B0bx3VPiG70GYoRK4h7nHWFEq5jM"/>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<main class="flex-1 p-space-xl max-w-5xl flex flex-col gap-space-xl">
+<!-- Breadcrumbs / Top Navigation -->
+<div class="flex items-center gap-space-xs font-meta text-meta text-on-surface-variant">
+<span class="hover:text-on-surface cursor-pointer">gateway</span>
+<span>/</span>
+<span class="hover:text-on-surface cursor-pointer">settings</span>
+<span>/</span>
+<span class="text-on-surface font-medium">developer</span>
+</div>
+<!-- Sub-navigation tabs & Header section -->
+<div class="flex flex-col gap-space-lg">
+<div>
+<h1 class="font-section text-section font-semibold text-on-surface">Developer Settings &amp; Diagnostics</h1>
+<p class="font-body text-body text-on-surface-variant mt-1">Configure experimental flags, request inspection logging, and perform master administrative resets.</p>
+</div>
+<!-- Three-tab sub-navigation -->
+<div class="flex items-center gap-space-lg border-b border-border-subtle">
+<button class="pb-2 font-body text-body text-on-surface-variant hover:text-on-surface transition-colors">General</button>
+<button class="pb-2 font-body text-body text-on-surface-variant hover:text-on-surface transition-colors">Auth &amp; Access</button>
+<button class="pb-2 font-body text-body text-primary font-medium border-b-2 border-primary -mb-[1px]">Developer</button>
+</div>
+</div>
+<!-- Card 1: Runtime Features & Flags -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg p-space-lg flex flex-col gap-space-lg">
+<div class="flex items-center gap-space-md">
+<div class="w-8 h-8 rounded bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]" data-icon="code">code</span>
+</div>
+<div>
+<h2 class="font-section text-section font-semibold text-on-surface">Runtime Features &amp; Flags</h2>
+<p class="font-meta text-meta text-on-surface-variant">Manage experimental platform flags and local diagnostic overrides.</p>
+</div>
+</div>
+<div class="flex flex-col divide-y divide-border-subtle">
+<!-- Toggle 1 -->
+<div class="py-space-md flex items-center justify-between gap-space-lg first:pt-0 last:pb-0">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="font-body font-medium text-on-surface">Developer Mode</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-table-mono bg-primary-container/20 text-primary uppercase">Active</span>
+</div>
+<span class="font-body text-body text-on-surface-variant">Enables advanced debugging panels, raw request payload inspection, and developer console utilities.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<!-- Toggle 2 -->
+<div class="py-space-md flex items-center justify-between gap-space-lg first:pt-0 last:pb-0">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="font-body font-medium text-on-surface">Request Tracing &amp; Verbose Logging</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-table-mono bg-primary-container/20 text-primary uppercase">Active</span>
+</div>
+<span class="font-body text-body text-on-surface-variant">Captures full inbound and outbound LLM payloads to local debug database.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<!-- Toggle 3 -->
+<div class="py-space-md flex items-center justify-between gap-space-lg first:pt-0 last:pb-0">
+<div class="flex flex-col gap-space-xs">
+<span class="font-body font-medium text-on-surface">Experimental SSE Stream Diagnostics</span>
+<span class="font-body text-body text-on-surface-variant">Live socket stream health monitoring and chunk-level latency profiling.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Card 2: Danger Zone -->
+<div class="bg-surface-elevated border border-status-red/40 rounded-lg p-space-lg flex flex-col gap-space-lg">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-md">
+<div class="w-8 h-8 rounded bg-error-container/20 flex items-center justify-center text-status-red">
+<span class="material-symbols-outlined text-[20px]" data-icon="warning">warning</span>
+</div>
+<div>
+<h2 class="font-section text-section font-semibold text-on-surface">Danger Zone</h2>
+<p class="font-meta text-meta text-on-surface-variant">Irreversible administrative actions and data purge utilities.</p>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded text-[11px] font-table-mono bg-status-red/10 text-status-red uppercase">Restricted</span>
+</div>
+<div class="bg-background border border-border-subtle rounded p-space-md flex items-center justify-between gap-space-lg">
+<div class="flex flex-col gap-space-xs">
+<span class="font-body font-medium text-on-surface">Master Data Reset</span>
+<span class="font-body text-body text-on-surface-variant">Permanently wipe all local routing tables, cache stores, usage logs, and custom proxy pool configurations.</span>
+</div>
+<button class="bg-status-red text-white px-space-md py-2 rounded-DEFAULT font-body text-body font-medium hover:opacity-90 transition-opacity cursor-pointer whitespace-nowrap" id="open-modal-btn">
+            Reset all data
+          </button>
+</div>
+</div>
+</main>
+</div>
+<!-- Modal Overlay (Open state) -->
+<div class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-space-md" id="reset-modal">
+<div class="bg-surface-elevated border border-border-subtle rounded-lg w-full max-w-md p-space-xl flex flex-col gap-space-lg shadow-2xl">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm text-status-red">
+<span class="material-symbols-outlined text-[22px]" data-icon="error">error</span>
+<h3 class="font-section text-section font-semibold text-on-surface">Confirm Master Data Reset</h3>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer" id="close-modal-btn">
+<span class="material-symbols-outlined text-[20px]" data-icon="close">close</span>
+</button>
+</div>
+<div class="flex flex-col gap-space-sm">
+<p class="font-body text-body text-on-surface-variant">
+          This action cannot be undone. Please type <code class="font-table-mono text-primary bg-surface-container px-1 py-0.5 rounded">AIGate-Node-Production</code> to confirm.
+        </p>
+<input class="bg-surface-container-low border border-border-subtle rounded-DEFAULT px-space-md py-2 font-table-mono text-table-mono text-on-surface placeholder-outline focus:outline-none focus:border-status-red transition-colors w-full" id="confirm-input" placeholder="Type object name to confirm..." type="text"/>
+</div>
+<div class="flex items-center justify-end gap-space-sm pt-space-md border-t border-border-subtle">
+<button class="bg-surface-container hover:bg-surface-container-high text-on-surface px-space-md py-2 rounded-DEFAULT font-body text-body font-medium transition-colors cursor-pointer" id="cancel-modal-btn">
+          Cancel
+        </button>
+<button class="bg-status-red text-white px-space-md py-2 rounded-DEFAULT font-body text-body font-medium opacity-50 cursor-not-allowed transition-opacity" disabled="" id="final-reset-btn">
+          Reset all data
+        </button>
+</div>
+</div>
+</div>
+<!-- Lightweight interaction script -->
+<script>
+    const modal = document.getElementById('reset-modal');
+    const openBtn = document.getElementById('open-modal-btn');
+    const closeBtn = document.getElementById('close-modal-btn');
+    const cancelBtn = document.getElementById('cancel-modal-btn');
+    const confirmInput = document.getElementById('confirm-input');
+    const finalResetBtn = document.getElementById('final-reset-btn');
+
+    function toggleModal(show) {
+      if (show) {
+        modal.classList.remove('hidden');
+        confirmInput.value = '';
+        finalResetBtn.disabled = true;
+        finalResetBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        finalResetBtn.classList.remove('cursor-pointer', 'hover:opacity-90');
+        confirmInput.focus();
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    openBtn.addEventListener('click', () => toggleModal(true));
+    closeBtn.addEventListener('click', () => toggleModal(false));
+    cancelBtn.addEventListener('click', () => toggleModal(false));
+
+    confirmInput.addEventListener('input', (e) => {
+      if (e.target.value === 'AIGate-Node-Production') {
+        finalResetBtn.disabled = false;
+        finalResetBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        finalResetBtn.classList.add('cursor-pointer', 'hover:opacity-90');
+      } else {
+        finalResetBtn.disabled = true;
+        finalResetBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        finalResetBtn.classList.remove('cursor-pointer', 'hover:opacity-90');
+      }
+    });
+
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        toggleModal(false);
+      }
+    });
+  </script>
+</body></html>

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console - Proxy Pools</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "status-green": "#22C55E",
+          "status-red": "#EF4444",
+          "surface-container-high": "#292932",
+          "secondary-fixed-dim": "#c3c0ff",
+          "tertiary": "#ffb783",
+          "on-primary-fixed-variant": "#2f2ebe",
+          "background": "#13131b",
+          "primary-container": "#8083ff",
+          "outline-variant": "#464554",
+          "status-grey": "#6B7280",
+          "surface-container-lowest": "#0d0d15",
+          "on-surface-variant": "#c7c4d7",
+          "surface-dark": "#090A0F",
+          "inverse-surface": "#e4e1ed",
+          "error-container": "#93000a",
+          "error": "#ffb4ab",
+          "on-secondary": "#1d00a5",
+          "on-primary": "#1000a9",
+          "on-error": "#690005",
+          "status-amber": "#F59E0B",
+          "on-tertiary-container": "#452000",
+          "primary-fixed-dim": "#c0c1ff",
+          "on-tertiary-fixed": "#301400",
+          "surface-variant": "#34343d",
+          "surface-container-low": "#1b1b23",
+          "surface-tint": "#c0c1ff",
+          "surface-dim": "#13131b",
+          "tertiary-container": "#d97721",
+          "secondary": "#c3c0ff",
+          "on-error-container": "#ffdad6",
+          "primary": "#c0c1ff",
+          "surface-container": "#1f1f27",
+          "on-surface": "#e4e1ed",
+          "tertiary-fixed-dim": "#ffb783",
+          "inverse-primary": "#494bd6",
+          "tertiary-fixed": "#ffdcc5",
+          "border-subtle": "#27272A",
+          "on-primary-container": "#0d0096",
+          "outline": "#908fa0",
+          "secondary-fixed": "#e2dfff",
+          "inverse-on-surface": "#303038",
+          "on-primary-fixed": "#07006c",
+          "on-tertiary-fixed-variant": "#703700",
+          "on-tertiary": "#4f2500",
+          "surface-container-highest": "#34343d",
+          "on-secondary-container": "#b3b1ff",
+          "surface-elevated": "#12131A",
+          "primary-fixed": "#e1e0ff",
+          "on-secondary-fixed": "#0f0069",
+          "on-secondary-fixed-variant": "#3323cc",
+          "on-background": "#e4e1ed",
+          "surface": "#13131b",
+          "secondary-container": "#3626ce",
+          "surface-bright": "#393841"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "margin": "1.5rem",
+          "gutter": "1rem",
+          "space-xs": "0.25rem",
+          "space-xl": "2rem",
+          "space-sm": "0.5rem",
+          "space-lg": "1.5rem",
+          "space-md": "1rem"
+        },
+        "fontFamily": {
+          "table-mono": ["JetBrains Mono"],
+          "table": ["Inter"],
+          "section": ["Inter"],
+          "meta": ["Inter"],
+          "body": ["Inter"],
+          "page-title": ["Inter"],
+          "metric": ["JetBrains Mono"]
+        },
+        "fontSize": {
+          "table-mono": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+          "table": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+          "section": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+          "meta": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+          "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+          "page-title": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+          "metric": ["32px", { "lineHeight": "38px", "fontWeight": "500" }]
+        }
+      }
+    }
+  }
+</script>
+</head>
+<body class="bg-background text-on-surface font-body antialiased min-h-screen flex flex-col">
+<!-- SideNavBar -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated border-r border-border-subtle flex flex-col justify-between p-space-sm select-none">
+<div class="flex flex-col space-y-space-md">
+<!-- Header -->
+<div class="flex items-center space-x-space-sm px-space-xs py-space-sm">
+<div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary-container font-bold text-body">AI</div>
+<div>
+<div class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</div>
+<div class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</div>
+</div>
+</div>
+<!-- Nav Links -->
+<nav class="flex flex-col space-y-space-xs">
+<a class="flex items-center space-x-space-sm px-space-sm py-space-xs text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-body">dashboard</span>
+<span class="font-body text-body">Overview</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-space-xs text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-body">alt_route</span>
+<span class="font-body text-body">Gateway</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-space-xs text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-body">hub</span>
+<span class="font-body text-body">Providers</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-space-xs text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-body">monitoring</span>
+<span class="font-body text-body">Traffic</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-space-xs bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-body" style="font-variation-settings: 'FILL' 1;">lan</span>
+<span class="font-body text-body">Network</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-space-xs text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-body">extension</span>
+<span class="font-body text-body">Integrations</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-space-xs text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-body">settings</span>
+<span class="font-body text-body">Settings</span>
+</a>
+</nav>
+</div>
+<!-- Footer -->
+<div class="flex flex-col space-y-space-xs border-t border-border-subtle pt-space-sm">
+<a class="flex items-center space-x-space-sm px-space-sm py-space-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-body">menu_book</span>
+<span class="font-body text-body">Docs</span>
+</a>
+<a class="flex items-center space-x-space-sm px-space-sm py-space-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-body">check_circle</span>
+<span class="font-body text-body">System Status</span>
+</a>
+</div>
+</aside>
+<!-- Main Wrapper -->
+<div class="pl-60 flex flex-col flex-1">
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark dark:bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin">
+<div class="flex items-center space-x-space-md">
+<div class="font-page-title text-page-title text-on-surface dark:text-on-surface font-semibold flex items-center space-x-space-xs">
+<span class="text-on-surface-variant">network</span>
+<span class="text-on-surface-variant">/</span>
+<span>proxy-pools</span>
+</div>
+<!-- Search bar -->
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2 text-on-surface-variant text-body">search</span>
+<input class="bg-surface-container border border-border-subtle rounded-lg pl-8 pr-3 py-1 text-meta text-on-surface placeholder-on-surface-variant focus:outline-none focus:border-primary w-64 transition-all" placeholder="Search gateways, proxies, metrics..." type="text"/>
+</div>
+</div>
+<div class="flex items-center space-x-space-sm">
+<span class="font-meta text-meta text-on-surface-variant bg-surface-container px-2 py-1 rounded border border-border-subtle">v2.4.1-proxy</span>
+<button class="p-space-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" title="Notifications">
+<span class="material-symbols-outlined text-body">notifications</span>
+</button>
+<button class="p-space-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" title="Theme Mode">
+<span class="material-symbols-outlined text-body">light_mode</span>
+</button>
+<button class="p-space-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" title="Help &amp; Support">
+<span class="material-symbols-outlined text-body">help</span>
+</button>
+<div class="w-7 h-7 rounded-full bg-surface-variant border border-border-subtle overflow-hidden flex items-center justify-center cursor-pointer ml-space-xs">
+<img class="w-full h-full object-cover" data-alt="A professional studio portrait of a software engineer with neutral expression, wearing a dark gray t-shirt, set against a softly lit minimalist tech workspace background with subtle blue ambient lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUsc0qSeKC7x-Xf6_WUdpv8lqhbthV2kjEMzh2hcx6wcZCJ35gw12CB1Oc5h9qi8MdwboO5Rmzw_rKyh6cOFD0TNntgyz5vDrzV1Ag31yN57qpQZv4cSmOQa6fEV9R9wh8ntbgzkm_bb9K0nk8bmSvXAYYrGMg4JEk5NmesotSObJ6HMXkFypjbv1WigdojXVq_zGMiQaY1mZWOpaUbD0ERN-KsWOatDRbRsywTrWazOP4JlGM4Qj5IjRlRl2E270gS1ex_2QaElY"/>
+</div>
+</div>
+</header>
+<!-- Content Area -->
+<main class="flex-1 p-margin space-y-space-lg max-w-[1400px] w-full mx-auto">
+<!-- Page Header & Actions -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-space-md">
+<div>
+<h1 class="font-page-title text-page-title font-semibold text-on-surface tracking-tight">Proxy Pools</h1>
+<p class="font-body text-body text-on-surface-variant mt-space-xs">Configure, monitor, and scale upstream proxy routing across global data centers and edge relays.</p>
+</div>
+<div class="flex items-center space-x-space-sm">
+<button class="px-space-md py-1.5 rounded-lg border border-border-subtle bg-surface-container hover:bg-surface-container-high text-on-surface font-body font-medium transition-colors duration-150 cursor-pointer flex items-center space-x-space-xs">
+<span class="material-symbols-outlined text-body">add</span>
+<span>Add manually</span>
+</button>
+<button class="px-space-md py-1.5 rounded-lg bg-primary text-on-primary-container font-body font-medium hover:bg-primary-fixed-dim transition-colors duration-150 cursor-pointer flex items-center space-x-space-xs">
+<span class="material-symbols-outlined text-body">bolt</span>
+<span>Auto-deploy relay</span>
+</button>
+</div>
+</div>
+<!-- Warning Banner -->
+<div class="border-l-2 border-status-amber bg-surface-container-low p-space-md rounded-r-lg flex items-start space-x-space-sm">
+<span class="material-symbols-outlined text-status-amber text-body mt-0.5">warning</span>
+<div class="font-body text-body text-on-surface">
+<span class="font-semibold">Security Notice:</span> Turning strict proxy off means a dead proxy silently falls back to a direct connection, exposing the real IP without any notice.
+        </div>
+</div>
+<!-- Proxy Pools Table Container -->
+<div class="bg-surface-elevated border border-border-subtle rounded-lg overflow-hidden shadow-none">
+<!-- Table Header Toolbar -->
+<div class="px-space-md py-space-sm border-b border-border-subtle flex items-center justify-between bg-surface-container-low">
+<div class="flex items-center space-x-space-sm">
+<span class="font-section text-section text-on-surface">Active Pools</span>
+<span class="bg-surface-container border border-border-subtle px-2 py-0.5 rounded text-meta text-on-surface-variant font-mono">4 configured</span>
+</div>
+<div class="flex items-center space-x-space-sm">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2 top-1.5 text-on-surface-variant text-meta">filter_list</span>
+<input class="bg-surface-container border border-border-subtle rounded pl-7 pr-3 py-1 text-meta text-on-surface placeholder-on-surface-variant focus:outline-none focus:border-primary" placeholder="Filter pools..." type="text"/>
+</div>
+</div>
+</div>
+<!-- Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-border-subtle bg-surface-container-low font-meta text-meta text-on-surface-variant">
+<th class="py-2.5 px-space-md font-semibold">Pool Name &amp; Region</th>
+<th class="py-2.5 px-space-md font-semibold">Provider Type</th>
+<th class="py-2.5 px-space-md font-semibold">Upstream URL</th>
+<th class="py-2.5 px-space-md font-semibold">Strict-Proxy</th>
+<th class="py-2.5 px-space-md font-semibold">Test Status</th>
+<th class="py-2.5 px-space-md font-semibold">Connections</th>
+<th class="py-2.5 px-space-md font-semibold text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle font-table text-table text-on-surface">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container transition-colors duration-150 h-[36px]">
+<td class="py-2 px-space-md font-medium flex items-center space-x-space-xs">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span>us-east-primary</span>
+<span class="text-on-surface-variant text-meta">/ us-east</span>
+</td>
+<td class="py-2 px-space-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-meta font-semibold uppercase bg-status-green/12 text-status-green">HTTP</span>
+</td>
+<td class="py-2 px-space-md font-table-mono text-table-mono text-on-surface-variant">https://proxy.us-east.aigate.internal/v1</td>
+<td class="py-2 px-space-md">
+<!-- Toggle Switch -->
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</td>
+<td class="py-2 px-space-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-meta font-medium bg-status-green/12 text-status-green">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green mr-1.5"></span>
+                    healthy
+                  </span>
+</td>
+<td class="py-2 px-space-md font-table-mono text-table-mono text-on-surface-variant">14 connections</td>
+<td class="py-2 px-space-md text-right space-x-space-xs">
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" title="Test Connection">
+<span class="material-symbols-outlined text-body">play_arrow</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" title="Edit Configuration">
+<span class="material-symbols-outlined text-body">edit</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:text-status-red hover:bg-surface-container-high rounded transition-colors" title="Delete Pool">
+<span class="material-symbols-outlined text-body">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container transition-colors duration-150 h-[36px]">
+<td class="py-2 px-space-md font-medium flex items-center space-x-space-xs">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span>eu-central-relay</span>
+<span class="text-on-surface-variant text-meta">/ eu-central</span>
+</td>
+<td class="py-2 px-space-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-meta font-semibold uppercase bg-primary/12 text-primary">Vercel</span>
+</td>
+<td class="py-2 px-space-md font-table-mono text-table-mono text-on-surface-variant">https://vercel-edge.eu.aigate.internal/proxy</td>
+<td class="py-2 px-space-md">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</td>
+<td class="py-2 px-space-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-meta font-medium bg-status-green/12 text-status-green">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green mr-1.5"></span>
+                    healthy
+                  </span>
+</td>
+<td class="py-2 px-space-md font-table-mono text-table-mono text-on-surface-variant">8 connections</td>
+<td class="py-2 px-space-md text-right space-x-space-xs">
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" title="Test Connection">
+<span class="material-symbols-outlined text-body">play_arrow</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" title="Edit Configuration">
+<span class="material-symbols-outlined text-body">edit</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:text-status-red hover:bg-surface-container-high rounded transition-colors" title="Delete Pool">
+<span class="material-symbols-outlined text-body">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container transition-colors duration-150 h-[36px]">
+<td class="py-2 px-space-md font-medium flex items-center space-x-space-xs">
+<span class="w-2 h-2 rounded-full bg-status-amber"></span>
+<span>apac-edge-edge1</span>
+<span class="text-on-surface-variant text-meta">/ apac-east</span>
+</td>
+<td class="py-2 px-space-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-meta font-semibold uppercase bg-tertiary/12 text-tertiary">Cloudflare</span>
+</td>
+<td class="py-2 px-space-md font-table-mono text-table-mono text-on-surface-variant">https://cf-worker.apac.aigate.internal/gateway</td>
+<td class="py-2 px-space-md">
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</td>
+<td class="py-2 px-space-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-meta font-medium bg-status-amber/12 text-status-amber">
+<span class="w-1.5 h-1.5 rounded-full bg-status-amber mr-1.5"></span>
+                    degraded
+                  </span>
+</td>
+<td class="py-2 px-space-md font-table-mono text-table-mono text-on-surface-variant">3 connections</td>
+<td class="py-2 px-space-md text-right space-x-space-xs">
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" title="Test Connection">
+<span class="material-symbols-outlined text-body">play_arrow</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" title="Edit Configuration">
+<span class="material-symbols-outlined text-body">edit</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:text-status-red hover:bg-surface-container-high rounded transition-colors" title="Delete Pool">
+<span class="material-symbols-outlined text-body">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container transition-colors duration-150 h-[36px]">
+<td class="py-2 px-space-md font-medium flex items-center space-x-space-xs">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span>deno-edge-worker</span>
+<span class="text-on-surface-variant text-meta">/ global</span>
+</td>
+<td class="py-2 px-space-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-meta font-semibold uppercase bg-secondary-fixed-dim/12 text-secondary-fixed-dim">Deno</span>
+</td>
+<td class="py-2 px-space-md font-table-mono text-table-mono text-on-surface-variant">https://deno-deploy.aigate.internal/proxy</td>
+<td class="py-2 px-space-md">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-8 h-4 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</td>
+<td class="py-2 px-space-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-meta font-medium bg-status-green/12 text-status-green">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green mr-1.5"></span>
+                    healthy
+                  </span>
+</td>
+<td class="py-2 px-space-md font-table-mono text-table-mono text-on-surface-variant">19 connections</td>
+<td class="py-2 px-space-md text-right space-x-space-xs">
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" title="Test Connection">
+<span class="material-symbols-outlined text-body">play_arrow</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" title="Edit Configuration">
+<span class="material-symbols-outlined text-body">edit</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:text-status-red hover:bg-surface-container-high rounded transition-colors" title="Delete Pool">
+<span class="material-symbols-outlined text-body">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer Pagination -->
+<div class="px-space-md py-space-sm border-t border-border-subtle flex items-center justify-between bg-surface-container-low text-meta text-on-surface-variant">
+<div>Showing 4 of 4 configured proxy pools</div>
+<div class="flex items-center space-x-space-sm">
+<button class="px-2 py-1 bg-surface-container border border-border-subtle rounded opacity-50 cursor-not-allowed">Previous</button>
+<button class="px-2 py-1 bg-surface-container border border-border-subtle rounded opacity-50 cursor-not-allowed">Next</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

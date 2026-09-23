@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console - Traffic Console</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-primary-fixed": "#07006c",
+            "primary-fixed-dim": "#c0c1ff",
+            "on-primary-container": "#0d0096",
+            "secondary-container": "#3626ce",
+            "on-primary": "#1000a9",
+            "tertiary-container": "#d97721",
+            "status-grey": "#6B7280",
+            "on-error-container": "#ffdad6",
+            "inverse-primary": "#494bd6",
+            "status-green": "#22C55E",
+            "primary-container": "#8083ff",
+            "primary": "#c0c1ff",
+            "on-surface": "#e4e1ed",
+            "surface-container-low": "#1b1b23",
+            "outline": "#908fa0",
+            "on-secondary-container": "#b3b1ff",
+            "on-secondary": "#1d00a5",
+            "inverse-surface": "#e4e1ed",
+            "on-tertiary": "#4f2500",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "outline-variant": "#464554",
+            "on-tertiary-container": "#452000",
+            "surface": "#13131b",
+            "tertiary-fixed-dim": "#ffb783",
+            "surface-container-lowest": "#0d0d15",
+            "error-container": "#93000a",
+            "tertiary": "#ffb783",
+            "inverse-on-surface": "#303038",
+            "surface-dark": "#090A0F",
+            "surface-container-highest": "#34343d",
+            "on-error": "#690005",
+            "error": "#ffb4ab",
+            "on-tertiary-fixed": "#301400",
+            "tertiary-fixed": "#ffdcc5",
+            "surface-tint": "#c0c1ff",
+            "secondary": "#c3c0ff",
+            "surface-dim": "#13131b",
+            "surface-container-high": "#292932",
+            "secondary-fixed": "#e2dfff",
+            "surface-variant": "#34343d",
+            "surface-bright": "#393841",
+            "surface-container": "#1f1f27",
+            "primary-fixed": "#e1e0ff",
+            "on-background": "#e4e1ed",
+            "status-red": "#EF4444",
+            "secondary-fixed-dim": "#c3c0ff",
+            "status-amber": "#F59E0B",
+            "surface-elevated": "#12131A",
+            "on-surface-variant": "#c7c4d7",
+            "on-tertiary-fixed-variant": "#703700",
+            "border-subtle": "#27272A",
+            "on-secondary-fixed": "#0f0069",
+            "background": "#13131b"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-md": "1rem",
+            "gutter": "1rem",
+            "space-sm": "0.5rem",
+            "space-xs": "0.25rem",
+            "space-xl": "2rem",
+            "space-lg": "1.5rem",
+            "margin": "1.5rem"
+          },
+          "fontFamily": {
+            "table-mono": ["JetBrains Mono"],
+            "section": ["Inter"],
+            "body": ["Inter"],
+            "page-title": ["Inter"],
+            "metric": ["JetBrains Mono"],
+            "table": ["Inter"],
+            "meta": ["Inter"]
+          },
+          "fontSize": {
+            "table-mono": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "section": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "page-title": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "metric": ["32px", { "lineHeight": "38px", "fontWeight": "500" }],
+            "table": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "meta": ["12px", { "lineHeight": "16px", "fontWeight": "400" }]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface text-on-surface font-body antialiased selection:bg-primary-container selection:text-on-primary-container min-h-screen flex flex-col">
+<!-- SideNavBar -->
+<aside class="bg-surface-elevated dark:bg-surface-elevated fixed top-0 left-0 h-screen w-60 z-40 flex flex-col justify-between h-full p-space-sm w-60 border-r border-border-subtle">
+<div>
+<!-- Header -->
+<div class="flex items-center gap-space-sm px-space-sm py-space-sm mb-space-md">
+<div class="w-7 h-7 bg-primary-container flex items-center justify-center rounded text-on-primary-container font-bold text-table-mono">AI</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</span>
+<span class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</span>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none font-body text-body">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span>Overview</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none font-body text-body">
+<span class="material-symbols-outlined text-lg">alt_route</span>
+<span>Gateway</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none font-body text-body">
+<span class="material-symbols-outlined text-lg">hub</span>
+<span>Providers</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 bg-surface-container-high text-primary dark:text-primary font-medium rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none font-body text-body">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">monitoring</span>
+<span>Traffic</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none font-body text-body">
+<span class="material-symbols-outlined text-lg">lan</span>
+<span>Network</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none font-body text-body">
+<span class="material-symbols-outlined text-lg">extension</span>
+<span>Integrations</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-2 text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface dark:hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 hover:bg-surface-container dark:hover:bg-surface-container cursor-pointer active:opacity-90 select-none font-body text-body">
+<span class="material-symbols-outlined text-lg">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Footer Tabs -->
+<div class="flex flex-col gap-1 pt-space-md border-t border-border-subtle">
+<a class="flex items-center gap-space-sm px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer text-meta">
+<span class="material-symbols-outlined text-base">menu_book</span>
+<span>Docs</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer text-meta">
+<span class="material-symbols-outlined text-base text-status-green">check_circle</span>
+<span>System Status</span>
+</a>
+</div>
+</aside>
+<!-- Main Wrapper to push content past sidebar -->
+<div class="pl-60 flex flex-col flex-1 min-h-screen">
+<!-- TopNavBar -->
+<header class="bg-surface-dark dark:bg-surface-dark sticky top-0 right-0 z-30 h-12 w-full flex items-center justify-between px-margin border-b border-border-subtle">
+<!-- Left: Breadcrumb & Search -->
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-2 font-meta text-on-surface-variant">
+<span class="hover:text-on-surface cursor-pointer">gateway</span>
+<span>/</span>
+<span class="hover:text-on-surface cursor-pointer">traffic</span>
+<span>/</span>
+<span class="text-on-surface font-medium">console</span>
+</div>
+<div class="relative hidden sm:flex items-center">
+<span class="material-symbols-outlined absolute left-2.5 text-outline text-base">search</span>
+<input class="bg-surface-container-low border border-border-subtle text-on-surface text-meta rounded-lg pl-8 pr-3 py-1 w-64 focus:outline-none focus:border-primary" placeholder="Search commands, proxies... (Cmd+K)" type="text"/>
+</div>
+</div>
+<!-- Right Actions -->
+<div class="flex items-center gap-space-sm">
+<span class="text-meta text-on-surface-variant bg-surface-container px-2 py-0.5 rounded font-table-mono">v2.4.1-proxy</span>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" title="Notifications">
+<span class="material-symbols-outlined text-lg">notifications</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" title="Toggle Theme">
+<span class="material-symbols-outlined text-lg">light_mode</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer" title="Help">
+<span class="material-symbols-outlined text-lg">help</span>
+</button>
+<div class="h-4 w-[1px] bg-border-subtle mx-1"></div>
+<div class="flex items-center gap-2 cursor-pointer hover:opacity-80">
+<div class="w-7 h-7 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container font-semibold text-xs" data-alt="Professional studio headshot of a software engineer with dark hair, wearing a sleek minimal dark grey hoodie, neutral warm office background with soft bokeh, high fidelity, professional lighting, technical developer profile picture" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuD5Qt31UpvLsOCyM76_oS4PyTO0YE0d4rJftKzb8IgxEugjFPLJI0pEL5gk5Wi32kDt9GQPoqtNncJwu0rGEw2wwygQS-ernhMWyMUlwH5uTja-UbJiBUP9oHnwjNg8R7hIio51xwYeTQ49AYb53xa_bjC9zQMgOzNFarn2Ao1y4xgXdo0UTGSaetrrxfSWW_iacHTwSELS6g2mACS0VLRrjaVRbYDP-QzU9TyLQ4BmFHm1iVcFTXIrELSY2AxZ0TXxgUkx-i80Yq0')">
+            EN
+          </div>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 p-margin flex flex-col gap-space-lg max-w-[1600px] w-full mx-auto">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-sm">
+<div>
+<div class="flex items-center gap-3">
+<h1 class="font-page-title text-page-title text-on-surface font-semibold">Console</h1>
+<div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-status-green/10 text-status-green font-meta uppercase tracking-wider font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green animate-pulse"></span>
+              Daemon v2.4.1 • Live
+            </div>
+</div>
+<p class="font-body text-body text-on-surface-variant mt-0.5">Real-time streaming daemon logs, debug traces, and system events.</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="bg-surface-container-high hover:bg-surface-bright text-on-surface px-3 py-1.5 rounded-lg text-meta font-medium border border-border-subtle flex items-center gap-1.5 transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-base">download</span>
+            Export Logs
+          </button>
+<button class="bg-primary text-on-primary hover:opacity-90 px-3 py-1.5 rounded-lg text-meta font-medium flex items-center gap-1.5 transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-base">settings_ethernet</span>
+            Configure Stream
+          </button>
+</div>
+</div>
+<!-- Log Viewer Container -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl flex flex-col flex-1 shadow-2xl overflow-hidden min-h-[650px] relative">
+<!-- Top Toolbar inside log viewer -->
+<div class="bg-surface-container-low border-b border-border-subtle px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+<div class="flex items-center gap-2 flex-wrap">
+<!-- Pause Toggle Button -->
+<button class="bg-primary text-on-primary hover:opacity-90 px-2.5 py-1 rounded text-meta font-medium flex items-center gap-1.5 transition-colors cursor-pointer" id="pause-btn" onclick="togglePause()">
+<span class="material-symbols-outlined text-base" id="pause-icon">pause</span>
+<span id="pause-text">Pause Stream</span>
+</button>
+<!-- Clear Button -->
+<button class="bg-surface-container hover:bg-surface-container-high text-on-surface px-2.5 py-1 rounded text-meta font-medium border border-border-subtle flex items-center gap-1.5 transition-colors cursor-pointer" onclick="clearLogs()">
+<span class="material-symbols-outlined text-base">block</span>
+              Clear
+            </button>
+<div class="h-4 w-[1px] bg-border-subtle mx-1"></div>
+<!-- Search filter input -->
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2.5 text-outline text-sm">filter_list</span>
+<input class="bg-surface-container border border-border-subtle text-on-surface text-table-mono rounded pl-8 pr-3 py-1 w-72 focus:outline-none focus:border-primary" id="log-search" oninput="filterLogs()" placeholder="Search logs, trace IDs, messages..." type="text"/>
+</div>
+</div>
+<!-- Level Filter Chips -->
+<div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+<button class="px-2.5 py-0.5 rounded text-meta font-medium bg-surface-container-high text-on-surface border border-outline/30 cursor-pointer transition-colors" id="chip-all" onclick="setLevelFilter('all')">
+              All (142)
+            </button>
+<button class="px-2.5 py-0.5 rounded text-meta font-medium bg-status-grey/10 text-status-grey border border-status-grey/20 cursor-pointer transition-colors" id="chip-log" onclick="setLevelFilter('LOG')">
+              Log (89)
+            </button>
+<button class="px-2.5 py-0.5 rounded text-meta font-medium bg-status-green/10 text-status-green border border-status-green/20 cursor-pointer transition-colors" id="chip-info" onclick="setLevelFilter('INFO')">
+              Info (34)
+            </button>
+<button class="px-2.5 py-0.5 rounded text-meta font-medium bg-status-amber/10 text-status-amber border border-status-amber/20 cursor-pointer transition-colors" id="chip-warn" onclick="setLevelFilter('WARN')">
+              Warn (14)
+            </button>
+<button class="px-2.5 py-0.5 rounded text-meta font-medium bg-status-red/10 text-status-red border border-status-red/20 cursor-pointer transition-colors" id="chip-error" onclick="setLevelFilter('ERROR')">
+              Error (5)
+            </button>
+<button class="px-2.5 py-0.5 rounded text-meta font-medium bg-surface-container text-on-surface-variant border border-border-subtle cursor-pointer transition-colors" id="chip-debug" onclick="setLevelFilter('DEBUG')">
+              Debug (24)
+            </button>
+</div>
+</div>
+<!-- Log Stream Area -->
+<div class="font-table-mono text-table-mono p-4 flex flex-col gap-1 overflow-y-auto flex-1 max-h-[600px] select-text" id="log-stream-container">
+<!-- Row Item -->
+<div class="log-row grid grid-cols-[110px_70px_130px_1fr] items-baseline gap-3 py-1 px-2 rounded hover:bg-surface-container/50 transition-colors" data-level="INFO" data-msg="Upstream proxy successfully initialized on port 8080. Connected to OpenAI and Anthropic endpoints.">
+<span class="text-on-surface-variant">16:42:01.042</span>
+<span class="text-status-green font-medium">[INFO]</span>
+<span class="text-primary-fixed-dim truncate">srv:proxy-init</span>
+<span class="text-on-surface">Upstream proxy successfully initialized on port <span class="text-tertiary">8080</span>. Connected to OpenAI and Anthropic endpoints.</span>
+</div>
+<div class="log-row grid grid-cols-[110px_70px_130px_1fr] items-baseline gap-3 py-1 px-2 rounded hover:bg-surface-container/50 transition-colors" data-level="DEBUG" data-msg="Token bucket rate limiter refreshed: 4500 tokens remaining for user_auth_sk_9921">
+<span class="text-on-surface-variant">16:42:01.419</span>
+<span class="text-status-grey font-medium">[DEBUG]</span>
+<span class="text-primary-fixed-dim truncate">ratelimit:bucket</span>
+<span class="text-on-surface-variant">Token bucket rate limiter refreshed: 4500 tokens remaining for <span class="text-on-surface">user_auth_sk_9921</span></span>
+</div>
+<div class="log-row grid grid-cols-[110px_70px_130px_1fr] items-baseline gap-3 py-1 px-2 rounded hover:bg-surface-container/50 transition-colors" data-level="LOG" data-msg="POST /v1/chat/completions HTTP/1.1 - 200 OK - 422 tokens - 340ms">
+<span class="text-on-surface-variant">16:42:02.102</span>
+<span class="text-on-surface-variant font-medium">[LOG]</span>
+<span class="text-primary-fixed-dim truncate">req_9831ac</span>
+<span class="text-on-surface">POST <span class="text-secondary-fixed">/v1/chat/completions</span> HTTP/1.1 - <span class="text-status-green">200 OK</span> - 422 tokens - 340ms</span>
+</div>
+<div class="log-row grid grid-cols-[110px_70px_130px_1fr] items-baseline gap-3 py-1 px-2 rounded hover:bg-surface-container/50 transition-colors" data-level="WARN" data-msg="Provider latency spike detected on anthropic/claude-3-5-sonnet: 1,420ms response time">
+<span class="text-on-surface-variant">16:42:03.885</span>
+<span class="text-status-amber font-medium">[WARN]</span>
+<span class="text-primary-fixed-dim truncate">monitor:latency</span>
+<span class="text-on-surface">Provider latency spike detected on <span class="text-tertiary">anthropic/claude-3-5-sonnet</span>: 1,420ms response time</span>
+</div>
+<div class="log-row grid grid-cols-[110px_70px_130px_1fr] items-baseline gap-3 py-1 px-2 rounded hover:bg-surface-container/50 transition-colors" data-level="LOG" data-msg="POST /v1/embeddings HTTP/1.1 - 200 OK - 128 tokens - 85ms">
+<span class="text-on-surface-variant">16:42:04.120</span>
+<span class="text-on-surface-variant font-medium">[LOG]</span>
+<span class="text-primary-fixed-dim truncate">req_9832ee</span>
+<span class="text-on-surface">POST <span class="text-secondary-fixed">/v1/embeddings</span> HTTP/1.1 - <span class="text-status-green">200 OK</span> - 128 tokens - 85ms</span>
+</div>
+<div class="log-row grid grid-cols-[110px_70px_130px_1fr] items-baseline gap-3 py-1 px-2 rounded hover:bg-surface-container/50 transition-colors" data-level="ERROR" data-msg="Upstream connection timeout (5000ms) reached for model endpoint openai/gpt-4o. Falling back to failover route.">
+<span class="text-on-surface-variant">16:42:05.501</span>
+<span class="text-status-red font-medium">[ERROR]</span>
+<span class="text-primary-fixed-dim truncate">failover:handler</span>
+<span class="text-on-surface">Upstream connection timeout (5000ms) reached for model endpoint <span class="text-error">openai/gpt-4o</span>. Falling back to failover route.</span>
+</div>
+<div class="log-row grid grid-cols-[110px_70px_130px_1fr] items-baseline gap-3 py-1 px-2 rounded hover:bg-surface-container/50 transition-colors" data-level="INFO" data-msg="Failover activated successfully. Rerouted request to secondary gateway node us-west-2a.">
+<span class="text-on-surface-variant">16:42:05.540</span>
+<span class="text-status-green font-medium">[INFO]</span>
+<span class="text-primary-fixed-dim truncate">failover:node</span>
+<span class="text-on-surface">Failover activated successfully. Rerouted request to secondary gateway node <span class="text-primary">us-west-2a</span>.</span>
+</div>
+<div class="log-row grid grid-cols-[110px_70px_130px_1fr] items-baseline gap-3 py-1 px-2 rounded hover:bg-surface-container/50 transition-colors" data-level="DEBUG" data-msg="Parsing SSE payload chunk [size: 1.4KB] for trace_id=t-881093">
+<span class="text-on-surface-variant">16:42:06.012</span>
+<span class="text-status-grey font-medium">[DEBUG]</span>
+<span class="text-primary-fixed-dim truncate">parser:sse</span>
+<span class="text-on-surface-variant">Parsing SSE payload chunk [size: 1.4KB] for trace_id=<span class="text-on-surface">t-881093</span></span>
+</div>
+<div class="log-row grid grid-cols-[110px_70px_130px_1fr] items-baseline gap-3 py-1 px-2 rounded hover:bg-surface-container/50 transition-colors" data-level="LOG" data-msg="POST /v1/chat/completions HTTP/1.1 - 200 OK - 890 tokens - 620ms">
+<span class="text-on-surface-variant">16:42:07.330</span>
+<span class="text-on-surface-variant font-medium">[LOG]</span>
+<span class="text-primary-fixed-dim truncate">req_9833ff</span>
+<span class="text-on-surface">POST <span class="text-secondary-fixed">/v1/chat/completions</span> HTTP/1.1 - <span class="text-status-green">200 OK</span> - 890 tokens - 620ms</span>
+</div>
+</div>
+<!-- Floating translucent pill for scrolled-up state -->
+<div class="absolute bottom-12 left-1/2 -translate-x-1/2 z-20">
+<button class="bg-surface-container-high/95 hover:bg-surface-bright text-primary border border-border-subtle shadow-xl px-4 py-1.5 rounded-full text-meta font-medium flex items-center gap-2 backdrop-blur-md transition-all cursor-pointer" onclick="scrollToBottom()">
+<span class="material-symbols-outlined text-sm animate-bounce">arrow_downward</span>
+<span>Jump to latest (14 new lines)</span>
+</button>
+</div>
+<!-- Bottom Status Bar -->
+<div class="bg-surface-container-low border-t border-border-subtle px-4 py-2 flex items-center justify-between text-meta text-on-surface-variant">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-status-green"></span>
+<span>Connected to <span class="text-on-surface font-table-mono">ws://127.0.0.1:8080/stream</span></span>
+</div>
+<div class="flex items-center gap-4 font-table-mono text-[12px]">
+<span>Buffer limit: 500 rows</span>
+<span class="text-status-amber">12 dropped (overflow)</span>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Interactive Script -->
+<script>
+    let isPaused = false;
+    let currentFilter = 'all';
+
+    function togglePause() {
+      isPaused = !isPaused;
+      const btn = document.getElementById('pause-btn');
+      const icon = document.getElementById('pause-icon');
+      const text = document.getElementById('pause-text');
+      
+      if (isPaused) {
+        btn.classList.remove('bg-primary', 'text-on-primary');
+        btn.classList.add('bg-status-amber', 'text-on-tertiary');
+        icon.textContent = 'play_arrow';
+        text.textContent = 'Resume Stream';
+      } else {
+        btn.classList.remove('bg-status-amber', 'text-on-tertiary');
+        btn.classList.add('bg-primary', 'text-on-primary');
+        icon.textContent = 'pause';
+        text.textContent = 'Pause Stream';
+      }
+    }
+
+    function clearLogs() {
+      const container = document.getElementById('log-stream-container');
+      container.innerHTML = '<div class="text-center py-8 text-on-surface-variant italic">Log stream cleared. Waiting for new events...</div>';
+    }
+
+    function setLevelFilter(level) {
+      currentFilter = level;
+      
+      // Update chip styles
+      ['all', 'log', 'info', 'warn', 'error', 'debug'].forEach(l => {
+        const chip = document.getElementById(`chip-${l}`);
+        if (l === level.toLowerCase()) {
+          chip.className = 'px-2.5 py-0.5 rounded text-meta font-medium bg-surface-container-high text-on-surface border border-primary/50 cursor-pointer transition-colors';
+        } else {
+          chip.className = 'px-2.5 py-0.5 rounded text-meta font-medium bg-surface-container text-on-surface-variant border border-border-subtle cursor-pointer transition-colors opacity-70 hover:opacity-100';
+        }
+      });
+
+      // Filter rows
+      const rows = document.querySelectorAll('.log-row');
+      rows.forEach(row => {
+        if (level === 'all' || row.getAttribute('data-level') === level) {
+          row.style.display = 'grid';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    }
+
+    function filterLogs() {
+      const query = document.getElementById('log-search').value.toLowerCase();
+      const rows = document.querySelectorAll('.log-row');
+      
+      rows.forEach(row => {
+        const text = row.getAttribute('data-msg').toLowerCase();
+        const level = row.getAttribute('data-level');
+        const matchesLevel = currentFilter === 'all' || level === currentFilter;
+        
+        if (matchesLevel && text.includes(query)) {
+          row.style.display = 'grid';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    }
+
+    function scrollToBottom() {
+      const container = document.getElementById('log-stream-container');
+      container.scrollTop = container.scrollHeight;
+    }
+  </script>
+</body></html>

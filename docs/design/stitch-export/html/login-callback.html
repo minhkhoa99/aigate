@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIGate Console — Authentication &amp; Callback Showcase</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "primary-fixed-dim": "#c0c1ff",
+            "on-tertiary-fixed": "#301400",
+            "status-green": "#22C55E",
+            "primary-container": "#8083ff",
+            "on-surface-variant": "#c7c4d7",
+            "surface-tint": "#c0c1ff",
+            "surface": "#13131b",
+            "status-grey": "#6B7280",
+            "surface-variant": "#34343d",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "on-primary-fixed": "#07006c",
+            "error": "#ffb4ab",
+            "on-error": "#690005",
+            "surface-bright": "#393841",
+            "tertiary-fixed-dim": "#ffb783",
+            "primary-fixed": "#e1e0ff",
+            "surface-container-high": "#292932",
+            "inverse-on-surface": "#303038",
+            "tertiary-container": "#d97721",
+            "background": "#13131b",
+            "surface-dark": "#090A0F",
+            "surface-container-highest": "#34343d",
+            "surface-container": "#1f1f27",
+            "on-surface": "#e4e1ed",
+            "on-secondary-fixed-variant": "#3323cc",
+            "secondary": "#c3c0ff",
+            "on-error-container": "#ffdad6",
+            "secondary-fixed": "#e2dfff",
+            "on-primary-container": "#0d0096",
+            "secondary-fixed-dim": "#c3c0ff",
+            "surface-container-low": "#1b1b23",
+            "on-tertiary": "#4f2500",
+            "surface-container-lowest": "#0d0d15",
+            "surface-elevated": "#12131A",
+            "secondary-container": "#3626ce",
+            "on-secondary": "#1d00a5",
+            "status-red": "#EF4444",
+            "primary": "#c0c1ff",
+            "inverse-surface": "#e4e1ed",
+            "on-primary": "#1000a9",
+            "tertiary": "#ffb783",
+            "on-background": "#e4e1ed",
+            "on-secondary-fixed": "#0f0069",
+            "surface-dim": "#13131b",
+            "inverse-primary": "#494bd6",
+            "tertiary-fixed": "#ffdcc5",
+            "outline": "#908fa0",
+            "outline-variant": "#464554",
+            "status-amber": "#F59E0B",
+            "on-tertiary-container": "#452000",
+            "error-container": "#93000a",
+            "on-tertiary-fixed-variant": "#703700",
+            "on-secondary-container": "#b3b1ff",
+            "border-subtle": "#27272A"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-sm": "0.5rem",
+            "margin": "1.5rem",
+            "gutter": "1rem",
+            "space-xl": "2rem",
+            "space-md": "1rem",
+            "space-lg": "1.5rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "metric": ["JetBrains Mono"],
+            "table": ["Inter"],
+            "table-mono": ["JetBrains Mono"],
+            "section": ["Inter"],
+            "body": ["Inter"],
+            "page-title": ["Inter"],
+            "meta": ["Inter"]
+          },
+          "fontSize": {
+            "metric": ["32px", { "lineHeight": "38px", "fontWeight": "500" }],
+            "table": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "table-mono": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "section": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "body": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "page-title": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "meta": ["12px", { "lineHeight": "16px", "fontWeight": "400" }]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface dark:bg-surface font-body text-body text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary-container">
+<!-- Header Banner / Context Bar -->
+<header class="w-full border-b border-border-subtle bg-surface-dark px-margin py-space-md flex items-center justify-between">
+<div class="flex items-center gap-space-md">
+<div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary-container font-section font-semibold">
+        AI
+      </div>
+<div>
+<h1 class="font-page-title text-page-title text-on-surface">AIGate Console</h1>
+<p class="font-meta text-meta text-on-surface-variant">Authentication &amp; Callback Showcase • Standalone Views</p>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-meta font-table-mono bg-surface-container border border-border-subtle text-status-green">
+<span class="w-1.5 h-1.5 rounded-full bg-status-green mr-1.5 animate-pulse"></span>
+        Proxy Online v2.4.1
+      </span>
+</div>
+</header>
+<!-- Main Showcase Container -->
+<main class="flex-1 w-full max-w-[1440px] mx-auto p-margin md:p-space-xl flex flex-col justify-center">
+<div class="mb-space-lg text-center md:text-left">
+<h2 class="font-section text-section text-on-surface mb-space-xs">Isolated Authentication Flows</h2>
+<p class="font-body text-body text-on-surface-variant">Reviewing core authentication endpoints and gateway entry states on a high-density operational background.</p>
+</div>
+<!-- 3-Column Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-lg items-start">
+<!-- 1. Login Panel (/login) -->
+<section aria-labelledby="login-panel-title" class="flex flex-col gap-space-md w-full">
+<!-- Warning Banner -->
+<div class="border-l-2 border-status-amber bg-surface-container border-border-subtle p-space-md rounded-lg flex items-start gap-space-md">
+<span class="material-symbols-outlined text-status-amber text-xl mt-0.5">warning</span>
+<div class="flex-1">
+<h3 class="font-section text-meta text-on-surface font-semibold uppercase tracking-wider">Security Notice</h3>
+<p class="font-body text-meta text-on-surface-variant mt-0.5">Default master password is active. You must update your credentials before proceeding.</p>
+</div>
+</div>
+<!-- Auth Card -->
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-xl shadow-none flex flex-col gap-space-lg">
+<!-- Logo & Header -->
+<div class="flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-lg bg-surface-container-high border border-border-subtle flex items-center justify-center text-primary mb-space-md">
+<span class="material-symbols-outlined text-2xl">hub</span>
+</div>
+<h2 class="font-page-title text-page-title text-on-surface" id="login-panel-title">AIGate Console</h2>
+<p class="font-meta text-meta text-on-surface-variant mt-1">Sign in with your master credentials or SSO</p>
+</div>
+<!-- Form Fields -->
+<form class="flex flex-col gap-space-md" onsubmit="event.preventDefault();">
+<div class="flex flex-col gap-space-xs">
+<label class="font-meta text-meta text-on-surface-variant font-medium">Master Password</label>
+<div class="relative flex items-center">
+<input class="w-full bg-surface border border-border-subtle rounded px-space-md py-space-sm font-table-mono text-table text-on-surface focus:outline-none focus:border-primary transition-colors pr-10" type="password" value="super-secret-master-key-2025"/>
+<button class="absolute right-3 text-on-surface-variant hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+</div>
+</div>
+<button class="w-full bg-[#6366f1] hover:bg-[#5254db] active:opacity-90 text-white font-section text-body py-2.5 px-space-md rounded transition-colors flex items-center justify-center gap-space-sm cursor-pointer select-none" type="submit">
+<span>Sign In</span>
+<span class="material-symbols-outlined text-base">arrow_forward</span>
+</button>
+</form>
+<!-- Divider -->
+<div class="relative flex py-2 items-center">
+<div class="flex-grow border-t border-border-subtle"></div>
+<span class="flex-shrink mx-4 font-meta text-meta text-on-surface-variant">or enterprise sso</span>
+<div class="flex-grow border-t border-border-subtle"></div>
+</div>
+<!-- SSO Buttons -->
+<div class="flex flex-col gap-space-sm">
+<button class="w-full bg-surface-container hover:bg-surface-container-high border border-border-subtle text-on-surface font-body text-body py-2.5 px-space-md rounded transition-colors flex items-center justify-center gap-space-sm cursor-pointer select-none">
+<span class="material-symbols-outlined text-lg">public</span>
+<span>Continue with Google Workspace</span>
+</button>
+<button class="w-full bg-surface-container hover:bg-surface-container-high border border-border-subtle text-on-surface font-body text-body py-2.5 px-space-md rounded transition-colors flex items-center justify-center gap-space-sm cursor-pointer select-none">
+<span class="material-symbols-outlined text-lg">code</span>
+<span>Continue with GitHub Enterprise</span>
+</button>
+</div>
+</div>
+</section>
+<!-- 2. OAuth Callback Panel (/callback) -->
+<section aria-labelledby="callback-panel-title" class="flex flex-col gap-space-md w-full h-full justify-center">
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-xl shadow-none flex flex-col items-center text-center gap-space-lg py-16">
+<!-- Animated Spinner -->
+<div class="relative flex items-center justify-center">
+<div class="w-16 h-16 rounded-full border-2 border-border-subtle border-t-primary animate-spin"></div>
+<div class="absolute inset-0 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl animate-pulse">sync</span>
+</div>
+</div>
+<!-- Title & Status -->
+<div class="flex flex-col gap-space-xs">
+<h2 class="font-page-title text-page-title text-on-surface" id="callback-panel-title">Authenticating with Upstream Provider</h2>
+<p class="font-body text-body text-on-surface-variant">Exchanging authorization code for secure session...</p>
+</div>
+<!-- Status Pill Details -->
+<div class="flex items-center gap-space-xs px-3 py-1 rounded bg-surface-container border border-border-subtle">
+<span class="w-2 h-2 rounded-full bg-status-amber animate-ping"></span>
+<span class="font-table-mono text-meta text-on-surface-variant">Step 1/3: Validating PKCE Challenge</span>
+</div>
+</div>
+</section>
+<!-- 3. Callback Failure Variant -->
+<section aria-labelledby="failure-panel-title" class="flex flex-col gap-space-md w-full">
+<div class="bg-surface-elevated border border-border-subtle rounded-xl p-space-xl shadow-none flex flex-col gap-space-lg">
+<!-- Header with Error Icon -->
+<div class="flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-error-container/30 border border-error/30 flex items-center justify-center text-error shrink-0">
+<span class="material-symbols-outlined text-xl">error</span>
+</div>
+<div>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-meta font-table-mono bg-error-container/20 text-error mb-1">
+                ERR_OAUTH_TOKEN_REJECTED
+              </span>
+<h2 class="font-section text-section text-on-surface" id="failure-panel-title">Authentication Failed</h2>
+</div>
+</div>
+<!-- Step Failure Detail -->
+<div class="bg-surface-container border border-border-subtle rounded-lg p-space-md flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-meta text-meta text-on-surface-variant uppercase tracking-wider">Failed Checkpoint</span>
+<span class="font-table-mono text-meta text-status-red font-semibold">Step 2/3</span>
+</div>
+<p class="font-body text-body text-on-surface font-medium">Token exchange rejected by upstream provider</p>
+</div>
+<!-- Explanation -->
+<p class="font-body text-body text-on-surface-variant">
+            The OAuth authorization grant has expired or was revoked during transmission. Upstream upstream identity provider responded with <code class="font-table-mono text-meta text-error bg-surface-container px-1.5 py-0.5 rounded">invalid_grant</code>. Please retry the authentication cycle.
+          </p>
+<!-- Primary Action -->
+<button class="w-full bg-surface-container hover:bg-surface-container-high border border-border-subtle text-on-surface hover:text-primary font-section text-body py-2.5 px-space-md rounded transition-colors flex items-center justify-center gap-space-sm cursor-pointer select-none">
+<span class="material-symbols-outlined text-base">refresh</span>
+<span>Try Again</span>
+</button>
+</div>
+</section>
+</div>
+</main>
+<!-- Footer -->
+<footer class="w-full border-t border-border-subtle bg-surface-dark px-margin py-space-sm flex items-center justify-between text-meta text-on-surface-variant">
+<div class="flex items-center gap-space-md">
+<span>AIGate Local Infrastructure</span>
+<span>•</span>
+<span class="font-table-mono">PID: 48912</span>
+</div>
+<div class="flex items-center gap-space-md">
+<a class="hover:text-on-surface transition-colors" href="#">Documentation</a>
+<a class="hover:text-on-surface transition-colors" href="#">System Status</a>
+</div>
+</footer>
+</body></html>

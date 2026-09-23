@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<title>AIGate Console — AuthFlow Modals Showcase</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "secondary": "#c3c0ff",
+          "status-red": "#EF4444",
+          "status-grey": "#6B7280",
+          "background": "#13131b",
+          "on-secondary-container": "#b3b1ff",
+          "on-background": "#e4e1ed",
+          "surface-container-high": "#292932",
+          "surface-dark": "#090A0F",
+          "border-subtle": "#27272A",
+          "on-secondary": "#1d00a5",
+          "surface-variant": "#34343d",
+          "inverse-on-surface": "#303038",
+          "secondary-fixed-dim": "#c3c0ff",
+          "outline-variant": "#464554",
+          "on-error": "#690005",
+          "secondary-fixed": "#e2dfff",
+          "surface-container": "#1f1f27",
+          "on-primary": "#1000a9",
+          "on-tertiary-fixed-variant": "#703700",
+          "primary-container": "#8083ff",
+          "on-error-container": "#ffdad6",
+          "on-secondary-fixed-variant": "#3323cc",
+          "status-green": "#22C55E",
+          "error": "#ffb4ab",
+          "primary": "#c0c1ff",
+          "tertiary-container": "#d97721",
+          "surface": "#13131b",
+          "on-secondary-fixed": "#0f0069",
+          "secondary-container": "#3626ce",
+          "surface-container-lowest": "#0d0d15",
+          "tertiary-fixed-dim": "#ffb783",
+          "surface-container-highest": "#34343d",
+          "status-amber": "#F59E0B",
+          "on-primary-fixed": "#07006c",
+          "primary-fixed": "#e1e0ff",
+          "error-container": "#93000a",
+          "on-tertiary-container": "#452000",
+          "primary-fixed-dim": "#c0c1ff",
+          "tertiary": "#ffb783",
+          "on-tertiary": "#4f2500",
+          "outline": "#908fa0",
+          "surface-tint": "#c0c1ff",
+          "tertiary-fixed": "#ffdcc5",
+          "surface-container-low": "#1b1b23",
+          "surface-dim": "#13131b",
+          "on-primary-fixed-variant": "#2f2ebe",
+          "inverse-surface": "#e4e1ed",
+          "on-tertiary-fixed": "#301400",
+          "surface-elevated": "#12131A",
+          "on-surface": "#e4e1ed",
+          "surface-bright": "#393841",
+          "on-surface-variant": "#c7c4d7",
+          "on-primary-container": "#0d0096",
+          "inverse-primary": "#494bd6"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "gutter": "1rem",
+          "space-md": "1rem",
+          "space-xs": "0.25rem",
+          "margin": "1.5rem",
+          "space-sm": "0.5rem",
+          "space-lg": "1.5rem",
+          "space-xl": "2rem"
+        },
+        "fontFamily": {
+          "section": ["Inter"],
+          "metric": ["JetBrains Mono"],
+          "page-title": ["Inter"],
+          "meta": ["Inter"],
+          "body": ["Inter"],
+          "table": ["Inter"],
+          "table-mono": ["JetBrains Mono"]
+        },
+        "fontSize": {
+          "section": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+          "metric": ["32px", {"lineHeight": "38px", "fontWeight": "500"}],
+          "page-title": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+          "meta": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+          "body": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+          "table": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+          "table-mono": ["13px", {"lineHeight": "20px", "fontWeight": "400"}]
+        }
+      }
+    }
+  }
+</script>
+</head>
+<body class="bg-background text-on-background font-body antialiased min-h-screen flex flex-col">
+<!-- SideNavBar -->
+<aside class="fixed top-0 left-0 h-screen w-60 z-40 bg-surface-elevated dark:bg-surface-elevated border-r border-border-subtle flex flex-col justify-between p-space-sm select-none">
+<div class="flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm px-space-sm py-space-sm">
+<div class="w-7 h-7 bg-primary-container rounded flex items-center justify-center text-on-primary-container font-semibold text-body">AI</div>
+<div class="flex flex-col">
+<span class="font-section text-section text-on-surface dark:text-on-surface font-semibold tracking-tight">AIGate Console</span>
+<span class="font-meta text-meta text-on-surface-variant">v2.4.1 • Production</span>
+</div>
+</div>
+<nav class="flex flex-col gap-space-xs mt-space-sm">
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-sm">dashboard</span>
+<span class="font-body text-body">Overview</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm bg-surface-container-high text-primary font-medium rounded-DEFAULT cursor-pointer">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">alt_route</span>
+<span class="font-body text-body">Gateway</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-sm">hub</span>
+<span class="font-body text-body">Providers</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-sm">monitoring</span>
+<span class="font-body text-body">Traffic</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-sm">lan</span>
+<span class="font-body text-body">Network</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-sm">extension</span>
+<span class="font-body text-body">Integrations</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-sm">settings</span>
+<span class="font-body text-body">Settings</span>
+</a>
+</nav>
+</div>
+<div class="flex flex-col gap-space-xs border-t border-border-subtle pt-space-sm">
+<a class="flex items-center gap-space-sm px-space-sm py-space-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-sm">menu_book</span>
+<span class="font-meta text-meta">Docs</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-DEFAULT transition-colors duration-150 cursor-pointer">
+<span class="material-symbols-outlined text-sm text-status-green">check_circle</span>
+<span class="font-meta text-meta">System Status</span>
+</a>
+</div>
+</aside>
+<!-- TopNavBar -->
+<header class="sticky top-0 right-0 z-30 h-12 w-full bg-surface-dark border-b border-border-subtle flex items-center justify-between px-margin pl-64">
+<div class="flex items-center gap-space-md">
+<span class="font-page-title text-page-title text-on-surface font-semibold">AIGate Console</span>
+<span class="text-on-surface-variant text-meta">• AuthFlow Modals Showcase</span>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2 text-on-surface-variant text-sm">search</span>
+<input class="bg-surface-container text-on-surface text-meta pl-8 pr-3 py-1 rounded border border-border-subtle focus:outline-none focus:border-primary w-60" placeholder="Search routes or models..." type="text"/>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">notifications</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">light_mode</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">help</span>
+</button>
+<span class="text-meta font-table-mono bg-surface-container px-2 py-0.5 rounded text-on-surface-variant">v2.4.1-proxy</span>
+</div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="ml-60 flex-1 p-space-xl bg-surface-dim relative">
+<!-- Background Dimmed Connections View (Simulated) -->
+<div class="absolute inset-0 opacity-15 pointer-events-none p-space-xl flex flex-col gap-space-lg filter blur-[1px]">
+<div class="flex justify-between items-center">
+<div class="h-8 w-48 bg-surface-container rounded"></div>
+<div class="h-8 w-24 bg-primary-container rounded"></div>
+</div>
+<div class="grid grid-cols-3 gap-space-md">
+<div class="h-32 bg-surface-container rounded border border-border-subtle"></div>
+<div class="h-32 bg-surface-container rounded border border-border-subtle"></div>
+<div class="h-32 bg-surface-container rounded border border-border-subtle"></div>
+</div>
+<div class="h-64 bg-surface-container rounded border border-border-subtle"></div>
+</div>
+<!-- Showcase Header -->
+<div class="relative z-10 mb-space-xl">
+<div class="flex items-center gap-space-sm mb-space-xs">
+<span class="px-2 py-0.5 bg-primary-container/10 text-primary font-table-mono text-xs rounded uppercase">Design System Verification</span>
+<span class="text-on-surface-variant text-meta">8 Variants Active</span>
+</div>
+<h1 class="font-page-title text-page-title text-on-surface font-semibold text-xl">AuthFlow Modals Showcase</h1>
+<p class="font-body text-body text-on-surface-variant">Comprehensive display of all authentication onboarding shells and state variants in the AIGate Console infrastructure.</p>
+</div>
+<!-- Modals Grid Layout -->
+<div class="relative z-10 grid grid-cols-1 xl:grid-cols-2 gap-space-xl">
+<!-- 1. Text fields step -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl flex flex-col overflow-hidden shadow-lg">
+<div class="bg-surface-container px-space-md py-space-sm border-b border-border-subtle flex items-center justify-between">
+<span class="font-section text-section text-on-surface">1. Text fields step</span>
+<span class="text-meta font-table-mono bg-surface-container-high px-2 py-0.5 rounded text-primary">API Key / Secret Input</span>
+</div>
+<div class="flex flex-1 min-h-[280px]">
+<div class="w-48 bg-surface-container-lowest border-r border-border-subtle p-space-md flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="w-5 h-5 rounded-full bg-status-green/20 text-status-green flex items-center justify-center text-xs font-bold">✓</span>
+<span class="font-body text-body text-on-surface">Provider</span>
+</div>
+<div class="flex items-center gap-space-sm bg-surface-container-high p-1 rounded">
+<span class="w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-xs font-bold">2</span>
+<span class="font-body text-body text-primary font-medium">Credentials</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="w-5 h-5 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center text-xs">3</span>
+<span class="font-body text-body text-on-surface-variant">Verify</span>
+</div>
+</div>
+<div class="flex-1 p-space-lg flex flex-col justify-between">
+<div class="flex flex-col gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<label class="font-meta text-meta text-on-surface-variant">Upstream Endpoint URL</label>
+<input class="bg-surface-container text-on-surface font-table-mono text-table px-3 py-2 rounded border border-border-subtle focus:outline-none focus:border-primary" type="text" value="https://api.anthropic.com/v1"/>
+</div>
+<div class="flex flex-col gap-space-xs">
+<label class="font-meta text-meta text-on-surface-variant">API Key Secret</label>
+<div class="relative flex items-center">
+<input class="w-full bg-surface-container text-on-surface font-table-mono text-table px-3 py-2 rounded border border-border-subtle focus:outline-none focus:border-primary pr-10" type="password" value="sk-ant-api03-xxxxxxxxxxxxxxxx92A"/>
+<button class="absolute right-2 text-on-surface-variant hover:text-on-surface cursor-pointer">
+<span class="material-symbols-outlined text-sm">visibility</span>
+</button>
+</div>
+<span class="font-meta text-meta text-on-surface-variant">Stored encrypted in secure local keyring. Never exposed to logs.</span>
+</div>
+</div>
+<div class="flex justify-between items-center pt-space-md border-t border-border-subtle mt-space-md">
+<button class="px-space-md py-1.5 bg-surface-container text-on-surface rounded font-body text-body hover:bg-surface-variant cursor-pointer">Back</button>
+<button class="px-space-md py-1.5 bg-primary-container text-on-primary-container rounded font-body text-body font-medium hover:opacity-90 cursor-pointer">Continue</button>
+</div>
+</div>
+</div>
+</div>
+<!-- 2. OAuth popup step -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl flex flex-col overflow-hidden shadow-lg">
+<div class="bg-surface-container px-space-md py-space-sm border-b border-border-subtle flex items-center justify-between">
+<span class="font-section text-section text-on-surface">2. OAuth popup step</span>
+<span class="text-meta font-table-mono bg-surface-container-high px-2 py-0.5 rounded text-primary">Browser Flow</span>
+</div>
+<div class="flex flex-1 min-h-[280px]">
+<div class="w-48 bg-surface-container-lowest border-r border-border-subtle p-space-md flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="w-5 h-5 rounded-full bg-status-green/20 text-status-green flex items-center justify-center text-xs font-bold">✓</span>
+<span class="font-body text-body text-on-surface">Select</span>
+</div>
+<div class="flex items-center gap-space-sm bg-surface-container-high p-1 rounded">
+<span class="w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-xs font-bold">2</span>
+<span class="font-body text-body text-primary font-medium">Authenticate</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="w-5 h-5 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center text-xs">3</span>
+<span class="font-body text-body text-on-surface-variant">Complete</span>
+</div>
+</div>
+<div class="flex-1 p-space-lg flex flex-col justify-between">
+<div class="flex flex-col gap-space-md items-center justify-center text-center my-auto">
+<p class="font-body text-body text-on-surface-variant max-w-xs">Authentication requires an external browser session to verify your developer token permissions.</p>
+<button class="px-space-lg py-2.5 bg-primary-container text-on-primary-container rounded font-body text-body font-medium flex items-center gap-space-sm hover:opacity-90 cursor-pointer">
+<span class="material-symbols-outlined text-sm">open_in_new</span>
+              Open provider login
+            </button>
+<div class="flex items-center gap-space-sm mt-space-sm">
+<div class="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+<span class="font-meta text-meta text-on-surface-variant">Waiting for polling response...</span>
+<a class="font-meta text-meta text-primary underline ml-2" href="#">Cancel</a>
+</div>
+</div>
+<div class="flex justify-between items-center pt-space-md border-t border-border-subtle">
+<button class="px-space-md py-1.5 bg-surface-container text-on-surface rounded font-body text-body hover:bg-surface-variant cursor-pointer">Back</button>
+<button class="px-space-md py-1.5 bg-surface-variant text-on-surface-variant rounded font-body text-body cursor-not-allowed opacity-50" disabled="">Continue</button>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. Device code step -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl flex flex-col overflow-hidden shadow-lg">
+<div class="bg-surface-container px-space-md py-space-sm border-b border-border-subtle flex items-center justify-between">
+<span class="font-section text-section text-on-surface">3. Device code step</span>
+<span class="text-meta font-table-mono bg-surface-container-high px-2 py-0.5 rounded text-primary">CLI / Headless</span>
+</div>
+<div class="flex flex-1 min-h-[280px]">
+<div class="w-48 bg-surface-container-lowest border-r border-border-subtle p-space-md flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm bg-surface-container-high p-1 rounded">
+<span class="w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-xs font-bold">1</span>
+<span class="font-body text-body text-primary font-medium">Device Auth</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="w-5 h-5 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center text-xs">2</span>
+<span class="font-body text-body text-on-surface-variant">Confirm</span>
+</div>
+</div>
+<div class="flex-1 p-space-lg flex flex-col justify-between">
+<div class="flex flex-col gap-space-md items-center text-center">
+<span class="font-meta text-meta text-on-surface-variant">Please enter this code at <span class="text-primary font-table-mono underline">auth.aigate.sh/activate</span></span>
+<div class="bg-surface-container border border-border-subtle px-space-xl py-space-sm rounded-lg flex items-center gap-space-md">
+<span class="font-metric text-metric text-on-surface tracking-wider">BC72-99XA</span>
+<button class="p-2 bg-surface-container-high rounded text-on-surface hover:text-primary cursor-pointer" title="Copy code">
+<span class="material-symbols-outlined text-sm">content_copy</span>
+</button>
+</div>
+<div class="flex items-center gap-space-sm w-full bg-surface-container px-space-md py-2 rounded">
+<span class="material-symbols-outlined text-status-amber text-sm animate-pulse">schedule</span>
+<span class="font-meta text-meta text-on-surface-variant flex-1 text-left">Waiting for approval... (Expires in 04:45)</span>
+<a class="font-meta text-meta text-status-red hover:underline" href="#">Cancel</a>
+</div>
+</div>
+<div class="flex justify-between items-center pt-space-md border-t border-border-subtle">
+<button class="px-space-md py-1.5 bg-surface-container text-on-surface rounded font-body text-body hover:bg-surface-variant cursor-pointer">Back</button>
+<button class="px-space-md py-1.5 bg-primary-container text-on-primary-container rounded font-body text-body font-medium hover:opacity-90 cursor-pointer">Continue</button>
+</div>
+</div>
+</div>
+</div>
+<!-- 4. Paste cookie step -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl flex flex-col overflow-hidden shadow-lg">
+<div class="bg-surface-container px-space-md py-space-sm border-b border-border-subtle flex items-center justify-between">
+<span class="font-section text-section text-on-surface">4. Paste cookie step</span>
+<span class="text-meta font-table-mono bg-surface-container-high px-2 py-0.5 rounded text-primary">Raw Cookie Inject</span>
+</div>
+<div class="flex flex-1 min-h-[280px]">
+<div class="w-48 bg-surface-container-lowest border-r border-border-subtle p-space-md flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="w-5 h-5 rounded-full bg-status-green/20 text-status-green flex items-center justify-center text-xs font-bold">✓</span>
+<span class="font-body text-body text-on-surface">Target</span>
+</div>
+<div class="flex items-center gap-space-sm bg-surface-container-high p-1 rounded">
+<span class="w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-xs font-bold">2</span>
+<span class="font-body text-body text-primary font-medium">Session Payload</span>
+</div>
+</div>
+<div class="flex-1 p-space-lg flex flex-col justify-between">
+<div class="flex flex-col gap-space-xs flex-1">
+<div class="flex justify-between items-center">
+<label class="font-meta text-meta text-on-surface-variant">Paste browser session cookie string (`__session=...`)</label>
+<span class="font-meta text-meta text-on-surface-variant">JSON / Raw text</span>
+</div>
+<textarea class="w-full flex-1 bg-surface-container text-on-surface font-table-mono text-table p-space-sm rounded border border-border-subtle focus:outline-none focus:border-primary resize-none h-24" placeholder="__session=eyJhbGciOiJIUzI1Ni... (Paste full header string)"></textarea>
+</div>
+<div class="flex justify-between items-center pt-space-md border-t border-border-subtle mt-space-sm">
+<button class="px-space-md py-1.5 bg-surface-container text-on-surface rounded font-body text-body hover:bg-surface-variant cursor-pointer">Back</button>
+<button class="px-space-md py-1.5 bg-primary-container text-on-primary-container rounded font-body text-body font-medium hover:opacity-90 cursor-pointer">Verify Session</button>
+</div>
+</div>
+</div>
+</div>
+<!-- 5. Import from file step -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl flex flex-col overflow-hidden shadow-lg">
+<div class="bg-surface-container px-space-md py-space-sm border-b border-border-subtle flex items-center justify-between">
+<span class="font-section text-section text-on-surface">5. Import from file step</span>
+<span class="text-meta font-table-mono bg-surface-container-high px-2 py-0.5 rounded text-primary">Config Ingestion</span>
+</div>
+<div class="flex flex-1 min-h-[280px]">
+<div class="w-48 bg-surface-container-lowest border-r border-border-subtle p-space-md flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm bg-surface-container-high p-1 rounded">
+<span class="w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-xs font-bold">1</span>
+<span class="font-body text-body text-primary font-medium">Auto-Detect</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="w-5 h-5 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center text-xs">2</span>
+<span class="font-body text-body text-on-surface-variant">Confirm</span>
+</div>
+</div>
+<div class="flex-1 p-space-lg flex flex-col justify-between">
+<div class="flex flex-col gap-space-md">
+<div class="bg-surface-container border border-border-subtle p-space-md rounded flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-sm">description</span>
+<span class="font-body text-body text-on-surface font-semibold">Detected local provider config</span>
+</div>
+<span class="font-table-mono text-table text-primary">~/.config/aigate/anthropic.json</span>
+<p class="font-meta text-meta text-on-surface-variant mt-1">Will read endpoint keys, headers, and rate-limit quotas directly from local disk storage.</p>
+</div>
+<div class="flex gap-space-sm">
+<button class="px-space-md py-1.5 bg-surface-container text-on-surface rounded font-body text-body hover:bg-surface-variant cursor-pointer">Choose another</button>
+</div>
+</div>
+<div class="flex justify-between items-center pt-space-md border-t border-border-subtle">
+<button class="px-space-md py-1.5 bg-surface-container text-on-surface rounded font-body text-body hover:bg-surface-variant cursor-pointer">Back</button>
+<button class="px-space-md py-1.5 bg-primary-container text-on-primary-container rounded font-body text-body font-medium hover:opacity-90 cursor-pointer">Import</button>
+</div>
+</div>
+</div>
+</div>
+<!-- 6. Choose social provider step -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl flex flex-col overflow-hidden shadow-lg">
+<div class="bg-surface-container px-space-md py-space-sm border-b border-border-subtle flex items-center justify-between">
+<span class="font-section text-section text-on-surface">6. Choose social provider step</span>
+<span class="text-meta font-table-mono bg-surface-container-high px-2 py-0.5 rounded text-primary">Federated SSO</span>
+</div>
+<div class="flex flex-1 min-h-[280px]">
+<div class="w-48 bg-surface-container-lowest border-r border-border-subtle p-space-md flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm bg-surface-container-high p-1 rounded">
+<span class="w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-xs font-bold">1</span>
+<span class="font-body text-body text-primary font-medium">Provider</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="w-5 h-5 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center text-xs">2</span>
+<span class="font-body text-body text-on-surface-variant">Authorize</span>
+</div>
+</div>
+<div class="flex-1 p-space-lg flex flex-col justify-between">
+<div class="flex flex-col gap-space-sm">
+<button class="w-full py-2.5 px-space-md bg-surface-container hover:bg-surface-variant border border-border-subtle rounded font-body text-body text-on-surface flex items-center justify-center gap-space-sm cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-sm">public</span>
+              Continue with Google Workspace
+            </button>
+<button class="w-full py-2.5 px-space-md bg-surface-container hover:bg-surface-variant border border-border-subtle rounded font-body text-body text-on-surface flex items-center justify-center gap-space-sm cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-sm">code</span>
+              Continue with GitHub Enterprise
+            </button>
+<button class="w-full py-2.5 px-space-md bg-surface-container hover:bg-surface-variant border border-border-subtle rounded font-body text-body text-on-surface flex items-center justify-center gap-space-sm cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-sm">domain</span>
+              Continue with Microsoft Azure AD
+            </button>
+</div>
+<div class="flex justify-between items-center pt-space-md border-t border-border-subtle">
+<button class="px-space-md py-1.5 bg-surface-container text-on-surface rounded font-body text-body hover:bg-surface-variant cursor-pointer">Back</button>
+<button class="px-space-md py-1.5 bg-surface-variant text-on-surface-variant rounded font-body text-body cursor-not-allowed opacity-50" disabled="">Continue</button>
+</div>
+</div>
+</div>
+</div>
+<!-- 7. Confirm step -->
+<div class="bg-surface-container-low border border-border-subtle rounded-xl flex flex-col overflow-hidden shadow-lg">
+<div class="bg-surface-container px-space-md py-space-sm border-b border-border-subtle flex items-center justify-between">
+<span class="font-section text-section text-on-surface">7. Confirm step</span>
+<span class="text-meta font-table-mono bg-surface-container-high px-2 py-0.5 rounded text-primary">Summary &amp; Masking</span>
+</div>
+<div class="flex flex-1 min-h-[280px]">
+<div class="w-48 bg-surface-container-lowest border-r border-border-subtle p-space-md flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="w-5 h-5 rounded-full bg-status-green/20 text-status-green flex items-center justify-center text-xs font-bold">✓</span>
+<span class="font-body text-body text-on-surface">Configure</span>
+</div>
+<div class="flex items-center gap-space-sm bg-surface-container-high p-1 rounded">
+<span class="w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-xs font-bold">2</span>
+<span class="font-body text-body text-primary font-medium">Review &amp; Save</span>
+</div>
+</div>
+<div class="flex-1 p-space-lg flex flex-col justify-between">
+<div class="flex flex-col gap-space-xs">
+<span class="font-meta text-meta text-on-surface-variant">Review parameters to be persisted:</span>
+<div class="bg-surface-container border border-border-subtle p-space-sm rounded flex flex-col gap-space-xs font-table-mono text-table">
+<div class="flex justify-between">
+<span class="text-on-surface-variant">Provider:</span>
+<span class="text-on-surface">Anthropic Direct</span>
+</div>
+<div class="flex justify-between">
+<span class="text-on-surface-variant">Endpoint:</span>
+<span class="text-on-surface">api.anthropic.com</span>
+</div>
+<div class="flex justify-between">
+<span class="text-on-surface-variant">API Key:</span>
+<span class="text-status-green">••••••••••••k92A</span>
+</div>
+<div class="flex justify-between">
+<span class="text-on-surface-variant">Proxy Route:</span>
+<span class="text-primary">/v1/claude</span>
+</div>
+</div>
+</div>
+<div class="flex justify-between items-center pt-space-md border-t border-border-subtle">
+<button class="px-space-md py-1.5 bg-surface-container text-on-surface rounded font-body text-body hover:bg-surface-variant cursor-pointer">Back</button>
+<button class="px-space-md py-1.5 bg-primary-container text-on-primary-container rounded font-body text-body font-medium hover:opacity-90 cursor-pointer">Save &amp; Connect</button>
+</div>
+</div>
+</div>
+</div>
+<!-- 8. Failure state variant -->
+<div class="bg-surface-container-low border border-status-red rounded-xl flex flex-col overflow-hidden shadow-lg">
+<div class="bg-surface-container px-space-md py-space-sm border-b border-status-red/50 flex items-center justify-between">
+<span class="font-section text-section text-status-red">8. Failure state variant</span>
+<span class="text-meta font-table-mono bg-error-container text-on-error-container px-2 py-0.5 rounded">ERR_UPSTREAM_TIMEOUT</span>
+</div>
+<div class="flex flex-1 min-h-[280px]">
+<div class="w-48 bg-surface-container-lowest border-r border-border-subtle p-space-md flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="w-5 h-5 rounded-full bg-status-green/20 text-status-green flex items-center justify-center text-xs font-bold">✓</span>
+<span class="font-body text-body text-on-surface">Handshake</span>
+</div>
+<div class="flex items-center gap-space-sm bg-error-container/20 p-1 rounded border border-status-red/30">
+<span class="w-5 h-5 rounded-full bg-status-red text-white flex items-center justify-center text-xs font-bold">!</span>
+<span class="font-body text-body text-status-red font-medium">Failed</span>
+</div>
+</div>
+<div class="flex-1 p-space-lg flex flex-col justify-between">
+<div class="flex flex-col gap-space-md items-center justify-center text-center my-auto">
+<div class="w-12 h-12 bg-status-red/10 border border-status-red rounded-full flex items-center justify-center text-status-red mb-1">
+<span class="material-symbols-outlined text-xl">error</span>
+</div>
+<p class="font-body text-body text-on-surface">The connection timed out while handshaking with the provider gateway.</p>
+<span class="font-table-mono text-meta text-on-surface-variant bg-surface-container px-2 py-1 rounded">Code: ERR_UPSTREAM_TIMEOUT • TCP 522</span>
+<button class="px-space-lg py-2 bg-status-red text-white rounded font-body text-body font-medium hover:opacity-90 cursor-pointer">Try again</button>
+</div>
+<div class="flex justify-between items-center pt-space-md border-t border-border-subtle">
+<button class="px-space-md py-1.5 bg-surface-container text-on-surface rounded font-body text-body hover:bg-surface-variant cursor-pointer">Back</button>
+<button class="px-space-md py-1.5 bg-surface-variant text-on-surface-variant rounded font-body text-body cursor-not-allowed opacity-50" disabled="">Continue</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

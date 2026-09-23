@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project map — read this before planning any AIGate work
+
+`docs/PROJECT_MAP.md` answers, in one table lookup: which UI sub-project (U0–U11) owns a
+screen, which bounded context feeds it, which backend SP must land first, which 9router
+feature group it ports, which design-system components it uses, and what the Stitch audit
+flagged on it. Use it instead of re-reading the spec.
+
+- It is **generated** — do not hand-edit. Source of truth stays the docs; the spec wins on conflict.
+- Refresh after editing docs: `/graphify docs --update`, then
+  `python graphify-out/supplement_spec_edges.py && python graphify-out/build_project_map.py`.
+- Deeper questions: `/graphify query "..."`, `/graphify path "U4" "SP16"`; visual graph at `graphify-out/graph.html`.
+
 ## What this is
 
 9Router (`9router-app`) — a local AI routing gateway + Next.js dashboard. It exposes one OpenAI-compatible endpoint (`/v1/*`) and routes traffic across 40+ upstream providers with format translation, model-combo fallback, multi-account fallback, OAuth/API-key credential management, token refresh, quota/usage tracking, and optional cloud sync.
