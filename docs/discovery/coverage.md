@@ -1,12 +1,12 @@
 # Discovery coverage
 
-Entries: 164
+Entries: 179
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 63/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +83 |
-| pages | 2/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind] … +18 |
-| providers | 14/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +100 |
+| routes | 81/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +65 |
+| pages | 4/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind]/[id] … +16 |
+| providers | 15/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +99 |
 | executors | 6/29 | azure, codebuddy-cn, codebuddy-intl, commandcode, cursor, devin-cli, gemini-cli, github … +15 |
 | translators | 2/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +38 |
 | repos | 9/11 | nodesRepo, proxyPoolsRepo |
@@ -18,15 +18,16 @@ Entries: 164
 - catalog: 21
 - connections: 38
 - identity: 1
+- media: 15
 - routing: 65
 - settings: 7
 - usage: 23
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 5
-- REFERENCE_BEHAVIOR: 140
-- SUSPECTED_BUG: 19
+- IMPLEMENTATION_ACCIDENT: 7
+- REFERENCE_BEHAVIOR: 151
+- SUSPECTED_BUG: 21
 
 ## Missing — routes
 
@@ -64,11 +65,6 @@ Entries: 164
 - api/locale
 - api/mcp/[plugin]/message
 - api/mcp/[plugin]/sse
-- api/media-providers/tts/deepgram/voices
-- api/media-providers/tts/elevenlabs/voices
-- api/media-providers/tts/inworld/voices
-- api/media-providers/tts/minimax/voices
-- api/media-providers/tts/voices
 - api/provider-nodes/[id]
 - api/provider-nodes/validate
 - api/providers/[id]/models
@@ -78,7 +74,6 @@ Entries: 164
 - api/providers/kilo/free-models
 - api/providers/suggested-models
 - api/providers/test-batch
-- api/providers/validate
 - api/proxy-pools
 - api/proxy-pools/[id]
 - api/proxy-pools/[id]/test
@@ -103,19 +98,7 @@ Entries: 164
 - api/tunnel/tailscale-disable
 - api/tunnel/tailscale-enable
 - api/tunnel/tailscale-install
-- api/v1/audio/speech
-- api/v1/audio/transcriptions
-- api/v1/audio/voices
-- api/v1/embeddings
-- api/v1/images/generations
 - api/v1/models/[...model]
-- api/v1/models/info
-- api/v1/search
-- api/v1/videos/[id]
-- api/v1/videos/edits
-- api/v1/videos/extensions
-- api/v1/videos/generations
-- api/v1/web/fetch
 - api/v1beta/models
 - api/v1beta/models/[...path]
 - api/version
@@ -131,10 +114,8 @@ Entries: 164
 - (dashboard)/dashboard/combos
 - (dashboard)/dashboard/console-log
 - (dashboard)/dashboard/endpoint
-- (dashboard)/dashboard/media-providers/[kind]
 - (dashboard)/dashboard/media-providers/[kind]/[id]
 - (dashboard)/dashboard/media-providers/combo/[id]
-- (dashboard)/dashboard/media-providers/web
 - (dashboard)/dashboard/mitm
 - (dashboard)/dashboard/profile
 - (dashboard)/dashboard/providers
@@ -233,7 +214,6 @@ Entries: 164
 - poolside
 - qoder
 - recraft
-- runwayml
 - sambanova
 - sdwebui
 - searchapi

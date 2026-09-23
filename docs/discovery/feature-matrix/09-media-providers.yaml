@@ -1,0 +1,597 @@
+# Trace: Media Providers — the nine non-chat modalities and their shared/duplicated
+# machinery (Task 14). 9router reference read at E:\9router. Read-only; every evidence
+# line was read directly, not inferred from names (behavioral.md §7).
+#
+# Inventory confirmed by glob/grep before writing:
+#   - src/shared/constants/providers.js MEDIA_PROVIDER_KINDS -> 9 kinds: embedding, image,
+#     imageToText, tts, stt, webSearch, webFetch, video, music.
+#   - open-sse/handlers/{embeddingsCore,imageGenerationCore,ttsCore,sttCore,videoCore}.js
+#     + open-sse/handlers/search/index.js + open-sse/handlers/fetch/index.js -> 7 core handlers.
+#   - src/sse/handlers/{embeddings,imageGeneration,tts,stt,videoGeneration,search,fetch}.js
+#     -> the 7 non-chat entry handlers named in the brief.
+#   - src/app/api/media-providers/**/route.js -> 5 routes (tts/voices, tts/deepgram/voices,
+#     tts/elevenlabs/voices, tts/inworld/voices, tts/minimax/voices).
+#   - No music route/handler/registry entry exists anywhere (grep -rl musicConfig
+#     open-sse/providers/registry/*.js -> empty); no images/understanding route exists
+#     (imageToText serves through /v1/chat/completions instead).
+#   - Per-kind provider-declaration counts (grep -rl "  <key>:" open-sse/providers/registry/*.js):
+#     embeddingConfig 15, imageConfig 18, imageToTextConfig 0 (11 providers instead declare
+#     "imageToText" in serviceKinds, routed through chat), ttsConfig 19, sttConfig 6,
+#     searchConfig 12, searchViaChat 9, fetchConfig 5, videoConfig 1, musicConfig 0.
+
+- id: media.kind-registry-and-endpoints
+  group: Media providers
+  feature: Media provider catalog
+  subFeature: MEDIA_PROVIDER_KINDS — the 9 kinds, their labels/icons, and each kind's declared REST endpoint
+  trigger: Any dashboard media-providers page render, or GET /v1/models/info building a per-model endpoint field
+  input: none
+  output: "A static array of 9 { id, label, icon, endpoint:{method,path} } objects: embedding, image, imageToText, tts, stt, webSearch, webFetch, video, music"
+  businessRules:
+    - "getProvidersByKind(kind) is the single lookup every dashboard media page and the /v1/models listing route uses to turn a kind id into a provider list: it defaults a provider's kinds to [\"llm\"] when serviceKinds is absent, excludes hidden providers, and additionally excludes a provider from just that one kind via hiddenKinds — a provider can be hidden from one kind's listing while still appearing under another"
+    - "Every kind's endpoint.path in MEDIA_PROVIDER_KINDS is a second, independently hand-maintained copy of the same routing fact also encoded in src/app/api/v1/models/info/route.js's own KIND_ENDPOINT map — the two are not derived from one source, so they can (and do, see media.kind-endpoint-map-mismatch) drift apart"
+    - "9 kinds are declared but only 7 have a live request-handling lane (embedding, image, tts, stt, webSearch, webFetch, video); imageToText has no lane of its own (see media.image-to-text-routes-via-chat) and music has none at all (see media.music-kind-dead-config)"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A provider whose registry entry omits serviceKinds entirely defaults to [\"llm\"] (chat-only) inside getProvidersByKind, not to appearing under every kind — the default is exclusionary, not permissive"
+  evidence:
+    - { file: src/shared/constants/providers.js, line: 72, note: "export const MEDIA_PROVIDER_KINDS = [ — array head" }
+    - { file: src/shared/constants/providers.js, line: 73, note: "embedding -> POST /v1/embeddings" }
+    - { file: src/shared/constants/providers.js, line: 75, note: "imageToText -> POST /v1/images/understanding (see mismatch entry)" }
+    - { file: src/shared/constants/providers.js, line: 79, note: "webFetch -> POST /v1/web/fetch" }
+    - { file: src/shared/constants/providers.js, line: 81, note: "music -> POST /v1/audio/music (no route implements this, see media.music-kind-dead-config)" }
+    - { file: src/shared/constants/providers.js, line: 146, note: "getProvidersByKind — default kinds=[\"llm\"], hidden + hiddenKinds exclusion, priority sort" }
+  newModule: media
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: media.kind-endpoint-map-mismatch
+  group: Media providers
+  feature: Media provider catalog
+  subFeature: Two independently-maintained kind→endpoint maps disagree for imageToText and webFetch
+  trigger: "GET /v1/models/info (builds a model's endpoint field from KIND_ENDPOINT); the media-providers connection detail page's GenericExampleCard (builds a curl example AND performs a live \"Try it\" fetch from MEDIA_PROVIDER_KINDS[kind].endpoint)"
+  input: "kind id (imageToText or webFetch)"
+  output: "Two different, both-consumed path strings for the same kind"
+  businessRules:
+    - "MEDIA_PROVIDER_KINDS.imageToText.endpoint.path is \"/v1/images/understanding\" — a path that does not exist anywhere else in the codebase (grep for \"understanding\" across src/ and open-sse/ finds only this one declaration); the real route imageToText models resolve to is /v1/chat/completions, which models/info/route.js's own independently-hand-written KIND_ENDPOINT map gets right"
+    - "KIND_ENDPOINT.webFetch is \"/v1/fetch\" (missing the /web/ segment); the real route is /v1/web/fetch (src/app/api/v1/web/fetch/route.js), which MEDIA_PROVIDER_KINDS.webFetch.endpoint.path gets right — the mismatch runs the opposite direction from the imageToText case (here it's models/info that's wrong)"
+    - "GenericExampleCard.js's handleRun doesn't just render a curl string for imageToText: it actually calls fetch(`/api${apiPathWithQuery}`, { method: kindConfig.endpoint.method, ... }) using MEDIA_PROVIDER_KINDS' path — so the dashboard's \"Try it\" button for any imageToText-kind provider/model POSTs to /api/v1/images/understanding, a route that returns 404, not the working /v1/chat/completions"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["media.kind-registry-and-endpoints"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "GenericExampleCard's \"Try it\" is used against an imageToText-kind provider — the built request 404s against a route that was never implemented", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: src/shared/constants/providers.js, line: 75, note: "imageToText declared endpoint /v1/images/understanding — unreferenced elsewhere" }
+    - { file: src/app/api/v1/models/info/route.js, line: 11, note: "KIND_ENDPOINT.imageToText = /v1/chat/completions — the actually-correct path" }
+    - { file: src/app/api/v1/models/info/route.js, line: 12, note: "KIND_ENDPOINT.webFetch = /v1/fetch — missing /web/ segment, wrong" }
+    - { file: src/app/api/v1/web/fetch/route.js, line: 1, note: "the real route is /v1/web/fetch (file path itself)" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/[id]/components/GenericExampleCard.js", line: 96, note: "apiPath = kindConfig.endpoint.path" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/[id]/components/GenericExampleCard.js", line: 147, note: "handleRun performs a live fetch(`/api${apiPathWithQuery}`" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/[id]/components/GenericExampleCard.js", line: 148, note: "method: kindConfig.endpoint.method — same wrong path drives the actual test call" }
+  newModule: media
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "MEDIA_PROVIDER_KINDS and models/info's KIND_ENDPOINT should agree, and both should name a route that actually exists, for every kind."
+    actual: "imageToText's MEDIA_PROVIDER_KINDS path (/v1/images/understanding) names a route that was never built; webFetch's KIND_ENDPOINT path (/v1/fetch) is missing the /web/ segment the real route uses."
+    impact: "The dashboard's live \"Try it\" widget for any imageToText-kind provider/model 404s instead of exercising the real /v1/chat/completions vision path; any external client trusting GET /v1/models/info's endpoint field for a webFetch-kind model builds a request against a path 9router never routes."
+
+- id: media.embedding-lane
+  group: Media providers
+  feature: Embedding
+  subFeature: "POST /v1/embeddings — account-selection loop + embeddingsCore provider dispatch"
+  trigger: POST /v1/embeddings
+  input: "{ model: \"provider/model\", input: string|string[], encoding_format?, dimensions? }"
+  output: "OpenAI-shaped embeddings response, or an error body"
+  businessRules:
+    - "handleEmbeddings resolves provider/model via getModelInfo, then runs its own while(true) credential+fallback loop (getProviderCredentials / markAccountUnavailable / clearAccountError / checkAndRefreshToken, all imported from the same src/sse/services/auth.js and tokenRefresh.js the chat lane uses) before calling handleEmbeddingsCore once per attempt"
+    - "embeddingsCore dispatches to a per-provider adapter (open-sse/handlers/embeddingProviders/{id}.js); a misconfigured adapter (e.g. selfhosted-embedding with no baseUrl) throws inside buildUrl/buildHeaders/buildBody, which is caught and turned into a 400 naming the reason rather than escaping as a 500 or hanging request — an explicit design choice called out in the handler's own comment"
+    - "On success, usage is only recorded when exactEmbeddingUsage() can derive an exact (non-estimated) token count from the provider's raw usage block (prompt_tokens/input_tokens present, completion_tokens===0, total_tokens===prompt_tokens) — an estimated or malformed usage object silently skips saveRequestUsage entirely rather than recording an approximate figure"
+  state:
+    reads: ["providerConnections (via getProviderCredentials)", "PROVIDER_MEDIA[id].embeddingConfig (indirectly, via getEmbeddingAdapter)"]
+    writes: ["providerConnections (lock/testStatus fields via markAccountUnavailable/clearAccountError)", "usageHistory (via saveRequestUsage, only for exact usage)"]
+    runtimeOnly: []
+  dependencies: ["routing.account-fallback-loop", "account.lock-storage-persistence", "account.clear-error-on-success", "routing.usage-recording-timing"]
+  providerInteraction: "POST to the provider's embeddings endpoint (adapter-built URL/headers/body)"
+  fallback: { hasFallback: true, retry: "one 401/403 refresh-and-retry inside embeddingsCore; account rotation via the outer while loop on markAccountUnavailable's shouldFallback", timeout: "FETCH_CONNECT_TIMEOUT_MS via AbortSignal.timeout when available", quota: "allRateLimited short-circuit surfaces retryAfter/retryAfterHuman from getProviderCredentials" }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "missing model or input, or input is neither string nor array", partial: false }
+    - { code: AUTH_ERROR, when: "no credentials at all for the provider (excludeConnectionIds empty)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "all accounts rate-limited/locked (credentials.allRateLimited)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "every account exhausted after rotation (excludeConnectionIds non-empty, no credentials left)", partial: false }
+  sideEffects: []
+  persistence: ["usageHistory row, only when usage is exact (not estimated)"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "15 providers declare embeddingConfig in the registry; a provider outside that set 400s with \"does not support embeddings\" from embeddingsCore rather than never appearing in getProvidersByKind(\"embedding\") — the dashboard-listing gate (serviceKinds) and the runtime-dispatch gate (getEmbeddingAdapter) are two separate checks that must be kept in sync by hand"
+  evidence:
+    - { file: src/sse/handlers/embeddings.js, line: 97, note: "while (true) credential+fallback loop head" }
+    - { file: src/sse/handlers/embeddings.js, line: 118, note: "checkAndRefreshToken(provider, credentials) before each attempt" }
+    - { file: src/sse/handlers/embeddings.js, line: 138, note: "exactEmbeddingUsage(result.usage) gate before saveRequestUsage" }
+    - { file: open-sse/handlers/embeddingsCore.js, line: 32, note: "getEmbeddingAdapter(provider) — 400 when no adapter" }
+    - { file: open-sse/handlers/embeddingsCore.js, line: 47, note: "adapter.buildUrl/buildHeaders/buildBody wrapped in try/catch -> 400 with reason" }
+    - { file: open-sse/handlers/embeddingsCore.js, line: 82, note: "401/403 refresh-and-retry-once block" }
+    - { file: src/app/api/v1/embeddings/route.js, line: 20, note: "POST /v1/embeddings -> handleEmbeddings(request)" }
+  newModule: media
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: media.image-lane
+  group: Media providers
+  feature: Text to Image
+  subFeature: "POST /v1/images/generations — account-selection loop + imageGenerationCore provider dispatch, including codex's SSE streaming path"
+  trigger: POST /v1/images/generations
+  input: "{ model, prompt, n?, size?, output_format? }, Accept: text/event-stream (opt-in streaming), ?response_format=binary (opt-in raw bytes)"
+  output: "OpenAI-shaped images response (JSON with data[].b64_json/url); raw image bytes when binaryOutput; an SSE Response passthrough for codex when streamToClient is requested and codex's adapter honors it"
+  businessRules:
+    - "wantsStream is derived purely from the inbound Accept header (Accept: text/event-stream) and passed through as streamToClient; imageGenerationCore only actually streams when the selected provider's adapter.parseResponse returns { sseResponse } — codex is the only adapter observed doing so, every other provider ignores streamToClient and returns a normal JSON/binary Response regardless of the client's Accept header"
+    - "binaryOutput (?response_format=binary) decodes the first result's b64_json (or fetches its url and base64-encodes it) into raw bytes, returned with a Content-Type matching output_format (png/jpeg/webp) — this happens after normalize(), so it applies uniformly across every adapter's already-OpenAI-shaped output"
+    - "Adapters that set useExecutor/executeViaExecutor skip the generic buildUrl/buildHeaders/buildBody/fetch path entirely and instead reuse that provider's full chat executor (401/403 refresh handling included) — a second, executor-driven dispatch style distinct from the generic adapter path most providers use"
+  state:
+    reads: ["providerConnections (via getProviderCredentials)"]
+    writes: ["providerConnections (lock/testStatus via markAccountUnavailable/clearAccountError)"]
+    runtimeOnly: []
+  dependencies: ["routing.account-fallback-loop", "account.lock-storage-persistence"]
+  providerInteraction: "POST to the provider's image-generation endpoint; codex's is a long-lived SSE connection when streaming"
+  fallback: { hasFallback: true, retry: "one 401/403 refresh-and-retry inside imageGenerationCore", timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "missing prompt, or adapter.buildUrl/buildBody/buildHeaders throws (e.g. bad size for that provider)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "all accounts rate-limited/locked", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "18 providers declare imageConfig; runwayml is one of them (imageConfig.baseUrl only) even though its own models[] array also lists two video-kind models with no matching videoConfig (see media.video-lane) — the same registry entry can be complete for one kind and dangling for another"
+  evidence:
+    - { file: src/sse/handlers/imageGeneration.js, line: 34, note: "wantsStream = Accept header includes text/event-stream" }
+    - { file: src/sse/handlers/imageGeneration.js, line: 114, note: "streamToClient: wantsStream passed into handleImageGenerationCore" }
+    - { file: open-sse/handlers/imageGenerationCore.js, line: 54, note: "useExecutor/executeViaExecutor branch — bypasses the generic adapter path" }
+    - { file: open-sse/handlers/imageGenerationCore.js, line: 179, note: "codex streaming case: parsed.sseResponse returned directly as the Response" }
+    - { file: open-sse/handlers/imageGenerationCore.js, line: 198, note: "binaryOutput decode — first.b64_json or urlToBase64(first.url)" }
+    - { file: src/app/api/v1/images/generations/route.js, line: 15, note: "POST /v1/images/generations -> handleImageGeneration(request)" }
+  newModule: media
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: media.image-to-text-routes-via-chat
+  group: Media providers
+  feature: Image to Text
+  subFeature: imageToText has no dedicated request lane — it is a catalog label for vision-capable chat models, served entirely through /v1/chat/completions
+  trigger: A client calling /v1/chat/completions with a model whose registry entry declares "imageToText" in serviceKinds
+  input: "Standard chat-completions body with an image content part"
+  output: "Standard chat-completions response — imageToText is never its own request shape"
+  businessRules:
+    - "11 providers (anthropic, gemini, groq, kimchi, minimax, mistral, openai, openrouter, vercel-ai-gateway, vertex, xai) declare \"imageToText\" in serviceKinds; none declares an imageToTextConfig block (0 files), because there is nothing kind-specific to configure — the request is an ordinary chat completion"
+    - "GET /v1/models filters imageToText models into the LLM list when the caller also requested the llm kind (kindFilter.includes(LLM_KIND)) — imageToText-kind models are presented to clients as vision-capable chat models, not as a separate catalog of image-understanding endpoints"
+    - "The dashboard still gives imageToText its own MEDIA_PROVIDER_KINDS entry, page route, and provider-card grid (getProvidersByKind(\"imageToText\")) purely for discoverability/UI grouping — the underlying request that a click on \"Try it\" builds is a chat completion, not a call to a dedicated imageToText backend (see media.kind-endpoint-map-mismatch for where that UI wiring is actually broken)"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.lane-entry-routes", "routing.request-preflight", "media.kind-endpoint-map-mismatch"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because imageToText has no request-time gate of its own, any error handling, fallback, and usage recording it gets comes entirely from the chat lane (routing.*) — this entry exists only to record that the kind is real in the catalog but has zero code of its own to trace beyond the chat pipeline already covered in Task 10/11's matrix files"
+  evidence:
+    - { file: src/app/api/v1/models/info/route.js, line: 11, note: "KIND_ENDPOINT.imageToText = /v1/chat/completions" }
+    - { file: src/app/api/v1/models/route.js, line: 429, note: "kind === \"imageToText\" && kindFilter.includes(LLM_KIND) — folded into the LLM listing" }
+    - { file: src/app/api/v1/models/route.js, line: 471, note: "allowAsLlm — imageToText custom models stay in the LLM list" }
+    - { file: open-sse/providers/registry/openai.js, line: 64, note: "serviceKinds includes \"imageToText\" alongside llm/embedding/tts/stt/image/webSearch — no imageToTextConfig block anywhere in the file" }
+  newModule: media
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: media.tts-lane
+  group: Media providers
+  feature: Text To Speech
+  subFeature: "POST /v1/audio/speech — combo expansion + account-selection loop + ttsCore provider dispatch"
+  trigger: POST /v1/audio/speech
+  input: "{ model, input: string, language?, style? }, ?response_format=mp3|json"
+  output: "Raw audio bytes (default) or { audio: base64, format } JSON"
+  businessRules:
+    - "model may name a combo, not just a provider/model pair: getComboModels(modelStr) expands it and the request is dispatched through handleComboChat (open-sse/services/combo.js) across the combo's member models before the single-provider account-selection loop ever runs — the same combo-expansion module the chat lane uses, reused here rather than duplicated"
+    - "handleTtsCore first tries a special-case adapter (getTtsAdapter — google-tts, edge-tts, local-device, elevenlabs, openai, openrouter, gemini, xiaomi-mimo); providers without one instead go through synthesizeViaConfig, a generic config-driven path keyed off the registry's ttsConfig (hyperbolic, deepgram, nvidia, huggingface, inworld, cartesia, playht, coqui, tortoise, qwen, ...) — two independent implementation strategies for the same endpoint, chosen per-provider"
+    - "response_format=json wraps the synthesized audio as base64 in a JSON body instead of returning it as a binary response — both code paths funnel through the same createTtsResponse formatter regardless of which adapter/config path produced the audio"
+  state:
+    reads: ["providerConnections (via getProviderCredentials)", "combos table (via getComboModels)"]
+    writes: ["providerConnections (lock/testStatus)"]
+    runtimeOnly: []
+  dependencies: ["routing.account-fallback-loop", "combo.mode-fallback", "combo.mode-round-robin"]
+  providerInteraction: "POST to the provider's TTS endpoint (adapter- or config-built request)"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "missing model or input", partial: false }
+    - { code: INVALID_REQUEST, when: "provider has neither a special-case adapter nor synthesizeViaConfig support", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "19 providers declare ttsConfig, the largest of any media kind's dedicated-config count — but CREDENTIALED_PROVIDERS (the set requiring a stored connection) is derived separately by filtering serviceKinds+noAuth+ttsConfig.authType, so a provider can be in the config set yet route through the noAuth-style skip if its ttsConfig.authType is explicitly \"none\""
+  evidence:
+    - { file: src/sse/handlers/tts.js, line: 17, note: "CREDENTIALED_PROVIDERS derived from serviceKinds+noAuth+ttsConfig.authType" }
+    - { file: src/sse/handlers/tts.js, line: 48, note: "getComboModels(modelStr) — combo expansion before the single-provider loop" }
+    - { file: open-sse/handlers/ttsCore.js, line: 57, note: "getTtsAdapter special-case dispatch comment listing google-tts/edge-tts/local-device/elevenlabs/openai/openrouter/gemini/xiaomi-mimo" }
+    - { file: open-sse/handlers/ttsCore.js, line: 67, note: "synthesizeViaConfig fallback — generic config-driven path" }
+    - { file: open-sse/handlers/ttsCore.js, line: 15, note: "createTtsResponse — json vs binary response, shared by both paths" }
+    - { file: src/app/api/v1/audio/speech/route.js, line: 15, note: "POST /v1/audio/speech -> handleTts(request)" }
+  newModule: media
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: media.tts-voice-listing
+  group: Media providers
+  feature: Text To Speech
+  subFeature: Voice listing — one generic credential-free route plus four dedicated per-provider routes that require a stored connection
+  trigger: Dashboard TTS provider/model picker loading available voices
+  input: "GET /api/media-providers/tts/voices?provider=edge-tts|local-device|elevenlabs&apiKey=... ; GET /api/media-providers/tts/{deepgram|elevenlabs|inworld|minimax}/voices"
+  output: "{ voices, languages, byLang } (generic route) or { languages, byLang } (dedicated routes)"
+  businessRules:
+    - "The generic /api/media-providers/tts/voices route dispatches through VOICE_FETCHERS[provider] (re-exported from ttsCore.js) and needs no stored connection for edge-tts/local-device; for elevenlabs it instead reads apiKey from the query string, not from a stored providerConnections row — the only voice route that accepts a credential as a request parameter rather than looking one up"
+    - "The four dedicated routes (deepgram, elevenlabs, inworld, minimax) all read the FIRST active connection for that exact provider id via getProviderConnections({ provider, isActive: true }) and 400 with \"No <Provider> connection found\" if none exists — no account rotation, no mutex, and no fallback to a second connection of the same provider if the first one's key is invalid"
+    - "GET /v1/audio/voices (the OpenAI-style public listing) proxies to a hardcoded PROVIDER_API map covering elevenlabs/deepgram/inworld/edge-tts/local-device but omits minimax — minimax's own dedicated voices route exists and works when called directly, but is not reachable through the public /v1/audio/voices listing endpoint"
+  state:
+    reads: ["providerConnections (first active row per provider, for deepgram/elevenlabs/inworld/minimax)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["media.tts-lane"]
+  providerInteraction: "GET to each provider's voices/models listing API (deepgram /v1/models, inworld /tts/v1/voices, elevenlabs's own voices endpoint via fetchElevenLabsVoices, minimax's get_voice endpoint)"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "generic route's provider query param has no matching VOICE_FETCHERS entry", partial: false }
+    - { code: AUTH_ERROR, when: "dedicated route's provider has no active stored connection", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "the upstream voices/models call itself fails (non-ok response)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Dedicated routes' getProviderConnections({provider, isActive:true}) reads the whole active-connections list and takes connections[0] rather than round-robining or preferring a healthy one — an expired/invalid first connection blocks voice listing even when a second, valid connection for the same provider exists"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The dedicated routes comment themselves as intentionally bypassing the auth mutex used for TTS inference (\"Direct DB read - bypass auth mutex ... to avoid blocking on concurrent TTS requests\") — a deliberate consistency/latency tradeoff for a read-only listing call"
+  evidence:
+    - { file: src/app/api/media-providers/tts/voices/route.js, line: 29, note: "VOICE_FETCHERS[provider] dispatch" }
+    - { file: src/app/api/media-providers/tts/voices/route.js, line: 35, note: "elevenlabs reads apiKey from the query string, not from stored connections" }
+    - { file: src/app/api/media-providers/tts/elevenlabs/voices/route.js, line: 18, note: "getProviderConnections({provider:\"elevenlabs\", isActive:true}) — first active connection" }
+    - { file: src/app/api/media-providers/tts/deepgram/voices/route.js, line: 16, note: "same first-active-connection pattern for deepgram" }
+    - { file: src/app/api/media-providers/tts/inworld/voices/route.js, line: 15, note: "same first-active-connection pattern for inworld" }
+    - { file: src/app/api/media-providers/tts/minimax/voices/route.js, line: 72, note: "same first-active-connection pattern for minimax" }
+    - { file: src/app/api/v1/audio/voices/route.js, line: 4, note: "PROVIDER_API map — omits minimax" }
+  newModule: media
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: media.stt-lane
+  group: Media providers
+  feature: Speech To Text
+  subFeature: "POST /v1/audio/transcriptions — noAuth bypass, then account-selection loop + sttCore provider dispatch"
+  trigger: POST /v1/audio/transcriptions (multipart form)
+  input: "multipart form: model, file (required); optional per-provider fields"
+  output: "OpenAI Whisper-compatible transcription JSON"
+  businessRules:
+    - "CREDENTIALED_PROVIDERS is computed once from serviceKinds.includes(\"stt\") && !noAuth && sttConfig.authType !== \"none\" — a provider absent from that set (e.g. a local/self-hosted STT with no auth) skips the entire account-selection loop and calls handleSttCore directly with no credentials object at all, the only media lane with an unconditional no-credential fast path rather than a noAuth virtual-connection inside getProviderCredentials"
+    - "6 providers declare sttConfig; sttCore.js dispatches per-provider (assemblyai's async submit+poll, others are single-call) but all funnel through the same upstreamError() helper for non-ok responses"
+    - "maxDuration = 300 is set on the route module itself (Next.js route segment config) specifically to allow up to 5 minutes for large audio file processing — this is route-level config, not something sttCore or the handler enforces itself"
+  state:
+    reads: ["providerConnections (only for CREDENTIALED_PROVIDERS)"]
+    writes: ["providerConnections (lock/testStatus, credentialed path only)"]
+    runtimeOnly: []
+  dependencies: ["routing.account-fallback-loop"]
+  providerInteraction: "POST (multipart or JSON, provider-dependent) to the provider's transcription endpoint"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "missing model or file, or invalid model format", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "all credentialed accounts rate-limited/locked", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A noAuth STT provider that starts failing has no markAccountUnavailable call at all on its fast path — errors are returned directly to the caller with no cooldown/lock bookkeeping, since there is no connectionId to lock against"
+  evidence:
+    - { file: src/sse/handlers/stt.js, line: 14, note: "CREDENTIALED_PROVIDERS derived set" }
+    - { file: src/sse/handlers/stt.js, line: 49, note: "noAuth fast path — handleSttCore called with no credentials, no loop" }
+    - { file: src/sse/handlers/stt.js, line: 60, note: "credentialed while(true) loop, mirrors embeddings/tts" }
+    - { file: src/app/api/v1/audio/transcriptions/route.js, line: 4, note: "maxDuration = 300 — route-segment config for large uploads" }
+  newModule: media
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: media.video-lane
+  group: Media providers
+  feature: Video
+  subFeature: "POST /v1/videos/{generations,edits,extensions} + GET /v1/videos/[id] — async job proxy, xAI-only in practice"
+  trigger: POST /v1/videos/generations|edits|extensions, or GET /v1/videos/{request_id} to poll
+  input: "JSON or multipart body forwarded byte-for-byte (model may carry a provider/ prefix); x-connection-id header pins polling to the creating account"
+  output: "Upstream JSON passed through verbatim (request_id/status/video.url/error), with x-9router-connection-id echoed back on create so the client can pin subsequent polls"
+  businessRules:
+    - "Only xai declares both serviceKinds:[\"video\"] and a videoConfig block; DEFAULT_VIDEO_PROVIDER=\"xai\" is the fallback target for a bare model id with no provider prefix — the handler's own comment states \"Video generation is xAI-only today\""
+    - "Creation POSTs are treated as billable and are NEVER auto-retried on a network error (the job may already exist upstream) — the only retry is a single auth-refresh-and-resend on 401/403/429 (CREATE_ROTATION_STATUSES), which only fires before the upstream could have created the job"
+    - "GET polls are pinned to the creating account (x-connection-id) with explicitly no cross-account rotation, since a video job lives only on the account that created it — this is a materially different fallback shape from every other media lane's per-request account rotation"
+  state:
+    reads: ["providerConnections (via getProviderCredentials, pinned by preferredConnectionId on poll)"]
+    writes: ["providerConnections (lock/testStatus via markAccountUnavailable, create path only)"]
+    runtimeOnly: []
+  dependencies: ["routing.account-fallback-loop", "account.select-preferred-pin"]
+  providerInteraction: "POST/GET forwarded byte-for-byte to the provider's async video job API"
+  fallback: { hasFallback: true, retry: "auth-refresh-and-resend once, gated to statuses in CREATE_ROTATION_STATUSES (401/403/429), create-path only", timeout: "VIDEO_FETCH_TIMEOUT_MS (default 120000ms), bounds only the HTTP round-trip not rendering", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "model resolves to a provider with no videoConfig and the model string included an explicit provider/ prefix", partial: false }
+    - { code: INVALID_REQUEST, when: "model resolves to a combo (combos are not supported for video generation)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "all xai accounts rate-limited/locked on create", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "runwayml's registry entry lists gen4_turbo and gen3a_turbo in its models[] array with kind:\"video\" (read by GET /v1/models' per-model kind classification), but runwayml's serviceKinds only declares [\"image\"] and it has no videoConfig block at all — a client that sees these two models listed as kind:video and calls /v1/videos/generations with model:\"runwayml/gen4_turbo\" gets a 400 \"Provider 'runwayml' does not support video generation\" rather than a working request; the same models never appear in the video kind's dashboard provider grid either, since getProvidersByKind(\"video\") also gates on serviceKinds"
+  evidence:
+    - { file: src/sse/handlers/videoGeneration.js, line: 17, note: "DEFAULT_VIDEO_PROVIDER = \"xai\", comment: video generation is xAI-only today" }
+    - { file: src/sse/handlers/videoGeneration.js, line: 76, note: "resolveVideoProvider — 400 when provider/ prefix names a provider with no videoConfig" }
+    - { file: src/sse/handlers/videoGeneration.js, line: 23, note: "CREATE_ROTATION_STATUSES = 401/403/429 only" }
+    - { file: src/sse/handlers/videoGeneration.js, line: 191, note: "GET poll — getProviderCredentials(provider, null, null, {preferredConnectionId}), no excludeConnectionIds rotation" }
+    - { file: open-sse/handlers/videoCore.js, line: 16, note: "getVideoConfig — PROVIDER_MEDIA[provider]?.videoConfig, strictly required" }
+    - { file: open-sse/providers/registry/runwayml.js, line: 25, note: "gen4_turbo/gen3a_turbo models declared kind: \"video\"" }
+    - { file: open-sse/providers/registry/runwayml.js, line: 28, note: "serviceKinds: [\"image\"] only — video omitted, no videoConfig block" }
+    - { file: src/app/api/v1/videos/generations/route.js, line: 15, note: "POST /v1/videos/generations -> handleVideoCreate(request, \"generations\")" }
+    - { file: src/app/api/v1/videos/edits/route.js, line: 15, note: "POST /v1/videos/edits -> handleVideoCreate(request, \"edits\")" }
+    - { file: src/app/api/v1/videos/extensions/route.js, line: 15, note: "POST /v1/videos/extensions -> handleVideoCreate(request, \"extensions\")" }
+    - { file: "src/app/api/v1/videos/[id]/route.js", line: 16, note: "GET /v1/videos/{request_id} -> handleVideoGet(request, id) — poll" }
+  newModule: media
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A model the catalog lists with kind:\"video\" should be reachable through the video-generation lane (or should not be listed as kind:video at all)."
+    actual: "runwayml's gen4_turbo/gen3a_turbo are cataloged as kind:\"video\" (visible via GET /v1/models) but runwayml's serviceKinds/videoConfig never enable the video lane for that provider, so a request against either model 400s."
+    impact: "A client that trusts the catalog's per-model kind field to pick a video model can select runwayml's video models and get a hard 400 on every attempt; the same models are also invisible on the dashboard's video provider grid since that grid gates on serviceKinds, not the models[] kind field, so there is no UI path to notice the gap either."
+
+- id: media.music-kind-dead-config
+  group: Media providers
+  feature: Music
+  subFeature: The "music" kind is fully declared in shared config/UI scaffolding but has zero implementing code anywhere
+  trigger: none — no request path reaches this kind
+  input: none
+  output: none
+  businessRules:
+    - "music is a full MEDIA_PROVIDER_KINDS entry (label \"Music\", icon music_note, endpoint POST /v1/audio/music) and musicConfig is a recognized key in both providers/index.js's MEDIA_KEYS build set and src/shared/constants/providers.js's MEDIA_ENTRY_KEYS mirror, and is read defensively in /api/providers/validate/route.js's connectivity-test config picker — but grep -rl musicConfig open-sse/providers/registry/*.js returns zero files: no provider declares it"
+    - "There is no /v1/audio/music route file, no music core handler under open-sse/handlers/, and no src/sse/handlers/music.js entry handler — every other kind's three-layer stack (registry config key -> core handler -> route) is entirely absent for music except the config-key plumbing itself"
+    - "Because no provider ever sets musicConfig, getProvidersByKind(\"music\") always returns an empty array — the dashboard's music kind page (if navigated to directly by URL) would render its own \"No providers support Music yet\" empty state, the one path where this dead kind is even visible"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["media.kind-registry-and-endpoints"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The MEDIA_KEYS/MEDIA_ENTRY_KEYS/validate-route inclusion of musicConfig is scaffolding for a kind that was planned but never shipped a single provider or handler — distinguishing this from a removed feature (no git history evidence of a prior implementation was consulted; this is a static-code read only) is out of scope for M-1 discovery, but the code shape (present in generic allow-lists, absent everywhere concrete) matches an unshipped placeholder rather than an intentional business rule to reproduce"
+  evidence:
+    - { file: src/shared/constants/providers.js, line: 81, note: "music kind declared: label, icon, endpoint /v1/audio/music" }
+    - { file: open-sse/providers/index.js, line: 25, note: "musicConfig listed in MEDIA_KEYS" }
+    - { file: src/shared/constants/providers.js, line: 7, note: "musicConfig listed in MEDIA_ENTRY_KEYS (mirrors MEDIA_KEYS)" }
+    - { file: src/app/api/providers/validate/route.js, line: 54, note: "cfg = ...||p.musicConfig — read defensively, always undefined in practice" }
+  newModule: media
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: media.websearch-lane
+  group: Media providers
+  feature: Web Search
+  subFeature: "POST /v1/search — combo expansion, credential-fallback-to-chat-provider, dedicated-API vs chat-wrapped search with cross-mode failover"
+  trigger: POST /v1/search
+  input: "{ provider|model, query, search_type?, max_results? } — provider IS the model, there is no separate model field for a non-combo request"
+  output: "Unified search-result envelope: { results:[{title,url,snippet,...}], metrics:{response_time_ms,...} }"
+  businessRules:
+    - "A provider can declare searchConfig (dedicated search API — 12 providers: brave-search, exa, firecrawl, glm, google-pse, jina-reader, linkup, ollama-search, ollama, searchapi, ...), searchViaChat (wrap a chat-completions call as search — 9 providers: antigravity, gemini, kimi, minimax, openai, perplexity-agent, perplexity, vercel-ai-gateway, xai), or both; handleSingleProviderSearch prefers the dedicated API when providerConfig is set, falling back to handleChatSearch only when no dedicated config exists"
+    - "When a provider has BOTH searchConfig and searchViaChat, a dedicated-API failure that is retriable (status not in NON_RETRIABLE = {400,401,403,404}) and still within GLOBAL_TIMEOUT_MS (15s) triggers an automatic same-request failover to the chat-wrapped search for that same provider — a second live upstream attempt inside one /v1/search call, distinct from and in addition to the outer account-rotation loop"
+    - "credentialFallback lets a search-only provider reuse a related chat provider's stored credentials (ollama-search reuses ollama's key, zai-search reuses glm's) when the search provider itself has no connection; markAccountUnavailable is scoped to a synthetic searchLockKey = `websearch:${providerId}` rather than the shared provider's default lock, specifically so a websearch failure on a borrowed key does not take that key offline for its owning chat provider too"
+  state:
+    reads: ["providerConnections (own or credentialFallback provider's)", "combos table"]
+    writes: ["providerConnections (lock/testStatus, scoped to the websearch:${providerId} key)"]
+    runtimeOnly: []
+  dependencies: ["routing.account-fallback-loop", "combo.mode-fallback", "combo.mode-round-robin", "account.lock-storage-persistence"]
+  providerInteraction: "Either a dedicated search API call, or a chat-completions call to that provider's searchViaChat.endpoint/defaultModel"
+  fallback: { hasFallback: true, retry: "dedicated-API -> chat-wrapped same-provider failover on retriable status within 15s, independent of account rotation", timeout: "GLOBAL_TIMEOUT_MS=15000ms bounds the failover window", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "missing provider/model or query", partial: false }
+    - { code: INVALID_REQUEST, when: "resolved provider has neither searchConfig nor searchViaChat", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "all accounts (own + credentialFallback) rate-limited/locked under the websearch lock key", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The credentialProviderId used to attribute a lock/error can differ from providerId once the credentialFallback path is taken — markAccountUnavailable is called with credentialProviderId so the failure is charged to the actual credential owner, not the search-provider alias"
+  evidence:
+    - { file: src/sse/handlers/search.js, line: 72, note: "getComboModelsFromData(providerInput, combos) — combo expansion before single-provider dispatch" }
+    - { file: src/sse/handlers/search.js, line: 155, note: "fallbackProviderId = resolvedProvider.credentialFallback" }
+    - { file: src/sse/handlers/search.js, line: 161, note: "searchLockKey = `websearch:${providerId}` — scoped lock to protect the borrowed chat key" }
+    - { file: src/sse/handlers/search.js, line: 172, note: "credentialFallback getProviderCredentials(fallbackProviderId, ...) when own credentials are absent" }
+    - { file: open-sse/handlers/search/index.js, line: 166, note: "providerConfig (dedicated) preferred over searchViaChat" }
+    - { file: open-sse/handlers/search/index.js, line: 192, note: "retriable + within GLOBAL_TIMEOUT_MS + both configs present -> same-request failover to chat-wrapped search" }
+    - { file: src/app/api/v1/search/route.js, line: 20, note: "POST /v1/search -> handleSearch(request)" }
+  newModule: media
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: media.webfetch-lane
+  group: Media providers
+  feature: Web Fetch
+  subFeature: "POST /v1/web/fetch — URL extraction, account-selection loop scoped to a webfetch-specific lock key"
+  trigger: POST /v1/web/fetch
+  input: "{ provider|model, url, format?, max_characters? } — provider IS the model, same shape convention as webSearch"
+  output: "{ url, title, format, text, links, metrics:{response_time_ms, upstream_latency_ms} }"
+  businessRules:
+    - "5 providers declare fetchConfig (dispatches to firecrawl, jina-reader, tavily, exa, ollama per the handler's own header comment); each returns a normalized shape regardless of provider"
+    - "fetchLockKey = `webfetch:${providerId}` exists for the same reason as webSearch's lock scoping: the handler's own comment names ollama explicitly — Ollama uses the same connection for chat and fetch, so an upstream fetch failure must not take that account offline for chat requests too"
+    - "assertPublicUrlResolved (an SSRF guard) is applied to the target URL before any fetch is attempted — the only media lane in this task whose own entry handler performs an SSRF check itself rather than relying solely on a downstream fetch wrapper"
+    - "Combo expansion is present here too (getComboModelsFromData + handleComboChat), matching the webSearch/tts lanes but not embeddings/image/stt/video — combo support was added per-lane individually rather than as a shared property all media lanes get automatically"
+  state:
+    reads: ["providerConnections", "combos table"]
+    writes: ["providerConnections (lock/testStatus, scoped to webfetch:${providerId})"]
+    runtimeOnly: []
+  dependencies: ["routing.account-fallback-loop", "combo.mode-fallback", "combo.mode-round-robin", "account.lock-storage-persistence"]
+  providerInteraction: "GET/POST to the provider's URL-extraction API"
+  fallback: { hasFallback: true, retry: null, timeout: "DEFAULT_TIMEOUT_MS=15000ms per upstream attempt (fetch/index.js tryFetch)", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "missing provider/model or url, or url fails the SSRF public-resolution check", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "all accounts (own connection) rate-limited/locked under the webfetch lock key", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because combo support exists for webSearch/webFetch/tts but not embeddings/image/stt/video, a combo named for e.g. embeddings silently falls through to being treated as a plain (unresolvable) provider id rather than erroring \"combos unsupported here\" the way video generation explicitly does — video is the only lane observed to reject combos with a dedicated error message"
+  evidence:
+    - { file: src/sse/handlers/fetch.js, line: 1, note: "header comment: dispatches to firecrawl, jina-reader, tavily, exa, ollama" }
+    - { file: src/sse/handlers/fetch.js, line: 163, note: "comment: fetchLockKey exists because Ollama shares its connection with chat" }
+    - { file: src/sse/handlers/fetch.js, line: 165, note: "fetchLockKey = `webfetch:${providerId}`" }
+    - { file: src/sse/handlers/fetch.js, line: 16, note: "assertPublicUrlResolved import — SSRF guard applied in this handler" }
+    - { file: open-sse/handlers/fetch/index.js, line: 4, note: "DEFAULT_TIMEOUT_MS = 15000" }
+  newModule: media
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: media.account-loop-shared-vs-duplicated
+  group: Media providers
+  feature: Cross-lane account selection
+  subFeature: "What every non-chat lane genuinely shares with the chat lane vs. what each lane independently re-implements"
+  trigger: Any of the 7 non-chat entry handlers processing a request
+  input: none
+  output: none
+  businessRules:
+    - "Genuinely SHARED (same imported functions, same module, same DB fields): getProviderCredentials, markAccountUnavailable, clearAccountError (src/sse/services/auth.js) and checkAndRefreshToken/updateProviderCredentials (src/sse/services/tokenRefresh.js) — every one of embeddings.js, imageGeneration.js, tts.js, stt.js, videoGeneration.js, search.js, fetch.js imports these from the exact same files the chat lane's handleChat uses; the modelLock_*/testStatus persistence model (account.lock-storage-persistence) is identical across all 8 lanes (7 media + chat)"
+    - "DUPLICATED (independently re-implemented per file, not shared as a function): the outer while(true) retry-and-rotate loop itself. All 7 non-chat handlers hand-write their own copy of: init excludeConnectionIds/lastError/lastStatus, call getProviderCredentials, branch on allRateLimited vs exhausted vs found, call the core handler, branch on result.success, call markAccountUnavailable, and continue-or-return — this is the same ~25-30 line shape rewritten 7 times rather than factored into one shared helper (e.g. runWithAccountFallback(provider, model, coreFn))"
+    - "Combo expansion (open-sse/services/combo.js's handleComboChat/getComboModels) is shared code but inconsistently WIRED: present in tts, webSearch, webFetch; absent in embeddings, image generation, stt, video generation — video generation is the only lane that explicitly rejects a combo model with its own error message, the other three combo-less lanes simply treat a combo name as an unresolvable provider id"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.account-fallback-loop", "account.lock-storage-persistence", "account.clear-error-on-success", "media.embedding-lane", "media.image-lane", "media.tts-lane", "media.stt-lane", "media.video-lane", "media.websearch-lane", "media.webfetch-lane"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "A bug fix to the shared account-fallback shape (e.g. a new error classification, a new lock reason) must currently be hand-applied to 7 near-identical while(true) blocks plus the chat lane's own copy (routing.account-fallback-loop) — 8 total call sites for what is conceptually one state machine, a real maintenance-surface cost even though no two copies were observed to have actually drifted apart in behavior during this trace"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: src/sse/handlers/embeddings.js, line: 2, note: "imports getProviderCredentials/markAccountUnavailable/clearAccountError from ../services/auth.js — same module as chat" }
+    - { file: src/sse/handlers/embeddings.js, line: 97, note: "hand-written while(true) loop, copy 1 of 7" }
+    - { file: src/sse/handlers/imageGeneration.js, line: 93, note: "hand-written while(true) loop, copy 2 of 7" }
+    - { file: src/sse/handlers/tts.js, line: 87, note: "hand-written while(true) loop, copy 3 of 7 (via grep, same shape)" }
+    - { file: src/sse/handlers/stt.js, line: 60, note: "hand-written while(true) loop, copy 4 of 7" }
+    - { file: src/sse/handlers/videoGeneration.js, line: 119, note: "hand-written while(true) loop, copy 5 of 7" }
+    - { file: src/sse/handlers/search.js, line: 163, note: "hand-written while(true) loop, copy 6 of 7 (with extra credentialFallback branch)" }
+    - { file: src/sse/handlers/fetch.js, line: 167, note: "hand-written while(true) loop, copy 7 of 7" }
+  newModule: media
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: media.dashboard-effective-status-stale
+  group: Media providers
+  feature: Dashboard connection status
+  subFeature: getEffectiveStatus displays a stale "unavailable" testStatus as "active" once its lock has actually expired
+  trigger: Any media-providers [kind] dashboard page render, computing each connection's displayed status badge
+  input: "A connection row's testStatus field plus its modelLock_* fields"
+  output: "\"active\" (displayed as Connected) instead of the DB-stored \"unavailable\", specifically when no modelLock_* field still has a future timestamp"
+  businessRules:
+    - "The exact condition: `conn.testStatus === \"unavailable\" && !isCooldown ? \"active\" : conn.testStatus` — isCooldown is true only if some modelLock_${x} field's value parses to a Date strictly in the future; any other testStatus value (active/error/expired) passes through unchanged"
+    - "This exists because testStatus is only ever written back to \"active\" by clearAccountError (src/sse/services/auth.js), which runs solely on a successful request to that connection — a connection whose cooldown already expired but which has not yet been re-selected for a live request stays testStatus:\"unavailable\" in the DB indefinitely; getProviderCredentials's own selection logic checks the live lock expiry directly (not testStatus), so the connection IS actually eligible for selection again even while its stored testStatus still says otherwise"
+    - "getEffectiveStatus is purely a display-layer correction for this staleness — it never writes back to the DB; the next real request through that connection is what will eventually reconcile testStatus via clearAccountError, this function just prevents the dashboard from showing a permanently-stuck error badge in the meantime"
+  state:
+    reads: ["providerConnections rows (testStatus, modelLock_* fields) via GET /api/providers, already fetched by the page"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["account.lock-storage-persistence", "account.clear-error-on-success", "account.mark-unavailable-lock-reasons"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "getEffectiveStatus is defined locally inside this one dashboard page file — it is not a shared utility, so any other UI surface reading testStatus directly (rather than through this function) would show the stale \"unavailable\" badge a beat longer than this page does"
+  evidence:
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/page.js", line: 15, note: "getEffectiveStatus function definition" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/page.js", line: 16, note: "isCooldown — any modelLock_ key with a future timestamp" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/page.js", line: 19, note: "the exact ternary: unavailable && !isCooldown -> \"active\"" }
+    - { file: src/sse/services/auth.js, line: 271, note: "markAccountUnavailable sets testStatus: \"unavailable\" — the value that can go stale" }
+    - { file: src/sse/services/auth.js, line: 326, note: "clearAccountError — the only path that resets testStatus back to \"active\", gated on a successful request" }
+  newModule: media
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: media.dashboard-combo-kinds-disabled
+  group: Media providers
+  feature: Dashboard combo creation
+  subFeature: "COMBO_KINDS is a permanently-empty Set — combo creation/listing UI for image and tts kinds is unreachable, and the code that would render it is dead"
+  trigger: "MediaProviderKindPage render for kind=image or kind=tts"
+  input: none
+  output: "supportsCombo is always false for every kind on this page (COMBO_KINDS.has(kind) can never be true since COMBO_KINDS is new Set([]))"
+  businessRules:
+    - "The page's own comment says why: \"Kinds that support combos (currently disabled for image/tts — temporarily hidden)\" — COMBO_BASE_NAMES still names image/tts explicitly (image-combo/tts-combo), confirming those two kinds are the intended-but-disabled members of an empty set, not an accidentally-never-populated generic mechanism"
+    - "Because supportsCombo is always false: the combos fetch effect never runs, the \"Create Combo\" button never renders, handleCreateCombo is defined but never callable from the UI, and the ComboList component (defined in this file) never renders — four pieces of working code made permanently unreachable by one empty Set literal"
+    - "This is NOT a blanket disable of media combos: /dashboard/media-providers/web (webSearch/webFetch) has its own independent, unconditional Create-Combo button and ComboList, wired with no COMBO_KINDS gate at all, and /dashboard/media-providers/combo/[id] (the combo detail/editor page) still fully supports webSearch, webFetch, image, and tts kinds via its own KIND_LABELS/EXAMPLE_PATHS maps — an image or tts combo created before this gate existed (or by any other client of POST /api/combos, which accepts kind:\"image\"/\"tts\" with no restriction) remains fully editable by direct URL, only its creation/listing entry point on this one page is blocked"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["combo.storage-shape", "combo.api-crud"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "POST /api/combos itself performs no kind-level gating (it accepts { name, models, kind: kind || null } for any kind string) — the disablement is entirely a frontend-only affordance removal on this one page component, not a backend capability restriction"
+  evidence:
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/page.js", line: 12, note: "const COMBO_KINDS = new Set([]) — comment: disabled for image/tts, temporarily hidden" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/page.js", line: 13, note: "COMBO_BASE_NAMES = { image: \"image-combo\", tts: \"tts-combo\" } — names the intended two kinds" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/page.js", line: 157, note: "supportsCombo = COMBO_KINDS.has(kind) — always false" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/page.js", line: 171, note: "if (supportsCombo) fetch(/api/combos) — never runs" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/page.js", line: 210, note: "handleCreateCombo — defined, unreachable (no button ever renders to call it)" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/page.js", line: 234, note: "supportsCombo && <Button ... >Create Combo</Button> — never rendered" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/page.js", line: 245, note: "supportsCombo && kindCombos.length > 0 && <ComboList /> — never rendered" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/web/page.js", line: 120, note: "web page's own unconditional Create Combo button — no COMBO_KINDS gate" }
+    - { file: src/app/api/combos/route.js, line: 41, note: "createCombo({ name, models, kind: kind || null }) — no kind restriction server-side" }
+  newModule: media
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
