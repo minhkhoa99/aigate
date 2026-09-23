@@ -1,0 +1,578 @@
+# Trace: Endpoint & API Key, Settings (Task 6)
+# 9router reference read at E:\9router. Read-only; every evidence line was
+# read directly, not inferred from names (behavioral.md §7).
+
+- id: identity.machine-id-derivation
+  group: Endpoint & API Key
+  feature: Machine identity
+  subFeature: Derive the stable per-install machineId embedded in new API keys
+  trigger: Any call to getConsistentMachineId — from POST /api/keys (key generation) or CLI auth
+  input: "Optional salt string; defaults to process.env.MACHINE_ID_SALT or the literal 'endpoint-proxy-salt'"
+  output: "16-char lowercase hex string, stable across process restarts"
+  businessRules:
+    - "Raw machine id is read from a persisted file (DATA_DIR/machine-id) first; only falls back to node-machine-id, then crypto.randomUUID(), if the file is missing or unreadable"
+    - "The raw id is written back to disk (mode 0o600) the first time it is computed, so it survives node-machine-id giving inconsistent values across runtimes"
+    - "A second secret (DATA_DIR/auth/cli-secret) is mixed in only when the caller passes the special CLI_AUTH_SALT ('9r-cli-auth'), producing a different, unguessable hash for CLI-to-server auth than for API-key machineId embedding"
+  state:
+    reads: ["DATA_DIR/machine-id file", "DATA_DIR/auth/cli-secret file", "MACHINE_ID_SALT env var"]
+    writes: ["DATA_DIR/machine-id file (first run only)", "DATA_DIR/auth/cli-secret file (first run only)"]
+    runtimeOnly: ["cachedRawId module-level cache", "cachedCliSecret module-level cache"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "both the machine-id file and node-machine-id fail (rare)", partial: false }
+  sideEffects: ["Writes machine-id and cli-secret files to disk on first run"]
+  persistence: ["DATA_DIR/machine-id (plain raw id, not the derived hash)", "DATA_DIR/auth/cli-secret (random 32-byte hex)"]
+  performanceConcerns:
+    - "First call per process does up to 2 filesystem reads and writes; subsequent calls hit the module-level cache"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "If node-machine-id and the persisted file are both unavailable, the id falls back to crypto.randomUUID() — a fresh identity every process, silently changing every key's embedded machineId on that host"
+  evidence:
+    - { file: src/shared/utils/machineId.js, line: 16, note: "loadRawMachineId — file-first, then node-machine-id, then random UUID fallback" }
+    - { file: src/shared/utils/machineId.js, line: 35, note: "loadCliSecret — persisted random secret used only for CLI_AUTH_SALT" }
+    - { file: src/shared/utils/machineId.js, line: 49, note: "getConsistentMachineId — sha256(raw + salt + extra), truncated to 16 hex chars" }
+  newModule: identity
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: apikey.generate-key
+  group: Endpoint & API Key
+  feature: API key
+  subFeature: Create a new API key (POST /api/keys)
+  trigger: Dashboard/API client calls POST /api/keys with a name
+  input: "{ name: string }"
+  output: "201 { key, name, id, machineId } — full key returned once, in plaintext"
+  businessRules:
+    - "machineId is never taken from the request body — the server always calls getConsistentMachineId() itself"
+    - "Key format is sk-{machineId}-{keyId}-{crc8}: a random 6-char keyId, and an 8-char HMAC-SHA256(machineId+keyId) truncated as a checksum, keyed by API_KEY_SECRET (default 'endpoint-proxy-api-key-secret' if unset)"
+    - "New key defaults isActive: true"
+  state:
+    reads: []
+    writes: ["apiKeys table (new row)"]
+    runtimeOnly: []
+  dependencies: ["identity.machine-id-derivation"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "name is missing from the request body", partial: false }
+    - { code: INTERNAL_ERROR, when: "DB insert throws", partial: false }
+  sideEffects: []
+  persistence: ["apiKeys.key (full generated key string, plaintext, no hashing)"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The plaintext key is only ever returned in this one response; the dashboard has no way to show it again after creation"
+    - "API_KEY_SECRET defaulting to a hardcoded string when unset means the CRC is not a secret if the operator never overrides it — anyone who reads the 9router source can forge a matching CRC for any machineId+keyId pair"
+  evidence:
+    - { file: src/app/api/keys/route.js, line: 19, note: "POST handler — reads name from body, always derives machineId server-side" }
+    - { file: src/shared/utils/machineId.js, line: 49, note: "getConsistentMachineId call site (imported in route)" }
+    - { file: src/lib/db/repos/apiKeysRepo.js, line: 28, note: "createApiKey — builds row, calls generateApiKeyWithMachine, inserts" }
+    - { file: src/shared/utils/apiKey.js, line: 34, note: "generateApiKeyWithMachine — sk-{machineId}-{keyId}-{crc8} format" }
+    - { file: src/shared/utils/apiKey.js, line: 20, note: "generateCrc — HMAC-SHA256(machineId+keyId) keyed by API_KEY_SECRET, truncated to 8 hex chars" }
+  newModule: apikeys
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: apikey.list-keys
+  group: Endpoint & API Key
+  feature: API key
+  subFeature: List all API keys (GET /api/keys)
+  trigger: Dashboard loads the API keys page
+  input: none
+  output: "200 { keys: [{ id, key, name, machineId, isActive, createdAt }, ...] } ordered by createdAt ASC"
+  businessRules:
+    - "The full plaintext key is returned in the list response — there is no masking of previously-issued keys"
+  state:
+    reads: ["apiKeys table (all rows)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "DB query throws", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Unbounded SELECT * FROM apiKeys with no LIMIT/pagination — fine at expected key counts (dashboard-managed, single install) but grows linearly"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Returning the plaintext key on every list call (not just at creation) means any dashboard XSS or unauthorized dashboard access exposes every live key, not just newly created ones"
+  evidence:
+    - { file: src/app/api/keys/route.js, line: 8, note: "GET handler — calls getApiKeys(), returns full rows" }
+    - { file: src/lib/db/repos/apiKeysRepo.js, line: 16, note: "getApiKeys — SELECT * ORDER BY createdAt ASC, mapped through rowToKey" }
+  newModule: apikeys
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A key-management list endpoint masks or omits the secret value after initial issuance (standard practice, and consistent with GET /api/settings stripping password/oidcClientSecret)"
+    actual: "rowToKey() copies row.key verbatim into every list/get response with no masking"
+    impact: "Any surface that can read GET /api/keys (dashboard XSS, an over-permissioned session, a logging/proxy layer that captures response bodies) leaks every currently-active API key in plaintext, not just the one just-created key"
+
+- id: apikey.update-key-status
+  group: Endpoint & API Key
+  feature: API key
+  subFeature: Toggle a key's isActive flag (PUT /api/keys/[id])
+  trigger: Dashboard revoke/reactivate action on a key row
+  input: "{ isActive: boolean }"
+  output: "200 { key: <updated row> } or 404 if id not found"
+  businessRules:
+    - "Only isActive is accepted from the body — name/key/machineId cannot be changed through this route even though updateApiKey would happily merge them"
+    - "isActive === undefined is a no-op for that field (explicit undefined check, not truthiness), so isActive: false is correctly applied"
+  state:
+    reads: ["apiKeys table (row by id)"]
+    writes: ["apiKeys table (isActive column)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "id does not correspond to an existing key", partial: false }
+    - { code: INTERNAL_ERROR, when: "DB transaction throws", partial: false }
+  sideEffects: []
+  persistence: ["apiKeys.isActive"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "updateApiKey does a full read-merge-write inside a transaction, so a revoke and an unrelated field update racing on the same id cannot interleave, but there is no optimistic-lock/version check against a stale client-side copy"
+  evidence:
+    - { file: "src/app/api/keys/[id]/route.js", line: 20, note: "PUT handler — only reads isActive out of body" }
+    - { file: src/lib/db/repos/apiKeysRepo.js, line: 48, note: "updateApiKey — transaction: read row, merge, UPDATE all columns" }
+  newModule: apikeys
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: apikey.delete-key
+  group: Endpoint & API Key
+  feature: API key
+  subFeature: Permanently remove a key (DELETE /api/keys/[id])
+  trigger: Dashboard delete action on a key row
+  input: "id path param"
+  output: "200 { message } or 404 if nothing was deleted"
+  businessRules:
+    - "Deletion is immediate and permanent — no soft-delete, no grace period; any in-flight request already validated against this key is unaffected (validation is per-request, not per-connection)"
+  state:
+    reads: []
+    writes: ["apiKeys table (row removed)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "id does not correspond to an existing key (res.changes === 0)", partial: false }
+    - { code: INTERNAL_ERROR, when: "DB DELETE throws", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "deleteApiKey reports success purely from res.changes > 0, so deleting an id twice concurrently correctly 404s on the second call rather than double-counting"
+  evidence:
+    - { file: "src/app/api/keys/[id]/route.js", line: 44, note: "DELETE handler — 404 when deleteApiKey returns false" }
+    - { file: src/lib/db/repos/apiKeysRepo.js, line: 64, note: "deleteApiKey — DELETE ... WHERE id = ?, returns changes > 0" }
+  newModule: apikeys
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: apikey.validate-lookup
+  group: Endpoint & API Key
+  feature: API key
+  subFeature: Validate an inbound key string against stored keys
+  trigger: Every /v1 request while settings.requireApiKey is true (via isValidApiKey)
+  input: "Raw key string extracted from the request"
+  output: "true if a row exists with that exact key AND isActive; false otherwise"
+  businessRules:
+    - "validateApiKey does a single SQL lookup: SELECT isActive FROM apiKeys WHERE key = ? — the comparison is a plain SQL '=' string equality done by the DB engine, not a constant-time comparison in application code"
+    - "An inactive key (isActive false/0) is rejected even though the row matched — the query fetches isActive and the caller re-checks it explicitly rather than filtering isActive in the WHERE clause"
+  state:
+    reads: ["apiKeys table (row by exact key match)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "no row matches the key string", partial: false }
+    - { code: AUTH_ERROR, when: "row matches but isActive is false/0", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "One SQL lookup per request on the hot path, no cache; WHERE key = ? has no explicit index, so cost scales with the size of the apiKeys table (small in practice — dashboard-managed, single install)"
+    - "The lookup uses the database engine's own string equality (not crypto.timingSafeEqual), so response-time differences between 'no match' and 'match at byte N' are whatever the underlying adapter's B-tree/string compare naturally produces — a timing side-channel is theoretically possible depending on adapter (better-sqlite3 vs sql.js) though impractical to exploit over HTTP jitter"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The key format (new sk-{machineId}-{keyId}-{crc8} vs legacy sk-{random8}) is completely irrelevant to validateApiKey — it never calls parseApiKey/verifyApiKeyCrc, so any string stored verbatim in the apiKeys.key column authenticates, regardless of shape"
+  evidence:
+    - { file: src/lib/db/repos/apiKeysRepo.js, line: 70, note: "validateApiKey — SELECT isActive FROM apiKeys WHERE key = ?, plain string equality" }
+    - { file: src/sse/services/auth.js, line: 361, note: "isValidApiKey — thin wrapper: null-guard then delegate to validateApiKey" }
+  newModule: apikeys
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: apikey.legacy-format-unenforced
+  group: Endpoint & API Key
+  feature: API key
+  subFeature: Legacy sk-{random8} keys and the never-invoked CRC/format validation
+  trigger: A request bearing a pre-machineId-era key, or any hand-crafted string
+  input: "sk-{random8} (2 dash-separated parts) or any other string"
+  output: "Accepted iff the exact string exists as an active row in apiKeys; format is never inspected"
+  businessRules:
+    - "parseApiKey() recognizes two shapes (4-part new format with CRC check, 2-part legacy format with no CRC) and isNewFormatKey/verifyApiKeyCrc build on it, but grepping the whole src tree shows none of the three is called from anywhere except inside apiKey.js itself — apiKeysRepo.createApiKey calls generateApiKeyWithMachine (write path only), and validateApiKey (read/auth path) never imports apiKey.js at all"
+    - "Legacy sk-{random8} keys are therefore accepted for as long as their row remains in the apiKeys table with isActive true — there is no migration, expiry, or forced-rotation step"
+  state:
+    reads: ["apiKeys table (row by exact key match, format-agnostic)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["apikey.validate-lookup"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "a malformed/tampered key does not match any DB row", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A 4-part key whose CRC segment was hand-edited (would fail parseApiKey's CRC check) still authenticates fine via validateApiKey, because validateApiKey never calls parseApiKey — the CRC only ever protects the write path (nothing regenerates or checks it against tampering at read time)"
+  evidence:
+    - { file: src/shared/utils/apiKey.js, line: 49, note: "parseApiKey — recognizes 4-part new format (CRC-checked) and 2-part legacy format (no CRC)" }
+    - { file: src/shared/utils/apiKey.js, line: 78, note: "verifyApiKeyCrc — the only caller of parseApiKey for validation purposes, itself uncalled elsewhere in src/" }
+    - { file: src/lib/db/repos/apiKeysRepo.js, line: 70, note: "validateApiKey — the actual request-time auth check; does not import or call anything from apiKey.js" }
+  newModule: apikeys
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Given generateCrc/parseApiKey/verifyApiKeyCrc exist specifically to bind a key to a machineId and detect tampering, the request-time auth path (validateApiKey / isValidApiKey) calls verifyApiKeyCrc (or parseApiKey) to reject a key whose embedded CRC doesn't match its machineId+keyId before or in addition to the DB lookup"
+    actual: "validateApiKey performs only a raw string equality lookup against the stored apiKeys.key column; parseApiKey/verifyApiKeyCrc/isNewFormatKey are dead code outside of key generation and are never invoked on the read/auth path"
+    impact: "The CRC provides no security property at request time — it cannot be used to detect a corrupted/tampered key independent of the DB, and the legacy sk-{random8} format is accepted with exactly the same trust as the new format purely because both are opaque strings to validateApiKey; anyone who can insert or copy a row into apiKeys (backup restore, DB access, export leak) gets a working key regardless of format"
+
+- id: endpoint.extract-header-order
+  group: Endpoint & API Key
+  feature: Endpoint
+  subFeature: Extract the inbound API key from request headers
+  trigger: Every call into handleChat (and any other handler that imports extractApiKey)
+  input: "Authorization header and/or x-api-key header"
+  output: "The bearer token string, the x-api-key string, or null"
+  businessRules:
+    - "Authorization: Bearer <key> is checked first; only if absent (or not prefixed 'Bearer ') does it fall back to the Anthropic-style x-api-key header"
+    - "If neither header is present, extractApiKey returns null and does not throw"
+  state:
+    reads: ["Authorization request header", "x-api-key request header"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "An Authorization header present but not starting with 'Bearer ' (e.g. 'Basic ...') is ignored entirely — extractApiKey falls through to check x-api-key rather than treating it as an error"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 342, note: "extractApiKey — Authorization Bearer checked first, then x-api-key" }
+  newModule: apikeys
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: endpoint.enforce-require-api-key
+  group: Endpoint & API Key
+  feature: Endpoint
+  subFeature: Gate chat requests behind settings.requireApiKey
+  trigger: Any POST that reaches handleChat, after body/model parsing but before combo/account resolution
+  input: "Parsed request body, request headers, current settings"
+  output: "401 with 'Missing API key' or 'Invalid API key' body, or falls through to continue processing the chat request"
+  businessRules:
+    - "The gate is skipped entirely when settings.requireApiKey is false — no key is required, no key is even logged as an error (only a debug 'local mode' line)"
+    - "When requireApiKey is true: missing key → 401 before any DB lookup; present-but-invalid key → 401 after one DB lookup via isValidApiKey"
+    - "The check happens after JSON body parsing and model-marker stripping but before model-existence, combo, or bypass-request checks — an unauthenticated caller cannot trigger those heavier code paths"
+  state:
+    reads: ["settings.requireApiKey", "apiKeys table (via isValidApiKey, only if a key was supplied)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["endpoint.extract-header-order", "apikey.validate-lookup", "settings.hot-path-read-no-cache"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "requireApiKey is true and no key was supplied", partial: false }
+    - { code: AUTH_ERROR, when: "requireApiKey is true and isValidApiKey(key) resolves false", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "getSettings() (a full settings-table read) runs on every chat request regardless of whether requireApiKey is even true, purely to read one boolean"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The masked-key debug log line at the top of handleChat runs even when requireApiKey is false, so a locally-running instance still logs a masked key if the client happens to send one"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 61, note: "apiKey = extractApiKey(request), masked debug log" }
+    - { file: src/sse/handlers/chat.js, line: 70, note: "settings = await getSettings(); enforcement gated on settings.requireApiKey" }
+    - { file: src/sse/handlers/chat.js, line: 76, note: "await isValidApiKey(apiKey) — the actual DB-backed check" }
+  newModule: apikeys
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: endpoint.rewrite-lanes
+  group: Endpoint & API Key
+  feature: Endpoint
+  subFeature: URL rewrite lanes that expose the API-key-gated router under multiple client-compatible paths
+  trigger: Any inbound HTTP request to one of the five rewritten path prefixes
+  input: "Request path: /v1/*, /v1/v1/* (double-prefixing clients), /v1beta/* (Gemini-native), /codex/* and /responses (OpenAI Responses-shaped clients)"
+  output: "Internally rewritten to /api/v1/*, /api/v1beta/*, or /api/v1/responses before Next.js route matching — all funnel through the same requireApiKey gate in their respective handlers"
+  businessRules:
+    - "/v1/v1/* is matched and rewritten before the plain /v1/* rule, because Next applies rewrites in array order and a naive /v1/* rule would otherwise itself match the /v1/v1/... prefix as its own :path* capture, only ever hitting /api/v1/v1/... (double-prefixing clients would 404 without this ordering)"
+    - "/codex/* and the bare /responses path both collapse onto the single /api/v1/responses handler regardless of the trailing path segments — /codex/:path* discards :path*"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "/v1beta and /v1 both have a path-less exact-match rule in addition to the /:path* rule, so a request to exactly '/v1' (no trailing slash/segment) still reaches /api/v1"
+  evidence:
+    - { file: next.config.mjs, line: 60, note: "rewrites() — array order matters: /v1/v1/:path* precedes /v1/:path*" }
+    - { file: next.config.mjs, line: 70, note: "/codex/:path* and /responses both rewrite to the single /api/v1/responses handler" }
+    - { file: next.config.mjs, line: 78, note: "/v1beta/:path* rewrite for Gemini-native clients" }
+  newModule: apikeys
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: settings.defaults-and-merge
+  group: Settings
+  feature: Settings
+  subFeature: DEFAULT_SETTINGS shape and migration-free merge with persisted data
+  trigger: Every getSettings()/updateSettings() call (i.e. every settings read or write anywhere in the app)
+  input: "Raw JSON blob previously stored in the settings table (may be missing keys added after it was last written)"
+  output: "A settings object with every DEFAULT_SETTINGS key present, persisted values taking precedence"
+  businessRules:
+    - "mergeWithDefaults is a flat `{ ...DEFAULT_SETTINGS, ...raw }` object spread plus one pass filling in any key still `undefined` after that spread — it has no per-key migration/rename table"
+    - "The one hand-written exception: if outboundProxyEnabled is undefined but outboundProxyUrl is a non-empty string, outboundProxyEnabled is inferred true instead of falling back to the DEFAULT_SETTINGS false — a bespoke backward-compat rule for one specific key, not a general mechanism"
+    - "Unknown keys present in raw (e.g. a key that has since been renamed or removed from DEFAULT_SETTINGS) pass through untouched in the merged object — nothing prunes them"
+  state:
+    reads: ["settings table row id=1 (JSON blob)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Renaming a DEFAULT_SETTINGS key breaks backward compatibility silently: existing installs have the old key name in their stored JSON, which mergeWithDefaults treats as an unrecognized extra property (kept but never read by the new code), while the new key name is always undefined in raw and therefore always resolves to its fresh default — the user's previous choice is effectively lost with no error, warning, or migration step"
+  evidence:
+    - { file: src/lib/db/repos/settingsRepo.js, line: 7, note: "DEFAULT_SETTINGS — full set of settings keys and their defaults" }
+    - { file: src/lib/db/repos/settingsRepo.js, line: 74, note: "mergeWithDefaults — spread + fill-undefined loop, one special-cased key (outboundProxyEnabled)" }
+    - { file: src/lib/db/repos/settingsRepo.js, line: 92, note: "getSettings — readRaw() then mergeWithDefaults(raw)" }
+  newModule: settings
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: settings.hot-path-read-no-cache
+  group: Settings
+  feature: Settings
+  subFeature: Settings read on the request hot path
+  trigger: Every /v1 chat request (via handleChat's requireApiKey check) and any other call site that reads settings mid-request
+  input: none
+  output: "Full merged settings object"
+  businessRules:
+    - "getSettings() always does a fresh `SELECT data FROM settings WHERE id = 1` — there is no in-process cache, TTL, or invalidation-on-write layer; every caller re-reads and re-parses the JSON blob"
+    - "Of the full settings object, handleChat's enforcement gate only actually reads the single boolean requireApiKey"
+  state:
+    reads: ["settings table row id=1 (full JSON blob, on every call)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["settings.defaults-and-merge"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "One full-row SELECT + JSON.parse of the entire settings blob per request just to read requireApiKey, with no caching; cost is bounded by the settings blob size (small, single row) but still redundant given the value rarely changes"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because there is no cache, a PATCH /api/settings toggling requireApiKey takes effect on the very next request with no propagation delay or restart — a correctness benefit that comes for free from the lack of caching"
+  evidence:
+    - { file: src/lib/db/repos/settingsRepo.js, line: 67, note: "readRaw — unconditional SELECT on every call, no memoization" }
+    - { file: src/sse/handlers/chat.js, line: 70, note: "await getSettings() on every chat request, before the requireApiKey check" }
+  newModule: settings
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: settings.get-secret-stripping
+  group: Settings
+  feature: Settings
+  subFeature: GET /api/settings response shaping — secret stripping and env-only fields
+  trigger: Dashboard settings page load
+  input: none
+  output: "200 with the full settings object minus password/oidcClientSecret, plus derived oidcConfigured/hasPassword booleans and env-sourced enableRequestLogs/enableTranslator"
+  businessRules:
+    - "password and oidcClientSecret are destructured out of the response object and never sent to the client; hasPassword (boolean) and oidcConfigured (boolean, requires issuer+clientId+secret all present) are sent instead"
+    - "enableRequestLogs and enableTranslator are read directly from process.env on every GET and are not stored in, or ever read from, the settings DB row — they are appended to the response object after the settings spread, so even if a client PATCHed same-named keys into the DB blob, the env-derived values would still win on the next GET"
+  state:
+    reads: ["settings table row id=1", "ENABLE_REQUEST_LOGS env var", "ENABLE_TRANSLATOR env var"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["settings.defaults-and-merge"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "getSettings() throws (e.g. malformed stored JSON)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "oidcConfigured can be true even though the client never receives oidcClientSecret itself — it only ever sees the derived boolean, so the UI can show 'OIDC configured' without ever handling the secret value"
+  evidence:
+    - { file: src/app/api/settings/route.js, line: 17, note: "GET — destructure password/oidcClientSecret out, compute oidcConfigured/hasPassword" }
+    - { file: src/app/api/settings/route.js, line: 23, note: "enableRequestLogs/enableTranslator read straight from process.env, appended after the settings spread" }
+  newModule: settings
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: settings.patch-protected-keys
+  group: Settings
+  feature: Settings
+  subFeature: PATCH /api/settings mass-assignment protection
+  trigger: Any PATCH /api/settings request
+  input: "Arbitrary JSON body of settings keys to update"
+  output: "Body is mutated in place to delete PROTECTED_SETTING_KEYS before any other handling runs"
+  businessRules:
+    - "PROTECTED_SETTING_KEYS = ['password', 'mitmSudoEncrypted'] — both are deleted from the incoming body before the password-change block, oidcClientSecret handling, or updateSettings(body) ever see them"
+    - "This is a mass-assignment guard (the code comment cites CWE-915): without it, a client could set body.password directly to an attacker-chosen bcrypt hash (or arbitrary string) and bypass the bcrypt.compare(currentPassword) check entirely, since that check only runs inside the body.newPassword branch — a raw password field would flow straight into updateSettings unauthenticated by any current-password check"
+    - "mitmSudoEncrypted (the encrypted sudo password used for MITM proxy host-file elevation) is protected the same way — direct overwrite would let a client plant attacker-controlled ciphertext that the MITM subsystem later decrypts and uses for privileged local operations"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The strip list is a fixed array checked by exact key name; a differently-cased or nested path to the same effective field would not be caught (not observed to exist elsewhere in the settings schema, but the guard is name-based, not schema-based)"
+  evidence:
+    - { file: src/app/api/settings/route.js, line: 15, note: "PROTECTED_SETTING_KEYS definition, with CWE-915 comment" }
+    - { file: src/app/api/settings/route.js, line: 42, note: "for (const key of PROTECTED_SETTING_KEYS) delete body[key] — runs before any other PATCH logic" }
+  newModule: settings
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: settings.patch-password-change
+  group: Settings
+  feature: Settings
+  subFeature: Password change flow inside PATCH /api/settings
+  trigger: PATCH /api/settings with a newPassword field
+  input: "{ newPassword, currentPassword? }"
+  output: "password field replaced with a fresh bcrypt hash; 400/401 on validation failure"
+  businessRules:
+    - "If a password hash already exists (settings.password is set), currentPassword is required and must bcrypt.compare true against it, else 401 'Invalid current password'"
+    - "If no password hash exists yet (first-time setup), currentPassword is optional; but if supplied, it must equal the literal string '123456' or the request is rejected with 401"
+    - "On success, newPassword is bcrypt-hashed (genSalt(10)) into body.password, and both newPassword and currentPassword are deleted from body before it reaches updateSettings"
+  state:
+    reads: ["settings.password (current hash)"]
+    writes: ["settings.password (new bcrypt hash, via updateSettings)"]
+    runtimeOnly: []
+  dependencies: ["settings.patch-protected-keys"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "a password hash already exists but currentPassword was not supplied", partial: false }
+    - { code: AUTH_ERROR, when: "currentPassword does not match the stored hash (or, first-time, does not equal '123456')", partial: false }
+  sideEffects: []
+  persistence: ["settings.password (bcrypt hash)"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The first-time-setup branch hardcodes the literal string '123456' rather than reading process.env.INITIAL_PASSWORD, unlike the sibling check in the login route"
+  evidence:
+    - { file: src/app/api/settings/route.js, line: 45, note: "if (body.newPassword) block — start of the password-change flow" }
+    - { file: src/app/api/settings/route.js, line: 51, note: "existing-hash branch: bcrypt.compare(currentPassword, currentHash) required" }
+    - { file: src/app/api/settings/route.js, line: 62, note: "first-time branch: currentPassword compared against the hardcoded literal '123456'" }
+    - { file: src/app/api/auth/login/route.js, line: 58, note: "the equivalent login-time check correctly reads process.env.INITIAL_PASSWORD before falling back to '123456'" }
+  newModule: settings
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "The first-time password-change gate in PATCH /api/settings checks currentPassword against the operator's actual configured initial password, i.e. `process.env.INITIAL_PASSWORD || \"123456\"`, mirroring the check already implemented in src/app/api/auth/login/route.js line 58 for the same purpose"
+    actual: "settings/route.js line 62 compares currentPassword only against the hardcoded literal \"123456\", never consulting process.env.INITIAL_PASSWORD"
+    impact: "An operator who sets INITIAL_PASSWORD to a non-default value (as CLAUDE.md instructs: 'must override') cannot use that real initial password to complete their first password change through the dashboard/API — currentPassword !== '123456' is rejected with 401 even though it is the correct, configured initial password. Worse, the well-known literal '123456' still satisfies this specific check regardless of what INITIAL_PASSWORD was set to, so on an install that changed the env var specifically to move off the public default, a local caller who still knows the old default can pass this gate anyway."
+
+- id: settings.outbound-proxy-live-apply
+  group: Settings
+  feature: Settings
+  subFeature: Outbound proxy env vars applied immediately on PATCH, without restart
+  trigger: PATCH /api/settings whose body includes outboundProxyEnabled, outboundProxyUrl, or outboundNoProxy
+  input: "Updated settings object (post-persist) containing the three outbound-proxy fields"
+  output: "process.env.HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY mutated in the current process"
+  businessRules:
+    - "applyOutboundProxyEnv only runs when the PATCH body itself contained one of the three keys (checked via hasOwnProperty on the request body, not on whether the merged value differs from before)"
+    - "It only ever writes env vars it validated (scheme allow-list http/https/socks4/socks4a/socks5/socks5h, rejects control chars/backticks/$ in the URL) and tracks a NINE_ROUTER_PROXY_MANAGED marker so it only clears vars it previously set, never externally-provided proxy env vars it didn't write"
+    - "Disabling the proxy (outboundProxyEnabled: false) only clears the env vars if they were previously marked as managed by this code — an externally-set HTTP_PROXY survives untouched"
+  state:
+    reads: ["outboundProxyEnabled/outboundProxyUrl/outboundNoProxy from the freshly-updated settings", "process.env.NINE_ROUTER_PROXY_MANAGED"]
+    writes: ["process.env.HTTP_PROXY, HTTPS_PROXY, ALL_PROXY, NO_PROXY, NINE_ROUTER_PROXY_MANAGED, NINE_ROUTER_PROXY_URL, NINE_ROUTER_NO_PROXY (in-process only, not persisted to disk beyond the settings DB row already written by updateSettings)"]
+    runtimeOnly: ["process.env mutations are per-process and lost on restart; only the settings DB row survives a restart, so applyOutboundProxyEnv must re-run at startup (outside this entry's scope) to restore them"]
+  dependencies: ["settings.patch-protected-keys"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Mutates global process.env, affecting every outbound HTTP call made by the process from that point on, not just this request"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A malformed/dangerous proxy URL (bad scheme, embedded backtick/$/newline) is silently dropped by validateProxyUrl — the PATCH still succeeds (settings persist), but the env var is simply never set, with no error surfaced to the caller"
+  evidence:
+    - { file: src/app/api/settings/route.js, line: 81, note: "PATCH — applyOutboundProxyEnv(settings) called only when one of the three keys was present in the body" }
+    - { file: src/lib/network/outboundProxy.js, line: 20, note: "applyOutboundProxyEnv — validates scheme/chars, tracks NINE_ROUTER_PROXY_MANAGED, only clears vars it owns" }
+  newModule: settings
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: settings.combo-rotation-reset
+  group: Settings
+  feature: Settings
+  subFeature: Combo rotation state invalidated when combo strategy settings change
+  trigger: PATCH /api/settings whose body includes comboStrategy, comboStickyRoundRobinLimit, or comboStrategies
+  input: "Updated settings object (post-persist)"
+  output: "In-memory combo rotation state cleared; next combo request re-derives its starting point under the new strategy"
+  businessRules:
+    - "resetComboRotation() with no argument clears the entire in-memory Map, not just the affected combo — any change to any of the three keys invalidates rotation state for every combo, not only the ones using the changed strategy"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["comboRotationState Map in open-sse/services/combo.js — cleared entirely"]
+  dependencies: ["settings.patch-protected-keys"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Any combo mid-round-robin cycle loses its position and restarts from the strategy's initial pick on the next request"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The reset is unconditional and global even for a settings PATCH that only touches one provider's comboStrategies override — an unrelated combo's round-robin position is reset as collateral"
+  evidence:
+    - { file: src/app/api/settings/route.js, line: 90, note: "PATCH — resetComboRotation() called when combo strategy keys are present in the body" }
+    - { file: open-sse/services/combo.js, line: 243, note: "resetComboRotation — clears the whole comboRotationState Map when called with no argument" }
+  newModule: settings
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

@@ -1,26 +1,31 @@
 # Discovery coverage
 
-Entries: 0
+Entries: 17
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 0/154 | api/auth/login, api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata … +146 |
+| routes | 4/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +142 |
 | pages | 0/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind] … +20 |
 | providers | 0/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, antigravity, api-airforce, assemblyai … +114 |
 | executors | 0/29 | antigravity, azure, base, codebuddy-cn, codebuddy-intl, codex, commandcode, cursor … +21 |
 | translators | 0/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +40 |
-| repos | 0/11 | aliasRepo, apiKeysRepo, combosRepo, connectionsRepo, disabledModelsRepo, nodesRepo, pricingRepo, proxyPoolsRepo … +3 |
-| settingsKeys | 0/52 | authMode, capacityAdapter, cavemanEnabled, cavemanLevel, cloudEnabled, comboStickyRoundRobinLimit, comboStrategies, comboStrategy … +44 |
+| repos | 2/11 | aliasRepo, combosRepo, connectionsRepo, disabledModelsRepo, nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo … +1 |
+| settingsKeys | 5/52 | authMode, capacityAdapter, cavemanEnabled, cavemanLevel, cloudEnabled, comboStickyRoundRobinLimit, comboStrategies, comboStrategy … +39 |
 
 ## Entries per bounded context
 
+- apikeys: 9
+- identity: 1
+- settings: 7
 
 ## Labels
 
+- IMPLEMENTATION_ACCIDENT: 1
+- REFERENCE_BEHAVIOR: 13
+- SUSPECTED_BUG: 3
 
 ## Missing — routes
 
-- api/auth/login
 - api/auth/logout
 - api/auth/oidc/callback
 - api/auth/oidc/start
@@ -60,8 +65,6 @@ Entries: 0
 - api/headroom/stop
 - api/health
 - api/init
-- api/keys
-- api/keys/[id]
 - api/locale
 - api/mcp/[plugin]/message
 - api/mcp/[plugin]/sse
@@ -119,7 +122,6 @@ Entries: 0
 - api/pxpipe/stats
 - api/pxpipe/status
 - api/pxpipe/stop
-- api/settings
 - api/settings/database
 - api/settings/proxy-test
 - api/settings/require-login
@@ -417,7 +419,6 @@ Entries: 0
 ## Missing — repos
 
 - aliasRepo
-- apiKeysRepo
 - combosRepo
 - connectionsRepo
 - disabledModelsRepo
@@ -425,7 +426,6 @@ Entries: 0
 - pricingRepo
 - proxyPoolsRepo
 - requestDetailsRepo
-- settingsRepo
 - usageRepo
 
 ## Missing — settingsKeys
@@ -450,13 +450,9 @@ Entries: 0
 - observabilityMaxJsonSize
 - observabilityMaxRecords
 - oidcClientId
-- oidcClientSecret
 - oidcIssuerUrl
 - oidcLoginLabel
 - oidcScopes
-- outboundNoProxy
-- outboundProxyEnabled
-- outboundProxyUrl
 - ponytailEnabled
 - ponytailLevel
 - providerStrategies
@@ -465,7 +461,6 @@ Entries: 0
 - pxpipeMinChars
 - pxpipeTimeoutMs
 - quotaVisibility
-- requireApiKey
 - requireLogin
 - rtkEnabled
 - samlAttributeEmail
