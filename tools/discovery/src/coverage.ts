@@ -44,7 +44,12 @@ export function computeCoverage(
     ])
     .join("\n");
 
-  const inventoryKeys = ["routes", "pages", "providers", "executors", "translators", "repos", "settingsKeys"] as const satisfies readonly (keyof Inventory)[];
+  const inventoryKeys = ["routes", "pages", "providers", "executors", "translators", "repos", "settingsKeys"] as const;
+
+  // Compile-time exhaustiveness check: fails if any Inventory key is missing from inventoryKeys
+  type MissingKeys = Exclude<keyof Inventory, (typeof inventoryKeys)[number]>;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _inventoryKeysExhaustive: [MissingKeys] extends [never] ? true : never = true;
 
   const dimensions: Dimension[] = inventoryKeys.map((name) => {
     const items = inv[name];
