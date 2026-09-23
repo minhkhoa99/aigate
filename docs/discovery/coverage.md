@@ -1,14 +1,14 @@
 # Discovery coverage
 
-Entries: 193
+Entries: 210
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 87/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +59 |
-| pages | 4/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind]/[id] … +16 |
+| routes | 94/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +52 |
+| pages | 5/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind]/[id] … +15 |
 | providers | 15/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +99 |
-| executors | 6/29 | azure, codebuddy-cn, codebuddy-intl, commandcode, cursor, devin-cli, gemini-cli, github … +15 |
-| translators | 2/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +38 |
+| executors | 9/29 | azure, codebuddy-cn, codebuddy-intl, devin-cli, gemini-cli, github, grok-cli, grok-web … +12 |
+| translators | 35/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/concerns/reasoning.js … +5 |
 | repos | 10/11 | nodesRepo |
 | settingsKeys | 32/52 | cloudEnabled, dnsToolEnabled, mitmRouterBaseUrl, oidcClientId, oidcIssuerUrl, oidcLoginLabel, oidcScopes, samlAttributeEmail … +12 |
 
@@ -19,16 +19,17 @@ Entries: 193
 - connections: 38
 - identity: 1
 - media: 15
-- routing: 65
+- routing: 79
 - settings: 7
+- tooling: 3
 - transport: 14
 - usage: 23
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 8
-- REFERENCE_BEHAVIOR: 160
-- SUSPECTED_BUG: 25
+- IMPLEMENTATION_ACCIDENT: 9
+- REFERENCE_BEHAVIOR: 175
+- SUSPECTED_BUG: 26
 
 ## Missing — routes
 
@@ -63,7 +64,6 @@ Entries: 193
 - api/cli-tools/opencode-settings
 - api/health
 - api/init
-- api/locale
 - api/mcp/[plugin]/message
 - api/mcp/[plugin]/sse
 - api/provider-nodes/[id]
@@ -80,12 +80,6 @@ Entries: 193
 - api/settings/require-login
 - api/shutdown
 - api/tags
-- api/translator/console-logs
-- api/translator/console-logs/stream
-- api/translator/load
-- api/translator/save
-- api/translator/send
-- api/translator/translate
 - api/tunnel/disable
 - api/tunnel/enable
 - api/tunnel/status
@@ -112,7 +106,6 @@ Entries: 193
 - (dashboard)/dashboard/media-providers/[kind]/[id]
 - (dashboard)/dashboard/media-providers/combo/[id]
 - (dashboard)/dashboard/mitm
-- (dashboard)/dashboard/profile
 - (dashboard)/dashboard/providers
 - (dashboard)/dashboard/providers/new
 - (dashboard)/dashboard/proxy-pools
@@ -242,8 +235,6 @@ Entries: 193
 - azure
 - codebuddy-cn
 - codebuddy-intl
-- commandcode
-- cursor
 - devin-cli
 - gemini-cli
 - github
@@ -251,7 +242,6 @@ Entries: 193
 - grok-web
 - iflow
 - kimchi
-- kiro
 - mimo-free
 - ollama-local
 - opencode
@@ -266,8 +256,6 @@ Entries: 193
 ## Missing — translators
 
 - open-sse/translator/concerns/chunk.js
-- open-sse/translator/concerns/finishReason.js
-- open-sse/translator/concerns/image.js
 - open-sse/translator/concerns/json.js
 - open-sse/translator/concerns/kiroConversation.js
 - open-sse/translator/concerns/message.js
@@ -276,41 +264,10 @@ Entries: 193
 - open-sse/translator/concerns/prefetch.js
 - open-sse/translator/concerns/reasoning.js
 - open-sse/translator/concerns/thinking.js
-- open-sse/translator/concerns/thinkingUnified.js
-- open-sse/translator/concerns/toolCall.js
-- open-sse/translator/concerns/usage.js
 - open-sse/translator/formats/claude.js
 - open-sse/translator/formats/gemini.js
 - open-sse/translator/formats/maxTokens.js
-- open-sse/translator/formats/openai.js
 - open-sse/translator/formats/responsesApi.js
-- open-sse/translator/request/antigravity-to-openai.js
-- open-sse/translator/request/claude-to-kiro.js
-- open-sse/translator/request/claude-to-openai.js
-- open-sse/translator/request/gemini-to-openai.js
-- open-sse/translator/request/openai-responses.js
-- open-sse/translator/request/openai-to-claude.js
-- open-sse/translator/request/openai-to-commandcode.js
-- open-sse/translator/request/openai-to-cursor.js
-- open-sse/translator/request/openai-to-gemini.js
-- open-sse/translator/request/openai-to-kiro.js
-- open-sse/translator/request/openai-to-ollama.js
-- open-sse/translator/request/openai-to-vertex.js
-- open-sse/translator/response/claude-to-openai.js
-- open-sse/translator/response/commandcode-to-openai.js
-- open-sse/translator/response/cursor-to-openai.js
-- open-sse/translator/response/gemini-to-openai.js
-- open-sse/translator/response/kiro-to-claude.js
-- open-sse/translator/response/kiro-to-openai.js
-- open-sse/translator/response/ollama-to-openai.js
-- open-sse/translator/response/openai-responses.js
-- open-sse/translator/response/openai-to-antigravity.js
-- open-sse/translator/response/openai-to-claude.js
-- open-sse/translator/schema/blocks.js
-- open-sse/translator/schema/defaults.js
-- open-sse/translator/schema/finishReasons.js
-- open-sse/translator/schema/index.js
-- open-sse/translator/schema/roles.js
 
 ## Missing — repos
 

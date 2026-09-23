@@ -1,0 +1,681 @@
+# Task 16: Translation engine and interface language
+#
+# Two distinct subjects, per the brief:
+#   translator.*  — the format-translation engine (open-sse/translator/**, open-sse/transformer/**,
+#                    src/app/api/translator/**). newModule: routing.
+#   i18n.*        — the UI language system (src/i18n/**, src/app/api/locale). newModule: tooling.
+#
+# Prior entries already documented the request-side pivot mechanics in
+# 05-request-routing-fallback.yaml (routing.source-format-detection,
+# routing.target-format-transport, routing.request-translation,
+# routing.native-passthrough, routing.responses-compact-lane,
+# routing.ollama-lane-transform) — cited as dependencies below, not re-traced.
+#
+# Q3 (what survives the OpenAI pivot) is answered in translator.pivot-loss.
+
+- id: translator.registered-format-pairs
+  group: Translation engine
+  feature: Translator registry
+  subFeature: Every registered source:target request/response pair
+  trigger: Module load — each translator file self-registers via register() as an import side effect
+  input: "None — registration is a side effect of importing each translator module"
+  output: "requestRegistry and responseRegistry Maps keyed `${from}:${to}`"
+  businessRules:
+    - "Request pairs (12 files register 16 keys): antigravity:openai, claude:kiro (direct), claude:openai, gemini:openai, gemini-cli:openai, openai-responses:openai, openai:openai-responses, openai:claude, openai:commandcode, openai:cursor, openai:gemini, openai:gemini-cli (wrapped in a Cloud Code envelope), openai:antigravity, openai:kiro, openai:ollama, openai:vertex"
+    - "Response pairs (10 files register 14 keys, read as upstream-format:client-format): claude:openai, commandcode:openai, cursor:openai, gemini:openai, gemini-cli:openai, antigravity:openai, vertex:openai, kiro:claude (direct), kiro:openai, ollama:openai, openai:openai-responses, openai-responses:openai, openai:antigravity, openai:claude"
+    - "Every provider that is not natively OpenAI-shaped has an X:openai response leg (so any client format can be reached via the OpenAI pivot) but most providers have only ONE request leg (openai:X) — a client sending X-native requests for cursor/kiro/ollama/vertex/commandcode/gemini(-cli)/antigravity must still go through the OpenAI pivot on the way out, only the way back can shortcut"
+    - "claude:kiro / kiro:claude is the only pair registered as a genuine bidirectional direct route (see translator.direct-route-claude-kiro)"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.request-translation"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "gemini-to-openai.js registers the same geminiToOpenAIRequest function for both gemini and gemini-cli sources — the two client dialects are treated as request-identical, only their response shaping (and enveloping) differs"
+  evidence:
+    - { file: open-sse/translator/index.js, line: 19, note: "register(from, to, requestFn, responseFn) stores into requestRegistry/responseRegistry keyed `${from}:${to}`" }
+    - { file: open-sse/translator/request/antigravity-to-openai.js, line: 242, note: "register(ANTIGRAVITY, OPENAI, ...)" }
+    - { file: open-sse/translator/request/claude-to-kiro.js, line: 350, note: "register(CLAUDE, KIRO, ...) — direct route" }
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 263, note: "register(CLAUDE, OPENAI, ...)" }
+    - { file: open-sse/translator/request/gemini-to-openai.js, line: 150, note: "register(GEMINI, OPENAI, ...)" }
+    - { file: open-sse/translator/request/gemini-to-openai.js, line: 151, note: "register(GEMINI_CLI, OPENAI, ...) — same function as gemini:openai" }
+    - { file: open-sse/translator/request/openai-responses.js, line: 466, note: "register(OPENAI_RESPONSES, OPENAI, ...)" }
+    - { file: open-sse/translator/request/openai-responses.js, line: 467, note: "register(OPENAI, OPENAI_RESPONSES, ...)" }
+    - { file: open-sse/translator/request/openai-to-claude.js, line: 382, note: "register(OPENAI, CLAUDE, ...)" }
+    - { file: open-sse/translator/request/openai-to-commandcode.js, line: 172, note: "register(OPENAI, COMMANDCODE, ...)" }
+    - { file: open-sse/translator/request/openai-to-cursor.js, line: 185, note: "register(OPENAI, CURSOR, ...)" }
+    - { file: open-sse/translator/request/openai-to-gemini.js, line: 458, note: "register(OPENAI, GEMINI, ...)" }
+    - { file: open-sse/translator/request/openai-to-gemini.js, line: 459, note: "register(OPENAI, GEMINI_CLI, ...) wrapped in wrapInCloudCodeEnvelope" }
+    - { file: open-sse/translator/request/openai-to-gemini.js, line: 460, note: "register(OPENAI, ANTIGRAVITY, ...)" }
+    - { file: open-sse/translator/request/openai-to-kiro.js, line: 443, note: "register(OPENAI, KIRO, ...)" }
+    - { file: open-sse/translator/request/openai-to-ollama.js, line: 195, note: "register(OPENAI, OLLAMA, ...)" }
+    - { file: open-sse/translator/request/openai-to-vertex.js, line: 42, note: "register(OPENAI, VERTEX, ...)" }
+    - { file: open-sse/translator/response/claude-to-openai.js, line: 194, note: "register(CLAUDE, OPENAI, null, ...)" }
+    - { file: open-sse/translator/response/commandcode-to-openai.js, line: 184, note: "register(COMMANDCODE, OPENAI, null, ...)" }
+    - { file: open-sse/translator/response/cursor-to-openai.js, line: 30, note: "register(CURSOR, OPENAI, null, ...)" }
+    - { file: open-sse/translator/response/gemini-to-openai.js, line: 159, note: "register(GEMINI, OPENAI, null, ...)" }
+    - { file: open-sse/translator/response/gemini-to-openai.js, line: 162, note: "register(VERTEX, OPENAI, null, ...) — same response fn as gemini/gemini-cli/antigravity" }
+    - { file: open-sse/translator/response/kiro-to-claude.js, line: 277, note: "register(KIRO, CLAUDE, null, ...) — direct route" }
+    - { file: open-sse/translator/response/kiro-to-openai.js, line: 160, note: "register(KIRO, OPENAI, null, ...)" }
+    - { file: open-sse/translator/response/ollama-to-openai.js, line: 134, note: "register(OLLAMA, OPENAI, null, ...)" }
+    - { file: open-sse/translator/response/openai-responses.js, line: 612, note: "register(OPENAI, OPENAI_RESPONSES, null, ...)" }
+    - { file: open-sse/translator/response/openai-responses.js, line: 613, note: "register(OPENAI_RESPONSES, OPENAI, null, ...)" }
+    - { file: open-sse/translator/response/openai-to-antigravity.js, line: 123, note: "register(OPENAI, ANTIGRAVITY, null, ...)" }
+    - { file: open-sse/translator/response/openai-to-claude.js, line: 265, note: "register(OPENAI, CLAUDE, null, ...)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.direct-route-claude-kiro
+  group: Translation engine
+  feature: Translator registry
+  subFeature: The one bidirectional direct route — claude:kiro / kiro:claude
+  trigger: sourceFormat=claude, targetFormat=kiro (request) or upstream=kiro, client=claude (response)
+  input: "Claude Messages-API request body / Kiro-executor-emitted OpenAI-shaped chunk"
+  output: "Kiro GenerateAssistantResponse payload / Claude SSE events"
+  businessRules:
+    - "claudeToKiroRequest converts Anthropic Messages requests straight to Kiro/AWS CodeWhisperer payloads instead of claude->openai->kiro, avoiding the double hop that would otherwise silently drop thinking blocks and is_error (openai has no field for either) before Kiro's session-replay canonicalizer ever sees them"
+    - "On the way back, KiroExecutor.transformEventStreamToSSE already decodes the binary AWS EventStream into OpenAI-shaped chat.completion.chunk objects (see translator.binary-protocol-bypass) before any translator runs, so kiroToClaudeResponse's real input is OpenAI chunks, not raw Kiro events"
+    - "kiroToClaudeResponse re-implements the same OpenAI-chunk -> Claude-SSE mapping that openai-to-claude.js (response) performs, duplicated so the direct route is self-contained and does not depend on a second pivot hop for reasoning_content -> thinking blocks, tool_calls -> tool_use blocks, and usage -> message_delta"
+    - "The direct route is reached only when source is exactly claude and target is exactly kiro (or the reverse for response); any other claude<->kiro-adjacent pairing still goes through the openai pivot with the losses in translator.pivot-loss"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["translator.registered-format-pairs", "translator.binary-protocol-bypass"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "kiroToClaudeResponse duplicates openai-to-claude.js's chunk-mapping logic rather than reusing it, so a fix to one does not propagate to the other"
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: open-sse/translator/request/claude-to-kiro.js, line: 1, note: "docblock: DIRECT route, no OpenAI pivot" }
+    - { file: open-sse/translator/response/kiro-to-claude.js, line: 4, note: "docblock: chunks arriving here are already OpenAI-shaped (from KiroExecutor), not raw EventStream" }
+    - { file: open-sse/translator/response/kiro-to-claude.js, line: 49, note: "kiroToClaudeResponse(chunk, state) — re-implements openai-to-claude.js mapping" }
+    - { file: open-sse/translator/index.js, line: 87, note: "directFn = requestRegistry.get(`${sourceFormat}:${targetFormat}`) — the lookup that reaches claudeToKiroRequest" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.missing-import-failure-mode
+  group: Translation engine
+  feature: Translator registry
+  subFeature: What breaks when a translator file is not imported by index.js
+  trigger: A translator module exists under request/ or response/ but is not among the static imports at the bottom of index.js
+  input: "None — this is a startup/wiring condition, not a per-request input"
+  output: "No error — the affected leg of the pivot is skipped silently"
+  businessRules:
+    - "register() is only ever invoked as an import side effect (the docblock and lazy var-hoisted requestRegistry/responseRegistry exist specifically to survive circular-import order); a translator file that is never imported never calls register(), so its `${from}:${to}` key is simply absent from the Map — there is no startup check that all expected pairs exist"
+    - "translateRequest's Step 1 (source->openai) and Step 2 (openai->target) each guard with `if (toOpenAI)` / `if (fromOpenAI)` before calling; when the lookup misses, that whole leg is skipped and `result` (the still-untranslated body from the previous step, or the original body if Step 1 missed) is passed straight to the next step or to the upstream provider"
+    - "The failure is invisible to the caller: no exception, no log line, no error code — the request goes out with fields the target provider does not expect (e.g. a Claude tool_result block sent verbatim to an OpenAI-shaped executor), and any resulting 400 from the provider surfaces only as a generic upstream error, not as a translator diagnostic"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.request-translation"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The same silent-skip already applies to the response side: translateResponse's Step 1/Step 2 use the identical `if (toOpenAI)`/`if (fromOpenAI)` guard shape"
+  evidence:
+    - { file: open-sse/translator/index.js, line: 12, note: "comment: lazy-init guards against circular-import order; register() runs as a side effect before this module's body" }
+    - { file: open-sse/translator/index.js, line: 92, note: "Step 1 source->openai: `if (toOpenAI) { result = toOpenAI(...) }` — no else branch, no error" }
+    - { file: open-sse/translator/index.js, line: 102, note: "Step 2 openai->target: same silent-skip shape" }
+    - { file: open-sse/translator/index.js, line: 186, note: "translateResponse Step 1 target->openai: identical guard" }
+    - { file: open-sse/translator/index.js, line: 199, note: "translateResponse Step 2 openai->source: identical guard" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.pivot-loss
+  group: Translation engine
+  feature: OpenAI pivot
+  subFeature: What survives a round trip through the OpenAI intermediate format, and what does not
+  trigger: Any request whose source and target format differ and have no direct route registered (the common case — see translator.direct-route-claude-kiro for the one exception)
+  input: "Source-format request/response, translated through source->openai->target"
+  output: "Target-format body/chunk with the fields below dropped, collapsed, or fabricated"
+  businessRules:
+    - "Thinking/reasoning block CONTENT + signature: claude-to-openai.js's convertClaudeMessage switch handles only text/image/tool_use/tool_result — there is no case for Claude's `thinking` or `redacted_thinking` block type, so a prior-turn thinking block from a Claude-native client is dropped entirely on the claude->openai leg (not even converted to plain text)"
+    - "Even when a thinking block DOES reach the OpenAI-target normalization step, filterToOpenAIFormat strips it explicitly: its own docblock says 'Remove: thinking, redacted_thinking, signature, and other non-OpenAI blocks', and stripBlock unconditionally destructures `signature` out of every content block regardless of source or target provider"
+    - "On the response leg (upstream Claude -> client), claude-to-openai.js's response translator does carry live thinking_delta text through, but only by re-encoding it as plain text wrapped in literal `<think>`/`</think>` tags merged into the OpenAI `content` string — the structural distinction between reasoning and answer text, and any cryptographic signature on the thinking block, is gone; server_tool_use (built-in web-search) blocks are dropped outright (skip, no representation at all)"
+    - "cache_control: Claude content-block cache_control markers are never copied by claude-to-openai.js's block conversion; filterToOpenAIFormat also strips cache_control from every block unless the target provider is flagged quirks.preserveCacheControl, in which case it is kept but only as an opaque pass-through, not reconciled with any OpenAI-side caching concept (OpenAI has none)"
+    - "tool_use id: preserved verbatim when it already matches Anthropic's `^[a-zA-Z0-9_-]+$` pattern; ensureToolCallIds regenerates a brand-new id (from message/tool-call position, not derived from the original string) whenever it does not match, so an original id containing e.g. `:` or `.` never survives the pivot unchanged"
+    - "tool_result is_error: claude-to-openai.js's TOOL_RESULT case builds a plain `{ role: tool, tool_call_id, content }` OpenAI message with no is_error field — OpenAI's tool-message shape has no equivalent, so the flag is lost on the claude->openai leg. It is preserved only in the one place OpenAI-to-Claude conversion re-reads an already-Claude-shaped tool_result block that arrived embedded in an OpenAI-format message (an edge case, not the general claude-native path)"
+    - "Non-base64 (URL-sourced) images: claude-to-openai.js only handles `block.source?.type === 'base64'` — a Claude-native client's `source: {type: 'url', ...}` image block has no matching case and is silently dropped on the claude->openai leg. The reverse leg (openai->claude) DOES preserve an http(s) image_url as `source: {type: 'url', url}`, so the loss is asymmetric"
+    - "System prompt arrays: Claude's `system` is an array of blocks (each with its own optional cache_control); claude-to-openai.js joins them into one newline-separated string on the way into OpenAI, discarding block boundaries and any per-block cache_control"
+    - "Stop reasons: OPENAI_FINISH has 4 values (stop/length/tool_calls/content_filter); CLAUDE_STOP has 4 of its own including stop_sequence. toOpenAIFinish maps end_turn AND stop_sequence to the same generic 'stop' — which sequence string actually matched is not carried into the OpenAI shape at all, since OpenAI's finish_reason has no slot for it"
+    - "Usage: cache_read_input_tokens/cache_creation_input_tokens ARE preserved into OpenAI's non-standard prompt_tokens_details.cached_tokens/cache_creation_tokens, and Gemini's thoughtsTokenCount into completion_tokens_details.reasoning_tokens — these are the one category that mostly survives the pivot, modulo the per-provider field-name mapping in concerns/usage.js's USAGE_EXTRACTORS"
+    - "Responses-API continuity: the Responses->Chat request translator stashes a turn's encrypted_content (the store=false reasoning-continuity token) on the assistant message so a LATER openai->responses hop can restore it; chatCore's stripContinuityFields then deletes encrypted_content/reasoning_encrypted_content from every outbound message before ANY non-Responses upstream call, so that continuity token never reaches a chat-native provider — Chat-native proxies would otherwise 400 on the unknown field"
+    - "Gemini/Antigravity thoughtSignature: Gemini requires a per-function-call cryptographic thoughtSignature for multi-turn tool continuity that an OpenAI- or Claude-native client never sends. openai-to-gemini.js fabricates one from a hardcoded constant (DEFAULT_THINKING_AG_SIGNATURE) when no real signature is cached for that tool_call id/session; openai-to-vertex.js additionally overwrites ANY signature (real or fabricated) with a Vertex-specific constant and strips `id` from functionCall/functionResponse parts entirely because 'Vertex rejects these' — so on the Vertex leg the tool-call id itself does not survive, not just the signature"
+    - "Thinking CONFIGURATION (effort level / token budget) is a separate concern from thinking CONTENT: applyThinking (thinkingUnified.js) reconstructs the effort/budget setting fresh for whatever target format is chosen on every request — it is not something that round-trips, it is recomputed each time from the client's current intent, so the effort setting itself is not 'lost' the way historical thinking content is"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.request-translation", "translator.registered-format-pairs"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "All of the above compounds on a claude->openai->claude round trip (e.g. Claude client through an OpenAI-compatible provider back to a Claude-shaped log): thinking content, is_error, url images, and per-block cache_control are gone by the time the OpenAI intermediate is built, so nothing downstream can recover them"
+  evidence:
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 32, note: "system array joined into one string; per-block cache_control not read" }
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 164, note: "convertClaudeMessage switch: TEXT/IMAGE/TOOL_USE/TOOL_RESULT only — no THINKING/REDACTED_THINKING case" }
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 171, note: "image block only handled when source.type === 'base64'" }
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 205, note: "tool_result -> OpenAI tool message built without is_error" }
+    - { file: open-sse/translator/formats/openai.js, line: 8, note: "docblock: Remove thinking, redacted_thinking, signature, and other non-OpenAI blocks" }
+    - { file: open-sse/translator/formats/openai.js, line: 15, note: "stripBlock always drops signature; keeps cache_control only if opts.preserveCacheControl" }
+    - { file: open-sse/translator/formats/openai.js, line: 38, note: "thinking/redacted_thinking blocks filtered out of any ->openai target body" }
+    - { file: open-sse/translator/response/claude-to-openai.js, line: 55, note: "server_tool_use (web search) blocks skipped entirely" }
+    - { file: open-sse/translator/response/claude-to-openai.js, line: 91, note: "thinking_delta re-encoded as plain <think> text, not a structured field" }
+    - { file: open-sse/translator/request/openai-to-claude.js, line: 224, note: "is_error preserved only on an already-Claude-shaped embedded tool_result block" }
+    - { file: open-sse/translator/schema/finishReasons.js, line: 4, note: "OPENAI_FINISH: 4 values" }
+    - { file: open-sse/translator/schema/finishReasons.js, line: 12, note: "CLAUDE_STOP: 4 values including STOP_SEQUENCE" }
+    - { file: open-sse/translator/concerns/finishReason.js, line: 13, note: "STOP_SEQUENCE -> OPENAI_FINISH.STOP — the matched sequence string is not carried over" }
+    - { file: open-sse/translator/concerns/usage.js, line: 21, note: "claude extractor folds cache_read/cache_creation into promptTokens and separate cachedTokens/cacheCreationTokens" }
+    - { file: open-sse/handlers/chatCore.js, line: 50, note: "stripContinuityFields deletes encrypted_content/reasoning_encrypted_content before any non-Responses upstream call" }
+    - { file: open-sse/translator/request/openai-to-gemini.js, line: 123, note: "part.thoughtSignature = signature (defaults to DEFAULT_THINKING_AG_SIGNATURE)" }
+    - { file: open-sse/translator/request/openai-to-gemini.js, line: 142, note: "getGeminiThoughtSignatureSync cache lookup, falls back to the same fabricated default" }
+    - { file: open-sse/translator/request/openai-to-vertex.js, line: 21, note: "any thoughtSignature overwritten with DEFAULT_THINKING_VERTEX_SIGNATURE" }
+    - { file: open-sse/translator/request/openai-to-vertex.js, line: 24, note: "id stripped from functionCall — 'Vertex rejects these'" }
+    - { file: open-sse/translator/concerns/toolCall.js, line: 34, note: "ensureToolCallIds regenerates the id when it fails TOOL_ID_PATTERN, instead of preserving the original string" }
+    - { file: open-sse/translator/concerns/thinkingUnified.js, line: 348, note: "applyThinking recomputes effort/budget fresh per request from captured intent, not from a stored prior value" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.response-pivot-dispatch
+  group: Translation engine
+  feature: Translator registry
+  subFeature: translateResponse — per-chunk direct route or two-hop pivot, and per-format stream state
+  trigger: Each streamed chunk (or the single non-streaming body) coming back from the executor
+  input: "targetFormat (upstream wire format), sourceFormat (client format), one chunk, mutable per-request state"
+  output: "Array of client-format chunks (may be empty)"
+  businessRules:
+    - "Same format short-circuits to decloakStreamChunk only (tool-name decloak still needed even with zero translation, since translateRequest may have cloaked tool names for an OAuth Claude target with no format change)"
+    - "Direct route: responseRegistry.get(`${targetFormat}:${sourceFormat}`) is tried first (mirrors the request-side direct-route check); only kiro:claude is currently registered this way"
+    - "Otherwise: Step 1 targetFormat->openai (skipped if target is already openai), Step 2 openai->sourceFormat (skipped if source is already openai); the openai-shaped intermediate results are stashed on `results._openaiIntermediate` only when BOTH hops actually ran, for logging"
+    - "initState builds format-specific streaming state: a shared base (toolCalls Map, finishReason, usage, block indices) plus, only for openai-responses sources, a large additional set of per-item/per-reasoning/per-function-call tracking fields (msgTextBuf, reasoningBuf, funcArgsBuf, etc.) not needed by any other format"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["per-request translation state object created by initState, threaded through every translateResponse call for that stream"]
+  dependencies: ["translator.registered-format-pairs", "translator.direct-route-claude-kiro"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Every chunk in a stream re-enters this two-step lookup/dispatch, for the lifetime of the response"
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "needsTranslation(sourceFormat, targetFormat) is exported but is a trivial `!==` check with no callers found in translateResponse/translateRequest themselves — it exists as a standalone helper for callers elsewhere in the codebase"
+  evidence:
+    - { file: open-sse/translator/index.js, line: 168, note: "same-format short-circuit still runs decloakStreamChunk" }
+    - { file: open-sse/translator/index.js, line: 179, note: "direct response route lookup responseRegistry.get(`${targetFormat}:${sourceFormat}`)" }
+    - { file: open-sse/translator/index.js, line: 186, note: "Step 1 target->openai" }
+    - { file: open-sse/translator/index.js, line: 199, note: "Step 2 openai->source" }
+    - { file: open-sse/translator/index.js, line: 214, note: "_openaiIntermediate stashed only when both hops ran" }
+    - { file: open-sse/translator/index.js, line: 227, note: "initState base fields" }
+    - { file: open-sse/translator/index.js, line: 244, note: "openai-responses-only extra state fields" }
+    - { file: open-sse/translator/index.js, line: 222, note: "needsTranslation trivial helper" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.responses-format-transformer
+  group: Translation engine
+  feature: Transformer (outside the registry)
+  subFeature: responsesTransformer.js — Chat Completions SSE to Codex Responses-API SSE, and its dead call path
+  trigger: Intended for POST /v1/responses when the client wants a streaming Responses-API reply
+  input: "OpenAI Chat Completions SSE stream"
+  output: "Responses-API SSE events (response.output_item.added, response.output_text.delta, etc.) with sequence_number per event"
+  businessRules:
+    - "createResponsesApiTransformStream is a TransformStream, not a request/response registry function — it reshapes one wire format into another at the SSE-event-shape level (both sides use the openai family), not between two client protocols, which is why it lives in transformer/ rather than translator/request or translator/response"
+    - "Its only caller in the codebase is handleResponsesCore in open-sse/handlers/responsesHandler.js, Case 2 (client wants streaming, provider forced SSE)"
+    - "handleResponsesCore itself has zero callers anywhere in the codebase: the live POST /v1/responses route (src/app/api/v1/responses/route.js) calls handleChat directly, whose own comment states the route is 'now handled by translator pattern (openai-responses format auto-detected)' via the registered openai:openai-responses / openai-responses:openai pair instead"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.responses-compact-lane"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["createResponsesLogger writes per-request debug files under logs/responses_<model>_<timestamp>/ when reachable"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A maintainer reading transformer/responsesTransformer.js next to the still-live streamToJsonConverter.js in the same directory could reasonably assume both are on the live request path"
+  evidence:
+    - { file: open-sse/transformer/responsesTransformer.js, line: 54, note: "createResponsesApiTransformStream definition" }
+    - { file: open-sse/handlers/responsesHandler.js, line: 25, note: "handleResponsesCore — sole consumer of createResponsesApiTransformStream" }
+    - { file: open-sse/handlers/responsesHandler.js, line: 84, note: "createResponsesApiTransformStream(null) call, Case 2" }
+    - { file: src/app/api/v1/responses/route.js, line: 27, note: "POST handler calls handleChat(request), not handleResponsesCore" }
+    - { file: src/app/api/v1/responses/route.js, line: 26, note: "comment: now handled by translator pattern (openai-responses format auto-detected)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "createResponsesApiTransformStream is exercised by the live /v1/responses streaming lane, since it exists specifically to shape Codex Responses-API SSE events"
+    actual: "Its only caller, handleResponsesCore, is never invoked from any route — the live /v1/responses route uses handleChat and the registered openai-responses translator pair instead, so handleResponsesCore and the transform stream it drives are unreachable"
+    impact: "A maintainer could change or delete createResponsesApiTransformStream believing it affects the Responses-API streaming lane and see no effect on live traffic, or conversely trust its event-shaping logic (reasoning items, sequence numbers) as authoritative when the actually-live path (the registered translator pair) may have since diverged from it"
+
+- id: translator.stream-to-json-converter
+  group: Translation engine
+  feature: Transformer (outside the registry)
+  subFeature: streamToJsonConverter.js — collapse a Responses-API SSE stream into one JSON object
+  trigger: A forceStream provider (e.g. Codex) streams even though the client requested non-streaming JSON
+  input: "Responses-API SSE ReadableStream from the provider"
+  output: "Single JSON object: { id, object: response, created_at, status, output[], usage }"
+  businessRules:
+    - "Unlike responsesTransformer.js, this one is on a live path: chatCore's handleForcedSSEToJson calls it whenever the upstream format is openai-responses (or the provider is flagged isResponsesProvider) and the response content-type is text/event-stream, regardless of whether the client itself used the /v1/responses route"
+    - "processSSEMessage only reacts to 4 event types (response.created, response.output_item.done, response.completed/response.done, response.failed) — every other Responses-API SSE event type (deltas, other item-added events) is silently ignored because only the DONE item snapshot per output_index is kept, not incremental deltas"
+    - "output[] is rebuilt by index from a Map, filling any gap up to the max seen index with an empty `{type: message, content: [], role: assistant}` placeholder — a provider that skips an index never produces a genuinely empty array slot"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.stream-mode-decision"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "stream is not a ReadableStream (no getReader) — returns a status: failed JSON object rather than throwing", partial: true }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A response.output_item.done event without a matching response.completed/response.done still produces status: in_progress in the final object (state.status defaults to completed only via the `|| \"completed\"` fallback at return time)"
+  evidence:
+    - { file: open-sse/transformer/streamToJsonConverter.js, line: 49, note: "convertResponsesStreamToJson definition" }
+    - { file: open-sse/transformer/streamToJsonConverter.js, line: 10, note: "processSSEMessage only handles 4 event types" }
+    - { file: open-sse/transformer/streamToJsonConverter.js, line: 89, note: "output[] rebuilt by index with placeholder fill for gaps" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 198, note: "isCodexResponsesApi branch selects this converter based on the upstream (target) format, not the client format" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 202, note: "convertResponsesStreamToJson(providerResponse.body) — the live call site" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.binary-protocol-bypass
+  group: Translation engine
+  feature: Executor-level decoding
+  subFeature: How Kiro EventStream, Cursor protobuf, and CommandCode NDJSON avoid the translator's pivot dispatch
+  trigger: A response arrives from kiro, cursor, or commandcode in its native binary/line-delimited wire format
+  input: "AWS EventStream binary frames (kiro) / ConnectRPC protobuf frames (cursor) / NDJSON lines (commandcode)"
+  output: "An OpenAI-shaped Response object (SSE text or JSON) returned by the executor itself, before chatCore's generic translateResponse dispatch ever runs on the raw upstream bytes"
+  businessRules:
+    - "KiroExecutor.transformEventStreamToSSE parses AWS EventStream framing (CRC32 checksums, header/payload bounds, KIRO_EVENT_TYPES) directly inside the executor and emits OpenAI chat.completion.chunk-shaped SSE text; the registered kiro:openai and kiro:claude response translators both open with an explicit 'already in OpenAI format, return as-is' check, confirming their real job is a passthrough for these executor-built chunks, not EventStream decoding"
+    - "CursorExecutor.transformProtobufToSSE/transformProtobufToJSON parse the ConnectRPC frame + gzip/deflate decompression + protobuf field extraction directly inside the executor (readCursorFrame, extractTextFromResponse) and build the final OpenAI-shaped Response themselves; cursorToOpenAIResponse's docblock states 'CursorExecutor already emits OpenAI format - this is a passthrough'"
+    - "CommandCodeExecutor is the odd one out: inspectAndWrapCommandCodeResponse wraps the raw upstream NDJSON body in a TransformStream (wrapNdjsonAsOpenAISse) that calls commandCodeToOpenAIResponse — the translator FILE's own parsing function — directly and synchronously per line, before the Response object is ever returned from executor.execute(). So the NDJSON-to-OpenAI-chunk mapping logic does live in translator/response/commandcode-to-openai.js, but it is invoked by the executor's own stream pipeline, never through chatCore's translateResponse dispatch or the responseRegistry lookup"
+    - "All three converge on the same effect: by the time chatCore reads `result.response`, the body is already OpenAI-shaped SSE/JSON, so the generic per-chunk translateResponse loop (when it does run, e.g. for a Claude-format client) only needs the trivial X:openai passthrough leg plus the ordinary openai:target leg — the actual protocol decoding never goes through the registry's two-hop pivot machinery"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["translator.response-pivot-dispatch"]
+  providerInteraction: "Direct upstream fetch/HTTP2 stream to kiro/cursor/commandcode, decoded in-process"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Cursor's protobuf decode buffers the entire response body before parsing (transformProtobufToJSON/SSE iterate a fully-read buffer), and CommandCode's NDJSON wrapping decodes line-by-line inside a TransformStream on every chunk"
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "chatCore reads `providerResponseFormat = result.responseFormat || targetFormat`; only Cursor's AgentService (chat-turn, non-protobuf) path explicitly sets responseFormat: FORMATS.OPENAI — the main protobuf execute() path and Kiro/CommandCode leave it unset, so providerResponseFormat falls back to the registry targetFormat (kiro/cursor/commandcode) and the per-chunk translateResponse loop still runs the registered X:openai passthrough leg rather than skipping translation outright"
+  evidence:
+    - { file: open-sse/executors/kiro.js, line: 330, note: "comment: transform the binary AWS EventStream into OpenAI-shaped SSE on success" }
+    - { file: open-sse/executors/kiro.js, line: 609, note: "transformEventStreamToSSE definition" }
+    - { file: open-sse/translator/response/kiro-to-openai.js, line: 27, note: "'already in OpenAI format, return as-is' guard" }
+    - { file: open-sse/executors/cursor.js, line: 727, note: "transformProtobufToJSON — protobuf decode + OpenAI JSON build inside the executor" }
+    - { file: open-sse/executors/cursor.js, line: 880, note: "transformProtobufToSSE — protobuf decode + OpenAI SSE build inside the executor" }
+    - { file: open-sse/translator/response/cursor-to-openai.js, line: 3, note: "docblock: CursorExecutor already emits OpenAI format - this is a passthrough" }
+    - { file: open-sse/executors/commandcode.js, line: 126, note: "inspectAndWrapCommandCodeResponse — wraps raw NDJSON body before returning from execute()" }
+    - { file: open-sse/executors/commandcode.js, line: 296, note: "wrapNdjsonAsOpenAISse calls commandCodeToOpenAIResponse directly per line, bypassing chatCore's dispatch" }
+    - { file: open-sse/handlers/chatCore.js, line: 356, note: "providerResponseFormat = result.responseFormat || targetFormat" }
+    - { file: open-sse/executors/cursor.js, line: 662, note: "only the AgentService (non-protobuf) branch explicitly sets responseFormat: FORMATS.OPENAI" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.schema-config-constants
+  group: Translation engine
+  feature: Translator conventions
+  subFeature: Shared schema enums and config constants translators must use instead of literal strings
+  trigger: Any translator file, at import time and per-call
+  input: "None — these are static imports, not request data"
+  output: "Role/block/finish-reason enums and per-provider config values imported from schema/ and config/, per open-sse/AGENTS.md convention"
+  businessRules:
+    - "schema/index.js is a pure-data barrel re-exporting ROLE/GEMINI_ROLE (roles.js), OPENAI_BLOCK/CLAUDE_BLOCK/RESPONSES_ITEM/VALID_OPENAI_CONTENT_TYPES/VALID_OPENAI_MESSAGE_TYPES (blocks.js), OPENAI_FINISH/CLAUDE_STOP/GEMINI_FINISH (finishReasons.js), and MODEL_FALLBACK/DEFAULT_IMAGE_MIME (defaults.js) — none of these files contain logic, only fixed discriminator strings, so a translator that hardcodes e.g. 'tool_use' instead of CLAUDE_BLOCK.TOOL_USE bypasses the single source of truth"
+    - "Mapping LOGIC is kept separate from the enums: concerns/finishReason.js (toOpenAIFinish/fromOpenAIFinish) and concerns/usage.js (USAGE_EXTRACTORS/toOpenAIUsage) both import the schema enums but hold the actual per-provider translation tables, matching the convention split"
+    - "Per-provider magic values that are NOT format-structural (fabricated thinking signatures, Kiro target constants, provider display metadata) live under config/ instead of schema/ — e.g. config/defaultThinkingSignature.js holds the 4 hardcoded DEFAULT_THINKING_*_SIGNATURE base64 blobs consumed by openai-to-gemini.js/openai-to-vertex.js (see translator.pivot-loss)"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "CLAUDE_BLOCK.TOOL_RESULT ('tool_result') is reused as a member of VALID_OPENAI_MESSAGE_TYPES in blocks.js — a Claude-native discriminator string doubling as part of the OpenAI validity list, rather than a separate OPENAI_BLOCK entry"
+  evidence:
+    - { file: open-sse/translator/schema/index.js, line: 1, note: "barrel: pure-data enums only, no logic" }
+    - { file: open-sse/translator/schema/roles.js, line: 4, note: "ROLE enum" }
+    - { file: open-sse/translator/schema/blocks.js, line: 15, note: "CLAUDE_BLOCK enum, including REDACTED_THINKING and SERVER_TOOL_USE" }
+    - { file: open-sse/translator/schema/blocks.js, line: 47, note: "VALID_OPENAI_MESSAGE_TYPES reuses CLAUDE_BLOCK.TOOL_RESULT" }
+    - { file: open-sse/translator/schema/finishReasons.js, line: 1, note: "comment: enums here, mapping LOGIC lives in concerns/finishReason.js" }
+    - { file: open-sse/translator/schema/defaults.js, line: 4, note: "MODEL_FALLBACK shared default" }
+    - { file: open-sse/translator/concerns/finishReason.js, line: 3, note: "imports the schema enums, holds the mapping tables" }
+    - { file: open-sse/translator/concerns/usage.js, line: 20, note: "USAGE_EXTRACTORS per-provider field-map + math" }
+    - { file: open-sse/config/defaultThinkingSignature.js, line: 4, note: "DEFAULT_THINKING_AG_SIGNATURE — provider-specific fabricated value, kept under config/ not schema/" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.tool-id-normalization
+  group: Translation engine
+  feature: Shared translator concerns
+  subFeature: Tool-call id validation, regeneration, and missing-response repair
+  trigger: Every translateRequest call, before format-specific conversion runs (and again inside claude-to-openai.js on the OpenAI leg)
+  input: "body.messages with tool_calls / tool_use / tool_result blocks in any source shape"
+  output: "body mutated in place: ids sanitized/regenerated, missing tool responses inserted, default tool `type` filled for Claude-format tools"
+  businessRules:
+    - "ensureToolCallIds enforces Anthropic's `^[a-zA-Z0-9_-]+$` id pattern on tool_calls[].id, tool messages' tool_call_id, and Claude-shaped tool_use/tool_result ids found anywhere in the body — every id runs through this check regardless of target format, not only when translating toward Claude"
+    - "An id that fails the pattern is first stripped of invalid characters (sanitizeToolId); if that leaves an empty string, a brand-new deterministic id is generated from `call_msg<i>_tc<j>_<toolName>` — the original id string is not recoverable from the new one"
+    - "fixMissingToolResponses (the generic, format-agnostic version — distinct from claude-to-openai.js's own fixMissingToolResponsesOpenAI local variant) inserts an empty-content tool response immediately after an assistant tool-call message when the very next message does not already answer every tool_call id; it is skipped for kiro targets (translateRequest's `if (targetFormat !== FORMATS.KIRO)` guard) because Kiro's own session-replay canonicalizer performs stricter, source-aware reconciliation that a generic OpenAI role:tool insertion would break"
+    - "defaultClaudeToolType fills `type: custom` onto any Claude-format tool declaration missing a `type`, using spread-first-then-override so a falsy existing type (null/undefined/empty string) does not survive — required because strict Anthropic-compatible gateways (e.g. MiniMax) 400 on tools with no explicit type"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.request-translation"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "ensureToolCallIds and fixMissingToolResponses both do an O(messages × blocks) scan on every request, in addition to claude-to-openai.js's own separate O(messages) fixMissingToolResponsesOpenAI pass on the OpenAI leg"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A regenerated tool_call id changes on every translation pass that touches it (Date.now()-based fallbackToolCallId, or the deterministic but source-string-independent generateToolCallId) — a client that correlates tool calls by comparing the id it sent against what it gets back in the response could see a mismatch if the id needed sanitizing"
+  evidence:
+    - { file: open-sse/translator/concerns/toolCall.js, line: 4, note: "TOOL_ID_PATTERN = /^[a-zA-Z0-9_-]+$/" }
+    - { file: open-sse/translator/concerns/toolCall.js, line: 25, note: "ensureToolCallIds scans tool_calls, tool messages, and Claude-shaped blocks" }
+    - { file: open-sse/translator/concerns/toolCall.js, line: 34, note: "sanitize-then-regenerate on pattern failure" }
+    - { file: open-sse/translator/concerns/toolCall.js, line: 121, note: "fixMissingToolResponses inserts empty tool responses" }
+    - { file: open-sse/translator/concerns/toolCall.js, line: 163, note: "defaultClaudeToolType spread-first-override-last" }
+    - { file: open-sse/translator/index.js, line: 69, note: "fixMissingToolResponses skipped for FORMATS.KIRO target — comment explains why" }
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 97, note: "fixMissingToolResponsesOpenAI — separate local variant on the OpenAI leg" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.image-data-uri-concern
+  group: Translation engine
+  feature: Shared translator concerns
+  subFeature: Base64 data-URI encode/parse shared by every image-capable translator
+  trigger: Any translator converting an image content block between formats
+  input: "mime type + base64 payload, or a data: URI string"
+  output: "data: URI string, or {mimeType, base64}, or null when the string is not a data URI"
+  businessRules:
+    - "encodeDataUri/parseDataUri are pure string helpers with no validation of the base64 payload itself or the declared mime type — any string matching `^data:([^;]+);base64,([\\s\\S]+)$` parses successfully regardless of whether the payload actually decodes to that mime"
+    - "This concern only covers already-inline (base64) images; fetching a remote URL into base64 is a separate, security-hardened concern (fetchImageAsBase64 in the same file) used by routing.modality-strip-prefetch's image-prefetch step, not by the per-block translators directly"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.modality-strip-prefetch"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "fetchImageAsBase64 (the remote-fetch half of this file) pins the resolved IP after an SSRF check (resolvePinnedIps/isPrivateIp) and verifies image magic bytes before trusting the declared mime — the inline encodeDataUri/parseDataUri pair used by the translators themselves does none of that, because by definition the bytes already came from the client's own request body"
+  evidence:
+    - { file: open-sse/translator/concerns/image.js, line: 2, note: "encodeDataUri" }
+    - { file: open-sse/translator/concerns/image.js, line: 9, note: "parseDataUri, no payload validation" }
+    - { file: open-sse/translator/concerns/image.js, line: 76, note: "fetchImageAsBase64 — separate, SSRF-hardened remote-fetch path" }
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 174, note: "encodeDataUri used to build an OpenAI image_url from a Claude base64 block" }
+    - { file: open-sse/translator/request/openai-to-claude.js, line: 228, note: "parseDataUri used to recover mimeType/base64 for a Claude image block" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.claude-oauth-cloaking
+  group: Translation engine
+  feature: Provider-specific request shaping
+  subFeature: Claude OAuth anti-ban tool cloaking and fingerprint injection
+  trigger: translateRequest's final step, only when PROVIDERS[provider].quirks.cloakToolsOnOAuth is set and the credential is a Claude Code OAuth token (apiKey/accessToken contains 'sk-ant-oat')
+  input: "translated Claude-format body with client tool declarations and tool_use history"
+  output: "body with every client tool/tool_use renamed with a suffix, ~20 decoy Claude-Code-native tool declarations appended, and (via applyCloaking, gated separately) a fabricated billing header + fake user_id metadata"
+  businessRules:
+    - "cloakClaudeTools renames every client-declared tool (and matching tool_use blocks in message history) by appending CLAUDE_TOOL_SUFFIX, skipping only tools that carry their own `type` (Anthropic built-ins like web_search_20250305, which must keep their exact reserved name); it then appends ~20 CC_DECOY_TOOLS (Task, Bash, Glob, Grep, Read, Edit, Write, WebFetch, WebSearch, etc.) each described as 'currently unavailable' — these make the outbound tool list resemble a real Claude Code CLI session"
+    - "A forced tool_choice pointing at a client tool is rewritten to the suffixed name so Claude does not reject it as unknown; decoy/built-in names are never rewritten"
+    - "The toolNameMap produced here is threaded back through translateResponse (decloakStreamChunk) so the client sees its original, unsuffixed tool names in the streamed response — Q1's claude-to-openai loss list does not apply here since this is a same-format (claude->claude) or post-translation cloak, not a pivot step"
+    - "applyCloaking (a separate function, not always called alongside cloakClaudeTools) injects a fabricated x-anthropic-billing-header as system[0] and a fake {device_id, account_uuid, session_id} JSON blob into metadata.user_id, deriving device_id/account_uuid deterministically from the API key (stable per account) so repeated requests from the same account look like the same real device"
+  state:
+    reads: ["PROVIDERS[provider].quirks.cloakToolsOnOAuth"]
+    writes: []
+    runtimeOnly: ["result._toolNameMap (threaded to translateResponse/streamController state for decloaking)"]
+  dependencies: ["routing.target-format-transport"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "cloakClaudeTools is only invoked from translateRequest when the apiKey/accessToken string contains 'sk-ant-oat' at the moment of translation — a non-OAuth Claude key (plain API key) never gets cloaked, so decoy tools and renamed tool names are OAuth-account-specific behavior, not universal to the claude target format"
+  evidence:
+    - { file: open-sse/translator/index.js, line: 138, note: "cloakToolsOnOAuth quirk gate + sk-ant-oat token check" }
+    - { file: open-sse/translator/index.js, line: 168, note: "decloakStreamChunk still runs on the same-format short-circuit path" }
+    - { file: open-sse/utils/claudeCloaking.js, line: 41, note: "cloakClaudeTools: rename + append CC_DECOY_TOOLS" }
+    - { file: open-sse/utils/claudeCloaking.js, line: 132, note: "CC_DECOY_TOOLS list, ~20 entries marked 'currently unavailable'" }
+    - { file: open-sse/utils/claudeCloaking.js, line: 165, note: "applyCloaking: fabricated billing header + fake user_id, gated on sk-ant-oat" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.playground-pipeline-debug
+  group: Translation engine
+  feature: Translator debug playground
+  subFeature: "api/translator/translate, load, save, send — step through and manually fire the pivot"
+  trigger: Dashboard developer tool for inspecting/replaying the translation pipeline outside a real client request
+  input: "step (1-3) + body for /translate; file+content for /load and /save; provider+model+body for /send"
+  output: "Intermediate translation results per step, or a live upstream SSE response"
+  businessRules:
+    - "POST /translate step 1 detects {provider, model, sourceFormat, targetFormat} via detectFormat/getTargetFormat/getModelInfo without translating anything"
+    - "Step 2 runs only the source->openai half of translateRequest (targetFormat forced to FORMATS.OPENAI) and strips _toolNameMap before returning, mirroring 3_req_openai.json in the on-disk log naming scheme"
+    - "Step 3 runs only the openai->target half, then goes further than a pure translation step: it looks up an active connection for the provider, builds real credentials, and calls the executor's buildUrl/buildHeaders/transformRequest to show the exact URL/headers/body that would be sent — this is read-only (no request is actually fired) until /send is called separately"
+    - "POST /send performs a real executor.execute() call against the live provider (including the same 401/403 refresh-and-retry pattern as chatCore.js) and streams the raw upstream SSE body straight back to the caller — this is the only one of the 4 routes that reaches an actual provider"
+    - "GET /load and POST /save are a matched pair restricted to an explicit allowedFiles whitelist of 8 filenames (1_req_client.json … 7_res_client.json/.txt) under logs/translator/ — arbitrary filenames are rejected with 400 before any filesystem path is built"
+  state:
+    reads: ["provider connections (via getProviderConnections)", "logs/translator/*.json|.txt on disk"]
+    writes: ["logs/translator/*.json|.txt on disk (POST /save)"]
+    runtimeOnly: []
+  dependencies: ["routing.request-translation", "routing.executor-selection"]
+  providerInteraction: "POST /send makes a real outbound call to the selected provider's active connection"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "/translate: missing step/body (400), invalid step outside 1-3 (400)", partial: false }
+    - { code: INVALID_REQUEST, when: "/load or /save: file not in the 8-entry allowedFiles whitelist (400)", partial: false }
+    - { code: INVALID_REQUEST, when: "/send or /translate step 3: no active connection found for the provider (400)", partial: false }
+    - { code: INTERNAL_ERROR, when: "any uncaught error in these handlers (500 with error.message)", partial: false }
+  sideEffects: ["POST /save writes files under logs/translator/, creating the directory if missing"]
+  persistence: ["logs/translator/*.json and *.txt (developer-tool debug artifacts, not part of the production data model)"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "None of these 4 routes appear in dashboardGuard's PUBLIC_API_PATHS, so they inherit the default authenticated-dashboard-session requirement rather than being explicitly public or explicitly protected"
+  evidence:
+    - { file: src/app/api/translator/translate/route.js, line: 18, note: "step 1: format detection only" }
+    - { file: src/app/api/translator/translate/route.js, line: 36, note: "step 2: translateRequest(source, OPENAI, ...)" }
+    - { file: src/app/api/translator/translate/route.js, line: 56, note: "step 3: translateRequest(OPENAI, target, ...) then executor.buildUrl/buildHeaders/transformRequest" }
+    - { file: src/app/api/translator/send/route.js, line: 65, note: "real executor.execute() call" }
+    - { file: src/app/api/translator/send/route.js, line: 68, note: "401/403 refresh-and-retry, same pattern as chatCore.js" }
+    - { file: src/app/api/translator/load/route.js, line: 15, note: "allowedFiles whitelist of 8 filenames" }
+    - { file: src/app/api/translator/save/route.js, line: 29, note: "logs/translator dir created if missing, then file written" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: translator.playground-console-logs
+  group: Translation engine
+  feature: Translator debug playground
+  subFeature: "api/translator/console-logs and console-logs/stream — buffered + live console output for the playground UI"
+  trigger: Dashboard playground polling or SSE-subscribing to server console output while stepping through a translation
+  input: "None (GET/DELETE take no body; /stream takes no query params)"
+  output: "GET returns the buffered log array; DELETE clears it; GET on /stream opens an SSE connection emitting new lines/clears as they happen"
+  businessRules:
+    - "Both routes call initConsoleLogCapture() at module load (an idempotent hook installer) so any console.* call anywhere in the process while these modules are loaded gets captured into a shared in-memory ring buffer, not just output from translator requests"
+    - "The stream route replays the full current buffer as one 'init' SSE event on connect, then subscribes to 'line'/'lines'/'clear' events from a shared emitter for the process lifetime of the connection, plus a 25s keepalive ping comment to hold the SSE connection through idle proxies"
+    - "Cleanup is made idempotent and triggered from three places (request.signal abort, controller.cancel(), or a failed enqueue) specifically because Next.js's ReadableStream.cancel() is not always invoked on client disconnect — the abort listener is the reliable path"
+  state:
+    reads: ["in-memory console log ring buffer + emitter (consoleLogBuffer.js), process-wide"]
+    writes: ["in-memory console log ring buffer (DELETE clears it)"]
+    runtimeOnly: ["the ring buffer and EventEmitter themselves — not persisted, reset on process restart"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "getConsoleLogs/clearConsoleLogs throw (500)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: "cleanup() unsubscribes all 3 emitter listeners and clears the keepalive interval; idempotent via state.closed guard", concurrency: "the underlying ring buffer/emitter is process-global, so every open /stream connection and every console.* call anywhere in the process shares it" }
+  edgeCases:
+    - "Because the buffer is process-global and captures ALL console output, not just translator-playground output, a busy production process would flood this debug buffer with unrelated log lines while a playground session is open"
+  evidence:
+    - { file: src/app/api/translator/console-logs/route.js, line: 4, note: "initConsoleLogCapture() at module load" }
+    - { file: src/app/api/translator/console-logs/route.js, line: 6, note: "GET returns buffered logs" }
+    - { file: src/app/api/translator/console-logs/stream/route.js, line: 24, note: "request.signal abort as the reliable cleanup trigger (ReadableStream.cancel() is not always invoked)" }
+    - { file: src/app/api/translator/console-logs/stream/route.js, line: 30, note: "buffered logs replayed as one 'init' event on connect" }
+    - { file: src/app/api/translator/console-logs/stream/route.js, line: 68, note: "25s keepalive ping" }
+  newModule: routing
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: i18n.locale-selection-persistence
+  group: Interface language
+  feature: Locale selection
+  subFeature: "POST /api/locale — validate, normalize, persist the chosen locale as a 1-year cookie"
+  trigger: User picks a language in LanguageSwitcher (dashboard UI)
+  input: "{ locale } JSON body"
+  output: "{ success, locale } and a `locale` cookie set; or 400 for an unsupported locale"
+  businessRules:
+    - "isSupportedLocale rejects (400) before any normalization runs — an unrecognized locale string never reaches normalizeLocale or the cookie write"
+    - "normalizeLocale is a 34-branch if/else identity chain (one branch per entry in LOCALES, each returning the exact value it matched) plus a `zh`/`zh-CN` alias and a DEFAULT_LOCALE fallback — functionally equivalent to `isSupportedLocale(x) ? x : DEFAULT_LOCALE`, but written as an explicit long-form chain rather than a lookup"
+    - "The cookie (LOCALE_COOKIE = 'locale') is set with path: '/' and maxAge: 60*60*24*365 (1 year) — no httpOnly/secure/sameSite flags are set, so it is readable and writable from client-side JavaScript, which is required by design since runtime.js reads it directly via document.cookie"
+    - "PUBLIC_API_PATHS in dashboardGuard.js includes /api/locale, so this route is reachable without an authenticated dashboard session"
+    - "LanguageSwitcher's handleSetLocale POSTs the cookie, then calls reloadTranslations() to apply the change immediately client-side, without a full page reload; the profile page separately reads the cookie into its own local state on mount via a duplicated getLocaleFromCookie() implementation (not imported from runtime.js)"
+  state:
+    reads: ["LOCALES / isSupportedLocale (src/i18n/config.js)"]
+    writes: ["locale cookie, 1-year maxAge, on the client's browser"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "locale missing or not in the LOCALES whitelist (400)", partial: false }
+    - { code: INTERNAL_ERROR, when: "cookie write throws (500 Failed to set locale)", partial: false }
+  sideEffects: []
+  persistence: ["locale cookie in the browser (not server-side state — there is no per-user locale row in the DB)"]
+  performanceConcerns:
+    - "normalizeLocale's 34-branch if-chain does up to 34 string comparisons for a locale near the end of the list, where a Set/Map lookup would be O(1); LOCALES.includes() (isSupportedLocale) is also a linear scan"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because persistence is a plain browser cookie with no server-side record, locale does not follow the user across devices/browsers and is lost if cookies are cleared — there is no server-persisted user-locale preference"
+  evidence:
+    - { file: src/app/api/locale/route.js, line: 9, note: "isSupportedLocale rejects before normalization" }
+    - { file: src/app/api/locale/route.js, line: 18, note: "cookie set path:/ maxAge 1 year" }
+    - { file: src/i18n/config.js, line: 79, note: "normalizeLocale — 34-branch identity if-chain" }
+    - { file: src/i18n/config.js, line: 188, note: "isSupportedLocale — LOCALES.includes()" }
+    - { file: src/dashboardGuard.js, line: 18, note: "/api/locale listed in PUBLIC_API_PATHS" }
+    - { file: src/shared/components/LanguageSwitcher.js, line: 91, note: "handleSetLocale: POST cookie then reloadTranslations(), no full page reload" }
+    - { file: "src/app/(dashboard)/dashboard/profile/page.js", line: 12, note: "duplicated getLocaleFromCookie() implementation, not imported from runtime.js" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: i18n.locale-normalization-fallback
+  group: Interface language
+  feature: Locale selection
+  subFeature: Supported-locale catalog and the DEFAULT_LOCALE fallback
+  trigger: Every read of LOCALES/normalizeLocale/isSupportedLocale — client cookie parsing, /api/locale validation, LanguageSwitcher menu rendering
+  input: "any locale string (from a cookie, a request body, or an unrecognized value)"
+  output: "one of 34 supported locale codes, or DEFAULT_LOCALE ('en') for anything unrecognized"
+  businessRules:
+    - "LOCALES lists exactly 34 codes (en, vi, zh-CN, zh-TW, ja, pt-BR, pt-PT, ko, es, de, fr, he, ar, ru, pl, cs, nl, tr, uk, tl, id, km, th, hi, bn, ur, ro, sv, it, el, hu, fi, da, no, fa); LOCALE_NAMES supplies a human-readable display name for each"
+    - "normalizeLocale('zh') and normalizeLocale('zh-CN') both resolve to 'zh-CN' — the only alias in the chain; every other supported code maps to itself, and anything not in the chain falls through to DEFAULT_LOCALE"
+    - "A cookie value that is missing, malformed, or for a locale removed from LOCALES silently becomes 'en' everywhere this fallback is used (getLocaleFromCookie in runtime.js, LanguageSwitcher, the profile page) — there is no user-visible error for a corrupted/unsupported cookie value, it just silently reverts to English"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["i18n.locale-selection-persistence"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "No script or generator for LOCALES/normalizeLocale/LOCALE_NAMES or the public/i18n/literals/*.json catalogs was found in this repo checkout — additions/removals from the 34-locale list appear to be maintained by hand across config.js and the literal JSON files"
+  evidence:
+    - { file: src/i18n/config.js, line: 1, note: "LOCALES array, 34 entries" }
+    - { file: src/i18n/config.js, line: 41, note: "LOCALE_NAMES display strings" }
+    - { file: src/i18n/config.js, line: 80, note: "zh/zh-CN alias, the only non-identity branch" }
+    - { file: src/i18n/config.js, line: 185, note: "fall-through return DEFAULT_LOCALE" }
+    - { file: src/i18n/runtime.js, line: 15, note: "getLocaleFromCookie defaults to DEFAULT_LOCALE when the cookie is absent, then still runs normalizeLocale on whatever was found" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: i18n.runtime-dom-translation
+  group: Interface language
+  feature: String translation mechanism
+  subFeature: Literal-keyed runtime DOM text substitution (not a conventional key-based i18n library)
+  trigger: initRuntimeI18n on client mount (RuntimeI18nProvider useEffect) and reloadTranslations on every route change / locale switch
+  input: "public/i18n/literals/{locale}.json — a flat English-source-string -> translated-string dictionary"
+  output: "Matching text nodes in the live DOM have their nodeValue replaced with the translated string"
+  businessRules:
+    - "There is no translation-key system: literal English source strings ARE the dictionary keys (e.g. public/i18n/literals/vi.json has 195 entries like {\"Cancel\": \"Hủy\", \"Delete\": \"Xóa\"}) — any component text that does not exactly match a stored key (including trailing/leading whitespace, which is handled via .trim(), but not case or punctuation variants) is left untranslated"
+    - "loadTranslations treats locale === 'en' as a no-op (empty translationMap, translate() short-circuits to the original text) rather than loading an en.json — English is the fallback identity, not a translated catalog"
+    - "The mechanism is a DOM TreeWalker (SHOW_TEXT) over document.body plus a MutationObserver watching childList/subtree — every text node gets translate() applied to its ORIGINAL text (cached on node._originalText on first visit) so re-running the walker after a locale switch always re-translates from the untranslated source, never double-translates an already-translated node"
+    - "Nodes are skipped when their parent tag is script/style/code/pre/table-structural/select-related, or when any ancestor carries a data-i18n-skip attribute — an explicit opt-out mechanism for text that must not be swapped"
+    - "Locale detection is entirely client-side: initRuntimeI18n reads the cookie via document.cookie (getLocaleFromCookie) — there is no server-side Accept-Language negotiation, no SSR-rendered translated markup, and no cookie read during Next.js server rendering; the page always first paints in whatever the server rendered (English source text) and then gets DOM-patched client-side after mount"
+    - "reloadTranslations (triggered on every pathname change via RuntimeI18nProvider, with a double requestAnimationFrame to wait for React's DOM commit) re-reads the cookie, re-fetches the locale's JSON, and re-walks the entire document.body — there is no scoping to only the newly-rendered route content"
+  state:
+    reads: ["locale cookie (client-side)", "public/i18n/literals/{locale}.json fetched over HTTP"]
+    writes: []
+    runtimeOnly: ["translationMap (module-level, in-memory dictionary for the current locale)", "currentLocale (module-level)", "node._originalText cached per DOM text node"]
+  dependencies: ["i18n.locale-selection-persistence", "i18n.locale-normalization-fallback"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "the locale JSON fetch fails or fails to parse — caught, translationMap reset to {} so translate() falls back to returning the original (English) text for every string", partial: true }
+  sideEffects: ["one HTTP fetch per locale load/reload to /i18n/literals/{locale}.json", "full document.body TreeWalker pass on every locale change and every route change"]
+  persistence: []
+  performanceConcerns:
+    - "reloadTranslations re-walks the ENTIRE document.body on every client-side route change (not just newly-added nodes), in addition to the MutationObserver already re-processing newly-added nodes as they appear"
+    - "The MutationObserver watches subtree: true on document.body for the lifetime of the page — every DOM mutation anywhere in the app triggers processElement on the added nodes"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because translation is applied post-mount by mutating already-rendered DOM text nodes, a user on a non-English locale sees an English flash of untranslated text before the fetch + DOM walk completes (no SSR translation, no loading gate)"
+    - "A literal string that appears in the English UI in two different contexts with different intended translations cannot be disambiguated — the dictionary is keyed purely by the literal string, with no namespace/context key"
+  evidence:
+    - { file: src/i18n/runtime.js, line: 20, note: "loadTranslations: locale === 'en' short-circuits to an empty map" }
+    - { file: src/i18n/runtime.js, line: 36, note: "translate() looks up trimmed original text as the dictionary key" }
+    - { file: src/i18n/runtime.js, line: 86, note: "node._originalText cached so retranslation always starts from the untranslated source" }
+    - { file: src/i18n/runtime.js, line: 68, note: "data-i18n-skip ancestor opt-out" }
+    - { file: src/i18n/runtime.js, line: 124, note: "initRuntimeI18n: cookie read + TreeWalker pass + MutationObserver setup, client-only" }
+    - { file: src/i18n/runtime.js, line: 153, note: "reloadTranslations re-walks the entire document.body" }
+    - { file: src/i18n/RuntimeI18nProvider.js, line: 15, note: "double requestAnimationFrame before reloadTranslations on route change" }
+    - { file: public/i18n/literals/vi.json, line: 1, note: "flat literal-string-keyed dictionary, e.g. Cancel -> Hủy" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
