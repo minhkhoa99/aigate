@@ -1,0 +1,575 @@
+# Trace: Proxy Pools — the outbound transport chain, proxy-pool CRUD/rotation, and the
+# Vercel/Cloudflare/Deno relay-deploy routes (Task 15). 9router reference read at
+# E:\9router. Read-only; every evidence line was read directly, not inferred from names
+# (behavioral.md §7).
+#
+# Scope note: src/lib/db/repos/proxyPoolsRepo.js is a plain JSON-blob-over-SQLite repo
+# (same shape as connection.storage-shape-json-blob in 03-accounts-multiaccount.yaml) —
+# only its proxy-pool-specific fields (strictProxy, type) are new; the generic
+# rowToPool/poolToRow shape is cited but not re-derived.
+# account.select-noauth-virtual-connection (03-accounts-multiaccount.yaml) already traces
+# the noAuth branch of getProviderCredentials() down to pickProxyPoolId() — this file
+# extends that trace into resolveConnectionProxyConfig()'s priority order and the proxy
+# CRUD/deploy surface, and cites 03's entry as a dependency rather than re-tracing auth.js.
+# settings.outbound-proxy-live-apply (01-endpoint-apikey-settings.yaml) traces the global
+# HTTP_PROXY/HTTPS_PROXY env-var path read by getEnvProxyUrl() here — cited, not re-traced.
+#
+# Empirical check for Q5 (this task's brief): a Node v22.19 script reproducing
+# createBypassRequest()'s exact pattern (plain net.Socket -> https.request({ socket,
+# servername })) was run against a real TLS host. It confirmed (a) the response socket is
+# encrypted (res.socket.encrypted === true) and (b) a deliberately wrong `servername`
+# causes an SSL handshake failure — i.e. https.request() DOES wrap a passed net.Socket in a
+# real TLS session keyed off `servername`, so the inline comment's claim (SNI + cert checked
+# against the original hostname) holds. Recorded as REFERENCE_BEHAVIOR, not a bug.
+
+- id: transport.proxy-priority-chain
+  group: Transport
+  feature: Proxy-aware outbound fetch
+  subFeature: proxyAwareFetch() dispatch priority chain
+  trigger: Every outbound provider/executor HTTP call routed through proxyAwareFetch(url, options, proxyOptions) instead of raw fetch
+  input: "target url; fetch options; proxyOptions ({ connectionProxyEnabled, connectionProxyUrl, connectionNoProxy, vercelRelayUrl, strictProxy } or null)"
+  output: "A Response — either relayed through a deployed Vercel/Cloudflare/Deno function, dispatched through an undici ProxyAgent, sent via a manual DNS-bypass socket, or sent as a direct fetch"
+  businessRules:
+    - "Priority order, evaluated in this sequence: (1) proxyOptions.vercelRelayUrl, if non-empty, short-circuits everything else — the request is forwarded to the relay URL with x-relay-target/x-relay-path headers added, unconditionally, before any proxy/MITM logic runs; (2) connectionProxyUrl = resolveConnectionProxyUrl(targetUrl, proxyOptions) — only non-null when proxyOptions.enabled or proxyOptions.connectionProxyEnabled is exactly true AND a URL is present AND the target host is not matched by proxyOptions.noProxy/connectionNoProxy; (3) envProxyUrl is computed ONLY when connectionProxyUrl is null (a per-connection pool proxy always wins over HTTP_PROXY/HTTPS_PROXY/ALL_PROXY env vars, and env lookup itself honors NO_PROXY/no_proxy); (4) proxyUrl = connectionProxyUrl || envProxyUrl"
+    - "If the target host is in MITM_BYPASS_HOSTS: with a proxyUrl present, it tries the proxy first (return on success); on proxy failure it falls through (not returns) to the manual-DNS-bypass branch, which resolves the real IP via Google DNS and opens a direct raw-socket HTTPS request to that IP with the original hostname as TLS servername/Host"
+    - "If that manual-bypass branch also fails (DNS resolve fails, or realIP is falsy, or createBypassRequest throws), execution falls out of the MITM block entirely and re-enters the generic `if (proxyUrl)` branch below — meaning a MITM host with a working proxyUrl and a failing bypass gets a SECOND proxy dispatch attempt through the same dispatcher before finally falling back to a plain direct fetch"
+    - "For non-MITM hosts (the common case): if proxyUrl is set, dispatch through the cached undici ProxyAgent; if proxyUrl is unset, call the original (unpatched) global fetch directly — got-scraping/TLS-fingerprinting is present in the file but fully commented out (dead code), so no JA3 spoofing occurs at all despite the file header describing it"
+  state:
+    reads: ["proxyOptions param (per-request, not global state)", "process.env.HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY (only when no connection-level proxy)"]
+    writes: []
+    runtimeOnly: ["proxyDispatchers Map and DNS_CACHE Map — both module-scope, see transport.proxy-dispatcher-cache"]
+  dependencies: ["settings.outbound-proxy-live-apply"]
+  providerInteraction: "Every executor's upstream API call for every provider goes through this function"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "proxy dispatch throws and strictProxy is not exactly true — caught, logged, silently falls back to a direct fetch (see transport.strict-proxy-fallback)", partial: false }
+  sideEffects: ["Reassigns globalThis.fetch to a patched wrapper at module load (idempotency-guarded)"]
+  persistence: []
+  performanceConcerns:
+    - "Commented-out got-scraping block (lines 11-98) is ~90 lines of dead code kept 'for future re-enable' — no functional cost but adds file-read/parse weight and reviewer confusion about whether JA3 spoofing is active"
+  behavior: { streaming: false, cancellation: "options.signal is passed through untouched to whichever transport is chosen", concurrency: null }
+  edgeCases:
+    - "A MITM-bypass host that also has a proxy configured can attempt the SAME proxy twice (once inside the MITM block, once in the generic block) before giving up, because the fallthrough after the manual-bypass failure does not skip the already-tried proxyUrl"
+  evidence:
+    - { file: open-sse/utils/proxyFetch.js, line: 294, note: "proxyAwareFetch signature" }
+    - { file: open-sse/utils/proxyFetch.js, line: 298, note: "vercelRelayUrl short-circuit, checked before anything else" }
+    - { file: open-sse/utils/proxyFetch.js, line: 309, note: "connectionProxyUrl computed first" }
+    - { file: open-sse/utils/proxyFetch.js, line: 310, note: "envProxyUrl only computed when connectionProxyUrl is null" }
+    - { file: open-sse/utils/proxyFetch.js, line: 314, note: "shouldBypassMitmDns(targetUrl) gate" }
+    - { file: open-sse/utils/proxyFetch.js, line: 315, note: "proxy attempted first inside the MITM branch" }
+    - { file: open-sse/utils/proxyFetch.js, line: 324, note: "fallthrough (no return) to manual bypass on proxy failure" }
+    - { file: open-sse/utils/proxyFetch.js, line: 337, note: "generic if (proxyUrl) branch runs again after the MITM block, even on the second attempt path" }
+    - { file: open-sse/utils/proxyFetch.js, line: 353, note: "final direct originalFetch(url, options) when nothing else applied" }
+  newModule: transport
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: transport.strict-proxy-fallback
+  group: Transport
+  feature: Proxy-aware outbound fetch
+  subFeature: strictProxy — hard-fail vs silent direct fallback on proxy dispatch failure
+  trigger: proxyUrl is set and the undici ProxyAgent dispatch throws (proxy unreachable, auth failure, connection refused, etc.)
+  input: "proxyOptions.strictProxy (boolean, sourced from a proxy pool's strictProxy field)"
+  output: "Either a thrown Error (request fails visibly) or a silent retry of the same URL with a plain direct fetch (no proxy, no error to the caller)"
+  businessRules:
+    - "strictProxy only gates the two explicit `if (proxyOptions?.strictProxy === true) throw` sites in proxyFetch.js, both immediately after a caught proxy-dispatch error — it does not affect any other branch (vercel relay, MITM manual-bypass failure, or the 'no proxy configured at all' path)"
+    - "With strictProxy anything other than exactly true (false, undefined, missing), a dead/unreachable proxy is caught, a console.warn is emitted, and the SAME request is silently retried via the unpatched direct fetch — the caller receives a normal response with no indication the proxy was bypassed"
+    - "SUSPECTED_BUG: the primary chat-completion request path (open-sse/handlers/chatCore.js, the code every /v1 chat request goes through) builds its proxyOptions object WITHOUT a strictProxy field at all, so `proxyOptions?.strictProxy === true` is always false on that path regardless of what a proxy pool's strictProxy toggle is set to. Three sibling call sites that also build a proxyOptions object DO set the field explicitly: antigravityQuota.js propagates the resolved value faithfully (strictProxy: proxyCfg.strictProxy === true); usage/[connectionId]/route.js and codex-reset-credits/route.js force it to false with an explicit code comment explaining the choice ('force strictProxy=false so quota/refresh fall back to direct on failure'). chatCore.js has no such comment and no such field — it reads as an omission, not a deliberate choice, and it means the strictProxy toggle can never actually enforce anything for real model traffic, only for the three secondary (quota/refresh) paths that already deliberately ignore it"
+  state:
+    reads: ["proxyOptions.strictProxy per call"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["transport.proxy-priority-chain"]
+  providerInteraction: "Determines whether a failed provider proxy silently degrades to direct connection for every provider request"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "strictProxy === true and proxy dispatch fails", partial: false }
+  sideEffects: ["When falling back silently, the request egresses from the server's own IP instead of the configured pool's IP — a policy/security-relevant behavior change with no signal to the caller or to logs beyond a console.warn"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "resolveConnectionProxyConfig() itself defaults strictProxy to false inside its own catch-all error handler (source: 'error' branch) — so a transient DB read error while resolving the proxy config ALSO silently disables strict enforcement for that request, on top of the chatCore.js omission"
+  evidence:
+    - { file: open-sse/utils/proxyFetch.js, line: 321, note: "MITM-branch proxy failure: throw only if strictProxy === true" }
+    - { file: open-sse/utils/proxyFetch.js, line: 343, note: "generic-branch proxy failure: throw only if strictProxy === true" }
+    - { file: open-sse/utils/proxyFetch.js, line: 346, note: "non-strict path: warn + silent direct fallback, same URL, no proxy" }
+    - { file: open-sse/handlers/chatCore.js, line: 320, note: "proxyOptions built for the main chat path — connectionProxyEnabled/Url/NoProxy/vercelRelayUrl only, no strictProxy key" }
+    - { file: src/sse/services/antigravityQuota.js, line: 113, note: "sibling call site that DOES propagate strictProxy from the resolved config" }
+    - { file: "src/app/api/usage/[connectionId]/route.js", line: 148, note: "sibling call site that explicitly forces strictProxy: false, with a comment explaining why" }
+    - { file: "src/app/api/usage/[connectionId]/codex-reset-credits/route.js", line: 72, note: "third sibling call site, also forces strictProxy: false explicitly" }
+    - { file: src/lib/network/connectionProxy.js, line: 184, note: "resolveConnectionProxyConfig's catch-all error path also defaults strictProxy: false" }
+  newModule: transport
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A proxy pool with strictProxy enabled should cause real model-traffic requests through that pool to fail (not silently go direct) when the proxy is unreachable, matching what the dashboard toggle promises and what the other three call sites (antigravityQuota, usage, codex-reset-credits) already do with the same field"
+    actual: "chatCore.js — the handler behind every /v1 chat/completions request — builds its proxyOptions without a strictProxy key at all, so proxyAwareFetch's `proxyOptions?.strictProxy === true` check is always false for the main request path regardless of the pool's configured value"
+    impact: "An operator who enables strictProxy specifically to guarantee traffic never leaves without the configured proxy (e.g. to hide the server's real egress IP from upstream providers) gets no such guarantee for actual chat requests — a dead proxy silently falls back to a direct connection from the box's own IP, with only a console.warn as a trace, defeating the stated purpose of the toggle on the one path that matters most"
+
+- id: transport.mitm-dns-bypass
+  group: Transport
+  feature: Proxy-aware outbound fetch
+  subFeature: MITM_BYPASS_HOSTS — manual DNS resolution + raw-socket TLS to dodge local DNS/hosts poisoning
+  trigger: proxyAwareFetch() called with a target URL whose hostname matches (via substring `includes`) one of MITM_BYPASS_HOSTS
+  input: "target hostname"
+  output: "A Response obtained either through the configured proxy (dispatcher) or, if no proxy, through a manually-constructed HTTPS request to the real (Google-DNS-resolved) IP"
+  businessRules:
+    - "MITM_BYPASS_HOSTS = cloudcode-pa.googleapis.com, daily-cloudcode-pa.googleapis.com, api.individual.githubcopilot.com, q.us-east-1.amazonaws.com, codewhisperer.us-east-1.amazonaws.com, api2.cursor.sh — exactly the upstream API hosts used by 9router's own antigravity/cloudcode, GitHub Copilot, kiro/codewhisperer, and cursor executors"
+    - "These are the same hostnames src/mitm/ rewrites in the OS hosts file / local DNS (per src/shared/constants/mitmToolHosts.js) to intercept IDE traffic for its own capture feature. When 9router's own outbound executor calls hit the SAME hostnames on a machine where the MITM feature is active, the OS-level resolution would route them into the local MITM interceptor instead of the real provider — this bypass exists so the router's own provider traffic is unaffected by whatever DNS/hosts state the MITM capture feature has put the machine in"
+    - "DNS resolution uses a dedicated Node dns.Resolver pinned to Google's public servers (8.8.8.8, 8.8.4.4), not the system resolver, specifically to avoid the poisoned /etc/hosts or local resolver"
+    - "TLS is still fully established and validated: the resolved real IP is used only for the raw TCP connect; the TLS `servername` (SNI) and the Host header are set to the ORIGINAL hostname, not the IP — confirmed empirically (see file header) that https.request() wraps the raw net.Socket in a genuine TLS session keyed to `servername`, and a mismatched servername causes a handshake failure. So certificate-hostname validation is preserved against the real target host; this bypass only sidesteps the DNS/hosts layer, not TLS trust"
+  state:
+    reads: ["DNS_CACHE (module-scope Map, TTL-bounded, see below)"]
+    writes: ["DNS_CACHE entries"]
+    runtimeOnly: ["DNS_CACHE — lost on restart, repopulated on first bypass request per host"]
+  dependencies: []
+  providerInteraction: "Google DNS (8.8.8.8/8.8.4.4) for resolution; the real provider host for the actual request"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "DNS resolve fails, or the raw-socket HTTPS request errors", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "DNS_CACHE entries live 5 minutes (MEMORY_CONFIG.dnsCacheTtlMs) — a real DNS change for one of these six hosts can take up to 5 minutes to be picked up"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "shouldBypassMitmDns() matches via `hostname.includes(host)`, a substring match rather than an exact/suffix match — a hostname that merely CONTAINS one of the six strings (e.g. as a subdomain prefix an attacker controls, though none of the current six are attacker-triggerable substrings of common domains) would also match"
+  evidence:
+    - { file: open-sse/utils/proxyFetch.js, line: 102, note: "MITM_BYPASS_HOSTS list" }
+    - { file: open-sse/utils/proxyFetch.js, line: 110, note: "GOOGLE_DNS_SERVERS = 8.8.8.8, 8.8.4.4" }
+    - { file: open-sse/utils/proxyFetch.js, line: 123, note: "resolveRealIP — dns.Resolver pinned to Google DNS, 5-minute cache" }
+    - { file: open-sse/utils/proxyFetch.js, line: 145, note: "shouldBypassMitmDns — substring hostname match against MITM_BYPASS_HOSTS" }
+    - { file: open-sse/utils/proxyFetch.js, line: 248, note: "createBypassRequest — raw net.Socket.connect(HTTPS_PORT, realIP, ...)" }
+    - { file: open-sse/utils/proxyFetch.js, line: 257, note: "servername: parsedUrl.hostname passed into https.request — SNI/cert-hostname intent, empirically confirmed correct (see file header)" }
+  newModule: transport
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: transport.proxy-dispatcher-cache
+  group: Transport
+  feature: Proxy-aware outbound fetch
+  subFeature: Cached undici ProxyAgent dispatchers, keyed by normalized proxy URL
+  trigger: getDispatcher(proxyUrl) called from either branch of proxyAwareFetch that needs to dispatch through a proxy
+  input: "normalized proxy URL string"
+  output: "A cached (or newly-created) undici ProxyAgent instance"
+  businessRules:
+    - "Bounded by count only (MEMORY_CONFIG.proxyDispatchersMaxSize = 20), never by time — there is no TTL/expiry for an entry once created; an entry only leaves the Map when the cache is full AND a brand-new proxy URL needs to be inserted"
+    - "Eviction is FIFO by insertion order, not true LRU: `proxyDispatchers.keys().next().value` always deletes the oldest-INSERTED entry (Map iteration order), and a cache HIT on an existing key does not re-insert/move it — so a frequently-reused proxy that happens to be old still gets evicted ahead of a rarely-used one that was added more recently"
+    - "An evicted ProxyAgent is only dropped from the Map reference — nothing calls .close()/.destroy() on it, unlike the one-off tester dispatcher in proxyTest.js which explicitly closes its ProxyAgent in a finally block. Sockets/connections held by an evicted-but-still-open agent are left to be reclaimed by GC/keep-alive timeout rather than an explicit close"
+  state:
+    reads: []
+    writes: ["proxyDispatchers Map"]
+    runtimeOnly: ["proxyDispatchers — module-scope Map, lost on restart"]
+  dependencies: ["transport.proxy-priority-chain"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Holds up to 20 live undici ProxyAgent instances (each with its own connection pool) in memory for the process lifetime"]
+  persistence: []
+  performanceConcerns:
+    - "An unbounded or never-expiring cache would leak; this one is size-bounded (20) but time-unbounded and does not close evicted agents — worth flagging even though not a full leak, since a stale ProxyAgent for a now-dead/rotated proxy pool can sit unused-but-un-closed until evicted by count pressure alone"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "normalizeProxyUrl() allows bare host:port (e.g. '127.0.0.1:7890') by prepending 'http://' — two logically-different proxy configs that normalize to the same string share one cache entry/dispatcher"
+  evidence:
+    - { file: open-sse/utils/proxyFetch.js, line: 219, note: "getDispatcher — cache lookup, size check, eviction, ProxyAgent construction" }
+    - { file: open-sse/utils/proxyFetch.js, line: 226, note: "size-bounded FIFO eviction: delete oldest key when at MEMORY_CONFIG.proxyDispatchersMaxSize" }
+    - { file: open-sse/config/runtimeConfig.js, line: 31, note: "proxyDispatchersMaxSize: 20 — no TTL field exists alongside it" }
+    - { file: src/lib/network/proxyTest.js, line: 86, note: "contrast: the one-off test dispatcher IS explicitly closed in a finally block" }
+  newModule: transport
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: transport.connection-proxy-config-priority
+  group: Transport
+  feature: Connection proxy resolution
+  subFeature: resolveConnectionProxyConfig() — pool vs legacy vs none priority
+  trigger: Called with a connection's (or a synthetic noAuth connection's) providerSpecificData, once per credential resolution (getProviderCredentials in auth.js) or per background quota/usage/reset-credits call
+  input: "providerSpecificData: { proxyPoolId, connectionProxyEnabled, connectionProxyUrl, connectionNoProxy } (legacy fields kept for pre-proxy-pool connections)"
+  output: "A normalized { source, proxyPoolId, proxyPool, connectionProxyEnabled, connectionProxyUrl, connectionNoProxy, strictProxy, vercelRelayUrl? } object"
+  businessRules:
+    - "Priority, in order: (1) proxyPoolId — if set (and not the sentinel '__none__'), the pool is looked up by id; only used if the pool exists, isActive === true, and has a non-empty proxyUrl (an inactive or URL-less pool is treated as if proxyPoolId were absent, falling through to legacy); (2) legacy connectionProxyEnabled+connectionProxyUrl on the connection itself; (3) no proxy at all"
+    - "A valid pool of type vercel/cloudflare/deno returns connectionProxyEnabled: false and instead sets vercelRelayUrl to the pool's proxyUrl — these three types are header-relay proxies, not HTTP_PROXY-style proxies, so they must NOT go through the undici ProxyAgent dispatch path; a plain 'http' pool type returns connectionProxyEnabled: true / connectionProxyUrl set, for the ProxyAgent path"
+    - "Any error during resolution (e.g. a DB read failure fetching the pool) is caught and degrades to source: 'error' with everything disabled (connectionProxyEnabled: false, strictProxy: false) rather than propagating — the caller always gets a valid object shape, never a rejected promise"
+  state:
+    reads: ["proxyPools table (via getProxyPoolById)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["account.select-noauth-virtual-connection"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "DB read for the pool throws", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "One DB read (getProxyPoolById) per credential resolution when a proxyPoolId is set — same hot-path-no-cache pattern already noted for settings.hot-path-read-no-cache"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "An inactive pool or a pool with an empty proxyUrl silently falls through to the legacy fields (or no proxy) rather than surfacing any warning that the configured pool was ignored"
+  evidence:
+    - { file: src/lib/network/connectionProxy.js, line: 66, note: "resolveConnectionProxyConfig signature and try block" }
+    - { file: src/lib/network/connectionProxy.js, line: 91, note: "isValidPool = proxyPool && isActive === true && proxyUrl — pool ignored otherwise" }
+    - { file: src/lib/network/connectionProxy.js, line: 101, note: "vercel/cloudflare/deno branch: connectionProxyEnabled false, vercelRelayUrl set instead" }
+    - { file: src/lib/network/connectionProxy.js, line: 127, note: "standard http pool branch: connectionProxyEnabled true, connectionProxyUrl set" }
+    - { file: src/lib/network/connectionProxy.js, line: 142, note: "legacy fallback when no valid pool" }
+    - { file: src/lib/network/connectionProxy.js, line: 168, note: "catch-all error branch degrades to fully-disabled config, never rejects" }
+  newModule: transport
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: proxypool.assign-to-connection
+  group: Transport
+  feature: Proxy pool assignment
+  subFeature: A real (non-noAuth) connection is bound to a proxy pool via its own create/update body
+  trigger: POST /api/providers (create connection) or PUT /api/providers/[id] (update connection) with a proxyPoolId field in the request body
+  input: "body.proxyPoolId — a proxy pool id string, or '__none__'/empty/omitted to leave/clear it"
+  output: "connection.providerSpecificData.proxyPoolId set to the validated id, or rejected with 400 if the id does not resolve to an existing pool"
+  businessRules:
+    - "proxyPoolId is validated against the proxyPools table before being accepted — normalizeProxyPoolId() calls getProxyPoolById() and returns an error ('Proxy pool not found') if it doesn't resolve, so a connection can never be bound to a dangling/nonexistent pool id at write time"
+    - "'__none__' (and empty string / null / undefined) explicitly clears the pool assignment rather than being treated as 'leave unchanged' on create; on update, only an explicitly-present 'proxyPoolId' key in the body triggers any change at all (undefined means untouched)"
+    - "The pool assignment is a static 1:1 binding stored on the connection row — there is no rotation for real connections (rotation only exists for noAuth/free providers, see proxypool.rotate-for-noauth); each request re-resolves the SAME assigned pool via resolveConnectionProxyConfig()"
+  state:
+    reads: ["proxyPools table (existence check)"]
+    writes: ["providerConnections table — providerSpecificData.proxyPoolId"]
+    runtimeOnly: []
+  dependencies: ["connection.create-dedup-and-priority-assignment", "connection.update-atomic-merge-and-reorder", "transport.connection-proxy-config-priority"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "proxyPoolId given does not resolve via getProxyPoolById", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections.data JSON blob, proxyPoolId field"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: src/app/api/providers/route.js, line: 31, note: "normalizeProxyPoolId — validates existence via getProxyPoolById, '__none__' clears" }
+    - { file: src/app/api/providers/route.js, line: 172, note: "proxyPoolId merged into providerSpecificData only when non-null" }
+    - { file: "src/app/api/providers/[id]/route.js", line: 36, note: "normalizeProxyPoolUpdate — same validation, update variant; hasProxyPoolField tracks presence-in-body" }
+  newModule: transport
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: proxypool.rotate-for-noauth
+  group: Transport
+  feature: Proxy pool assignment
+  subFeature: pickProxyPoolId() rotation for free/noAuth providers, keyed by settings.providerStrategies
+  trigger: getProviderCredentials() for a noAuth provider, per request
+  input: "settings.providerStrategies[providerId].rotateStrategy ('none'/'round-robin'/'random') and .proxyPoolId (fixed pin, used when strategy is 'none'); the list of active pools with a non-empty proxyUrl"
+  output: "One proxyPoolId, fed into resolveConnectionProxyConfig({ proxyPoolId }) to build the synthetic noAuth connection's proxy config"
+  businessRules:
+    - "strategy 'none' (the default when unset) skips pickProxyPoolId entirely and uses providerStrategies[providerId].proxyPoolId as a fixed pin — no pool list is even fetched in that case"
+    - "strategy 'round-robin' or 'random' fetches all isActive pools with a non-empty proxyUrl, then pickProxyPoolId() selects one: round-robin advances a per-providerId index stored in an in-memory Map (rotateState) modulo the pool count; random picks uniformly via Math.random()"
+    - "round-robin state is in-memory only and keyed per providerId (not per pool-list — if the active pool list changes shape between requests, the stored index can point at a different pool than intended, since it's a raw array index, not a cursor tied to pool identity)"
+    - "A single-pool list always short-circuits to that one pool regardless of strategy (pickProxyPoolId's poolIds.length === 1 check), so round-robin/random only matter with 2+ active pools"
+  state:
+    reads: ["settings.providerStrategies", "proxyPools table (isActive filter, only when strategy !== 'none')"]
+    writes: []
+    runtimeOnly: ["rotateState Map (providerId -> { index }) — lost on restart, round-robin restarts from pool[0] on every process restart"]
+  dependencies: ["account.select-noauth-virtual-connection", "transport.connection-proxy-config-priority"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "round-robin/random modes fetch and filter the full proxyPools table on every noAuth request (no cache) — acceptable at typical pool-list sizes but is another hot-path DB read with no cache, same pattern as settings.hot-path-read-no-cache"
+  behavior: { streaming: false, cancellation: null, concurrency: "rotateState is a plain Map with a read-then-write increment (no lock) — concurrent requests for the same providerId can race and both read the same index before either writes back, occasionally reusing a pool instead of advancing, but never skipping the array bounds since the modulo is recomputed from the pre-increment value each time" }
+  edgeCases:
+    - "If providerStrategies[providerId].proxyPoolId points at a pool that's since been deleted or deactivated, strategy 'none' still passes that stale id straight into resolveConnectionProxyConfig(), which then silently falls through to 'no proxy' per transport.connection-proxy-config-priority's isValidPool check — no error surfaces"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 46, note: "noAuth short-circuit branch entry (already traced fully in account.select-noauth-virtual-connection)" }
+    - { file: src/sse/services/auth.js, line: 49, note: "strategy resolution from providerStrategies override, default 'none'" }
+    - { file: src/sse/services/auth.js, line: 54, note: "pickProxyPoolId(poolIds, strategy, providerId) call, only when strategy !== 'none'" }
+    - { file: src/lib/network/connectionProxy.js, line: 18, note: "pickProxyPoolId — single-pool short-circuit, round-robin index Map, random branch, 'none'/unknown falls to poolIds[0]" }
+    - { file: src/lib/network/connectionProxy.js, line: 23, note: "round-robin: rotateState.get/set keyed by providerId, index incremented modulo pool count" }
+  newModule: transport
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: proxypool.crud-list-and-create
+  group: Transport
+  feature: Proxy pool management
+  subFeature: GET/POST /api/proxy-pools — list (with optional usage enrichment) and create
+  trigger: "GET /api/proxy-pools[?isActive=true|false&includeUsage=true]; POST /api/proxy-pools"
+  input: "GET: isActive/includeUsage query params. POST body: { name, proxyUrl, noProxy?, isActive?, strictProxy?, type? }"
+  output: "GET: { proxyPools: [...] }, each optionally carrying boundConnectionCount. POST: { proxyPool } 201, or { error } 400/500"
+  businessRules:
+    - "VALID_PROXY_TYPES = http, vercel, cloudflare, deno — any other/missing type on create silently coerces to 'http' rather than rejecting the request"
+    - "name and proxyUrl are required (trimmed, non-empty) on create; isActive defaults to true when omitted; strictProxy defaults to false (only true if the body literal is `true`)"
+    - "includeUsage=true triggers a second full table scan (getProviderConnections() with no filter) to build a Map of proxyPoolId -> count of connections whose providerSpecificData.proxyPoolId matches, then merges boundConnectionCount onto each pool in the response — this count only reflects real (non-noAuth) connections bound via proxypool.assign-to-connection, not noAuth providers using the pool through rotation/pin in settings.providerStrategies"
+  state:
+    reads: ["proxyPools table", "providerConnections table (only when includeUsage=true)"]
+    writes: ["proxyPools table (on POST)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "POST body missing name or proxyUrl", partial: false }
+    - { code: INTERNAL_ERROR, when: "DB read/write throws", partial: false }
+  sideEffects: []
+  persistence: ["proxyPools table row created on POST"]
+  performanceConcerns:
+    - "includeUsage=true reads the entire providerConnections table on every list call with no cache, regardless of how many pools were requested"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "boundConnectionCount only counts real connections, so a pool used exclusively by a noAuth provider via round-robin/random rotation always reports boundConnectionCount: 0 even while actively serving traffic — the dashboard's 'in use' signal undercounts for free-provider pools"
+  evidence:
+    - { file: src/app/api/proxy-pools/route.js, line: 10, note: "VALID_PROXY_TYPES list" }
+    - { file: src/app/api/proxy-pools/route.js, line: 12, note: "normalizeProxyPoolInput — required-field validation, type coercion to 'http'" }
+    - { file: src/app/api/proxy-pools/route.js, line: 31, note: "buildUsageMap — counts connections by providerSpecificData.proxyPoolId" }
+    - { file: src/app/api/proxy-pools/route.js, line: 56, note: "GET handler, includeUsage branch" }
+    - { file: src/app/api/proxy-pools/route.js, line: 87, note: "POST handler — createProxyPool(normalized)" }
+  newModule: transport
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: proxypool.crud-get-update-delete
+  group: Transport
+  feature: Proxy pool management
+  subFeature: GET/PUT/DELETE /api/proxy-pools/[id]
+  trigger: "GET/PUT/DELETE /api/proxy-pools/{id}"
+  input: "PUT body: partial { name, proxyUrl, noProxy, isActive, strictProxy, type } — only present keys are applied"
+  output: "GET/PUT: { proxyPool }. DELETE: { success: true }, or 409 with boundConnectionCount if the pool is still bound to any connection"
+  businessRules:
+    - "PUT only touches fields present in the body (hasOwnProperty checks per field) — omitted fields are left untouched, matching the partial-PATCH pattern used elsewhere in the codebase (cf. settings.patch-protected-keys)"
+    - "DELETE is guarded: it recomputes bound-connection count the same way as buildUsageMap (real connections only, via providerSpecificData.proxyPoolId) and refuses with 409 if any exist — but, same gap as proxypool.crud-list-and-create, this guard is blind to noAuth providers pinned/rotating onto the pool via settings.providerStrategies, so a pool actively serving a free-provider's traffic can be deleted out from under it with no warning"
+    - "SUSPECTED_BUG: the PUT handler's inline type allow-list (validTypes) is `[\"http\", \"vercel\", \"cloudflare\"]` — it omits 'deno', even though VALID_PROXY_TYPES in the sibling create route (proxy-pools/route.js line 10) and the deno-deploy route both treat 'deno' as a first-class type. Any PUT that includes a `type` field on an existing deno-relay pool (even re-submitting its own current value 'deno' from an edit form) silently coerces it to 'http'. Since resolveConnectionProxyConfig() branches on `proxyPool.type === 'vercel' || 'cloudflare' || 'deno'` to decide between the header-relay path (vercelRelayUrl) and the ProxyAgent path (connectionProxyUrl), a pool downgraded to 'http' this way is misrouted: proxyAwareFetch would try to use the Deno relay's URL as a literal HTTP_PROXY endpoint via undici's ProxyAgent instead of sending it the x-relay-target/x-relay-path headers the deployed Deno relay function expects, breaking every request through that pool"
+  state:
+    reads: ["proxyPools table", "providerConnections table (DELETE only, for the bound-count guard)"]
+    writes: ["proxyPools table (PUT/DELETE)"]
+    runtimeOnly: []
+  dependencies: ["proxypool.crud-list-and-create", "transport.connection-proxy-config-priority"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "PUT sets name/proxyUrl to empty, or id not found (404 branch, not modeled as one of the eight enum codes — treated as INVALID_REQUEST here for the not-found case)", partial: false }
+    - { code: INTERNAL_ERROR, when: "DB read/write throws", partial: false }
+  sideEffects: []
+  persistence: ["proxyPools table row updated/deleted"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "DELETE's in-use guard only checks real connections, identical blind spot to the list route's usage count (see proxypool.crud-list-and-create)"
+  evidence:
+    - { file: "src/app/api/proxy-pools/[id]/route.js", line: 9, note: "normalizeProxyPoolUpdate — partial-update, hasOwnProperty-gated" }
+    - { file: "src/app/api/proxy-pools/[id]/route.js", line: 41, note: "type update: validTypes = [\"http\",\"vercel\",\"cloudflare\"] — 'deno' missing" }
+    - { file: "src/app/api/proxy-pools/[id]/route.js", line: 48, note: "countBoundConnections — same real-connections-only usage check as buildUsageMap" }
+    - { file: "src/app/api/proxy-pools/[id]/route.js", line: 107, note: "DELETE 409 guard when boundConnectionCount > 0" }
+    - { file: src/app/api/proxy-pools/route.js, line: 10, note: "contrast: create-route VALID_PROXY_TYPES correctly includes 'deno'" }
+    - { file: src/lib/network/connectionProxy.js, line: 101, note: "resolveConnectionProxyConfig's type check that a silently-downgraded 'deno'->'http' pool would fail to match" }
+  newModule: transport
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "PUT /api/proxy-pools/[id] should accept the same four proxy types the create route and the deploy routes produce (http, vercel, cloudflare, deno), so editing/resaving an existing Deno-relay pool preserves its type"
+    actual: "The PUT handler's validTypes array only lists http/vercel/cloudflare; any PUT body that includes a 'type' field on a deno pool is coerced to 'http'"
+    impact: "A Deno relay pool edited through the dashboard (e.g. renaming it, or toggling isActive, if the edit form resubmits the current type) gets silently reclassified as a plain HTTP proxy; resolveConnectionProxyConfig() then routes it through the undici ProxyAgent path instead of the vercelRelayUrl header-relay path, and every subsequent request through that pool breaks because the Deno relay function only understands x-relay-target/x-relay-path headers, not being dialed as an HTTP_PROXY"
+
+- id: proxypool.test-connectivity
+  group: Transport
+  feature: Proxy pool management
+  subFeature: POST /api/proxy-pools/[id]/test — live connectivity check, updates testStatus/isActive as a side effect
+  trigger: POST /api/proxy-pools/{id}/test
+  input: "proxy pool id (path param)"
+  output: "{ ok, status, statusText, error, elapsedMs, testedAt }"
+  businessRules:
+    - "Dispatch differs by pool type: vercel/cloudflare/deno pools are tested via testVercelRelay() — a direct GET to the relay URL with x-relay-target: https://httpbin.org and x-relay-path: /get headers, 10s timeout; plain 'http' pools are tested via testProxyUrl() — a HEAD to https://google.com/ dispatched through a fresh, one-off undici ProxyAgent built from the pool's proxyUrl, default 8s timeout (caller-overridable, capped at 30s)"
+    - "The test result is NOT purely read-only: the pool row is unconditionally updated afterward with testStatus ('active'/'error'), lastTestedAt, lastError, and — notably — isActive is overwritten to exactly the test's ok boolean. A previously-active pool that fails one connectivity check is automatically deactivated (isActive: false), and a previously-inactive pool that passes is automatically reactivated, with no separate 'do not auto-toggle' option"
+    - "testProxyUrl()'s one-off ProxyAgent is explicitly closed in a finally block after the test (dispatcher?.close?.()), unlike the long-lived cached ProxyAgents in transport.proxy-dispatcher-cache which are never explicitly closed on eviction"
+  state:
+    reads: ["proxyPools table (by id)"]
+    writes: ["proxyPools table — testStatus, lastTestedAt, lastError, isActive"]
+    runtimeOnly: []
+  dependencies: ["proxypool.crud-get-update-delete"]
+  providerInteraction: "https://httpbin.org (relay types) or https://google.com/ (http type) as the connectivity probe target"
+  fallback: { hasFallback: false, retry: null, timeout: "10000ms for relay types (testVercelRelay maxMs param), 8000ms default / 30000ms max for http type (testProxyUrl timeoutMs)", quota: null }
+  errorCases:
+    - { code: TIMEOUT, when: "probe exceeds its timeout — AbortController fires, surfaced as 'Relay test timed out' or 'Proxy test timed out'", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "probe request errors for any other reason (connection refused, invalid proxy URL, etc.)", partial: false }
+  sideEffects: ["Can flip a pool's isActive flag (and therefore whether it's eligible for noAuth round-robin/random selection and whether resolveConnectionProxyConfig treats it as valid) as a byproduct of what looks like a read-only 'test' action"]
+  persistence: ["proxyPools.testStatus/lastTestedAt/lastError/isActive"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A pool that fails the test is deactivated even if it's currently bound to live connections or in noAuth rotation — no warning is surfaced about breaking in-flight assignments, only the 409 in-use guard on DELETE checks bindings, not on this auto-deactivation path"
+  evidence:
+    - { file: "src/app/api/proxy-pools/[id]/test/route.js", line: 6, note: "testVercelRelay — httpbin.org probe via relay headers, 10s default timeout" }
+    - { file: "src/app/api/proxy-pools/[id]/test/route.js", line: 46, note: "dispatch branch: relay types vs testProxyUrl for http type" }
+    - { file: "src/app/api/proxy-pools/[id]/test/route.js", line: 51, note: "updateProxyPool call — isActive overwritten to result.ok unconditionally" }
+    - { file: src/lib/network/proxyTest.js, line: 28, note: "testProxyUrl — one-off ProxyAgent, HEAD to google.com, timeout clamp" }
+    - { file: src/lib/network/proxyTest.js, line: 86, note: "explicit dispatcher.close() in finally" }
+  newModule: transport
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: proxypool.vercel-relay-deploy
+  group: Transport
+  feature: Proxy pool relay deployment
+  subFeature: POST /api/proxy-pools/vercel-deploy — deploys a header-relay Edge Function and polls it to readiness
+  trigger: POST /api/proxy-pools/vercel-deploy with { vercelToken, projectName? }
+  input: "Vercel API token; optional project name (defaults to relay-<timestamp36>)"
+  output: "201 { proxyPool, deployUrl } once the deployment is READY and a proxy pool row has been created for it; or an error response at any failed step"
+  businessRules:
+    - "The deployed RELAY_FUNCTION_CODE is a Vercel Edge Function that reads x-relay-target (the scheme+host to forward to) and x-relay-path (path+query) off the incoming request, rejects with 400 if x-relay-target is missing, then deletes x-relay-target, x-relay-path, AND host from the forwarded headers before calling fetch(targetUrl, ...) — x-relay-target/x-relay-path are internal routing instructions never meant for the real upstream (leaving them would leak 9router's internal relay protocol to the provider and could collide with real headers); host must be deleted because it still holds the RELAY function's own domain (or whatever the original inbound Host was) and is invalid/misleading for a request now going to targetUrl's actual host — fetch() sets the correct Host itself once the stale one is removed"
+    - "After a successful deploy, the code issues a PATCH to disable Vercel's own deployment protection (ssoProtection: null) so the relay is reachable without a Vercel auth challenge — this PATCH's response is not checked (no error handling if it fails), so a deploy can succeed with SSO protection still silently enabled, in which case every subsequent relay request would get intercepted by Vercel's auth page instead of reaching the relay function"
+    - "pollDeployment(deploymentId, token, maxMs=120000) polls GET /v13/deployments/{id} every 3000ms; returns once readyState is READY; throws immediately (no further retry) on ERROR/CANCELED; throws 'Deployment timed out' after 120000ms of polling with no READY/ERROR/CANCELED resolution"
+    - "SUSPECTED_BUG / partial-deployment risk: createProxyPool() — the only step that records the deployment locally — runs AFTER pollDeployment() resolves. If pollDeployment throws (timeout, or Vercel reports ERROR/CANCELED), the outer catch returns a 500 with no cleanup: the Vercel deployment (and, if it got that far, the disabled SSO protection) already exists on Vercel's account, consuming a real deployment slot/build minutes, but no proxyPools row is ever created — the operator has no record in 9router of the orphaned Vercel deployment and must find/delete it manually via the Vercel dashboard"
+    - "Newly-created pools from this route always get strictProxy: false and isActive: true hardcoded — strictProxy must be turned on manually afterward via PUT if desired"
+  state:
+    reads: []
+    writes: ["proxyPools table (only on full success)"]
+    runtimeOnly: []
+  dependencies: ["proxypool.crud-list-and-create", "transport.proxy-priority-chain"]
+  providerInteraction: "Vercel REST API (api.vercel.com) — deployment creation, project-settings PATCH, deployment-status polling"
+  fallback: { hasFallback: false, retry: null, timeout: "120000ms total, 3000ms poll interval, no retry after timeout/error — the whole deploy attempt just fails", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "vercelToken missing from the request body", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "Vercel deployment creation call itself returns non-ok", partial: false }
+    - { code: TIMEOUT, when: "pollDeployment exceeds 120000ms without reaching READY/ERROR/CANCELED", partial: true }
+    - { code: INTERNAL_ERROR, when: "deployment reaches ERROR/CANCELED state, or any other unhandled exception", partial: true }
+  sideEffects: ["Creates a real, billable Vercel project/deployment on the operator's Vercel account; on timeout/failure this deployment is left behind with no local record and no automated cleanup call (contrast with proxypool.deno-relay-deploy, which DOES issue a DELETE on failure)"]
+  persistence: ["proxyPools table row, only on full success"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The SSO-protection-disable PATCH response is never checked — a relay can end up deployed but still gated behind Vercel's own auth, silently breaking every proxied request with no signal at deploy time"
+  evidence:
+    - { file: src/app/api/proxy-pools/vercel-deploy/route.js, line: 12, note: "RELAY_FUNCTION_CODE — reads x-relay-target/x-relay-path" }
+    - { file: src/app/api/proxy-pools/vercel-deploy/route.js, line: 21, note: "targetUrl built by concatenating target host + relayPath" }
+    - { file: src/app/api/proxy-pools/vercel-deploy/route.js, line: 24, note: "x-relay-target, x-relay-path, host headers deleted before forwarding" }
+    - { file: src/app/api/proxy-pools/vercel-deploy/route.js, line: 42, note: "pollDeployment — 3000ms poll interval, 120000ms default maxMs" }
+    - { file: src/app/api/proxy-pools/vercel-deploy/route.js, line: 55, note: "'Deployment timed out' thrown after maxMs elapsed" }
+    - { file: src/app/api/proxy-pools/vercel-deploy/route.js, line: 114, note: "SSO-protection-disable PATCH — response not checked" }
+    - { file: src/app/api/proxy-pools/vercel-deploy/route.js, line: 124, note: "pollDeployment awaited BEFORE createProxyPool — pool row only created after poll resolves" }
+    - { file: src/app/api/proxy-pools/vercel-deploy/route.js, line: 128, note: "createProxyPool — strictProxy: false, isActive: true hardcoded" }
+  newModule: transport
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A failed or timed-out Vercel relay deployment should either be cleaned up (deleted from Vercel) or otherwise reconciled so no orphaned billable resource is left with zero trace in 9router — matching the deno-deploy route's own behavior on the identical failure shape"
+    actual: "On pollDeployment timeout/ERROR/CANCELED, the function throws straight into the outer catch, which just returns a 500 — the already-created Vercel deployment (and any already-issued SSO-protection PATCH) is never deleted or recorded"
+    impact: "Repeated failed/slow deploy attempts accumulate orphaned Vercel deployments/projects that consume the operator's Vercel account quota and cost, discoverable only by manually auditing the Vercel dashboard, since 9router has no local record of them at all"
+
+- id: proxypool.cloudflare-relay-deploy
+  group: Transport
+  feature: Proxy pool relay deployment
+  subFeature: POST /api/proxy-pools/cloudflare-deploy — uploads a Worker relay script and resolves its workers.dev URL
+  trigger: POST /api/proxy-pools/cloudflare-deploy with { accountId, apiToken, projectName? }
+  input: "Cloudflare account id + API token; optional project/script name"
+  output: "201 { proxyPool, deployUrl }, or an error at any failed step"
+  businessRules:
+    - "Same relay contract as the Vercel function: the Worker reads x-relay-target/x-relay-path, deletes those two plus host before forwarding, and additionally wraps the forward in its own try/catch returning a 502 JSON error on fetch failure (the Vercel/Deno relay functions don't have this extra guard — an unhandled forward failure there propagates as a platform-level 5xx instead of a relay-authored 502 body)"
+    - "Deployment is synchronous (a single multipart PUT of the Worker script, no polling/readiness wait like Vercel or Deno) — the script is live as soon as the upload call returns ok"
+    - "Enabling the workers.dev subdomain (step 2, a POST to .../subdomain) is explicitly best-effort: its response is checked but a non-ok result only logs a warning and the code comment says 'We don't fail completely here, just continue' — deployment proceeds even if the subdomain couldn't be enabled"
+    - "The final deployUrl is only resolvable by a THIRD call (GET account subdomain info) — if that call fails or the account has no workers.dev subdomain configured at all, the route returns a 400 even though the Worker script IS already uploaded and live (partial-deployment: script exists on Cloudflare, but no proxyPools row is created and no cleanup/delete of the uploaded script is attempted)"
+  state:
+    reads: []
+    writes: ["proxyPools table (only on full success, including a resolvable deployUrl)"]
+    runtimeOnly: []
+  dependencies: ["proxypool.crud-list-and-create", "transport.proxy-priority-chain"]
+  providerInteraction: "Cloudflare REST API (api.cloudflare.com) — Worker script upload, subdomain enable, account subdomain lookup"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "accountId or apiToken missing", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "Worker script upload (PUT) fails", partial: false }
+    - { code: INTERNAL_ERROR, when: "subdomain lookup fails or returns no subdomain — script already uploaded, no local record created, no rollback", partial: true }
+  sideEffects: ["Uploads and activates a live Cloudflare Worker script even when the surrounding deploy flow ultimately fails to produce a usable deployUrl — same 'orphaned live resource, no local record' shape as the Vercel route's timeout case, but reached via a different failure point (subdomain resolution instead of a build timeout)"]
+  persistence: ["proxyPools table row, only on full success"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A worker upload can succeed while the workers.dev subdomain-enable step silently fails ('continue' comment) — the script is live but potentially unreachable at the workers.dev URL the route later tries to construct"
+  evidence:
+    - { file: src/app/api/proxy-pools/cloudflare-deploy/route.js, line: 8, note: "RELAY_WORKER_CODE — reads x-relay-target/x-relay-path" }
+    - { file: src/app/api/proxy-pools/cloudflare-deploy/route.js, line: 29, note: "x-relay-target, x-relay-path, host headers deleted before forwarding" }
+    - { file: src/app/api/proxy-pools/cloudflare-deploy/route.js, line: 39, note: "try/catch around the forward fetch, returns 502 JSON on failure (extra guard vs. the other two relays)" }
+    - { file: src/app/api/proxy-pools/cloudflare-deploy/route.js, line: 73, note: "Worker script upload — synchronous, no polling" }
+    - { file: src/app/api/proxy-pools/cloudflare-deploy/route.js, line: 100, note: "subdomain-enable best-effort — non-ok logged, flow continues regardless ('We don't fail completely here')" }
+    - { file: src/app/api/proxy-pools/cloudflare-deploy/route.js, line: 123, note: "400 returned when deployUrl can't be resolved — script already live at this point, no rollback" }
+    - { file: src/app/api/proxy-pools/cloudflare-deploy/route.js, line: 131, note: "createProxyPool — strictProxy: false hardcoded" }
+  newModule: transport
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: proxypool.deno-relay-deploy
+  group: Transport
+  feature: Proxy pool relay deployment
+  subFeature: POST /api/proxy-pools/deno-deploy — creates a Deno Deploy app, deploys the relay, polls status, and rolls back on failure
+  trigger: POST /api/proxy-pools/deno-deploy with { denoToken, orgDomain, projectName? }
+  input: "Deno Deploy API token; org domain (used to build the final *.deno.net URL); optional project/app slug"
+  output: "201 { proxyPool, deployUrl }, or an error at any failed step"
+  businessRules:
+    - "Same relay header contract as the other two (reads x-relay-target/x-relay-path, deletes those plus host, wraps the forward fetch in try/catch returning a 502 JSON on failure, matching the Cloudflare Worker's guard — unlike the Vercel Edge Function, which has no such try/catch around its forward)"
+    - "Deployment is two calls (create app, then deploy revision) followed by a bounded poll loop: up to 30 attempts at 2000ms apart (60s max) while status is 'queued'/'building'; throws 'Deploy timed out after 60 seconds' if still not resolved after 30 attempts"
+    - "UNLIKE the Vercel route, both failure paths explicitly roll back: if the deploy-revision call itself fails (non-ok), OR if the poll loop ends with status !== 'succeeded' (including the 60s-timeout throw, since that throw is caught by the outer try/catch — the DELETE call before it inside the poll-timeout branch itself only fires on the non-succeeded-status path, not on the thrown timeout, see evidence), the code issues a DELETE /apps/{id} to remove the Deno app before returning the error — actively avoiding the orphaned-resource issue documented in proxypool.vercel-relay-deploy for the deploy-call-failure and bad-final-status cases"
+    - "The rollback DELETE call itself is fire-and-forget (.catch(() => {})) — if the DELETE also fails, that failure is swallowed silently and the orphaned app can still be left behind, just less often than the Vercel path since two of the three failure modes here do attempt cleanup"
+  state:
+    reads: []
+    writes: ["proxyPools table (only on full success)"]
+    runtimeOnly: []
+  dependencies: ["proxypool.crud-list-and-create", "transport.proxy-priority-chain"]
+  providerInteraction: "Deno Deploy REST API v2 (api.deno.com/v2) — app creation, revision deploy, revision-status polling, app deletion on rollback"
+  fallback: { hasFallback: false, retry: null, timeout: "60000ms total (30 attempts x 2000ms), no retry after timeout — deploy attempt fails and the app is deleted", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "orgDomain or denoToken missing", partial: false }
+    - { code: INVALID_REQUEST, when: "app creation returns 409 (name already exists)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "app creation (non-409) or deploy-revision call fails", partial: false }
+    - { code: TIMEOUT, when: "poll loop exhausts 30 attempts (60s) without reaching a terminal status", partial: true }
+    - { code: INTERNAL_ERROR, when: "revision status resolves to anything other than 'succeeded'", partial: true }
+  sideEffects: ["Creates a Deno Deploy app+revision; actively attempts to delete it again on the two failure paths described above (fire-and-forget)"]
+  persistence: ["proxyPools table row, only on full success"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "If the poll loop's own statusRes fetch fails (statusRes.ok false), the loop breaks with whatever `status` was last observed rather than retrying that single status check — a transient network blip while polling can end the loop early with a stale non-succeeded status, triggering the same rollback+error path as a genuine deploy failure"
+  evidence:
+    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 7, note: "DENO_RELAY_CODE — reads x-relay-target/x-relay-path" }
+    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 20, note: "x-relay-target, x-relay-path, host headers deleted before forwarding" }
+    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 40, note: "try/catch around the forward fetch, returns 502 JSON on failure" }
+    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 116, note: "rollback DELETE on deploy-revision call failure, fire-and-forget .catch(() => {})" }
+    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 131, note: "poll loop: 30 attempts x 2000ms = 60s cap, throws on exhaustion" }
+    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 140, note: "statusRes.ok false breaks the loop early with the last-seen status" }
+    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 146, note: "rollback DELETE when final status !== 'succeeded'" }
+  newModule: transport
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: proxypool.storage-json-blob
+  group: Transport
+  feature: Proxy pool persistence
+  subFeature: proxyPoolsRepo.js — proxyPools table storage shape
+  trigger: Any proxy-pool CRUD call (createProxyPool/updateProxyPool/deleteProxyPool/getProxyPools/getProxyPoolById)
+  input: "Pool fields: id, name, proxyUrl, noProxy, type, isActive, strictProxy, testStatus, lastTestedAt, lastError, createdAt, updatedAt"
+  output: "Row objects reconstructed by merging id/isActive/testStatus/createdAt/updatedAt (real columns) with a parsed JSON blob (everything else: name, proxyUrl, noProxy, type, strictProxy)"
+  businessRules:
+    - "Same JSON-blob-over-relational-columns shape as connection.storage-shape-json-blob: only id, isActive, testStatus, createdAt, updatedAt are real SQL columns with types; name/proxyUrl/noProxy/type/strictProxy all live inside a single `data` TEXT column, parsed/stringified via parseJson/stringifyJson on every read/write"
+    - "isActive is stored as SQLite 0/1 (poolToRow: `isActive === false ? 0 : 1`, so anything not literally `false` — including undefined — persists as 1/active) and read back via `row.isActive === 1 || row.isActive === true` (rowToPool) to tolerate either representation depending on the underlying adapter (bun:sqlite/better-sqlite3/node:sqlite/sql.js all normalize booleans differently)"
+    - "createProxyPool/updateProxyPool/deleteProxyPool all use a single INSERT ... ON CONFLICT DO UPDATE (upsert) or a db.transaction() wrapper — id collisions on create silently become an update rather than erroring, since the same `upsert()` helper backs create and update"
+    - "getProxyPools() sorts results by updatedAt descending in application code after the SQL SELECT (no ORDER BY in the query itself) — every list call does a full-table scan-and-sort regardless of the isActive/testStatus filter size"
+  state:
+    reads: ["proxyPools table"]
+    writes: ["proxyPools table"]
+    runtimeOnly: []
+  dependencies: ["connection.storage-shape-json-blob"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["proxyPools table: id (PK), isActive, testStatus, data (JSON blob), createdAt, updatedAt"]
+  performanceConcerns:
+    - "No ORDER BY in the SQL query — sort is done in JS after fetching every matching row into memory"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "createProxyPool's id collision silently upserts instead of rejecting — a caller that generates its own id (rather than relying on the uuidv4() default) can unintentionally overwrite an existing pool with no conflict error"
+  evidence:
+    - { file: src/lib/db/repos/proxyPoolsRepo.js, line: 5, note: "rowToPool — merges real columns with parsed JSON blob" }
+    - { file: src/lib/db/repos/proxyPoolsRepo.js, line: 18, note: "poolToRow — isActive false->0 else 1, rest stringified into data" }
+    - { file: src/lib/db/repos/proxyPoolsRepo.js, line: 30, note: "upsert — single INSERT ... ON CONFLICT(id) DO UPDATE, shared by create and update" }
+    - { file: src/lib/db/repos/proxyPoolsRepo.js, line: 50, note: "getProxyPools — application-level sort by updatedAt desc after the SQL SELECT" }
+  newModule: transport
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]

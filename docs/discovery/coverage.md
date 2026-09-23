@@ -1,15 +1,15 @@
 # Discovery coverage
 
-Entries: 179
+Entries: 193
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 81/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +65 |
+| routes | 87/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +59 |
 | pages | 4/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind]/[id] … +16 |
 | providers | 15/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +99 |
 | executors | 6/29 | azure, codebuddy-cn, codebuddy-intl, commandcode, cursor, devin-cli, gemini-cli, github … +15 |
 | translators | 2/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +38 |
-| repos | 9/11 | nodesRepo, proxyPoolsRepo |
+| repos | 10/11 | nodesRepo |
 | settingsKeys | 32/52 | cloudEnabled, dnsToolEnabled, mitmRouterBaseUrl, oidcClientId, oidcIssuerUrl, oidcLoginLabel, oidcScopes, samlAttributeEmail … +12 |
 
 ## Entries per bounded context
@@ -21,13 +21,14 @@ Entries: 179
 - media: 15
 - routing: 65
 - settings: 7
+- transport: 14
 - usage: 23
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 7
-- REFERENCE_BEHAVIOR: 151
-- SUSPECTED_BUG: 21
+- IMPLEMENTATION_ACCIDENT: 8
+- REFERENCE_BEHAVIOR: 161
+- SUSPECTED_BUG: 24
 
 ## Missing — routes
 
@@ -74,12 +75,6 @@ Entries: 179
 - api/providers/kilo/free-models
 - api/providers/suggested-models
 - api/providers/test-batch
-- api/proxy-pools
-- api/proxy-pools/[id]
-- api/proxy-pools/[id]/test
-- api/proxy-pools/cloudflare-deploy
-- api/proxy-pools/deno-deploy
-- api/proxy-pools/vercel-deploy
 - api/settings/database
 - api/settings/proxy-test
 - api/settings/require-login
@@ -320,7 +315,6 @@ Entries: 179
 ## Missing — repos
 
 - nodesRepo
-- proxyPoolsRepo
 
 ## Missing — settingsKeys
 
