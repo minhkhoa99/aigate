@@ -213,7 +213,7 @@
     - { file: src/lib/network/connectionProxy.js, line: 91, note: "isValidPool = proxyPool && isActive === true && proxyUrl — pool ignored otherwise" }
     - { file: src/lib/network/connectionProxy.js, line: 101, note: "vercel/cloudflare/deno branch: connectionProxyEnabled false, vercelRelayUrl set instead" }
     - { file: src/lib/network/connectionProxy.js, line: 127, note: "standard http pool branch: connectionProxyEnabled true, connectionProxyUrl set" }
-    - { file: src/lib/network/connectionProxy.js, line: 142, note: "legacy fallback when no valid pool" }
+    - { file: src/lib/network/connectionProxy.js, line: 141, note: "legacy fallback when no valid pool" }
     - { file: src/lib/network/connectionProxy.js, line: 168, note: "catch-all error branch degrades to fully-disabled config, never rejects" }
   newModule: transport
   parityStatus: traced
@@ -321,7 +321,7 @@
     - { file: src/app/api/proxy-pools/route.js, line: 10, note: "VALID_PROXY_TYPES list" }
     - { file: src/app/api/proxy-pools/route.js, line: 12, note: "normalizeProxyPoolInput — required-field validation, type coercion to 'http'" }
     - { file: src/app/api/proxy-pools/route.js, line: 31, note: "buildUsageMap — counts connections by providerSpecificData.proxyPoolId" }
-    - { file: src/app/api/proxy-pools/route.js, line: 56, note: "GET handler, includeUsage branch" }
+    - { file: src/app/api/proxy-pools/route.js, line: 58, note: "GET handler, includeUsage branch" }
     - { file: src/app/api/proxy-pools/route.js, line: 87, note: "POST handler — createProxyPool(normalized)" }
   newModule: transport
   parityStatus: traced
@@ -417,7 +417,7 @@
     - "The deployed RELAY_FUNCTION_CODE is a Vercel Edge Function that reads x-relay-target (the scheme+host to forward to) and x-relay-path (path+query) off the incoming request, rejects with 400 if x-relay-target is missing, then deletes x-relay-target, x-relay-path, AND host from the forwarded headers before calling fetch(targetUrl, ...) — x-relay-target/x-relay-path are internal routing instructions never meant for the real upstream (leaving them would leak 9router's internal relay protocol to the provider and could collide with real headers); host must be deleted because it still holds the RELAY function's own domain (or whatever the original inbound Host was) and is invalid/misleading for a request now going to targetUrl's actual host — fetch() sets the correct Host itself once the stale one is removed"
     - "After a successful deploy, the code issues a PATCH to disable Vercel's own deployment protection (ssoProtection: null) so the relay is reachable without a Vercel auth challenge — this PATCH's response is not checked (no error handling if it fails), so a deploy can succeed with SSO protection still silently enabled, in which case every subsequent relay request would get intercepted by Vercel's auth page instead of reaching the relay function"
     - "pollDeployment(deploymentId, token, maxMs=120000) polls GET /v13/deployments/{id} every 3000ms; returns once readyState is READY; throws immediately (no further retry) on ERROR/CANCELED; throws 'Deployment timed out' after 120000ms of polling with no READY/ERROR/CANCELED resolution"
-    - "SUSPECTED_BUG / partial-deployment risk: createProxyPool() — the only step that records the deployment locally — runs AFTER pollDeployment() resolves. If pollDeployment throws (timeout, or Vercel reports ERROR/CANCELED), the outer catch returns a 500 with no cleanup: the Vercel deployment (and, if it got that far, the disabled SSO protection) already exists on Vercel's account, consuming a real deployment slot/build minutes, but no proxyPools row is ever created — the operator has no record in 9router of the orphaned Vercel deployment and must find/delete it manually via the Vercel dashboard"
+    - "SUSPECTED_BUG / partial-deployment risk: createProxyPool() — the only step that records the deployment locally — runs AFTER pollDeployment() resolves. If pollDeployment throws (timeout, or Vercel reports ERROR/CANCELED), the outer catch returns a 500 with no cleanup at all: this file contains no DELETE/cleanup call anywhere, for any failure mode. The Vercel deployment (and, if it got that far, the disabled SSO protection) already exists on Vercel's account, consuming a real deployment slot/build minutes, but no proxyPools row is ever created — the operator has no record in 9router of the orphaned Vercel deployment and must find/delete it manually via the Vercel dashboard"
     - "Newly-created pools from this route always get strictProxy: false and isActive: true hardcoded — strictProxy must be turned on manually afterward via PUT if desired"
   state:
     reads: []
@@ -431,7 +431,7 @@
     - { code: PROVIDER_UNAVAILABLE, when: "Vercel deployment creation call itself returns non-ok", partial: false }
     - { code: TIMEOUT, when: "pollDeployment exceeds 120000ms without reaching READY/ERROR/CANCELED", partial: true }
     - { code: INTERNAL_ERROR, when: "deployment reaches ERROR/CANCELED state, or any other unhandled exception", partial: true }
-  sideEffects: ["Creates a real, billable Vercel project/deployment on the operator's Vercel account; on timeout/failure this deployment is left behind with no local record and no automated cleanup call (contrast with proxypool.deno-relay-deploy, which DOES issue a DELETE on failure)"]
+  sideEffects: ["Creates a real, billable Vercel project/deployment on the operator's Vercel account; on any failure (creation error, timeout, ERROR/CANCELED) this deployment is left behind with no local record and no automated cleanup call at all — contrast with proxypool.deno-relay-deploy, which DOES issue a DELETE rollback on 2 of its 3 failure paths (though not on its own timeout path)"]
   persistence: ["proxyPools table row, only on full success"]
   performanceConcerns: []
   behavior: { streaming: false, cancellation: null, concurrency: null }
@@ -450,8 +450,8 @@
   parityStatus: traced
   labels: [SUSPECTED_BUG]
   suspicion:
-    expected: "A failed or timed-out Vercel relay deployment should either be cleaned up (deleted from Vercel) or otherwise reconciled so no orphaned billable resource is left with zero trace in 9router — matching the deno-deploy route's own behavior on the identical failure shape"
-    actual: "On pollDeployment timeout/ERROR/CANCELED, the function throws straight into the outer catch, which just returns a 500 — the already-created Vercel deployment (and any already-issued SSO-protection PATCH) is never deleted or recorded"
+    expected: "A failed or timed-out Vercel relay deployment should be cleaned up (deleted from Vercel) or otherwise reconciled so no orphaned billable resource is left with zero trace in 9router — the deno-deploy route (proxypool.deno-relay-deploy) shows this codebase already knows how to do that: it issues a DELETE rollback on 2 of its 3 failure paths"
+    actual: "vercel-deploy/route.js has no DELETE/cleanup call anywhere in the file — every failure mode (deployment-creation failure, pollDeployment timeout, or Vercel reporting ERROR/CANCELED) throws straight into the single outer catch, which just logs and returns a 500. This is a strictly worse gap than deno-deploy's: Deno only orphans on its timeout path (see proxypool.deno-relay-deploy's own SUSPECTED_BUG), while Vercel orphans unconditionally on every failure path, including ones its own Deno sibling already handles correctly (e.g. the deployment-creation-call failure, which Deno rolls back but Vercel does not)"
     impact: "Repeated failed/slow deploy attempts accumulate orphaned Vercel deployments/projects that consume the operator's Vercel account quota and cost, discoverable only by manually auditing the Vercel dashboard, since 9router has no local record of them at all"
 
 - id: proxypool.cloudflare-relay-deploy
@@ -498,29 +498,29 @@
 - id: proxypool.deno-relay-deploy
   group: Transport
   feature: Proxy pool relay deployment
-  subFeature: POST /api/proxy-pools/deno-deploy — creates a Deno Deploy app, deploys the relay, polls status, and rolls back on failure
+  subFeature: POST /api/proxy-pools/deno-deploy — creates a Deno Deploy app, deploys the relay, polls status, and rolls back on 2 of its 3 failure paths
   trigger: POST /api/proxy-pools/deno-deploy with { denoToken, orgDomain, projectName? }
   input: "Deno Deploy API token; org domain (used to build the final *.deno.net URL); optional project/app slug"
   output: "201 { proxyPool, deployUrl }, or an error at any failed step"
   businessRules:
     - "Same relay header contract as the other two (reads x-relay-target/x-relay-path, deletes those plus host, wraps the forward fetch in try/catch returning a 502 JSON on failure, matching the Cloudflare Worker's guard — unlike the Vercel Edge Function, which has no such try/catch around its forward)"
-    - "Deployment is two calls (create app, then deploy revision) followed by a bounded poll loop: up to 30 attempts at 2000ms apart (60s max) while status is 'queued'/'building'; throws 'Deploy timed out after 60 seconds' if still not resolved after 30 attempts"
-    - "UNLIKE the Vercel route, both failure paths explicitly roll back: if the deploy-revision call itself fails (non-ok), OR if the poll loop ends with status !== 'succeeded' (including the 60s-timeout throw, since that throw is caught by the outer try/catch — the DELETE call before it inside the poll-timeout branch itself only fires on the non-succeeded-status path, not on the thrown timeout, see evidence), the code issues a DELETE /apps/{id} to remove the Deno app before returning the error — actively avoiding the orphaned-resource issue documented in proxypool.vercel-relay-deploy for the deploy-call-failure and bad-final-status cases"
-    - "The rollback DELETE call itself is fire-and-forget (.catch(() => {})) — if the DELETE also fails, that failure is swallowed silently and the orphaned app can still be left behind, just less often than the Vercel path since two of the three failure modes here do attempt cleanup"
+    - "Deployment is two calls (create app, then deploy revision) followed by a bounded poll loop: up to 30 attempts at 2000ms apart (60s max) while status is 'queued'/'building'"
+    - "This route has three distinct failure paths, and only two of them roll back. (1) The deploy-revision call itself failing (non-ok) DOES roll back: it hits an explicit DELETE /apps/{id} before returning the error. (2) The poll loop ending with a non-'succeeded' status (reached either by observing a genuine terminal bad status, e.g. 'failed'/'canceled', or by the statusRes fetch itself failing mid-poll and breaking the loop early with whatever status was last seen) also DOES roll back, via the same `if (status !== \"succeeded\")` DELETE block. (3) The poll loop exhausting all 30 attempts (60s) throws `new Error(\"Deploy timed out after 60 seconds\")` INSIDE the while loop — this throw unwinds immediately past the `if (status !== \"succeeded\")` rollback block entirely (it's never reached) and lands directly in the function's single outer catch, which only logs and returns a 500 with no DELETE call. So the 60s-timeout path does NOT roll back — see suspicion below"
+    - "The two rollback DELETE calls that do fire are fire-and-forget (.catch(() => {})) — if the DELETE itself also fails, that failure is swallowed silently and the app can still be left behind even on the two paths that do attempt cleanup"
   state:
     reads: []
     writes: ["proxyPools table (only on full success)"]
     runtimeOnly: []
   dependencies: ["proxypool.crud-list-and-create", "transport.proxy-priority-chain"]
   providerInteraction: "Deno Deploy REST API v2 (api.deno.com/v2) — app creation, revision deploy, revision-status polling, app deletion on rollback"
-  fallback: { hasFallback: false, retry: null, timeout: "60000ms total (30 attempts x 2000ms), no retry after timeout — deploy attempt fails and the app is deleted", quota: null }
+  fallback: { hasFallback: false, retry: null, timeout: "60000ms total (30 attempts x 2000ms), no retry after timeout — deploy attempt fails; the app is deleted for a bad-final-status failure but NOT for the timeout itself (see suspicion)", quota: null }
   errorCases:
     - { code: INVALID_REQUEST, when: "orgDomain or denoToken missing", partial: false }
     - { code: INVALID_REQUEST, when: "app creation returns 409 (name already exists)", partial: false }
     - { code: PROVIDER_UNAVAILABLE, when: "app creation (non-409) or deploy-revision call fails", partial: false }
-    - { code: TIMEOUT, when: "poll loop exhausts 30 attempts (60s) without reaching a terminal status", partial: true }
-    - { code: INTERNAL_ERROR, when: "revision status resolves to anything other than 'succeeded'", partial: true }
-  sideEffects: ["Creates a Deno Deploy app+revision; actively attempts to delete it again on the two failure paths described above (fire-and-forget)"]
+    - { code: TIMEOUT, when: "poll loop exhausts 30 attempts (60s) without reaching a terminal status — this path orphans the Deno app (no rollback)", partial: true }
+    - { code: INTERNAL_ERROR, when: "revision status resolves to anything other than 'succeeded' via a genuine terminal status or an early loop break — this path DOES roll back", partial: true }
+  sideEffects: ["Creates a Deno Deploy app+revision; attempts to delete it again (fire-and-forget) on the deploy-call-failure and bad-final-status paths, but NOT on the 60s-timeout path, which leaves the app orphaned with no local record — same shape as proxypool.vercel-relay-deploy's gap, just narrower in scope"]
   persistence: ["proxyPools table row, only on full success"]
   performanceConcerns: []
   behavior: { streaming: false, cancellation: null, concurrency: null }
@@ -531,12 +531,18 @@
     - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 20, note: "x-relay-target, x-relay-path, host headers deleted before forwarding" }
     - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 40, note: "try/catch around the forward fetch, returns 502 JSON on failure" }
     - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 116, note: "rollback DELETE on deploy-revision call failure, fire-and-forget .catch(() => {})" }
-    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 131, note: "poll loop: 30 attempts x 2000ms = 60s cap, throws on exhaustion" }
+    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 131, note: "poll loop: 30 attempts x 2000ms = 60s cap" }
+    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 133, note: "attempts >= maxAttempts throws INSIDE the while loop, before the status !== 'succeeded' rollback block is ever reached" }
     - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 140, note: "statusRes.ok false breaks the loop early with the last-seen status" }
-    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 146, note: "rollback DELETE when final status !== 'succeeded'" }
+    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 146, note: "rollback DELETE when final status !== 'succeeded' — this block is skipped entirely by the timeout throw at line 133" }
+    - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 171, note: "single outer catch — logs and returns 500, no DELETE call, this is where the timeout throw lands" }
   newModule: transport
   parityStatus: traced
-  labels: [REFERENCE_BEHAVIOR]
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Given that this route already rolls back on 2 of its 3 failure paths (deploy-call failure, bad-final-status), the timeout path should follow the same pattern — either DELETE before throwing, or set a sentinel status and let it fall through to the existing `if (status !== \"succeeded\")` rollback block, instead of throwing straight past it"
+    actual: "The timeout branch (`if (attempts >= maxAttempts) throw new Error(...)`) throws from inside the while loop, which unwinds directly to the function's single outer try/catch — a scope that only logs and returns a 500, with no DELETE call anywhere in it. The rollback block at `if (status !== \"succeeded\")` is structurally unreachable once that throw fires"
+    impact: "A Deno deploy that hangs in 'queued'/'building' for the full 60s (slow build, transient Deno Deploy backend delay, etc.) leaves the app+revision live on the operator's Deno Deploy account with zero local record and zero cleanup attempt — the same class of orphaned-billable-resource risk flagged for proxypool.vercel-relay-deploy, just reachable only via this one specific failure mode here instead of all of them"
 
 - id: proxypool.storage-json-blob
   group: Transport
