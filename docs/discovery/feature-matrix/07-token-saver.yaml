@@ -1,0 +1,525 @@
+# Trace: Token Saver (Task 12)
+# 9router reference read at E:\9router. Read-only; every evidence line was
+# read directly, not inferred from names (behavioral.md §7).
+#
+# Entry points read in full: open-sse/handlers/chatCore.js (the pipeline call
+# site, lines ~250-298), src/sse/handlers/chat.js (settings wiring + pxpipe
+# transform lookup, lines ~266-292), open-sse/rtk/index.js, autodetect.js,
+# constants.js, applyFilter.js, headroom.js, caveman.js, ponytail.js,
+# systemInject.js, pxpipe.js, registry.js; src/lib/pxpipe/{loader,service,
+# install,events}.js and all 8 src/app/api/pxpipe/**/route.js; all 6
+# src/app/api/headroom/**/route.js (+ the nested proxy/[...path] route).
+#
+# This file goes deep on the hand-off point that 05-request-routing-fallback.yaml
+# already stubbed thin as `routing.token-saver-pipeline` (chatCore.js:251-298).
+# That entry stays the "one line in the main chain" summary; the entries below
+# are what it points into. Kept consistent with it — same line citations for
+# the shared call sites.
+#
+# One entry each:
+#   tokensaver.pipeline-execution-order   the five stages, in order, with their gate
+#   tokensaver.rtk-compress-shapes        compressMessages: 4 shapes + Kiro, is_error skip
+#   tokensaver.rtk-autodetect-order       autoDetectFilter dispatch order + caps
+#   tokensaver.rtk-fail-open              RTK's two try/catch layers (index.js, applyFilter.js)
+#   tokensaver.headroom-compress          external proxy call, translate-compress-translate, fail-open
+#   tokensaver.system-prompt-injection    caveman + ponytail share injectSystemPrompt, fail-open
+#   tokensaver.pxpipe-compress            threshold gate, timeout race, Claude-only, fail-open
+#   tokensaver.pxpipe-master-optout-bug   SB-1 CONFIRMED — pxpipeEnabled gate skips tokenSaverEnabled
+#   tokensaver.pxpipe-library-mode-status "running" = module loaded, not a port listening
+#   tokensaver.pxpipe-management-routes   8 api/pxpipe/* routes (install/start/stop/restart/status/health/logs/stats)
+#   tokensaver.headroom-management-routes 6 api/headroom/* routes (start/stop/restart/status/extras/proxy)
+#   tokensaver.savings-recording          pxpipe events persisted to disk; RTK/headroom stats console-only
+# SUSPECTED_BUG: tokensaver.pxpipe-master-optout-bug (SB-1, confirmed).
+
+- id: tokensaver.pipeline-execution-order
+  group: Token Saver
+  feature: Token Saver
+  subFeature: Five-stage pipeline run once per chat request, just before dispatch
+  trigger: Every chat request, after translation/passthrough and before getExecutor(provider) is resolved
+  input: "translatedBody (already translated/passthrough), finalFormat, upstreamModel, the settings token-saver flags, and the x-9router-token-saver request header"
+  output: "translatedBody mutated in place by RTK/headroom/caveman/ponytail; replaced wholesale by pxpipe when it applies"
+  businessRules:
+    - "Fixed order, not configurable: RTK -> Headroom -> Caveman -> Ponytail -> PXPIPE (matches the UI pipeline diagram in the spec, §5#15)"
+    - "Per-request opt-out header x-9router-token-saver: off computes tokenSaverEnabled=false, which gates RTK/headroom/caveman/ponytail — but NOT pxpipe (see tokensaver.pxpipe-master-optout-bug)"
+    - "Each of the four gated stages is additionally gated by its own settings.*Enabled flag: rtkEnabled, headroomEnabled, cavemanEnabled (+ cavemanLevel truthy), ponytailEnabled (+ ponytailLevel truthy)"
+    - "PXPIPE is last so it sees the final body after every other saver has already run"
+  state:
+    reads: ["settings.rtkEnabled", "settings.headroomEnabled", "settings.cavemanEnabled", "settings.cavemanLevel", "settings.ponytailEnabled", "settings.ponytailLevel", "settings.pxpipeEnabled", "x-9router-token-saver header"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.token-saver-pipeline"]
+  providerInteraction: "headroom stage calls out to an external HTTP proxy when enabled"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["console/log line per stage that fired (rtkLine, headroomLine, xf join for caveman/ponytail/pxpipe)"]
+  persistence: []
+  performanceConcerns:
+    - "Headroom and pxpipe are awaited synchronously on the request path, adding their latency (headroomTimeoutMs / pxpipeTimeoutMs) before the upstream call even starts"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The x-9router-token-saver header itself is never stripped from clientRawRequest, but the executor builds upstream headers fresh rather than copying client headers, so it does not leak upstream"
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 251, note: "tokenSaverEnabled computed from x-9router-token-saver header; 'off' (case-insensitive) is the only value that disables it" }
+    - { file: open-sse/handlers/chatCore.js, line: 254, note: "stage 1: RTK compressMessages(translatedBody, tokenSaverEnabled && rtkEnabled)" }
+    - { file: open-sse/handlers/chatCore.js, line: 260, note: "stage 2: headroom compressWithHeadroom, enabled: tokenSaverEnabled && headroomEnabled" }
+    - { file: open-sse/handlers/chatCore.js, line: 274, note: "stage 3: caveman injectCaveman, gated by tokenSaverEnabled && cavemanEnabled && cavemanLevel" }
+    - { file: open-sse/handlers/chatCore.js, line: 280, note: "stage 4: ponytail injectPonytail, gated by tokenSaverEnabled && ponytailEnabled && ponytailLevel" }
+    - { file: open-sse/handlers/chatCore.js, line: 287, note: "stage 5: pxpipe, gated only by pxpipeEnabled (no tokenSaverEnabled)" }
+    - { file: src/sse/handlers/chat.js, line: 278, note: "rtkEnabled read from settings and coerced to boolean" }
+    - { file: src/sse/handlers/chat.js, line: 287, note: "pxpipeEnabled read from settings and coerced to boolean" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tokensaver.rtk-compress-shapes
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "RTK stage: compress tool_result / tool-message content across four wire shapes plus Kiro"
+  trigger: "Stage 1 of the pipeline, only when tokenSaverEnabled && rtkEnabled"
+  input: "translatedBody.messages[] or .input[] (or body.conversationState for Kiro)"
+  output: "Matched text fields rewritten in place with a compressed version; stats object {bytesBefore, bytesAfter, hits[]} or null"
+  businessRules:
+    - "Four non-Kiro shapes handled: (1) OpenAI tool message string content, (1b) OpenAI tool message array content, (2) Claude tool_result string content, (3) Claude tool_result array content; plus a fifth top-level Responses shape (function_call_output, string or array output)"
+    - "Kiro is a fully separate code path (compressKiroFormat) walking conversationState.history[]/currentMessage instead of messages[]/input[]"
+    - "A candidate string is only compressed when MIN_COMPRESS_SIZE <= length <= RAW_CAP; otherwise it passes through unchanged and still counts toward bytesBefore/bytesAfter"
+    - "The chosen filter's output is discarded (original kept) if it is empty or not smaller than the input — RTK never grows or blanks a tool result"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Runs synchronously over every message/tool_result in the body on every gated request; pure CPU, no I/O"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Shape 2/3 tool_result blocks with is_error: true, and Kiro toolResults with status: 'error', are skipped entirely — never even measured for compression (see tokensaver.rtk-error-preservation for why)"
+  evidence:
+    - { file: open-sse/rtk/index.js, line: 9, note: "compressMessages(body, enabled) — if (!enabled) return null; short-circuits the whole stage" }
+    - { file: open-sse/rtk/index.js, line: 13, note: "body.conversationState present -> compressKiroFormat, a separate path" }
+    - { file: open-sse/rtk/index.js, line: 45, note: "shape 1: role tool, string content" }
+    - { file: open-sse/rtk/index.js, line: 53, note: "shape 1b: role tool, array content with type text parts" }
+    - { file: open-sse/rtk/index.js, line: 67, note: "shape 2/3: tool_result block, is_error true skipped before any compression" }
+    - { file: open-sse/rtk/index.js, line: 120, note: "compressText: MIN_COMPRESS_SIZE/RAW_CAP bounds, never grow/never blank guard at line 138" }
+    - { file: open-sse/rtk/index.js, line: 103, note: "Kiro path: toolResult.status === 'error' skipped" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tokensaver.rtk-error-preservation
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "Why RTK refuses to compress an error tool_result"
+  trigger: "A tool_result block has is_error: true (Claude) or a Kiro toolResult has status: 'error'"
+  input: "The same block that would otherwise be compressed"
+  output: "Block is left byte-for-byte unmodified and does not contribute to stats.bytesBefore/bytesAfter"
+  businessRules:
+    - "RTK's compression filters are heuristic (git-log/diff/status, grep, find, ls, tree, dedup, smart-truncate — see tokensaver.rtk-autodetect-order) and are lossy by design: they drop lines, dedupe, or truncate"
+    - "An error result is the one place the exact original text matters — the model needs to see precisely what failed and why to recover, and a downstream reviewer/trace needs the untouched error for debugging; lossy truncation could hide the failing line or the error message itself"
+    - "Skipping is a full bypass, not a lighter compression: no filter is even selected for these blocks"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["tokensaver.rtk-compress-shapes"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "If RTK compressed an error trace and a filter (e.g. dedup-log) removed the one line carrying the actual exception, the model would retry blind or hallucinate a cause — this is the concrete failure the skip prevents"
+  evidence:
+    - { file: open-sse/rtk/index.js, line: 67, note: "if (block.is_error === true) continue; // preserve error traces" }
+    - { file: open-sse/rtk/index.js, line: 103, note: "if (tr.status === 'error') continue; // preserve error traces (Kiro)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tokensaver.rtk-autodetect-order
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "RTK filter selection: autoDetectFilter dispatch order and the caps that bound it"
+  trigger: "compressText() calls autoDetectFilter(text) for any candidate string within [MIN_COMPRESS_SIZE, RAW_CAP]"
+  input: "The candidate text (a tool_result / tool-message string)"
+  output: "A filter function to apply, or null (no filter matched -> text passes through unchanged)"
+  businessRules:
+    - "Detection only inspects the first DETECT_WINDOW (1024) chars of the text, not the whole string"
+    - "Fixed priority order: git-log -> git-diff -> git-status -> build-output -> (porcelain heuristic re-checked as git-status) -> grep -> find -> tree -> ls -> search-list -> read-numbered -> dedup-log -> smart-truncate -> null"
+    - "build-output is checked before the porcelain/git-status heuristic specifically to stop cargo's 'Compiling' lines from being misdetected as git status output"
+    - "find requires ALL non-empty lines to be path-like and >=3 lines; grep requires ANY of the first 5 non-empty lines to look like 'file:number:content'"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["tokensaver.rtk-compress-shapes"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "RAW_CAP (10 MiB) and MIN_COMPRESS_SIZE (500 bytes) bound the work: huge blobs and tiny ones both skip detection entirely"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A blob with no recognizable structure falls through to smart-truncate only if it has >= SMART_TRUNCATE_MIN_LINES (250) lines; otherwise autoDetectFilter returns null and nothing is compressed"
+  evidence:
+    - { file: open-sse/rtk/autodetect.js, line: 2, note: "detection order documented in the file header comment" }
+    - { file: open-sse/rtk/autodetect.js, line: 30, note: "head = text.slice(0, DETECT_WINDOW) — only first 1024 chars inspected" }
+    - { file: open-sse/rtk/autodetect.js, line: 37, note: "build-output checked before the porcelain/git-status heuristic (isMostlyPorcelain at line 39), by design (comment above)" }
+    - { file: open-sse/rtk/autodetect.js, line: 71, note: "return null — no filter matched, caller leaves text untouched" }
+    - { file: open-sse/rtk/constants.js, line: 2, note: "RAW_CAP = 10 * 1024 * 1024" }
+    - { file: open-sse/rtk/constants.js, line: 3, note: "MIN_COMPRESS_SIZE = 500" }
+    - { file: open-sse/rtk/constants.js, line: 4, note: "DETECT_WINDOW = 1024" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tokensaver.rtk-fail-open
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "RTK's two-layer fail-open: a bad filter panics safely, a bad body returns null"
+  trigger: "Any exception while compressing a message body, or a single filter throwing on its input"
+  input: "The in-flight body / candidate text at the point of failure"
+  output: "compressMessages/compressKiroFormat return null (request continues with the body untouched by RTK); safeApply returns the original text unmodified if the chosen filter itself throws"
+  businessRules:
+    - "Two independent catch layers: the per-filter layer (safeApply) prevents one bad filter from aborting the whole compression pass; the outer layer (compressMessages/compressKiroFormat) prevents any other bug in the loop from throwing out of the token-saver stage"
+    - "Both layers only log (console.warn) — neither raises, retries, nor surfaces an error to the client"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["tokensaver.rtk-compress-shapes"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["console.warn on filter panic or compression error"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "safeApply also treats a non-string return from a filter as failure (falls back to raw text), not just a thrown exception"
+  evidence:
+    - { file: open-sse/rtk/applyFilter.js, line: 5, note: "try around fn(text); non-string return also falls through to raw text at line 7" }
+    - { file: open-sse/rtk/applyFilter.js, line: 9, note: "catch: warn and return the original text unmodified — filter panic never propagates" }
+    - { file: open-sse/rtk/index.js, line: 83, note: "compressMessages outer catch: warn and return null, translatedBody left as-is by the caller" }
+    - { file: open-sse/rtk/index.js, line: 113, note: "compressKiroFormat outer catch: same fail-open, return null" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tokensaver.headroom-compress
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "Headroom stage: send messages to an external compression proxy, fail open on any failure"
+  trigger: "Stage 2, only when tokenSaverEnabled && headroomEnabled"
+  input: "translatedBody plus finalFormat/upstreamModel/headroomUrl/headroomCompressUserMessages/headroomTimeoutMs"
+  output: "translatedBody.messages (or .input, or Kiro's projected fields) replaced with the proxy's compressed messages; null on any failure, body left untouched"
+  businessRules:
+    - "The proxy's /v1/compress endpoint only understands OpenAI message shape, so Claude, OpenAI-Responses and Kiro bodies are translated to OpenAI messages first, compressed, then translated back into the original wire shape using 9Router's own translators"
+    - "openai-responses bodies carrying tool/reasoning input items are refused up front (hasUnsafeResponsesInputForCompression) rather than risking a lossy round-trip"
+    - "A hard timeoutMs (default 3000ms) is enforced via AbortSignal.timeout on the fetch to the proxy"
+    - "compressUserMessages is an opt-in flag forwarded as config.compress_user_messages; by default only tool/assistant history is compressed, not the user's own messages"
+  state:
+    reads: ["settings.headroomUrl", "settings.headroomCompressUserMessages", "settings.headroomTimeoutMs"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "POST {headroomUrl}/v1/compress — an external HTTP proxy process managed via the api/headroom/* routes"
+  fallback: { hasFallback: false, retry: null, timeout: "timeoutMs, default DEFAULT_TIMEOUT_MS=3000ms via AbortSignal.timeout", quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Adds a synchronous round trip to a local/loopback (or external) HTTP proxy on the hot path, up to headroomTimeoutMs before falling back"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "If the proxy's response message count doesn't match what was sent (Kiro path), or the JSON is missing messages[], the whole stage is treated as a failure and discarded — no partial application"
+    - "isHeadroomPhantomSavings flags (log-only) a case where the proxy reports token savings but the outbound JSON barely shrank — the provider may still bill close to the original payload"
+  evidence:
+    - { file: open-sse/rtk/headroom.js, line: 248, note: "compressWithHeadroom signature; enabled/url/body guards return null with a diagnostics reason" }
+    - { file: open-sse/rtk/headroom.js, line: 227, note: "fetch with signal: AbortSignal.timeout(timeoutMs) enforcing the hard timeout" }
+    - { file: open-sse/rtk/headroom.js, line: 267, note: "Claude shape: translate to OpenAI, compress, translate back" }
+    - { file: open-sse/rtk/headroom.js, line: 286, note: "openai-responses: unsafe tool/reasoning input skipped before any network call" }
+    - { file: open-sse/rtk/headroom.js, line: 338, note: "outer catch: unexpected error -> diagnostics reason, return null (fail-open)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tokensaver.system-prompt-injection
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "Caveman + Ponytail stages: inject a terse-style system prompt via a shared, format-dispatching injector"
+  trigger: "Stage 3 (caveman) when tokenSaverEnabled && cavemanEnabled && cavemanLevel; stage 4 (ponytail) when tokenSaverEnabled && ponytailEnabled && ponytailLevel"
+  input: "translatedBody, finalFormat, and the level-selected prompt string (CAVEMAN_PROMPTS[level] / PONYTAIL_PROMPTS[level])"
+  output: "The prompt text appended into the body's system/instructions field for the detected wire shape; no-op if already present (idempotent) or if the shape is unrecognized"
+  businessRules:
+    - "injectCaveman and injectPonytail are thin wrappers over the same injectSystemPrompt(body, format, prompt) — they differ only in which prompt table they pull from"
+    - "Dispatch is by wire shape, checked in order: Kiro (systemPrompt+conversationState) -> Claude (system field) -> Gemini/Gemini-CLI/Vertex/Antigravity (systemInstruction) -> OpenAI instructions string -> OpenAI messages[] -> OpenAI Responses input[]; a plain string body.input is left untouched"
+    - "Idempotency is exact: the prompt must appear as its own SEP-delimited segment (or the whole string), not merely as a substring, before it is considered already-injected"
+    - "Kiro injection additionally mirrors/repairs the prompt into the first user turn's content (not just systemPrompt), with a rollback if the write doesn't converge"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Every mutation attempt (array push, property assignment) is individually wrapped in its own try/catch so a frozen or Proxy-wrapped body object degrades to a silent no-op instead of throwing"
+  evidence:
+    - { file: open-sse/rtk/caveman.js, line: 8, note: "injectCaveman(body, format, level) delegates straight to injectSystemPrompt" }
+    - { file: open-sse/rtk/ponytail.js, line: 8, note: "injectPonytail(body, format, level) delegates straight to injectSystemPrompt" }
+    - { file: open-sse/rtk/systemInject.js, line: 17, note: "Kiro shape checked first via isKiroBody() or format === FORMATS.KIRO" }
+    - { file: open-sse/rtk/systemInject.js, line: 25, note: "Claude dispatched by format label before the messages[]/contents[] shape sniff below it" }
+    - { file: open-sse/rtk/systemInject.js, line: 42, note: "OpenAI messages[] path — injectChatSystem" }
+    - { file: open-sse/rtk/systemInject.js, line: 75, note: "hasPrompt: haystack.split(SEP).includes(prompt) — exact segment match, not substring, for idempotency" }
+    - { file: open-sse/rtk/systemInject.js, line: 13, note: "if (!body || !prompt) return; — fail-open guard for the whole dispatcher" }
+    - { file: open-sse/rtk/systemInject.js, line: 57, note: "outer catch (_) { // fail-open }" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tokensaver.pxpipe-compress
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "PXPIPE stage: render bulky Claude-format tool context as dense PNGs via an in-process transform"
+  trigger: "Stage 5, gated only by pxpipeEnabled (see tokensaver.pxpipe-master-optout-bug for why that's a finding)"
+  input: "translatedBody (Claude format only), model, minChars threshold, timeoutMs, and the transform function (pxpipeTransform, looked up once per request in chat.js)"
+  output: "{ body: <new body with text replaced by image blocks> | null, summary }. body is null (original untouched) whenever pxpipe skips or fails"
+  businessRules:
+    - "Only Claude-format bodies are eligible (format !== FORMATS.CLAUDE -> skipped('unsupported_format'))"
+    - "A minChars threshold (settings.pxpipeMinChars, default 25000) gates the whole call — bodies smaller than the threshold are skipped before the transform even runs"
+    - "The CPU-bound transform can't be aborted mid-flight, so it's raced against a timer (Promise.race) with a default 15000ms budget; losing the race discards the (still-running) result and leaves the original body untouched"
+    - "The transformed body trades bytes for tokens: base64 PNGs make it bigger in bytes, but Anthropic bills images by pixels/750 rather than encoded length, so the after-estimate uses image-token math, not chars/4 of the new body"
+  state:
+    reads: ["settings.pxpipeMinChars", "settings.pxpipeTimeoutMs"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["tokensaver.pxpipe-library-mode-status"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: "timeoutMs, default DEFAULT_TIMEOUT_MS=15000ms via Promise.race against a setTimeout", quota: null }
+  errorCases: []
+  sideEffects: ["onPxpipeEvent(...) fired regardless of outcome (applied, skipped or errored) — see tokensaver.savings-recording"]
+  persistence: []
+  performanceConcerns:
+    - "The transform is synchronous CPU work (PNG rendering) inside the request path; only the wait is bounded by the race, not the underlying work itself, which keeps running in the background after losing the race"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "transform is not a function whenever pxpipe isn't installed or hasn't been loaded yet for this process — that alone makes the stage a no-op (skipped('not_installed')), independent of pxpipeEnabled"
+  evidence:
+    - { file: open-sse/rtk/pxpipe.js, line: 32, note: "compressWithPxpipe signature and the enabled/transform/body/format guards, each a skipped(...) fail-open" }
+    - { file: open-sse/rtk/pxpipe.js, line: 36, note: "format !== FORMATS.CLAUDE -> skipped('unsupported_format')" }
+    - { file: open-sse/rtk/pxpipe.js, line: 41, note: "originalChars < threshold -> skipped('below_threshold')" }
+    - { file: open-sse/rtk/pxpipe.js, line: 50, note: "Promise.race(transform(...), timeout) — CPU work can't be cancelled, only its wait" }
+    - { file: open-sse/rtk/pxpipe.js, line: 95, note: "outer catch: transform_error -> skipped(...), fail-open" }
+    - { file: open-sse/handlers/chatCore.js, line: 288, note: "compressWithPxpipe called with enabled: true (pxpipeEnabled already checked by the caller at line 287)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tokensaver.pxpipe-master-optout-bug
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "SB-1: the token-saver master opt-out header does not reach the PXPIPE gate"
+  trigger: "A client sends x-9router-token-saver: off intending to disable the whole token-saver pipeline, while settings.pxpipeEnabled is true"
+  input: "x-9router-token-saver: off header + a Claude-format body large enough to clear pxpipeMinChars"
+  output: "RTK/headroom/caveman/ponytail are all skipped (tokenSaverEnabled is false), but PXPIPE still runs and can replace the body with image-block content"
+  businessRules:
+    - "Every other stage's enable check is `tokenSaverEnabled && <stage>Enabled` (chatCore.js:254,260,274,280); PXPIPE's check at line 287 is `if (pxpipeEnabled)` alone — tokenSaverEnabled is computed at line 251 but never referenced again after line 280"
+    - "This is confirmed directly from source (not inferred): grepping the whole file for tokenSaverEnabled shows exactly 5 uses — the definition plus 4 gate checks (RTK, headroom, caveman, ponytail) — and none at the PXPIPE gate"
+  state:
+    reads: ["settings.pxpipeEnabled", "x-9router-token-saver header (computed but not consulted here)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["tokensaver.pipeline-execution-order", "tokensaver.pxpipe-compress"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The spec (2026-09-22-aigate-design.md SB-1, §6.2 and the UI note at §7) already names this exact bug and requires the opt-out to disable the whole lane — this trace confirms the spec's claim against current 9router source rather than merely repeating it"
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 251, note: "tokenSaverEnabled computed from the header" }
+    - { file: open-sse/handlers/chatCore.js, line: 287, note: "if (pxpipeEnabled) — the only stage gate that omits tokenSaverEnabled" }
+  newModule: routing
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "x-9router-token-saver: off disables every token-saver stage, including PXPIPE, for that request"
+    actual: "PXPIPE runs whenever settings.pxpipeEnabled is true, regardless of the per-request opt-out header — only RTK, headroom, caveman and ponytail honor it"
+    impact: "A client that opts out to keep its exact payload intact (e.g. to preserve verbatim tool output for debugging, or because it distrusts lossy image conversion) can still have its request body silently rewritten into PNG image blocks by PXPIPE, changing token accounting and provider-visible content the client explicitly asked to avoid"
+
+- id: tokensaver.pxpipe-library-mode-status
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "'PXPIPE is running' means the transform module is loaded in-process, not that a port is listening"
+  trigger: "GET /api/pxpipe/status, or any internal caller of getPxpipeStatus()"
+  input: none
+  output: "{ installed, installing, version, path, running, loadedAt, uptimeMs, npmAvailable, mode: 'library' }"
+  businessRules:
+    - "PXPIPE has no server process and no port: 'install' is an npm install into DATA_DIR/pxpipe, 'start'/'restart' load the package's dist/core/library.js via a versioned dynamic import(), and 'stop' just drops the cached module reference"
+    - "running is literally `loaded.loaded`, i.e. whether the in-process module cache (`cached` in loader.js) is populated — there is no health probe of a network socket anywhere in this path"
+    - "The module is cache-busted by package version on every load (?v=<version> query on the file:// import URL) so a repair/upgrade takes effect without a full server restart"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["module-scope `cached` / `loadPromise` in loader.js — process-lifetime cache, not persisted"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "loadPxpipe() dedupes concurrent callers onto the same in-flight promise (loadPromise), so two simultaneous cold requests don't double-import the module"
+    - "getTransform({autoLoad: true}) (the request-path lookup) will trigger a cold load on the very first eligible request rather than requiring an explicit /start call first"
+  evidence:
+    - { file: src/lib/pxpipe/service.js, line: 6, note: "comment: \"running\" in library mode = module loaded into this process" }
+    - { file: src/lib/pxpipe/service.js, line: 14, note: "running: loaded.loaded — no socket/port check anywhere" }
+    - { file: src/lib/pxpipe/loader.js, line: 9, note: "getLoadedInfo() reports loaded purely from the `cached` module-scope variable" }
+    - { file: src/lib/pxpipe/loader.js, line: 28, note: "dynamic import() of the library entry file, cache-busted by version query string" }
+    - { file: src/lib/pxpipe/loader.js, line: 45, note: "getTransform: fail-open, returns null (not throw) on any load error" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tokensaver.pxpipe-management-routes
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "8 api/pxpipe/* routes: install, lifecycle, and observability for the in-process PXPIPE module"
+  trigger: "Dashboard Token Saver card actions and status polling"
+  input: "None (GET) or {extras} style bodies where noted; all are simple POST/GET, no auth beyond the dashboard session"
+  output: "JSON status/result payloads; errors returned as {error, code} with 500 (or 400/409 for expected preconditions), never thrown to the Next.js error boundary"
+  businessRules:
+    - "install: npm-installs pxpipe-proxy@latest into DATA_DIR/pxpipe (serialized — concurrent calls await the same in-flight promise), unloads any cached module, then re-runs the health check"
+    - "start: auto-installs first only if settings.pxpipeAutoInstall is true and the package is missing, otherwise 409 NOT_INSTALLED; then loads the module"
+    - "stop: drops the cached module reference only — requests fail open to uncompressed passthrough (compressWithPxpipe sees transform is not a function) until started again"
+    - "restart: unload then load, for picking up an upgraded install without a full server restart"
+    - "health: installed? -> module loads? -> a synthetic ping request transforms? three-step checklist, each step short-circuiting the next on failure"
+    - "logs / stats: read-only; logs tails install.log plus the events.jsonl audit trail, stats aggregates it into all-time/today/7d/30d windows and a daily timeline"
+  state:
+    reads: ["settings.pxpipeAutoInstall (start only)", "settings.pxpipeEnabled/minChars/timeoutMs (status only)"]
+    writes: ["DATA_DIR/pxpipe/node_modules/pxpipe-proxy (install)", "DATA_DIR/pxpipe/install.log"]
+    runtimeOnly: ["the module cache from tokensaver.pxpipe-library-mode-status"]
+  dependencies: ["tokensaver.pxpipe-library-mode-status"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: "install: 5-minute hard kill (INSTALL_TIMEOUT_MS) via SIGKILL on the npm child process", quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "npm not found on PATH during install", partial: false }
+    - { code: INTERNAL_ERROR, when: "npm install exits non-zero or times out after 5 minutes", partial: false }
+    - { code: INVALID_REQUEST, when: "start called while not installed and pxpipeAutoInstall is off", partial: false }
+  sideEffects: ["fire-and-forget event log line per compression attempt (see tokensaver.savings-recording)"]
+  persistence: ["install.log tail, events.jsonl (via events.js)"]
+  performanceConcerns:
+    - "install has maxDuration: 300 (Next route config) matching the 5-minute npm timeout"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "getInstallInfo() treats 'installed' as purely a filesystem check (package.json + library.js both exist) — it does not verify the package is loadable or version-compatible; that's what health's second step is for"
+  evidence:
+    - { file: src/app/api/pxpipe/install/route.js, line: 13, note: "installPxpipe then unloadPxpipe (line 14) then runHealthCheck (line 15)" }
+    - { file: src/app/api/pxpipe/start/route.js, line: 16, note: "auto-install gate on settings.pxpipeAutoInstall, 409 NOT_INSTALLED otherwise (line 17)" }
+    - { file: src/app/api/pxpipe/stop/route.js, line: 11, note: "unloadPxpipe() only — comment above: requests fail open to uncompressed passthrough" }
+    - { file: src/app/api/pxpipe/restart/route.js, line: 10, note: "unloadPxpipe then loadPxpipe (line 11)" }
+    - { file: src/app/api/pxpipe/health/route.js, line: 8, note: "delegates to runHealthCheck()" }
+    - { file: src/app/api/pxpipe/status/route.js, line: 10, note: "merges getPxpipeStatus() with settings.pxpipeEnabled/minChars/timeoutMs (line 13)" }
+    - { file: src/app/api/pxpipe/logs/route.js, line: 12, note: "installLog tail + readPxpipeEvents (line 13), limit capped at 500" }
+    - { file: src/app/api/pxpipe/stats/route.js, line: 10, note: "getPxpipeStats({recentLimit}) aggregation" }
+    - { file: src/lib/pxpipe/install.js, line: 70, note: "installInFlight = runInstall()... — concurrent installPxpipe() calls await the same in-flight promise (guard at line 69)" }
+    - { file: src/lib/pxpipe/install.js, line: 99, note: "child.kill('SIGKILL') when INSTALL_TIMEOUT_MS (5 min, line 9) elapses" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tokensaver.headroom-management-routes
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "6 api/headroom/* routes: process lifecycle for headroom, an external (not library-mode) proxy"
+  trigger: "Dashboard Token Saver card actions for the Headroom stage"
+  input: "None (GET/POST), except extras which takes {extras: string[]}"
+  output: "JSON status/result payloads; a nested proxy/[...path] route forwards arbitrary requests to the live headroom process"
+  businessRules:
+    - "Unlike PXPIPE, headroom is a real child process 9Router spawns/manages (start/restart/stop against a port derived from settings.headroomUrl, default 8787) — not an in-process module"
+    - "start/restart both refuse (400 EXTERNAL_PROXY) unless the configured headroomUrl is a loopback address — 9Router will not try to manage a proxy it doesn't own"
+    - "extras manages optional Python-based compression extras (findPython310 discovery) independent of the main proxy process"
+    - "proxy/[...path] reverse-proxies to the configured headroomUrl, stripping hop-by-hop headers and additionally stripping cookie/authorization when the target host is not loopback (credential leak guard), and rewrites the vendored dashboard HTML's relative fetch() calls to stay under the /api/headroom/proxy prefix"
+  state:
+    reads: ["settings.headroomUrl", "settings.headroomCodeAware", "settings.headroomKompress"]
+    writes: []
+    runtimeOnly: ["managed child process PID (getManagedPid)"]
+  dependencies: []
+  providerInteraction: "start/restart/stop manage a local child process; proxy/[...path] forwards live HTTP traffic to it (or to an external headroomUrl)"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "start/restart called with a non-loopback headroomUrl", partial: false }
+    - { code: INTERNAL_ERROR, when: "headroom package not installed when start/restart is called", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "proxy/[...path] deletes cookie and authorization headers before forwarding to a non-loopback host specifically so a misconfigured external headroomUrl can't be handed the viewer's dashboard session"
+  evidence:
+    - { file: src/app/api/headroom/start/route.js, line: 21, note: "EXTERNAL_PROXY 400 guard: isLoopbackHeadroomUrl(url) required before spawning (message at line 22)" }
+    - { file: src/app/api/headroom/stop/route.js, line: 8, note: "stopHeadroomProxy() — kills the managed child process" }
+    - { file: src/app/api/headroom/restart/route.js, line: 21, note: "same loopback guard as start, then restartHeadroomProxy (line 25)" }
+    - { file: src/app/api/headroom/status/route.js, line: 12, note: "getHeadroomStatus(url) + getManagedPid() (line 13) — this one queries the live process/socket, unlike pxpipe's module-loaded check" }
+    - { file: src/app/api/headroom/extras/route.js, line: 13, note: "findPython310 + getInstalledHeadroomExtras (line 14), independent of the main proxy lifecycle" }
+    - { file: "src/app/api/headroom/proxy/[...path]/route.js", line: 46, note: "cookie/authorization (line 47) stripped when target host is not loopback" }
+    - { file: "src/app/api/headroom/proxy/[...path]/route.js", line: 52, note: "rewriteDashboardHtml rewrites relative fetch() paths to the /api/headroom/proxy prefix" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tokensaver.savings-recording
+  group: Token Saver
+  feature: Token Saver
+  subFeature: "Only PXPIPE's savings are persisted; RTK and headroom stats are console-log only and discarded"
+  trigger: "End of each stage's run, per request"
+  input: "Each stage's own stats object (rtkStats, headroomStats/headroomDiagnostics, pxpipeSummary)"
+  output: "PXPIPE: one JSON line appended to DATA_DIR/pxpipe/events.jsonl (rotated at 5MB) via onPxpipeEvent -> appendPxpipeEvent, later aggregated by getPxpipeStats() for the dashboard. RTK/headroom/caveman/ponytail: formatted into a console.log/log.line string and never written anywhere else"
+  businessRules:
+    - "chatCore.js never returns rtkStats/headroomStats to its caller (chat.js) and chat.js does not persist them either — grepping the whole tree for rtkStats/headroomStats/rtkLine/headroomLine shows no reference outside chatCore.js's own log lines"
+    - "pxpipeSummary is the one exception: chat.js wires onPxpipeEvent: appendPxpipeEvent, and chatCore.js calls onPxpipeEvent?.({provider, model, ...pxpipeSummary}) after every pxpipe attempt (applied or not), inside its own try/catch so a broken stats write can't fail the request"
+    - "getPxpipeStats() buckets events into all/today/yesterday/last7d/last30d totals plus a daily timeline, classifying non-applied events as either 'errors' (transform_error/timeout) or 'bypassed' (everything else, e.g. below_threshold/unsupported_format)"
+  state:
+    reads: []
+    writes: ["DATA_DIR/pxpipe/events.jsonl"]
+    runtimeOnly: []
+  dependencies: ["tokensaver.pxpipe-compress"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["fs.appendFile to events.jsonl, fire-and-forget (no awaited callback)"]
+  persistence: ["events.jsonl (pxpipe only) — file-rotation at 5MB to events.jsonl.1, no DB table"]
+  performanceConcerns:
+    - "events.jsonl grows unbounded between rotations and readPxpipeEvents() reads the whole file into memory on every stats/logs request — fine at hobby scale, a real bottleneck under sustained high request volume"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A corrupt line in events.jsonl is skipped silently (try/catch per line in readPxpipeEvents) rather than aborting the whole read"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 292, note: "onPxpipeEvent: appendPxpipeEvent wired into the pipeline call" }
+    - { file: open-sse/handlers/chatCore.js, line: 295, note: "onPxpipeEvent?.({provider, model, ...pxpipeSummary}) inside its own try/catch" }
+    - { file: src/lib/pxpipe/events.js, line: 15, note: "appendPxpipeEvent: fire-and-forget fs.appendFile, comment: stats must never break the request path" }
+    - { file: src/lib/pxpipe/events.js, line: 81, note: "getPxpipeStats aggregates windows + timeline for the dashboard" }
+    - { file: open-sse/handlers/chatCore.js, line: 256, note: "if (rtkLine) console.log(rtkLine); — rtkLine only ever reaches console.log, no persistence call anywhere for RTK stats" }
+    - { file: open-sse/handlers/chatCore.js, line: 264, note: "headroomLine only ever reaches log?.info — same, no persistence for headroom stats" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

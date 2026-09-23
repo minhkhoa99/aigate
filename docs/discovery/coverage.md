@@ -1,16 +1,16 @@
 # Discovery coverage
 
-Entries: 128
+Entries: 141
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 39/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +107 |
+| routes | 53/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +93 |
 | pages | 1/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind] … +19 |
 | providers | 14/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +100 |
 | executors | 6/29 | azure, codebuddy-cn, codebuddy-intl, commandcode, cursor, devin-cli, gemini-cli, github … +15 |
 | translators | 2/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +38 |
 | repos | 7/11 | nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo |
-| settingsKeys | 13/52 | cavemanEnabled, cavemanLevel, cloudEnabled, dnsToolEnabled, enableObservability, headroomCompressUserMessages, headroomEnabled, headroomTimeoutMs … +31 |
+| settingsKeys | 25/52 | cloudEnabled, dnsToolEnabled, enableObservability, mitmRouterBaseUrl, observabilityBatchSize, observabilityFlushIntervalMs, observabilityMaxJsonSize, observabilityMaxRecords … +19 |
 
 ## Entries per bounded context
 
@@ -18,14 +18,14 @@ Entries: 128
 - catalog: 21
 - connections: 38
 - identity: 1
-- routing: 52
+- routing: 65
 - settings: 7
 
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 4
-- REFERENCE_BEHAVIOR: 109
-- SUSPECTED_BUG: 15
+- REFERENCE_BEHAVIOR: 121
+- SUSPECTED_BUG: 16
 
 ## Missing — routes
 
@@ -58,12 +58,6 @@ Entries: 128
 - api/cli-tools/kilo-settings
 - api/cli-tools/openclaw-settings
 - api/cli-tools/opencode-settings
-- api/headroom/extras
-- api/headroom/proxy/[...path]
-- api/headroom/restart
-- api/headroom/start
-- api/headroom/status
-- api/headroom/stop
 - api/health
 - api/init
 - api/locale
@@ -91,14 +85,6 @@ Entries: 128
 - api/proxy-pools/cloudflare-deploy
 - api/proxy-pools/deno-deploy
 - api/proxy-pools/vercel-deploy
-- api/pxpipe/health
-- api/pxpipe/install
-- api/pxpipe/logs
-- api/pxpipe/restart
-- api/pxpipe/start
-- api/pxpipe/stats
-- api/pxpipe/status
-- api/pxpipe/stop
 - api/settings/database
 - api/settings/proxy-test
 - api/settings/require-login
@@ -370,15 +356,9 @@ Entries: 128
 
 ## Missing — settingsKeys
 
-- cavemanEnabled
-- cavemanLevel
 - cloudEnabled
 - dnsToolEnabled
 - enableObservability
-- headroomCompressUserMessages
-- headroomEnabled
-- headroomTimeoutMs
-- headroomUrl
 - mitmRouterBaseUrl
 - observabilityBatchSize
 - observabilityFlushIntervalMs
@@ -388,12 +368,6 @@ Entries: 128
 - oidcIssuerUrl
 - oidcLoginLabel
 - oidcScopes
-- ponytailEnabled
-- ponytailLevel
-- pxpipeAutoInstall
-- pxpipeEnabled
-- pxpipeMinChars
-- pxpipeTimeoutMs
 - quotaVisibility
 - requireLogin
 - samlAttributeEmail
