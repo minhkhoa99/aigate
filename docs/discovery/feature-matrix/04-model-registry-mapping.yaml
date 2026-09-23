@@ -59,7 +59,7 @@
   edgeCases:
     - "A provider with genuine per-account model variance (Kiro's comment in src/app/api/v1/models/route.js notes it 'returns dynamic -thinking/-agentic variants per account') cannot be represented in this global structure at all — see catalog.model-listing-live-override for how the client-facing listing compensates by fetching a live per-connection list instead of trusting this table"
   evidence:
-    - { file: open-sse/config/providerModels.js, line: 12, note: "getProviderModels reads the single global PROVIDER_MODELS[aliasOrId]" }
+    - { file: open-sse/config/providerModels.js, line: 13, note: "getProviderModels reads the single global PROVIDER_MODELS[aliasOrId]" }
     - { file: src/shared/constants/models.js, line: 17, note: "import { PROVIDER_MODELS as MODELS } from open-sse/config/providerModels.js — same object, no connection parameter" }
     - { file: src/shared/constants/models.js, line: 36, note: "AI_MODELS built once via Object.entries(MODELS).flatMap — global flat list" }
     - { file: open-sse/providers/index.js, line: 30, note: "PROVIDERS/PROVIDER_MODELS built once at module load (catalog.registry-build)" }
@@ -474,7 +474,91 @@
     - { file: src/shared/utils/providerModelsFetcher.js, line: 16, note: "fetchSuggestedModels — checks the 10-minute cache before fetching" }
     - { file: src/shared/utils/providerModelsFetcher.js, line: 21, note: "proxies via /api/providers/suggested-models to avoid CORS" }
     - { file: "src/app/(dashboard)/dashboard/providers/[id]/page.js", line: 495, note: "only call site: fetchSuggestedModels(fetcher).then(setSuggestedModels)" }
-    - { file: open-sse/config/providerModels.js, line: 38, note: "isValidModel returns true unconditionally for passthrough/openai-compatible providers, independent of any live list" }
+    - { file: open-sse/config/providerModels.js, line: 39, note: "isValidModel returns true unconditionally for passthrough/openai-compatible providers, independent of any live list" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.model-availability-lock-state
+  group: Model registry
+  feature: Model catalog
+  subFeature: "/api/models/availability — dashboard-facing, model-centric aggregation of per-connection cooldown/unavailable locks, plus a manual clear-cooldown action"
+  trigger: Dashboard "model availability" panel (GET), or an operator clicking "clear cooldown" for a specific provider+model (POST)
+  input: "GET — none. POST { action: 'clearCooldown', provider, model }"
+  output: "GET — { models:[{provider, model, status:'cooldown'|'unavailable', until?, connectionId, connectionName, lastError}], unavailableCount }. POST — { ok: true } or 400 on an invalid action"
+  businessRules:
+    - "The underlying per-model lock write/read primitives (the modelLock_{model} connection fields, the '__all'-model connection-wide lock, and testStatus/lastError bookkeeping) are already traced in 03-accounts-multiaccount.yaml (account.mark-unavailable-lock-reasons, account.lock-storage-persistence, account.clear-error-on-success) — this entry documents only the two things THIS route adds on top of that state: a flat, model-scoped view across every connection, and a manual override action"
+    - "GET flattens every connection's active modelLock_* fields into one array via getActiveModelLocks — a lock is only included while new Date(value).getTime() > now (already-expired locks are silently dropped, not surfaced or cleaned up here)"
+    - "A connection with testStatus:'unavailable' but zero active model-specific locks is reported once as a single model:'__all' row — connection-wide unavailability and per-model cooldown are two distinct rows in the same response shape"
+    - "POST clearCooldown scopes to connections matching { provider } and only touches ones that actually have the modelLock_{model} field truthy; clearing the lock ALSO resets testStatus/lastError/backoffLevel back to active if the connection's overall status was 'unavailable' — a per-model clear can silently clear the connection's whole unavailable status, not just the one model's lock"
+  state:
+    reads: ["providerConnections (modelLock_* fields, testStatus, lastError)"]
+    writes: ["providerConnections — clears modelLock_{model} and, conditionally, testStatus/lastError/lastErrorAt/backoffLevel"]
+    runtimeOnly: []
+  dependencies: ["account.mark-unavailable-lock-reasons", "account.lock-storage-persistence", "account.clear-error-on-success"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "POST action is not 'clearCooldown' or provider/model is missing", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections rows, same storage as 03's connection.storage-shape-json-blob"]
+  performanceConcerns:
+    - "GET iterates every connection and every one of its modelLock_* keys on each call — no caching, acceptable at typical connection-count scale"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Exposed under /api/models/* (a model-catalog surface) rather than under the connections/providers dashboard pages, because the panel it feeds is a model-troubleshooting view ('which models are currently cooling down/unavailable across all my accounts') rather than a connection-management view — kept newModule: catalog for that reason rather than connections, even though the state it reads/writes is connection-owned"
+  evidence:
+    - { file: src/app/api/models/availability/route.js, line: 7, note: "MODEL_LOCK_PREFIX = \"modelLock_\"" }
+    - { file: src/app/api/models/availability/route.js, line: 19, note: "getActiveModelLocks filters to locks where until > now" }
+    - { file: src/app/api/models/availability/route.js, line: 41, note: "a connection-wide 'unavailable' status with no active per-model lock is reported as a single model:'__all' row" }
+    - { file: src/app/api/models/availability/route.js, line: 70, note: "POST 400s unless action==='clearCooldown' and provider/model are both present" }
+    - { file: src/app/api/models/availability/route.js, line: 79, note: "clearCooldown only touches connections where connection[lockKey] is truthy" }
+    - { file: src/app/api/models/availability/route.js, line: 85, note: "clearing the lock also resets testStatus/lastError/backoffLevel when the connection was 'unavailable'" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.model-connectivity-test
+  group: Model registry
+  feature: Model catalog
+  subFeature: "/api/models/test — synchronous per-model connectivity probe, self-dispatched through 9router's own /v1/* endpoints"
+  trigger: Dashboard "test this model" action
+  input: "POST { model, kind }  — kind ∈ llm (default) | embedding | image | stt"
+  output: "{ ok: boolean, latencyMs, status, error?, note? }"
+  businessRules:
+    - "pingModelByKind does not call the upstream provider directly — it issues a real HTTP request to 9router's OWN /api/v1/{chat/completions|embeddings|images/generations|audio/transcriptions} endpoint on 127.0.0.1, so the probe exercises the full request path (alias resolution, capability lookup, account selection, translation, upstream call) exactly like a real client would, not just a raw upstream ping"
+    - "The internal self-call authenticates with a real active API key (first isActive!==false row from getApiKeys()) plus an x-9r-cli-token machine-id header — the probe is indistinguishable from an ordinary authenticated client request"
+    - "Every probe kind has a 15000ms hard timeout (AbortSignal.timeout(15000)) and classifies success/failure from the RESPONSE BODY shape, not just HTTP status: e.g. embedding requires a non-empty data[0].embedding array, image requires a non-empty data array, stt requires non-empty trimmed text, llm requires a non-empty choices array"
+    - "LLM probes use max_tokens:1024, not a smaller probe size, specifically because reasoning models spend their token budget on chain-of-thought before an answer (issue #3010 cited in the code) — a tiny max_tokens would starve the answer and produce a false failure"
+    - "A reasoning model that hits finish_reason:'length' with empty visible content but non-empty reasoning/thinking text is treated as a SOFT PASS ({ ok:true, note:'reasoning-only response (length-limited)' }) rather than a failure — the probe distinguishes 'the connection works but the budget ran out' from 'the connection is broken'"
+    - "stt probes synthesize a real (silent) 250ms 16kHz WAV file in-process rather than shipping a fixture asset, so the test has no external file dependency"
+  state:
+    reads: ["apiKeys table (for the internal auth header)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.alias-resolve-before-capability", "catalog.capability-tier-fallback"]
+  providerInteraction: "Indirect — routes back through 9router's own /v1/* handlers, which then dispatch to the real upstream provider via the normal account-selection/executor path"
+  fallback: { hasFallback: false, retry: null, timeout: "AbortSignal.timeout(15000) per probe", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "model is missing from the POST body", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "the internal /v1/* call returns a non-OK HTTP status or a provider-shaped error body", partial: false }
+    - { code: TIMEOUT, when: "the internal call exceeds 15000ms and the AbortSignal fires", partial: false }
+  sideEffects:
+    - "Performs a real (metered) request against the live upstream provider through the normal request path — a 'test' still consumes a real chat/embedding/image/stt call and any associated usage/quota"
+  persistence: []
+  performanceConcerns:
+    - "Each test is a full round-trip through the entire chatCore/translator/executor stack, not a lightweight ping — proportionally as slow as a real request, capped at 15s"
+  behavior: { streaming: false, cancellation: "AbortSignal.timeout aborts the underlying fetch at 15000ms", concurrency: null }
+  edgeCases:
+    - "A provider that returns HTTP 200 with an embedded { status, msg } error convention (checked in the llm branch, e.g. providerStatus not 200/0 with a message) is still classified as a failure even though the outer HTTP status was 200 — the probe reads provider-specific soft-error conventions, not just res.ok"
+  evidence:
+    - { file: src/app/api/models/test/route.js, line: 9, note: "POST delegates to pingModelByKind(model, kind || 'llm')" }
+    - { file: src/app/api/models/test/ping.js, line: 53, note: "pingModelByKind targets 9router's own 127.0.0.1 base URL — a self-dispatched probe, not a direct upstream call" }
+    - { file: src/app/api/models/test/ping.js, line: 62, note: "AbortSignal.timeout(15000) on the embedding probe (same pattern for image/stt/llm)" }
+    - { file: src/app/api/models/test/ping.js, line: 73, note: "embedding success requires a non-empty data[0].embedding array, not just res.ok" }
+    - { file: src/app/api/models/test/ping.js, line: 142, note: "max_tokens:1024 chosen so reasoning models don't starve their answer (issue #3010)" }
+    - { file: src/app/api/models/test/ping.js, line: 196, note: "soft-pass: finish_reason==='length' with empty content but present reasoning is still ok:true" }
+    - { file: src/app/api/models/test/ping.js, line: 49, note: "x-9r-cli-token machine-id header added alongside the real API key for internal auth" }
   newModule: catalog
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]

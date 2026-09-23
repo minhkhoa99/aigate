@@ -1,10 +1,10 @@
 # Discovery coverage
 
-Entries: 74
+Entries: 76
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 27/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +119 |
+| routes | 29/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +117 |
 | pages | 1/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind] … +19 |
 | providers | 9/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, antigravity, api-airforce, assemblyai … +105 |
 | executors | 4/29 | antigravity, azure, codebuddy-cn, codebuddy-intl, codex, commandcode, cursor, devin-cli … +17 |
@@ -15,7 +15,7 @@ Entries: 74
 ## Entries per bounded context
 
 - apikeys: 9
-- catalog: 19
+- catalog: 21
 - connections: 38
 - identity: 1
 - settings: 7
@@ -23,7 +23,7 @@ Entries: 74
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 3
-- REFERENCE_BEHAVIOR: 65
+- REFERENCE_BEHAVIOR: 67
 - SUSPECTED_BUG: 6
 
 ## Missing — routes
@@ -75,8 +75,6 @@ Entries: 74
 - api/media-providers/tts/inworld/voices
 - api/media-providers/tts/minimax/voices
 - api/media-providers/tts/voices
-- api/models/availability
-- api/models/test
 - api/pricing
 - api/provider-nodes
 - api/provider-nodes/[id]
