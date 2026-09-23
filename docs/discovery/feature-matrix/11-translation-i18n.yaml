@@ -126,10 +126,10 @@
     - "The same silent-skip already applies to the response side: translateResponse's Step 1/Step 2 use the identical `if (toOpenAI)`/`if (fromOpenAI)` guard shape"
   evidence:
     - { file: open-sse/translator/index.js, line: 12, note: "comment: lazy-init guards against circular-import order; register() runs as a side effect before this module's body" }
-    - { file: open-sse/translator/index.js, line: 92, note: "Step 1 source->openai: `if (toOpenAI) { result = toOpenAI(...) }` — no else branch, no error" }
-    - { file: open-sse/translator/index.js, line: 102, note: "Step 2 openai->target: same silent-skip shape" }
-    - { file: open-sse/translator/index.js, line: 186, note: "translateResponse Step 1 target->openai: identical guard" }
-    - { file: open-sse/translator/index.js, line: 199, note: "translateResponse Step 2 openai->source: identical guard" }
+    - { file: open-sse/translator/index.js, line: 93, note: "Step 1 source->openai: `if (toOpenAI) { result = toOpenAI(...) }` — no else branch, no error" }
+    - { file: open-sse/translator/index.js, line: 103, note: "Step 2 openai->target: same silent-skip shape" }
+    - { file: open-sse/translator/index.js, line: 187, note: "translateResponse Step 1 target->openai: identical guard" }
+    - { file: open-sse/translator/index.js, line: 200, note: "translateResponse Step 2 openai->source: identical guard" }
   newModule: routing
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
@@ -144,7 +144,8 @@
   businessRules:
     - "Thinking/reasoning block CONTENT + signature: claude-to-openai.js's convertClaudeMessage switch handles only text/image/tool_use/tool_result — there is no case for Claude's `thinking` or `redacted_thinking` block type, so a prior-turn thinking block from a Claude-native client is dropped entirely on the claude->openai leg (not even converted to plain text)"
     - "Even when a thinking block DOES reach the OpenAI-target normalization step, filterToOpenAIFormat strips it explicitly: its own docblock says 'Remove: thinking, redacted_thinking, signature, and other non-OpenAI blocks', and stripBlock unconditionally destructures `signature` out of every content block regardless of source or target provider"
-    - "On the response leg (upstream Claude -> client), claude-to-openai.js's response translator does carry live thinking_delta text through, but only by re-encoding it as plain text wrapped in literal `<think>`/`</think>` tags merged into the OpenAI `content` string — the structural distinction between reasoning and answer text, and any cryptographic signature on the thinking block, is gone; server_tool_use (built-in web-search) blocks are dropped outright (skip, no representation at all)"
+    - "On the response leg (upstream Claude -> client), reasoning TEXT itself survives: content_block_delta's thinking_delta case calls reasoningDelta(delta.thinking), which builds a separate structured `{ reasoning_content: text }` delta that concerns/chunk.js's buildChunk passes through verbatim as choices[0].delta — the same reasoning_content convention used for GLM/Qwen/DeepSeek/Kimi, not a text merge. What IS lost is the discrete thinking-BLOCK structure: content_block_start/content_block_stop for a THINKING block instead emit bare literal `<think>`/`</think>` boundary markers into the OpenAI `content` field (no text inside them) — so a client sees a `<think>` marker in `content` running in parallel with the actual reasoning text arriving on a separate `reasoning_content` field, an unusual split representation — plus any cryptographic signature on the thinking block, which has no field on either side. redacted_thinking has no case in this response switch at all, so it produces neither markers nor reasoning_content. server_tool_use (built-in web-search) blocks are dropped outright (skip, no representation at all)"
+    - "The reverse direction (a prior turn's reasoning_content -> Claude thinking block) is not reconstructed at all: openai-to-claude.js's getContentBlocksFromMessage only reads msg.content (array or string) and msg.tool_calls for an assistant message — it never reads the sibling msg.reasoning_content field, so that text is silently dropped, not converted into a Claude thinking block, whenever a request is translated toward the claude target format"
     - "cache_control: Claude content-block cache_control markers are never copied by claude-to-openai.js's block conversion; filterToOpenAIFormat also strips cache_control from every block unless the target provider is flagged quirks.preserveCacheControl, in which case it is kept but only as an opaque pass-through, not reconciled with any OpenAI-side caching concept (OpenAI has none)"
     - "tool_use id: preserved verbatim when it already matches Anthropic's `^[a-zA-Z0-9_-]+$` pattern; ensureToolCallIds regenerates a brand-new id (from message/tool-call position, not derived from the original string) whenever it does not match, so an original id containing e.g. `:` or `.` never survives the pivot unchanged"
     - "tool_result is_error: claude-to-openai.js's TOOL_RESULT case builds a plain `{ role: tool, tool_call_id, content }` OpenAI message with no is_error field — OpenAI's tool-message shape has no equivalent, so the flag is lost on the claude->openai leg. It is preserved only in the one place OpenAI-to-Claude conversion re-reads an already-Claude-shaped tool_result block that arrived embedded in an OpenAI-format message (an edge case, not the general claude-native path)"
@@ -170,15 +171,20 @@
   edgeCases:
     - "All of the above compounds on a claude->openai->claude round trip (e.g. Claude client through an OpenAI-compatible provider back to a Claude-shaped log): thinking content, is_error, url images, and per-block cache_control are gone by the time the OpenAI intermediate is built, so nothing downstream can recover them"
   evidence:
-    - { file: open-sse/translator/request/claude-to-openai.js, line: 32, note: "system array joined into one string; per-block cache_control not read" }
-    - { file: open-sse/translator/request/claude-to-openai.js, line: 164, note: "convertClaudeMessage switch: TEXT/IMAGE/TOOL_USE/TOOL_RESULT only — no THINKING/REDACTED_THINKING case" }
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 34, note: "system array joined into one string; per-block cache_control not read" }
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 165, note: "convertClaudeMessage switch: TEXT/IMAGE/TOOL_USE/TOOL_RESULT only — no THINKING/REDACTED_THINKING case" }
     - { file: open-sse/translator/request/claude-to-openai.js, line: 171, note: "image block only handled when source.type === 'base64'" }
     - { file: open-sse/translator/request/claude-to-openai.js, line: 205, note: "tool_result -> OpenAI tool message built without is_error" }
     - { file: open-sse/translator/formats/openai.js, line: 8, note: "docblock: Remove thinking, redacted_thinking, signature, and other non-OpenAI blocks" }
     - { file: open-sse/translator/formats/openai.js, line: 15, note: "stripBlock always drops signature; keeps cache_control only if opts.preserveCacheControl" }
     - { file: open-sse/translator/formats/openai.js, line: 38, note: "thinking/redacted_thinking blocks filtered out of any ->openai target body" }
     - { file: open-sse/translator/response/claude-to-openai.js, line: 55, note: "server_tool_use (web search) blocks skipped entirely" }
-    - { file: open-sse/translator/response/claude-to-openai.js, line: 91, note: "thinking_delta re-encoded as plain <think> text, not a structured field" }
+    - { file: open-sse/translator/response/claude-to-openai.js, line: 65, note: "content_block_start THINKING: bare '<think>' marker pushed into content" }
+    - { file: open-sse/translator/response/claude-to-openai.js, line: 92, note: "content_block_delta thinking_delta: reasoningDelta(delta.thinking) — reasoning TEXT goes to reasoning_content, not content" }
+    - { file: open-sse/translator/response/claude-to-openai.js, line: 116, note: "content_block_stop THINKING: bare '</think>' marker pushed into content" }
+    - { file: open-sse/translator/concerns/reasoning.js, line: 7, note: "reasoningDelta(text) (withRole defaults false, the call shape used here) returns { reasoning_content: text } — a separate structured field" }
+    - { file: open-sse/translator/concerns/chunk.js, line: 9, note: "buildChunk passes the delta object through verbatim as choices[0].delta" }
+    - { file: open-sse/translator/request/openai-to-claude.js, line: 255, note: "getContentBlocksFromMessage(ASSISTANT) reads msg.content/msg.tool_calls only — never msg.reasoning_content" }
     - { file: open-sse/translator/request/openai-to-claude.js, line: 224, note: "is_error preserved only on an already-Claude-shaped embedded tool_result block" }
     - { file: open-sse/translator/schema/finishReasons.js, line: 4, note: "OPENAI_FINISH: 4 values" }
     - { file: open-sse/translator/schema/finishReasons.js, line: 12, note: "CLAUDE_STOP: 4 values including STOP_SEQUENCE" }
@@ -225,8 +231,8 @@
   evidence:
     - { file: open-sse/translator/index.js, line: 168, note: "same-format short-circuit still runs decloakStreamChunk" }
     - { file: open-sse/translator/index.js, line: 179, note: "direct response route lookup responseRegistry.get(`${targetFormat}:${sourceFormat}`)" }
-    - { file: open-sse/translator/index.js, line: 186, note: "Step 1 target->openai" }
-    - { file: open-sse/translator/index.js, line: 199, note: "Step 2 openai->source" }
+    - { file: open-sse/translator/index.js, line: 187, note: "Step 1 target->openai" }
+    - { file: open-sse/translator/index.js, line: 200, note: "Step 2 openai->source" }
     - { file: open-sse/translator/index.js, line: 214, note: "_openaiIntermediate stashed only when both hops ran" }
     - { file: open-sse/translator/index.js, line: 227, note: "initState base fields" }
     - { file: open-sse/translator/index.js, line: 244, note: "openai-responses-only extra state fields" }
@@ -261,8 +267,8 @@
     - { file: open-sse/transformer/responsesTransformer.js, line: 54, note: "createResponsesApiTransformStream definition" }
     - { file: open-sse/handlers/responsesHandler.js, line: 25, note: "handleResponsesCore — sole consumer of createResponsesApiTransformStream" }
     - { file: open-sse/handlers/responsesHandler.js, line: 84, note: "createResponsesApiTransformStream(null) call, Case 2" }
-    - { file: src/app/api/v1/responses/route.js, line: 27, note: "POST handler calls handleChat(request), not handleResponsesCore" }
-    - { file: src/app/api/v1/responses/route.js, line: 26, note: "comment: now handled by translator pattern (openai-responses format auto-detected)" }
+    - { file: src/app/api/v1/responses/route.js, line: 29, note: "POST handler calls handleChat(request), not handleResponsesCore" }
+    - { file: src/app/api/v1/responses/route.js, line: 25, note: "comment: now handled by translator pattern (openai-responses format auto-detected)" }
   newModule: routing
   parityStatus: traced
   labels: [SUSPECTED_BUG]
@@ -369,7 +375,7 @@
     - { file: open-sse/translator/schema/index.js, line: 1, note: "barrel: pure-data enums only, no logic" }
     - { file: open-sse/translator/schema/roles.js, line: 4, note: "ROLE enum" }
     - { file: open-sse/translator/schema/blocks.js, line: 15, note: "CLAUDE_BLOCK enum, including REDACTED_THINKING and SERVER_TOOL_USE" }
-    - { file: open-sse/translator/schema/blocks.js, line: 47, note: "VALID_OPENAI_MESSAGE_TYPES reuses CLAUDE_BLOCK.TOOL_RESULT" }
+    - { file: open-sse/translator/schema/blocks.js, line: 46, note: "VALID_OPENAI_MESSAGE_TYPES reuses CLAUDE_BLOCK.TOOL_RESULT" }
     - { file: open-sse/translator/schema/finishReasons.js, line: 1, note: "comment: enums here, mapping LOGIC lives in concerns/finishReason.js" }
     - { file: open-sse/translator/schema/defaults.js, line: 4, note: "MODEL_FALLBACK shared default" }
     - { file: open-sse/translator/concerns/finishReason.js, line: 3, note: "imports the schema enums, holds the mapping tables" }
@@ -570,7 +576,7 @@
   output: "{ success, locale } and a `locale` cookie set; or 400 for an unsupported locale"
   businessRules:
     - "isSupportedLocale rejects (400) before any normalization runs — an unrecognized locale string never reaches normalizeLocale or the cookie write"
-    - "normalizeLocale is a 34-branch if/else identity chain (one branch per entry in LOCALES, each returning the exact value it matched) plus a `zh`/`zh-CN` alias and a DEFAULT_LOCALE fallback — functionally equivalent to `isSupportedLocale(x) ? x : DEFAULT_LOCALE`, but written as an explicit long-form chain rather than a lookup"
+    - "normalizeLocale is a 35-if if/else chain (1 zh/zh-CN alias branch + 34 identity branches, one per entry in LOCALES, each returning the exact value it matched) plus a DEFAULT_LOCALE fallback — functionally equivalent to `isSupportedLocale(x) ? x : DEFAULT_LOCALE`, but written as an explicit long-form chain rather than a lookup"
     - "The cookie (LOCALE_COOKIE = 'locale') is set with path: '/' and maxAge: 60*60*24*365 (1 year) — no httpOnly/secure/sameSite flags are set, so it is readable and writable from client-side JavaScript, which is required by design since runtime.js reads it directly via document.cookie"
     - "PUBLIC_API_PATHS in dashboardGuard.js includes /api/locale, so this route is reachable without an authenticated dashboard session"
     - "LanguageSwitcher's handleSetLocale POSTs the cookie, then calls reloadTranslations() to apply the change immediately client-side, without a full page reload; the profile page separately reads the cookie into its own local state on mount via a duplicated getLocaleFromCookie() implementation (not imported from runtime.js)"
@@ -587,16 +593,16 @@
   sideEffects: []
   persistence: ["locale cookie in the browser (not server-side state — there is no per-user locale row in the DB)"]
   performanceConcerns:
-    - "normalizeLocale's 34-branch if-chain does up to 34 string comparisons for a locale near the end of the list, where a Set/Map lookup would be O(1); LOCALES.includes() (isSupportedLocale) is also a linear scan"
+    - "normalizeLocale's 35-if chain does up to 35 string comparisons for a locale near the end of the list, where a Set/Map lookup would be O(1); LOCALES.includes() (isSupportedLocale) is also a linear scan"
   behavior: { streaming: false, cancellation: null, concurrency: null }
   edgeCases:
     - "Because persistence is a plain browser cookie with no server-side record, locale does not follow the user across devices/browsers and is lost if cookies are cleared — there is no server-persisted user-locale preference"
   evidence:
     - { file: src/app/api/locale/route.js, line: 9, note: "isSupportedLocale rejects before normalization" }
     - { file: src/app/api/locale/route.js, line: 18, note: "cookie set path:/ maxAge 1 year" }
-    - { file: src/i18n/config.js, line: 79, note: "normalizeLocale — 34-branch identity if-chain" }
+    - { file: src/i18n/config.js, line: 79, note: "normalizeLocale — 35-if chain (1 alias + 34 identity branches)" }
     - { file: src/i18n/config.js, line: 188, note: "isSupportedLocale — LOCALES.includes()" }
-    - { file: src/dashboardGuard.js, line: 18, note: "/api/locale listed in PUBLIC_API_PATHS" }
+    - { file: src/dashboardGuard.js, line: 26, note: "/api/locale listed in PUBLIC_API_PATHS" }
     - { file: src/shared/components/LanguageSwitcher.js, line: 91, note: "handleSetLocale: POST cookie then reloadTranslations(), no full page reload" }
     - { file: "src/app/(dashboard)/dashboard/profile/page.js", line: 12, note: "duplicated getLocaleFromCookie() implementation, not imported from runtime.js" }
   newModule: tooling

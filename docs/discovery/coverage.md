@@ -8,7 +8,7 @@ Entries: 210
 | pages | 5/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind]/[id] … +15 |
 | providers | 15/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +99 |
 | executors | 9/29 | azure, codebuddy-cn, codebuddy-intl, devin-cli, gemini-cli, github, grok-cli, grok-web … +12 |
-| translators | 35/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/concerns/reasoning.js … +5 |
+| translators | 37/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/concerns/thinking.js, open-sse/translator/formats/claude.js … +3 |
 | repos | 10/11 | nodesRepo |
 | settingsKeys | 32/52 | cloudEnabled, dnsToolEnabled, mitmRouterBaseUrl, oidcClientId, oidcIssuerUrl, oidcLoginLabel, oidcScopes, samlAttributeEmail … +12 |
 
@@ -255,14 +255,12 @@ Entries: 210
 
 ## Missing — translators
 
-- open-sse/translator/concerns/chunk.js
 - open-sse/translator/concerns/json.js
 - open-sse/translator/concerns/kiroConversation.js
 - open-sse/translator/concerns/message.js
 - open-sse/translator/concerns/modality.js
 - open-sse/translator/concerns/paramSupport.js
 - open-sse/translator/concerns/prefetch.js
-- open-sse/translator/concerns/reasoning.js
 - open-sse/translator/concerns/thinking.js
 - open-sse/translator/formats/claude.js
 - open-sse/translator/formats/gemini.js
