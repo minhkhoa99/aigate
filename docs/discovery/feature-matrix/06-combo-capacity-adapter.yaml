@@ -214,7 +214,7 @@
     - { file: open-sse/services/combo.js, line: 571, note: "panelBody: tools/tool_choice/stream_options stripped, stream:false" }
     - { file: open-sse/services/combo.js, line: 609, note: "answers.length===0 -> 503 'All fusion panel models failed'" }
     - { file: open-sse/services/combo.js, line: 618, note: "answers.length===1 -> handleSingleModel(body, answers[0].model) re-invoked with the original body" }
-    - { file: open-sse/services/combo.js, line: 396, note: "extractPanelText — OpenAI/Claude/Gemini/Responses shapes; falls through to ''" }
+    - { file: open-sse/services/combo.js, line: 390, note: "extractPanelText — OpenAI/Claude/Gemini/Responses shapes; falls through to ''" }
   newModule: routing
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
@@ -247,7 +247,7 @@
   edgeCases:
     - "appendUserTurn's else-branch (fresh `messages: [{role:'user', content:text}]`) only triggers when the body has none of messages/input/contents — a malformed body in that shape silently loses every other original field for the judge call"
   evidence:
-    - { file: open-sse/services/combo.js, line: 452, note: "buildJudgePrompt — panel answers labeled '[Source N]', anonymized" }
+    - { file: open-sse/services/combo.js, line: 451, note: "buildJudgePrompt — panel answers labeled '[Source N]', anonymized" }
     - { file: open-sse/services/combo.js, line: 459, note: "instruction: do not mention multiple models, do not refer to sources" }
     - { file: open-sse/services/combo.js, line: 428, note: "appendUserTurn — format branching, preserves the original body" }
     - { file: open-sse/services/combo.js, line: 563, note: "judge = judgeModel && judgeModel.trim() ? judgeModel.trim() : panel[0]" }
@@ -355,10 +355,10 @@
     - "getCapabilitiesForModel is looked up once per model per request with no memoization across the sort — cheap since it is a static-table/pattern lookup, not an I/O call"
   behavior: { streaming: false, cancellation: null, concurrency: null }
   edgeCases:
-    - "HARD_CAPS in combo.js is currently the same 4-capability set detectRequiredCapabilities ever emits, and 'search' (a would-be soft capability) is disabled there — so the tier-0-vs-tier-1 (soft-satisfied vs soft-missing) split is implemented but currently unreachable; every real request that reaches this function only ever produces tier 1 or tier 2 members, never tier 0 via a soft distinction"
+    - "HARD_CAPS in combo.js is currently the same 4-capability set detectRequiredCapabilities ever emits, and 'search' (a would-be soft capability) is disabled there — so `required` never contains anything outside HARD_CAPS, meaning `soft` (required filtered to non-hard) is always the empty array. `[].every(...)` is vacuously true, so tierOf's `soft.every((c) => caps[c] === true) ? 0 : 1` always returns 0 once the hard check passes. In practice this means TIER 0 is the common case (any model that satisfies the required hard capabilities lands in tier 0, never tier 1) and TIER 1 (hard satisfied but a soft capability missing) is the currently-unreachable branch, not tier 0 — the reverse of what a first read of the code might suggest"
   evidence:
-    - { file: open-sse/services/combo.js, line: 10, note: "HARD_CAPS = vision/pdf/audioInput/videoInput, with comment distinguishing hard vs soft" }
-    - { file: open-sse/services/combo.js, line: 68, note: "tierOf: hard.every(...) false -> tier 2, else soft.every(...) ? 0 : 1" }
+    - { file: open-sse/services/combo.js, line: 12, note: "HARD_CAPS = vision/pdf/audioInput/videoInput, with comment distinguishing hard vs soft" }
+    - { file: open-sse/services/combo.js, line: 73, note: "tierOf: hard.every(...) false -> tier 2, else soft.every(...) ? 0 : 1" }
     - { file: open-sse/services/combo.js, line: 80, note: "stable sort by (tier, original index)" }
     - { file: open-sse/services/combo.js, line: 285, note: "handleComboChat's autoSwitch call site into reorderByCapabilities" }
   newModule: routing
