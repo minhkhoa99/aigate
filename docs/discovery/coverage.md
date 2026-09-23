@@ -1,16 +1,16 @@
 # Discovery coverage
 
-Entries: 141
+Entries: 164
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 53/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +93 |
-| pages | 1/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind] … +19 |
+| routes | 63/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +83 |
+| pages | 2/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind] … +18 |
 | providers | 14/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +100 |
 | executors | 6/29 | azure, codebuddy-cn, codebuddy-intl, commandcode, cursor, devin-cli, gemini-cli, github … +15 |
 | translators | 2/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +38 |
-| repos | 7/11 | nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo |
-| settingsKeys | 25/52 | cloudEnabled, dnsToolEnabled, enableObservability, mitmRouterBaseUrl, observabilityBatchSize, observabilityFlushIntervalMs, observabilityMaxJsonSize, observabilityMaxRecords … +19 |
+| repos | 9/11 | nodesRepo, proxyPoolsRepo |
+| settingsKeys | 32/52 | cloudEnabled, dnsToolEnabled, mitmRouterBaseUrl, oidcClientId, oidcIssuerUrl, oidcLoginLabel, oidcScopes, samlAttributeEmail … +12 |
 
 ## Entries per bounded context
 
@@ -20,12 +20,13 @@ Entries: 141
 - identity: 1
 - routing: 65
 - settings: 7
+- usage: 23
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 4
-- REFERENCE_BEHAVIOR: 121
-- SUSPECTED_BUG: 16
+- IMPLEMENTATION_ACCIDENT: 5
+- REFERENCE_BEHAVIOR: 140
+- SUSPECTED_BUG: 19
 
 ## Missing — routes
 
@@ -68,7 +69,6 @@ Entries: 141
 - api/media-providers/tts/inworld/voices
 - api/media-providers/tts/minimax/voices
 - api/media-providers/tts/voices
-- api/pricing
 - api/provider-nodes/[id]
 - api/provider-nodes/validate
 - api/providers/[id]/models
@@ -103,15 +103,6 @@ Entries: 141
 - api/tunnel/tailscale-disable
 - api/tunnel/tailscale-enable
 - api/tunnel/tailscale-install
-- api/usage/[connectionId]/codex-reset-credits
-- api/usage/chart
-- api/usage/history
-- api/usage/logs
-- api/usage/providers
-- api/usage/request-details
-- api/usage/request-logs
-- api/usage/stats
-- api/usage/stream
 - api/v1/audio/speech
 - api/v1/audio/transcriptions
 - api/v1/audio/voices
@@ -150,7 +141,6 @@ Entries: 141
 - (dashboard)/dashboard/providers/new
 - (dashboard)/dashboard/proxy-pools
 - (dashboard)/dashboard/pxpipe
-- (dashboard)/dashboard/quota
 - (dashboard)/dashboard/skills
 - (dashboard)/dashboard/token-saver
 - (dashboard)/dashboard/translator
@@ -350,26 +340,17 @@ Entries: 141
 ## Missing — repos
 
 - nodesRepo
-- pricingRepo
 - proxyPoolsRepo
-- requestDetailsRepo
 
 ## Missing — settingsKeys
 
 - cloudEnabled
 - dnsToolEnabled
-- enableObservability
 - mitmRouterBaseUrl
-- observabilityBatchSize
-- observabilityFlushIntervalMs
-- observabilityMaxJsonSize
-- observabilityMaxRecords
 - oidcClientId
 - oidcIssuerUrl
 - oidcLoginLabel
 - oidcScopes
-- quotaVisibility
-- requireLogin
 - samlAttributeEmail
 - samlAttributeName
 - samlCert

@@ -1,0 +1,873 @@
+# Task 13: Usage, Quota Tracker
+#
+# Prior art (documented elsewhere, cited via dependencies rather than re-traced):
+# - 05-request-routing-fallback.yaml: routing.usage-recording-timing (streaming/non-streaming
+#   usage write timing relative to the flush), routing.success-callback-timing (onRequestSuccess
+#   timing).
+# - 02-providers-auth.yaml: catalog.usage-feature-flag (which providers support vendor usage).
+# - 03-*.yaml: account lock / quota-exhaustion entries (GitHub monthly lock, Antigravity
+#   quota prefilter).
+# - 07-token-saver.yaml: tokensaver.savings-recording.
+
+- id: usage.request-field-trace-order
+  group: Usage tracking
+  feature: Per-request usage capture
+  subFeature: Every field recorded for one request, in the order it becomes known
+  trigger: A chat request reaches a success or error return point inside handleChatCore (or the embeddings/other modality equivalents)
+  input: "modelInfo {provider, model}, credentials.connectionId, the translated request body, the upstream response body, and wall-clock marks"
+  output: "A buildRequestDetail() object persisted via saveRequestDetail, and a canonicalized {provider, model, tokens, connectionId, apiKey, endpoint, cost, status} object persisted via saveRequestUsage"
+  businessRules:
+    - "provider and model are known first — they come from modelInfo at handler entry, before any network call"
+    - "account (connectionId) is known next — it is set on credentials before dispatch and threaded through as connectionId"
+    - "input/output/cached tokens are known only after the upstream response returns: extractUsageFromResponse() branches on Claude (usage.input_tokens), OpenAI (usage.prompt_tokens) or Gemini (usageMetadata) response shapes to pull them out"
+    - "cached tokens are folded into prompt_tokens by canonicalizeUsage() before storage (the cache-inclusive convention), not stored as a separate additive field"
+    - "cost is computed last and lazily: saveUsageStats()/saveRequestUsage() receive raw tokens and provider/model; calculateCost() looks up pricing and multiplies inside saveRequestUsage itself, not by the caller"
+    - "latency.total = Date.now() - requestStartTime, computed once the outcome (success or error) is known; latency.ttft is only ever set by the streaming path (buildOnStreamComplete) — every non-streaming and forced-JSON error/success path hardcodes ttft: 0"
+    - "status is 'success' (buildRequestDetail default) or explicitly 'error'; the error message is stored under response.error, not as a separate field"
+    - "fallback attempts are NOT part of the usage row: a single request may try several accounts/providers before one succeeds, but only the account/provider that finally answered (or the account whose failure ended the loop) is passed into saveRequestUsage/saveRequestDetail — see edgeCases"
+  state:
+    reads: []
+    writes: ["usageHistory / usageDaily (via saveRequestUsage)", "requestDetails (via saveRequestDetail)"]
+    runtimeOnly: ["requestStartTime", "pxpipeSummary"]
+  dependencies: ["routing.usage-recording-timing"]
+  providerInteraction: "Token counts come from the upstream response body (usage / usageMetadata block); when absent they are estimated elsewhere in the streaming path (see routing.usage-recording-timing), never left null"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["usageHistory row (promptTokens, completionTokens, cost, status, tokens JSON)", "requestDetails row (latency, tokens, request/providerRequest/providerResponse/response bodies)"]
+  performanceConcerns:
+    - "extractUsageFromResponse() re-parses the full provider response body shape on every single request to locate the usage block"
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "GAP: fallback attempts (other accounts/providers tried and rejected before the winning one) are not recorded anywhere — usageHistory and requestDetails only ever see the final attempt. AIGate has no source data to reconstruct 'how many accounts did this request burn through' from 9router's persisted usage rows."
+    - "GAP: latency.ttft = 0 is used both as the literal value for a genuinely instant response and as the 'not measured on this code path' default for every non-streaming/error case — the two cannot be told apart from the stored data."
+  evidence:
+    - { file: open-sse/handlers/chatCore/requestDetail.js, line: 24, note: "extractUsageFromResponse — three provider response shapes" }
+    - { file: open-sse/handlers/chatCore/requestDetail.js, line: 67, note: "buildRequestDetail — latency/tokens defaults, ttft:0 baked in" }
+    - { file: open-sse/handlers/chatCore/requestDetail.js, line: 103, note: "saveUsageStats — cost NOT computed here, only tokens/provider/model passed on" }
+    - { file: open-sse/handlers/chatCore.js, line: 381, note: "error branch: latency.total computed, ttft hardcoded 0" }
+    - { file: open-sse/handlers/chatCore.js, line: 455, note: "provider-error branch: same ttft:0 pattern" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.write-not-synchronous
+  group: Usage tracking
+  feature: Per-request usage capture
+  subFeature: Whether the usage write blocks the HTTP response
+  trigger: saveUsageStats()/saveRequestUsage() called from any chat/embeddings success or error path
+  input: "{provider, model, tokens, connectionId, apiKey, endpoint}"
+  output: "A pending usageHistory write that races the HTTP response instead of gating it"
+  businessRules:
+    - "Every call site invokes saveRequestUsage(...).catch(() => {}) without awaiting it — the promise is fired and its rejection swallowed, the caller moves on immediately"
+    - "saveRequestUsage's own function body starts with `const db = await getAdapter();` — even the portion of the function that runs before the caller regains control is minimal; the DB work happens after a yield to the event loop"
+    - "Because the write is unawaited and off the critical path, it is NOT synchronous with the response and does not sit on the hot path — the condition stated for labeling this IMPLEMENTATION_ACCIDENT does not hold here"
+  state:
+    reads: []
+    writes: ["usageHistory / usageDaily"]
+    runtimeOnly: []
+  dependencies: ["routing.usage-recording-timing", "routing.success-callback-timing"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["usageHistory row (eventually, not guaranteed before the client sees a response)"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: "Fire-and-forget: multiple in-flight saveRequestUsage calls for concurrent requests interleave freely; each is its own transaction" }
+  edgeCases:
+    - "A process crash between the HTTP response being sent and the fire-and-forget promise settling drops the usage row silently — no retry, no dead-letter, no log beyond a swallowed .catch(() => {})"
+  evidence:
+    - { file: open-sse/handlers/chatCore/requestDetail.js, line: 124, note: "saveRequestUsage(...).catch(() => {}) — not awaited" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 243, note: "saveRequestUsage's first statement is itself an await, yielding immediately" }
+    - { file: src/sse/handlers/embeddings.js, line: 140, note: "same fire-and-forget pattern in the embeddings lane" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.pending-request-orphan-timeout
+  group: Usage tracking
+  feature: Live request tracking
+  subFeature: trackPendingRequest and the PENDING_TIMEOUT_MS watchdog
+  trigger: trackPendingRequest(model, provider, connectionId, started, error) called at request dispatch, completion, disconnect and error points
+  input: "model, provider, connectionId, started (bool), error (bool)"
+  output: "In-memory pending counters (global._pendingRequests) used to render the 'active requests' widget"
+  businessRules:
+    - "started=true increments byModel[modelKey] and byAccount[connectionId][modelKey], then (re)arms a 60000ms (PENDING_TIMEOUT_MS) setTimeout keyed by `${connectionId}|${modelKey}`"
+    - "started=false decrements both counters (clamped to >= 0 via Math.max) and clears the timer — this is the normal 'request finished' signal, called from success, error, disconnect and stream-complete paths"
+    - "If the timer fires before a matching started=false ever arrives (unhandled exception before onError/onDisconnect wiring, process anomaly), it force-resets the counter to 0 for that model/account and deletes itself — a watchdog against a permanently-stuck 'N active requests' badge, not a request-level timeout that cancels anything"
+    - "The timer is a plain Node setTimeout, not unref'd, scoped per connectionId+modelKey so a second started=true for the same pair replaces (clearTimeout + reschedule) rather than stacking timers"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["global._pendingRequests.byModel", "global._pendingRequests.byAccount", "global._pendingTimers"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: "60000ms per model+account pair (PENDING_TIMEOUT_MS), resets the counter, does not cancel or retry the underlying request", quota: null }
+  errorCases: []
+  sideEffects: ["scheduleStatsEvent('pending') — debounced SSE push to /api/usage/stream subscribers"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "Multiple started=false calls for the same request (e.g. both onDisconnect and the natural completion path) are tolerated by the Math.max(0, ...) clamp but not detected as a double-call" }
+  edgeCases:
+    - "trackPendingRequest is purely in-memory counting; it has no relationship to any provider-side rate limit or quota — 'pending' here means 'a request this process dispatched and has not yet resolved', nothing else"
+  evidence:
+    - { file: src/lib/db/repos/usageRepo.js, line: 12, note: "PENDING_TIMEOUT_MS = 60 * 1000" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 152, note: "trackPendingRequest signature and counter math" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 172, note: "started branch: clearTimeout + reschedule" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 174, note: "timer callback: force-reset to 0 on orphan timeout" }
+    - { file: open-sse/handlers/chatCore.js, line: 305, note: "trackPendingRequest(..., true) at dispatch" }
+    - { file: open-sse/handlers/chatCore.js, line: 475, note: "trackDone = () => trackPendingRequest(..., false) — normal completion" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.active-requests-and-recent-ring
+  group: Usage tracking
+  feature: Live request tracking
+  subFeature: getActiveRequests — active counters plus a deduped recent-request ring buffer
+  trigger: Called by getUsageStats(), by /api/usage/stream's pending-refresh push, and directly for lightweight polling
+  input: "global._pendingRequests, global._recentRing"
+  output: "{ activeRequests: [...], recentRequests: [...], errorProvider }"
+  businessRules:
+    - "recentRing is a 50-item (RING_CAP) in-memory ring, lazily hydrated once per process from the last 50 usageHistory rows on first read (ensureRingInitialized), then appended to on every saveRequestUsage insert"
+    - "recentRequests are deduped by `${model}|${provider}|${promptTokens}|${completionTokens}|${minuteTimestamp}` and rows with zero prompt AND zero completion tokens are dropped entirely, capped at 20 after dedup"
+    - "errorProvider surfaces the last provider that errored, but only within a 10-second window of the error (Date.now() - lastErrorProvider.ts < 10000) — it self-clears by staleness, not by an explicit reset"
+  state:
+    reads: ["usageHistory (cold-start hydration only)"]
+    writes: []
+    runtimeOnly: ["global._recentRing", "global._pendingRequests", "global._lastErrorProvider", "global._connectionMapCache (30s TTL)"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "getConnectionMapCached() caches connectionId -> display name for 30s (CONN_CACHE_TTL_MS) to avoid a full connections read on every poll"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The ring is capped at 50 items but recentRequests further dedups+truncates to 20 — a burst of >50 requests between reads can silently drop older entries before they are ever surfaced"
+  evidence:
+    - { file: src/lib/db/repos/usageRepo.js, line: 13, note: "RING_CAP = 50" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 100, note: "pushToRing — trims to RING_CAP" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 120, note: "ensureRingInitialized — cold-start hydration from usageHistory" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 196, note: "getActiveRequests" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 227, note: "dedup + zero-token filter" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 237, note: "errorProvider 10s staleness window" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.history-write-dedup-transaction
+  group: Usage tracking
+  feature: Usage persistence
+  subFeature: saveRequestUsage — dedup check, single-transaction 3-way write
+  trigger: Any fire-and-forget saveRequestUsage(entry) call
+  input: "{provider, model, tokens, connectionId, apiKey, endpoint, timestamp?}"
+  output: "One usageHistory row, one usageDaily upsert, one _meta lifetime counter increment — or a no-op endpoint patch if a matching row already exists"
+  businessRules:
+    - "Before inserting, a SELECT looks for an existing usageHistory row with the same timestamp (ISO string, millisecond precision), provider, model, connectionId, apiKey, promptTokens and completionTokens"
+    - "If found, no new row is written — at most the existing row's endpoint is backfilled if it was previously null"
+    - "If not found, all three writes (history insert, usageDaily upsert via aggregateEntryToDay, _meta.totalRequestsLifetime increment) happen inside one db.transaction(), justified in-source by better-sqlite3 being synchronous so no other JS runs mid-transaction in the same process"
+    - "pushToRing() and the debounced stats-event only fire when a new row was actually inserted (inserted === true)"
+  state:
+    reads: ["usageHistory (dedup SELECT)", "usageDaily (current day row)", "_meta.totalRequestsLifetime"]
+    writes: ["usageHistory", "usageDaily", "_meta.totalRequestsLifetime"]
+    runtimeOnly: []
+  dependencies: ["pricing.cost-calculation-cache-inclusive"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "the transaction throws (e.g. adapter failure)", partial: false }
+  sideEffects: ["pushToRing", "scheduleStatsEvent('update', 250ms)"]
+  persistence: ["usageHistory row", "usageDaily aggregate row", "_meta.totalRequestsLifetime"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "Single-process, synchronous better-sqlite3 transaction — no cross-request race inside one process; the whole function is still wrapped in try/catch so a failure only logs, it never throws back to the fire-and-forget caller" }
+  edgeCases: []
+  evidence:
+    - { file: src/lib/db/repos/usageRepo.js, line: 254, note: "comment: all 3 writes in ONE transaction, sync DB so no mid-transaction race" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 256, note: "dedup SELECT before insert" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 274, note: "existing-row branch: endpoint backfill only, no new row" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 281, note: "usageHistory INSERT" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 291, note: "usageDaily upsert via aggregateEntryToDay" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 300, note: "_meta.totalRequestsLifetime atomic increment" }
+  newModule: usage
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Every completed request that calls saveRequestUsage produces its own usageHistory row"
+    actual: "A request whose ISO-millisecond timestamp, provider, model, connectionId, apiKey, promptTokens and completionTokens all match the most recently matching prior row is treated as a duplicate: no new row is inserted, no usageDaily counts are added, no lifetime counter increment happens — only the endpoint column may be backfilled"
+    impact: "Genuinely distinct requests that happen to land in the same millisecond with identical provider/model/account/token counts (e.g. rapid retries, fixed-size embeddings calls) are silently undercounted in usageHistory, usageDaily aggregates, byModel/byAccount stats and the lifetime request counter"
+
+- id: usage.daily-rollup-aggregation
+  group: Usage tracking
+  feature: Usage persistence
+  subFeature: aggregateEntryToDay — per-day rollup by provider/model/account/apiKey/endpoint
+  trigger: Inside the saveRequestUsage transaction, once per new row
+  input: "The usageDaily row for today's dateKey (or a fresh zeroed one) plus the new entry"
+  output: "Updated usageDaily.data JSON blob with requests/promptTokens/completionTokens/cachedTokens/cost totals and 5 breakdown maps"
+  businessRules:
+    - "dateKey is computed by getLocalDateKey() using the server process's local timezone (new Date().getFullYear/Month/Date), not UTC"
+    - "byApiKey buckets missing apiKey under the literal key 'local-no-key' rather than omitting the request from that breakdown"
+    - "Each breakdown key embeds enough context to redisplay later without re-joining (rawModel, provider) via addToCounter's `meta` merge"
+  state:
+    reads: []
+    writes: ["usageDaily row for today's dateKey"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["usageDaily.data JSON (byProvider, byModel, byAccount, byApiKey, byEndpoint)"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "dateKey bucketing uses the server's local timezone, not UTC — a server timezone change (or a multi-region deployment sharing one DB) shifts which calendar day a request's usage is attributed to"
+  evidence:
+    - { file: src/lib/db/repos/usageRepo.js, line: 48, note: "getLocalDateKey — local timezone, not UTC" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 53, note: "addToCounter — per-bucket accumulation" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 63, note: "aggregateEntryToDay — 5 breakdown dimensions" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 91, note: "'local-no-key' fallback bucket for missing apiKey" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.stats-query-dual-path
+  group: Usage tracking
+  feature: Usage querying
+  subFeature: getUsageStats — live-history path vs pre-aggregated usageDaily path
+  trigger: GET /api/usage/stats?period=... or /api/usage/history (no period)
+  input: "period: today|24h|7d|30d|60d|all"
+  output: "{totalRequests, totalPromptTokens, ..., byProvider, byModel, byAccount, byApiKey, byEndpoint, last10Minutes, pending, activeRequests, recentRequests, errorProvider}"
+  businessRules:
+    - "period in {today, 24h} scans usageHistory rows directly for the window (useDailySummary = false)"
+    - "period in {7d, 30d, 60d, all} sums pre-aggregated usageDaily rows instead (useDailySummary = true), then does a second pass over raw usageHistory (bounded to the same window) purely to overlay precise lastUsed timestamps onto each breakdown entry"
+    - "Provider/connection/API-key display names are enriched via 3 parallel repo imports (connectionsRepo, apiKeysRepo, nodesRepo) at the top of the function, each independently wrapped in try/catch so one repo failing degrades to raw ids instead of failing the whole stats call"
+    - "last10Minutes is always computed from live usageHistory regardless of period, as a fixed 10-bucket-per-minute series"
+  state:
+    reads: ["usageDaily (period >= 7d)", "usageHistory (period in {today,24h}, plus the lastUsed overlay pass, plus last10Minutes)", "providerConnections", "apiKeys", "providerNodes"]
+    writes: []
+    runtimeOnly: ["global._pendingRequests (embedded as stats.pending)"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "The 7d/30d/60d/all path loads every usageDaily row in range and every matching usageHistory row (for the lastUsed overlay) on every request; there is no server-side caching beyond the unrelated 5s pricing cache"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: src/lib/db/repos/usageRepo.js, line: 346, note: "getUsageStats(period='all')" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 446, note: "useDailySummary branch selection (period !== '24h' && period !== 'today')" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 541, note: "lastUsed overlay pass over raw usageHistory" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 566, note: "else branch: live usageHistory scan for today/24h" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.chart-data-buckets
+  group: Usage tracking
+  feature: Usage querying
+  subFeature: getChartData — time-bucketed tokens+cost series
+  trigger: GET /api/usage/chart?period=...
+  input: "period: today|24h|7d|30d|60d"
+  output: "Array of {label, tokens, cost} buckets"
+  businessRules:
+    - "today: 24 hourly buckets anchored at local midnight, scanning live usageHistory"
+    - "24h: 24 hourly buckets trailing backward from now, scanning live usageHistory"
+    - "7d/30d/60d: one bucket per day sourced from pre-aggregated usageDaily rows (loadDaysInRange), not raw history"
+  state:
+    reads: ["usageHistory (today/24h)", "usageDaily (7d/30d/60d)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "period is not one of the VALID_PERIODS set at the route layer", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: src/lib/db/repos/usageRepo.js, line: 661, note: "getChartData entry" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 665, note: "today: 24 hourly buckets from local midnight" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 691, note: "24h: 24 hourly buckets trailing from now" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 712, note: "7d/30d/60d: daily buckets from usageDaily" }
+    - { file: src/app/api/usage/chart/route.js, line: 4, note: "VALID_PERIODS gate at the route" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.recent-logs-and-noop-append
+  group: Usage tracking
+  feature: Usage querying
+  subFeature: appendRequestLog is an empty no-op; the log view is derived read-side from usageHistory
+  trigger: GET /api/usage/logs or /api/usage/request-logs
+  input: none
+  output: "Array of formatted log lines: 'DD-MM-YYYY HH:mm:ss | model | PROVIDER | account | sent | received | status'"
+  businessRules:
+    - "appendRequestLog() takes any arguments and does nothing — it is `export async function appendRequestLog() {}`, per an in-source comment: 'request log is now derived from usageHistory table on read'"
+    - "Every one of its 5+ call sites (chatCore.js PENDING/FAILED lines, stream.js) invokes it as `appendRequestLog({...}).catch(() => {})` and never inspects the resolved value or branches on it — nothing depends on it having an effect"
+    - "getRecentLogs(limit=200) instead reads the last N usageHistory rows directly and formats them for display, resolving connectionId -> account name via a fresh (uncached) connectionsRepo call every invocation — unlike getActiveRequests' 30s-TTL connectionMapCache"
+  state:
+    reads: ["usageHistory", "providerConnections (uncached)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "getRecentLogs re-fetches all provider connections on every call with no caching, unlike the sibling getActiveRequests path"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "/api/usage/logs and /api/usage/request-logs are two separate route files with byte-for-byte identical bodies, both calling getRecentLogs(200) — an undocumented alias pair rather than one canonical endpoint"
+  evidence:
+    - { file: src/lib/db/repos/usageRepo.js, line: 739, note: "appendRequestLog — no-op, comment explains why" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 742, note: "getRecentLogs — derives log lines from usageHistory" }
+    - { file: open-sse/handlers/chatCore.js, line: 306, note: "appendRequestLog({...}).catch(() => {}) — fire-and-forget, result unused" }
+    - { file: open-sse/handlers/chatCore.js, line: 474, note: "appendLog helper, same discard pattern" }
+    - { file: src/app/api/usage/logs/route.js, line: 6, note: "calls getRecentLogs(200)" }
+    - { file: src/app/api/usage/request-logs/route.js, line: 6, note: "identical call, separate route file" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.global-state-next-reeval
+  group: Usage tracking
+  feature: Live request tracking
+  subFeature: Why live counters live on global.* instead of module-scope state
+  trigger: usageRepo.js module load
+  input: "None — this is a module-initialization-time decision, not a per-request input"
+  output: "global._pendingRequests, global._lastErrorProvider, global._statsEmitter, global._pendingTimers, global._recentRing, global._connectionMapCache, global._statsEmitTimers"
+  businessRules:
+    - "All 7 pieces of live, in-memory usage state are guarded with `if (!global._x) global._x = ...` instead of being declared as module-scope `let`/`const`"
+    - "The in-source comment states the reason directly: 'In-memory state shared across Next.js modules'"
+    - "Next.js can evaluate a given source module more than once within the same server process (dev-mode HMR, and the route-handler module graph in general); module-scope state would silently re-initialize on each re-evaluation — a fresh EventEmitter with no subscribers, a reset pending-counter map — breaking the pending-request badge and dropping in-flight SSE listeners. Attaching to the single process-wide `global` object survives re-evaluation because it is not tied to any one module instance."
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["global._pendingRequests", "global._lastErrorProvider", "global._statsEmitter", "global._pendingTimers", "global._recentRing", "global._connectionMapCache", "global._statsEmitTimers"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "All of process-level in-memory usage state is single-writer within one Node event loop turn, but shared across every request handled by that process" }
+  edgeCases:
+    - "AIGate's architecture does not need to reproduce Next.js's module re-evaluation quirk — a normal singleton/DI-managed service (or any state that isn't re-created per module load) achieves the same 'one shared instance per process' goal without the global.* pattern"
+  evidence:
+    - { file: src/lib/db/repos/usageRepo.js, line: 17, note: "comment: in-memory state shared across Next.js modules" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 18, note: "global._pendingRequests guard" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 20, note: "global._statsEmitter guard, EventEmitter with maxListeners(50)" }
+  newModule: usage
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: usage.sse-live-stream
+  group: Usage tracking
+  feature: Live request tracking
+  subFeature: GET /api/usage/stream — SSE push of usage stats
+  trigger: Dashboard opens the usage/quota view
+  input: none (long-lived GET)
+  output: "text/event-stream of JSON stats payloads"
+  businessRules:
+    - "On connect: sends one full stats payload immediately (state.send)"
+    - "Subscribes to statsEmitter's 'update' event (full getUsageStats() recalculation) and 'pending' event (lightweight activeRequests+recentRequests+errorProvider refresh merged onto the last cached full stats)"
+    - "Both events are debounced at the source: scheduleStatsEvent('update', 250) and scheduleStatsEvent('pending', 150-default) in usageRepo.js collapse bursts of writes into one emit per 150ms/250ms window"
+    - "A 25000ms keepalive comment ping (`: ping\\n\\n`) is sent on an interval independent of the event-driven pushes, to hold the connection through idle periods"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["statsEmitter listeners for the lifetime of the connection"]
+  dependencies: ["usage.active-requests-and-recent-ring"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Every 'update' event triggers a full getUsageStats() recompute (see usage.stats-query-dual-path) for every connected SSE client independently — no shared/broadcast cache across clients"
+  behavior: { streaming: true, cancellation: "controller.cancel() unregisters both listeners and clears the keepalive interval", concurrency: "One independent statsEmitter subscription + interval per connected client" }
+  edgeCases: []
+  evidence:
+    - { file: src/app/api/usage/stream/route.js, line: 12, note: "state.send — full recalc + immediate lightweight push" }
+    - { file: src/app/api/usage/stream/route.js, line: 34, note: "state.sendPending — lightweight-only push" }
+    - { file: src/app/api/usage/stream/route.js, line: 53, note: "25000ms keepalive interval" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 38, note: "scheduleStatsEvent — per-event-type debounce" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 309, note: "scheduleStatsEvent('update', 250) after a successful write" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.request-details-buffered-persistence
+  group: Usage tracking
+  feature: Per-request detail storage (observability)
+  subFeature: requestDetailsRepo — disabled by default, buffered batch writes, capped and sanitized
+  trigger: saveRequestDetail(detail) called from chatCore's success/error paths
+  input: "The full buildRequestDetail() object, including request/providerRequest/providerResponse/response bodies"
+  output: "requestDetails row (or nothing, if observability is disabled)"
+  businessRules:
+    - "The write is a no-op unless config.enabled is true; enabled resolves from ENABLE_REQUEST_LOGS env var if set, else settings.enableObservability, which defaults to false"
+    - "Enabled writes are buffered in a module-scope array and flushed either when the buffer reaches batchSize (default 20) or on a flushIntervalMs timer (default 5000ms) — whichever comes first"
+    - "flushToDatabase() drains the entire buffer in a while-loop so pushes that happen during the async flush are still captured, and writes all buffered items inside one db.transaction()"
+    - "After each flush, rows beyond maxRecords (default 200 in this file's own fallback; 1000 in settingsRepo's DEFAULT_SETTINGS) are deleted, oldest-timestamp-first"
+    - "sanitizeHeaders() strips authorization/x-api-key/cookie/token/api-key headers from item.request.headers before it is ever written to disk"
+    - "truncateField() replaces any request/providerRequest/providerResponse/response field larger than maxJsonSize (default 5KB) with a {_truncated, _originalSize, _preview} stub instead of storing it whole"
+    - "beforeExit/SIGINT/SIGTERM/exit handlers force a final flush of any buffered-but-unflushed items so a graceful shutdown doesn't lose the tail of the buffer"
+  state:
+    reads: ["settings.enableObservability / observabilityMaxRecords / observabilityBatchSize / observabilityFlushIntervalMs / observabilityMaxJsonSize (5s-cached)"]
+    writes: ["requestDetails"]
+    runtimeOnly: ["writeBuffer", "flushTimer", "isFlushing"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "flushToDatabase's transaction throws", partial: true }
+  sideEffects: ["process.on(beforeExit/SIGINT/SIGTERM/exit) handlers registered once"]
+  persistence: ["requestDetails row, capped at maxRecords, oldest evicted"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "isFlushing guard prevents overlapping flush calls; a flush already in progress is skipped, not queued" }
+  edgeCases:
+    - "This table (and everything derived from it — /api/usage/request-details, /api/usage/providers) is silently empty on a default install: enableObservability defaults to false, so saveRequestDetail is a no-op unless the operator opts in."
+    - "The hardcoded DEFAULT_MAX_RECORDS in this file (200) differs from settingsRepo.js's DEFAULT_SETTINGS.observabilityMaxRecords (1000) — the file's own fallback only applies if getSettings() itself throws, so the 1000 default wins in practice, but two different defaults for the same knob exist in the codebase."
+  evidence:
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 4, note: "DEFAULT_MAX_RECORDS = 200 (fallback default, differs from settingsRepo)" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 13, note: "getObservabilityConfig — enabled resolution" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 61, note: "sanitizeHeaders — strips auth/cookie/token headers" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 80, note: "truncateField — caps oversized JSON fields" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 88, note: "flushToDatabase — drain loop + transaction" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 127, note: "eviction: DELETE oldest rows beyond maxRecords" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 143, note: "saveRequestDetail — disabled-flag short-circuit" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 207, note: "shutdown handlers force a final flush" }
+    - { file: src/lib/db/repos/settingsRepo.js, line: 42, note: "enableObservability: false — disabled by default" }
+    - { file: src/lib/db/repos/settingsRepo.js, line: 43, note: "observabilityMaxRecords: 1000 (settings default, differs from repo's own fallback)" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.request-details-api-redaction
+  group: Usage tracking
+  feature: Per-request detail storage (observability)
+  subFeature: GET /api/usage/request-details — pagination plus mandatory content redaction
+  trigger: Dashboard's request-details tab fetches a page of detail rows
+  input: "page, pageSize (1-100), provider, model, connectionId, status, startDate, endDate"
+  output: "{details: [...], pagination}, with request/providerRequest/providerResponse/response fields replaced by {redacted: true}"
+  businessRules:
+    - "page must be >= 1 and pageSize must be 1-100, both validated with an explicit 400 before querying"
+    - "Every returned detail has its request, providerRequest, providerResponse and response fields overwritten with {redacted: true} — the in-source comment states this is deliberate: those fields hold full user prompts, tool calls and provider responses, and any dashboard-authenticated user (or anyone, if requireLogin is disabled) could otherwise read every user's conversation history through this endpoint"
+    - "Only metadata (model, tokens, latency, status, timestamps) survives redaction"
+  state:
+    reads: ["requestDetails"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["usage.request-details-buffered-persistence"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "page < 1 or pageSize outside 1-100", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: src/app/api/usage/request-details/route.js, line: 23, note: "page validation" }
+    - { file: src/app/api/usage/request-details/route.js, line: 30, note: "pageSize validation" }
+    - { file: src/app/api/usage/request-details/route.js, line: 51, note: "comment: why redaction is mandatory" }
+    - { file: src/app/api/usage/request-details/route.js, line: 56, note: "redaction loop over 4 fields" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.providers-distinct-api
+  group: Usage tracking
+  feature: Per-request detail storage (observability)
+  subFeature: GET /api/usage/providers — distinct-provider filter list for the request-details tab
+  trigger: RequestDetailsTab.js loads its provider filter dropdown
+  input: none
+  output: "{providers: [{id, name}]}"
+  businessRules:
+    - "Sources DISTINCT provider from the requestDetails table, not usageHistory — the in-source comment explains this avoids parsing every row's full JSON blob (usageHistory rows can total hundreds of MB), which previously caused OOM"
+    - "Display name resolution: providerNodes.name first, then getProviderByAlias/AI_PROVIDERS config name, else the raw provider id"
+    - "This list is scoped to the request-details table specifically (it is the filter for that tab), so it naturally returns an empty array whenever requestDetails is empty — which is the default state, since observability is off by default (see usage.request-details-buffered-persistence)"
+  state:
+    reads: ["requestDetails (DISTINCT provider column only)", "providerNodes"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["usage.request-details-buffered-persistence"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: src/app/api/usage/providers/route.js, line: 12, note: "comment: DISTINCT provider avoids parsing the full JSON blob" }
+    - { file: src/app/api/usage/providers/route.js, line: 14, note: "getDistinctProviders() call" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 195, note: "getDistinctProviders — plain SQL DISTINCT, no JSON parse" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: usage.history-route-returns-aggregate-not-rows
+  group: Usage tracking
+  feature: Usage querying
+  subFeature: "/api/usage/history is not a history-rows endpoint — it returns the same aggregate shape as /api/usage/stats"
+  trigger: GET /api/usage/history
+  input: none
+  output: "The full getUsageStats() aggregate object (period defaults to 'all')"
+  businessRules:
+    - "history/route.js calls `await getUsageStats()` with no period argument, which defaults to 'all' inside getUsageStats — an aggregate stats object identical in shape to what /api/usage/stats?period=all returns"
+    - "The function that actually returns per-request rows with provider/model/date-range filtering — getUsageHistory(filter) — is exported from usageRepo.js and re-exported through both src/lib/db/index.js and src/lib/usageDb.js, but has zero callers anywhere in the checkout (verified: the only matches for 'getUsageHistory' are its own definition and the two re-export barrel lines)"
+  state:
+    reads: ["usageDaily + usageHistory (via getUsageStats)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["usage.stats-query-dual-path"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "getUsageHistory(filter) supports provider/model/startDate/endDate filtering and returns masked-apiKey per-row data — real, working code with no route or caller wired to it"
+  evidence:
+    - { file: src/app/api/usage/history/route.js, line: 6, note: "getUsageStats() called with no period -> defaults to 'all'" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 316, note: "getUsageHistory(filter) — the actual per-row function, unused" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 346, note: "getUsageStats(period = 'all') default" }
+    - { file: src/app/api/usage/stats/route.js, line: 17, note: "the sibling /api/usage/stats route, functionally near-identical when period=all" }
+  newModule: usage
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A route named /api/usage/history returns per-request usage history rows — the sibling getUsageHistory(filter) function (provider/model/date-range filterable) appears purpose-built to back exactly this route"
+    actual: "It calls getUsageStats() with no period, returning the same aggregated shape as /api/usage/stats?period=all; getUsageHistory() is never invoked by any route or other code in the checkout"
+    impact: "AIGate would misdesign a 'usage history' endpoint contract by assuming per-row data if this were ported literally; the working, filter-capable raw-row query exists in source but is unreachable from the API surface"
+
+- id: pricing.cost-calculation-cache-inclusive
+  group: Usage tracking
+  feature: Cost calculation
+  subFeature: calculateCost — pricing lookup and cache-inclusive token math
+  trigger: Inside saveRequestUsage(), before the usageHistory INSERT
+  input: "provider, model, canonicalized tokens {prompt_tokens (cache-inclusive), completion_tokens, cached_tokens, cache_creation_input_tokens}"
+  output: "cost in dollars (0 if tokens/provider/model/pricing missing)"
+  businessRules:
+    - "calculateCost() looks up pricing via pricingRepo.getPricingForModel(provider, model) — user overrides (KV store) first, then open-sse/providers/pricing.js's built-in table — and delegates the actual arithmetic to calculateCostFromTokens() in open-sse so there is one source of truth for the formula"
+    - "canonicalizeUsage() folds cached_tokens and cache_creation_input_tokens INTO prompt_tokens ahead of time (the cache-inclusive convention) — calculateCostFromTokens then subtracts them back out (nonCachedInput = inputTokens - cachedTokens - cacheCreationTokens) so cached tokens are billed at pricing.cached (falling back to pricing.input) instead of double-counting them at full input rate"
+    - "Any failure (missing provider, missing model, missing pricing, thrown error) resolves to cost = 0, not an error — calculateCost wraps the whole lookup in try/catch and logs to console.error"
+  state:
+    reads: ["pricing KV (via pricingRepo, 5s cache)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "calculateCost silently returns 0 (not an error, not a distinguishable 'unknown' marker) whenever pricing is missing for a provider/model — a misconfigured or brand-new model shows $0 cost forever in every dashboard view rather than surfacing as unpriced"
+  evidence:
+    - { file: src/lib/db/repos/usageRepo.js, line: 134, note: "calculateCost — pricing lookup + delegate to open-sse math" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 144, note: "comment: delegates to the single source of truth to avoid drift" }
+    - { file: open-sse/providers/pricing.js, line: 418, note: "calculateCostFromTokens" }
+    - { file: open-sse/providers/pricing.js, line: 428, note: "nonCachedInput subtraction — avoids double-billing cached tokens" }
+    - { file: open-sse/utils/usageTracking.js, line: 164, note: "canonicalizeUsage — folds cache into prompt_tokens" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: pricing.crud-api
+  group: Usage tracking
+  feature: Cost calculation
+  subFeature: /api/pricing — GET merged pricing, PATCH validated overrides, DELETE reset-to-default
+  trigger: Dashboard pricing editor
+  input: "PATCH body: {provider: {model: {input, output, cached, reasoning, cache_creation}}}; DELETE query: ?provider=&model="
+  output: "Merged pricing object (built-in PROVIDER_PRICING + user KV overrides)"
+  businessRules:
+    - "GET merges: for every built-in provider/model, a matching user override (if any) is spread over it; for user-only providers/models with no built-in counterpart, the user entry is added as-is"
+    - "PATCH validates before writing: every field key must be one of input/output/cached/reasoning/cache_creation, and every value must be a non-negative finite number, or the whole request 400s before any write happens"
+    - "updatePricing() does a per-provider read-modify-write inside one db.transaction() so concurrent PATCHes to different providers cannot clobber each other's KV rows"
+    - "DELETE resets one model (provider+model given), one whole provider (provider only), or all pricing (neither) back to defaults by removing the corresponding KV override(s)"
+    - "Every write (PATCH or DELETE) calls invalidate() to clear the 5000ms (CACHE_TTL_MS) in-process pricing cache so the next getPricing()/getPricingForModel() call re-reads from the KV store"
+  state:
+    reads: ["pricing KV"]
+    writes: ["pricing KV"]
+    runtimeOnly: ["5s in-process merged-pricing cache"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "PATCH body has an unknown pricing field or a negative/non-numeric value", partial: false }
+  sideEffects: ["invalidate() clears the 5s pricing cache on every write"]
+  persistence: ["pricing KV rows, one per provider"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The file also exports GET_DEFAULTS (intended per its comment as 'GET /api/pricing/defaults'), but Next.js App Router route handlers only dispatch on exports literally named after HTTP methods (GET/POST/PATCH/DELETE/...); there is no nested app/api/pricing/defaults/route.js. GET_DEFAULTS is unreachable over HTTP — the dashboard's PricingModal.js instead imports getDefaultPricing() directly as a JS function, never hitting this route."
+  evidence:
+    - { file: src/app/api/pricing/route.js, line: 9, note: "GET — merged pricing" }
+    - { file: src/app/api/pricing/route.js, line: 27, note: "PATCH — field/value validation before write" }
+    - { file: src/app/api/pricing/route.js, line: 56, note: "validFields whitelist" }
+    - { file: src/app/api/pricing/route.js, line: 91, note: "DELETE — model/provider/all reset" }
+    - { file: src/app/api/pricing/route.js, line: 123, note: "GET_DEFAULTS — not a valid Next.js route export, unreachable over HTTP" }
+    - { file: src/lib/db/repos/pricingRepo.js, line: 6, note: "CACHE_TTL_MS = 5000" }
+    - { file: src/lib/db/repos/pricingRepo.js, line: 60, note: "updatePricing — per-provider transaction" }
+    - { file: src/shared/components/PricingModal.js, line: 26, note: "dashboard calls getDefaultPricing() directly, not via /api/pricing/defaults" }
+  newModule: usage
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "GET /api/pricing/defaults returns the built-in default pricing table over HTTP, matching the route's own doc comment"
+    actual: "GET_DEFAULTS is not a Next.js-recognized route export name (only GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS are dispatched) and no app/api/pricing/defaults/route.js file exists, so the function is dead code reachable only via direct import — which is exactly how the dashboard actually consumes it (PricingModal.js imports getDefaultPricing() from open-sse directly)"
+    impact: "Any external client relying on the documented '/api/pricing/defaults' HTTP contract gets a 404, not the default pricing table; the feature works today only because the one consumer bypasses the API entirely"
+
+- id: quota.sources-taxonomy
+  group: Quota tracking
+  feature: Quota sources
+  subFeature: The four categories behavioral.md §21 asks about — which exist in 9router and how
+  trigger: N/A — cross-cutting taxonomy over the quota subsystem
+  input: "None — this is a classification over the whole quota subsystem, not a single call's input"
+  output: "A classification of every quota reading 9router produces as vendor-reported, subscription, locally-counted, or absent (budget)"
+  businessRules:
+    - "vendor-reported (measured): the majority of quota data. USAGE_HANDLERS dispatches by provider to a handler in open-sse/services/usage/*.js that calls the provider's own usage/rate-limit API directly (Claude OAuth usage endpoint, GitHub copilot_internal/user, Codex rate_limit endpoint, Kiro, GLM, MiniMax, etc.). Refresh cadence is on-demand (dashboard poll or auto-refresh timer), not push-based; reset time and 'remaining' are computed however the vendor's own payload expresses them (percent-utilization for Claude/Codex, used/total counts for GitHub) — 9router does not compute 'remaining' itself for these, it relays the vendor's number."
+    - "subscription (measured, embedded): not a separately-fetched source — every vendor usage handler also returns a `plan` field (Claude Code plan tier, GitHub copilot_plan, Codex plan_type) alongside the quota numbers, describing which tier's limits are in effect"
+    - "locally-counted (inferred): Antigravity is the one provider where 9router does not simply relay the vendor's number. A local in-memory cache (antigravityQuota.js) stores the last vendor reading per connection+model, refreshed at most once per 30s, AND a strike-based circuit breaker can override that cache with a synthesized 0%-remaining entry after 3 429/409s within 60s on the same pair — even when the vendor API itself still claims quota remains. See quota.antigravity-local-cache-strike-breaker."
+    - "budget: absent. No spend-cap, budget-limit, or cost-ceiling enforcement mechanism exists anywhere in src/ or open-sse/ — grepping for budget/spending-limit/cost-cap across both trees turns up only Claude/Kiro 'thinking budget' (an unrelated token-count parameter) and the Grok CLI 402 'spending-limit' vendor status code, which 9router treats as a soft-success (credentials are fine, the vendor's own account is out of credits) rather than something it enforces or tracks locally. Cost itself is tracked per-request (pricing.cost-calculation-cache-inclusive) but is never compared against any ceiling."
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.usage-feature-flag", "account.antigravity-quota-prefilter"]
+  providerInteraction: "Every vendor-reported and subscription reading is a live call to that provider's own usage/rate-limit API"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "GAP: there is no local budget/spend-cap concept for AIGate to port from 9router — if a budget capability is required, it must be designed fresh rather than reproduced, since nothing here implements one"
+  evidence:
+    - { file: open-sse/services/usage.js, line: 35, note: "USAGE_HANDLERS — per-provider vendor-reported dispatch table" }
+    - { file: open-sse/services/usage/claude.js, line: 134, note: "plan: 'Claude Code' returned alongside quotas — the subscription tier" }
+    - { file: src/sse/services/antigravityQuota.js, line: 18, note: "MIN_REFRESH_INTERVAL_MS — locally-counted cache throttle" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 125, note: "402 spending-limit treated as soft-success, not a locally enforced budget" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: quota.vendor-fetch-caching-claude-github-codex
+  group: Quota tracking
+  feature: Quota sources
+  subFeature: Vendor-reported quota fetch mechanics — per-provider windows, caching, cooldowns
+  trigger: GET /api/usage/[connectionId] for an OAuth/apikey-eligible connection
+  input: "connection.accessToken, force flag"
+  output: "Provider-specific {plan, quotas: {name: {used, total, remaining, resetAt, unlimited}}}"
+  businessRules:
+    - "Claude: primary source is the OAuth usage endpoint, returning rolling 5h (five_hour) and 7d (seven_day) windows plus per-model 7d windows (seven_day_sonnet, seven_day_opus, seven_day_fable...); utilization is %-used, remaining = 100 - used; a 429 from this endpoint triggers a 180000ms (OAUTH_429_COOLDOWN_MS) per-token cooldown that routes subsequent calls to a legacy settings+org-usage endpoint instead; successful reads are cached 300000ms (USAGE_CACHE_TTL_MS) per access token, with in-flight-promise dedup so concurrent callers share one fetch, and force=true bypasses both the cache and the dedup"
+    - "GitHub: two response shapes depending on plan — paid plans return quota_snapshots (chat/completions/premium_interactions, each with entitlement/remaining, resetAt from quota_reset_date, a MONTHLY cadence); free/limited plans return monthly_quotas + limited_user_quotas with a separate limited_user_reset_date"
+    - "Codex: rate_limit primary/secondary windows map to session/weekly quotas (percent-used, resetAt), plus separate review and spark sub-limit windows found via several possible response key shapes (code_review_rate_limit, rate_limits_by_limit_id, additional_rate_limits array); also returns resetCredits.availableCount, a distinct redeemable pool (see quota.codex-reset-credits)"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["Claude per-token usageCache (300s TTL)", "Claude per-token oauthCooldown (180s)"]
+  dependencies: ["quota.sources-taxonomy"]
+  providerInteraction: "Direct HTTPS call to each provider's own usage/rate-limit endpoint using the connection's accessToken"
+  fallback: { hasFallback: true, retry: "Claude falls back from the OAuth usage endpoint to a legacy settings+org endpoint on non-200 or after a 429 cooldown; GitHub/Codex have no fallback endpoint, they surface a message string instead", timeout: null, quota: "429 on Claude's OAuth usage endpoint specifically cools that access token down for 180000ms before it is tried again" }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "the vendor usage/rate-limit endpoint returns non-200 and there is no fallback for that provider", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Claude's dedup+cache exists specifically because many tabs/accounts/auto-refresh cycles funnel through the same endpoint and would otherwise trigger vendor-side 429s"
+  behavior: { streaming: false, cancellation: null, concurrency: "Claude's in-flight-promise map coalesces concurrent callers for the same token into one upstream fetch" }
+  edgeCases: []
+  evidence:
+    - { file: open-sse/services/usage/claude.js, line: 19, note: "OAUTH_429_COOLDOWN_MS = 180000" }
+    - { file: open-sse/services/usage/claude.js, line: 24, note: "USAGE_CACHE_TTL_MS = 300000, dedup+cache per token" }
+    - { file: open-sse/services/usage/claude.js, line: 97, note: "five_hour window -> createQuotaObject" }
+    - { file: open-sse/services/usage/claude.js, line: 101, note: "seven_day window" }
+    - { file: open-sse/services/usage/github.js, line: 45, note: "paid-plan quota_snapshots shape" }
+    - { file: open-sse/services/usage/github.js, line: 59, note: "free-plan monthly_quotas/limited_user_quotas shape" }
+    - { file: open-sse/services/usage/codex.js, line: 41, note: "formatCodexWindow — percent-used session/weekly windows" }
+    - { file: open-sse/services/usage/codex.js, line: 52, note: "appendCodexQuotaWindows — session/weekly/review/spark" }
+    - { file: open-sse/services/usage/codex.js, line: 132, note: "return shape: plan, limitReached flags, resetCredits.availableCount" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: quota.codex-reset-credits
+  group: Quota tracking
+  feature: Quota sources
+  subFeature: Codex reset credits — a redeemable pool that manually ends the current 5h window early
+  trigger: Dashboard 'use reset credit' button on a Codex connection
+  input: none (GET to list) / a server-generated redeemRequestId (POST to consume)
+  output: "GET: {availableCount, credits: [{status, grantedAt, expiresAt}]}; POST: {code, reset, windows_reset, credit} or a 409/error"
+  businessRules:
+    - "POST generates redeemRequestId server-side via crypto.randomUUID() specifically to prevent a client-controlled replay of the same redeem id"
+    - "A 409 no_credit response is returned distinctly from other 4xx/5xx failures when the vendor reports zero credits available"
+    - "The dashboard confirms via a modal showing the remaining credit count, then re-fetches the connection's quota (fetchQuota) after a successful reset so the UI reflects the freshly-reset window immediately"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["quota.vendor-fetch-caching-claude-github-codex"]
+  providerInteraction: "POST to the Codex reset-credits-consume endpoint with the connection's accessToken"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: QUOTA_EXHAUSTED, when: "vendor responds with noCredit (no reset credits available)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "the consume call returns an unexpected non-4xx-non-2xx response", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: "src/app/api/usage/[connectionId]/codex-reset-credits/route.js", line: 88, note: "GET — list credits" }
+    - { file: "src/app/api/usage/[connectionId]/codex-reset-credits/route.js", line: 121, note: "POST — consume one credit" }
+    - { file: "src/app/api/usage/[connectionId]/codex-reset-credits/route.js", line: 137, note: "server-generated redeemRequestId via crypto.randomUUID()" }
+    - { file: open-sse/services/usage/codex.js, line: 188, note: "consumeCodexRateLimitResetCredit" }
+    - { file: "src/app/(dashboard)/dashboard/usage/components/ProviderLimits/index.js", line: 305, note: "handleResetCodexLimit — confirm modal then re-fetch quota" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: quota.antigravity-local-cache-strike-breaker
+  group: Quota tracking
+  feature: Quota sources
+  subFeature: Antigravity's locally-counted/inferred quota — RAM cache plus a strike-based trust override
+  trigger: auth.js's account pre-filter reading the cache, or a 409/429 from an Antigravity generation call
+  input: "connectionId, accessToken, providerSpecificData, model, HTTP status (409/429)"
+  output: "quotaCache.get(connectionId)[model] = {remainingPercentage, resetAt} — either the vendor's own reading or a synthesized 0%-blocked entry"
+  businessRules:
+    - "refreshAntigravityQuota is throttled to once per 30000ms (MIN_REFRESH_INTERVAL_MS) per connectionId, with in-flight-promise dedup so concurrent 409/429 bursts share one upstream call; every attempt (success or failure) still updates lastRefreshAt so a failing quota endpoint cannot itself trigger a request-amplification loop"
+    - "A fresh vendor read replaces the cache entry, but applyActiveStrikeBlocks() re-asserts any still-active synthesized block on top of it immediately — so an optimistic vendor reading cannot resurrect a pair 9router has already decided to distrust"
+    - "handleAntigravityQuotaError: on a 409/429 where the vendor's own quota reading is either optimistic (remainingPercentage > 0) or unavailable, it counts a 'strike' in a 60000ms (STRIKE_WINDOW_MS) fixed window anchored at the FIRST qualifying strike (not a rolling window); 3 strikes (STRIKE_THRESHOLD) within that window synthesizes a local 0%-remaining, 15-minute-blocked (STRIKE_BLOCK_MS) cache entry regardless of what the vendor API claims — this is the 'locally-counted / inferred' quota reading, overriding the vendor's own number because the generation endpoint and the quota endpoint disagreed 3 times in a row"
+    - "When the vendor reading is instead a genuine exhausted (remainingPercentage <= 0, resetAt present and in the future), strikes are cleared and the vendor's own resetAt is used directly — this branch is measured, not inferred"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["quotaCache (Map: connectionId -> {model: {remainingPercentage, resetAt}})", "lastRefreshAt", "inflightRefresh", "strikeCounts", "strikeBlocks"]
+  dependencies: ["account.antigravity-quota-prefilter", "quota.sources-taxonomy"]
+  providerInteraction: "getAntigravityUsage() — the same vendor usage handler used by the dashboard quota tab"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: "30000ms minimum refresh interval per connection (MIN_REFRESH_INTERVAL_MS); 15-minute synthesized block after 3 strikes in 60s (STRIKE_BLOCK_MS)" }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "inflightRefresh Map dedups concurrent refreshes for the same connectionId into a single upstream call" }
+  edgeCases:
+    - "The cache entry shape ({remainingPercentage, resetAt}) is identical whether it holds a genuine vendor reading or a synthesized strike-block — two different trust levels wear the same shape, so a downstream reader (the auth pre-filter) cannot distinguish 'vendor says 0%' from '9router decided to distrust an optimistic vendor reading' without inspecting strikeBlocks directly"
+  evidence:
+    - { file: src/sse/services/antigravityQuota.js, line: 18, note: "MIN_REFRESH_INTERVAL_MS = 30_000" }
+    - { file: src/sse/services/antigravityQuota.js, line: 25, note: "STRIKE_WINDOW_MS / STRIKE_THRESHOLD / STRIKE_BLOCK_MS" }
+    - { file: src/sse/services/antigravityQuota.js, line: 82, note: "refreshAntigravityQuota — throttle + in-flight dedup" }
+    - { file: src/sse/services/antigravityQuota.js, line: 124, note: "applyActiveStrikeBlocks re-asserted over every fresh vendor read" }
+    - { file: src/sse/services/antigravityQuota.js, line: 152, note: "strike counting on optimistic/unavailable readings, fixed window anchored at first strike" }
+    - { file: src/sse/services/antigravityQuota.js, line: 161, note: "3rd strike synthesizes a local 0% / 15-minute-blocked entry" }
+    - { file: src/sse/services/antigravityQuota.js, line: 178, note: "healthy-exhausted path: strikes cleared, vendor's own resetAt used" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: quota.dashboard-refresh-and-visibility
+  group: Quota tracking
+  feature: Quota UI
+  subFeature: The /dashboard/quota page — auto-refresh cadence, per-provider throttling, client cache, visibility settings
+  trigger: User opens /dashboard/quota
+  input: none
+  output: "ProviderLimits renders one card per connection with its parsed quota rows"
+  businessRules:
+    - "quota/page.js is a thin wrapper (Suspense + CardSkeleton) around the ProviderLimits client component, which does all the fetching"
+    - "Auto-refresh polls every REFRESH_INTERVAL_MS = 60000ms; Claude connections are additionally throttled to once every CLAUDE_REFRESH_INTERVAL_MS / REFRESH_INTERVAL_MS = 10 ticks (i.e. ~600000ms) unless force=true (manual refresh or 'refresh all')"
+    - "The auto-refresh interval and its 1s countdown are both cleared and stop firing when the browser tab is hidden (Page Visibility API), and re-armed on visibilitychange when it becomes visible again"
+    - "Each connection's last successful quota read is cached client-side in localStorage under QUOTA_CACHE_KEY ('quotaCacheData'); this is purely a client-side display cache, not consulted for freshness decisions"
+    - "Per-quota-row visibility (hide/show individual quota lines like a specific model's weekly window) and per-connection auto-ping toggles are both persisted server-side via PATCH /api/settings (quotaVisibility, claudeAutoPing/codexAutoPing.connections), not client-only state"
+    - "DEPLETED_QUOTA_THRESHOLD = 5 (percent) drives the 'Turn off Empty' / 'Turn on Available' bulk actions: a connection counts as depleted if any of its quota rows has remaining% <= 5"
+  state:
+    reads: ["/api/providers/client (paginated connections)", "/api/usage/[connectionId] (per-connection quota)", "/api/settings (quotaVisibility, auto-ping maps)"]
+    writes: ["/api/settings PATCH (quotaVisibility, claudeAutoPing/codexAutoPing)"]
+    runtimeOnly: ["localStorage quotaCacheData", "localStorage quotaAutoRefresh"]
+  dependencies: ["quota.vendor-fetch-caching-claude-github-codex", "quota.antigravity-local-cache-strike-breaker"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "a connection's quota fetch 401s — shown inline as a message instead of throwing", partial: true }
+  sideEffects: []
+  persistence: ["settings.quotaVisibility", "settings.claudeAutoPing/codexAutoPing"]
+  performanceConcerns:
+    - "refreshAll fires one /api/usage/[connectionId] fetch per visible connection in parallel (Promise.all) on every tick"
+  behavior: { streaming: false, cancellation: "Auto-refresh timers are torn down on tab-hidden and on unmount", concurrency: null }
+  edgeCases:
+    - "'Expiring first' sort only reorders accounts within the current page; cross-page ordering still follows backend pagination — the UI surfaces this as a visible caveat banner rather than fixing the ordering"
+  evidence:
+    - { file: "src/app/(dashboard)/dashboard/quota/page.js", line: 8, note: "thin Suspense wrapper around ProviderLimits" }
+    - { file: "src/app/(dashboard)/dashboard/usage/components/ProviderLimits/utils.js", line: 5, note: "REFRESH_INTERVAL_MS = 60000" }
+    - { file: "src/app/(dashboard)/dashboard/usage/components/ProviderLimits/utils.js", line: 7, note: "CLAUDE_REFRESH_INTERVAL_MS = 600000" }
+    - { file: "src/app/(dashboard)/dashboard/usage/components/ProviderLimits/utils.js", line: 8, note: "DEPLETED_QUOTA_THRESHOLD = 5" }
+    - { file: "src/app/(dashboard)/dashboard/usage/components/ProviderLimits/index.js", line: 472, note: "Claude throttled to every Nth auto-tick, force bypasses" }
+    - { file: "src/app/(dashboard)/dashboard/usage/components/ProviderLimits/index.js", line: 650, note: "auto-refresh interval effect" }
+    - { file: "src/app/(dashboard)/dashboard/usage/components/ProviderLimits/index.js", line: 683, note: "Page Visibility API pause/resume" }
+    - { file: "src/app/(dashboard)/dashboard/usage/components/ProviderLimits/index.js", line: 576, note: "updateQuotaVisibility — PATCH /api/settings" }
+    - { file: "src/app/(dashboard)/dashboard/usage/components/ProviderLimits/index.js", line: 554, note: "toggleAutoPing — PATCH /api/settings" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: quota.auto-ping-window-warming
+  group: Quota tracking
+  feature: Quota UI
+  subFeature: quotaAutoPing scheduler — opt-in pings that start a new quota window right after reset
+  trigger: A 60000ms (tickIntervalMs) scheduler interval, started/stopped based on whether any connection has auto-ping enabled
+  input: "settings.claudeAutoPing/codexAutoPing.connections[id] === true, per-connection vendor usage reading"
+  output: "A tiny (1-token 'hi', or a minimal Codex Responses call) request sent to the provider to open a fresh quota window early"
+  businessRules:
+    - "Only connections explicitly opted in via settings (claudeAutoPing/codexAutoPing.connections[connectionId] = true) and active + oauth are targeted"
+    - "Claude waits for the wall-clock resetAt to actually pass (within pingLeadMs = 5000ms tolerance) before pinging — a time-based window"
+    - "Codex instead pings whenever its resetAt 'slides' by resetAtDriftMs (30000ms) or more between reads (pingWhenResetAtSlides) — an inactive session's window doesn't start counting down until first use, so Codex polls every tick rather than waiting for a fixed time, gated by minPingIntervalMs (600000ms) and skipWhenBlockingQuotaExhausted"
+    - "A ping is skipped entirely if a blocking (non-session) quota is already exhausted, if the same resetAt was already pinged (lastPingedResetKey dedup, normalized to whole minutes), or if a ping/refresh failed recently (failureCooldownMs = 900000ms)"
+    - "On success, the connection is updated with lastPingedResetAt/lastPingedResetKey/lastPingAt so the same reset window is never pinged twice"
+    - "The scheduler's interval handle lives on global.__quotaAutoPing (same 'survive Next.js hot reload / one instance per process' pattern as usage.global-state-next-reeval) rather than module-scope state"
+  state:
+    reads: ["settings.claudeAutoPing/codexAutoPing", "providerConnections"]
+    writes: ["providerConnections.lastPingedResetAt/lastPingedResetKey/lastPingAt"]
+    runtimeOnly: ["global.__quotaAutoPing.resetCache", "global.__quotaAutoPing.failureCache", "global.__quotaAutoPing.interval"]
+  dependencies: ["quota.vendor-fetch-caching-claude-github-codex"]
+  providerInteraction: "A real (billable, tiny) request to the Claude Messages API or a Codex Responses stream, sent purely to open a new quota window"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: "failureCooldownMs = 900000ms backs off retrying a connection after a failed ping or credential refresh" }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "the ping request itself fails (non-ok response)", partial: false }
+  sideEffects: ["Sends a real, billable request to the provider purely to warm the next quota window"]
+  persistence: ["providerConnections.lastPingedResetAt / lastPingedResetKey / lastPingAt"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "state.running guard prevents overlapping ticks; per-connection state (resetCache/failureCache) is process-global and shared across ticks" }
+  edgeCases:
+    - "Reuses the same global.* survive-hot-reload pattern documented as IMPLEMENTATION_ACCIDENT in usage.global-state-next-reeval, for the same underlying Next.js module re-evaluation reason — not re-labeled separately here since the ping-scheduling business logic itself (warm quota windows early) is a real, reproducible capability"
+  evidence:
+    - { file: src/shared/constants/config.js, line: 66, note: "QUOTA_AUTOPING_CONFIG — tickIntervalMs, pingLeadMs, refreshAheadMs, failureCooldownMs" }
+    - { file: src/shared/services/quotaAutoPing.js, line: 29, note: "global.__quotaAutoPing — survive-hot-reload state" }
+    - { file: src/shared/services/quotaAutoPing.js, line: 87, note: "shouldPingForReset — time-based (Claude) vs slide-based (Codex) dispatch" }
+    - { file: src/shared/services/quotaAutoPing.js, line: 183, note: "shouldSkipAfterFailure — failureCooldownMs gate" }
+    - { file: src/shared/services/quotaAutoPing.js, line: 188, note: "pingConnection — full per-connection decision chain" }
+    - { file: src/shared/services/quotaAutoPing.js, line: 261, note: "runQuotaAutoPingTick — one scheduler tick over all opted-in connections" }
+    - { file: src/shared/services/quotaAutoPing.js, line: 292, note: "startQuotaAutoPing — interval registration" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
