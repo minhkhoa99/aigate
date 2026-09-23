@@ -1,0 +1,603 @@
+# Trace: Provider account management, Multi-account (Task 8)
+# 9router reference read at E:\9router. Read-only; every evidence line was
+# read directly, not inferred from names (behavioral.md §7).
+#
+# Entry points read in full: src/sse/services/auth.js (365 lines),
+# open-sse/services/accountFallback.js, open-sse/config/errorConfig.js,
+# src/lib/db/repos/connectionsRepo.js (262 lines). chatCore.js's 401/403
+# refresh-and-retry path and src/sse/services/tokenRefresh.js's proactive
+# path were read to trace the concurrency question (Q5).
+#
+# Task 7 (02-providers-auth.yaml) deliberately kept catalog.connection-listing
+# and catalog.connection-detail-crud shallow (secret stripping, name
+# resolution) and left selection/priority/rotation semantics to this file —
+# both are cited below as the dashboard-facing entry surface for the
+# connection rows this file's selection/lock logic operates on.
+
+- id: account.select-mutex-global-scope
+  group: Multi-account
+  feature: Multi-account selection
+  subFeature: Mutex scope around getProviderCredentials
+  trigger: Every call to getProviderCredentials() — one call per account-selection attempt on any /v1 lane, for any provider
+  input: "provider, excludeConnectionIds, model, options.preferredConnectionId"
+  output: A selected credentials object, an allRateLimited descriptor, or null — see the other account.select-* entries
+  businessRules:
+    - "selectionMutex is a single module-scope `let`, not keyed by provider or connection — every call to getProviderCredentials, for every provider, awaits the same chained Promise before doing anything else, and the whole function body (DB reads, settings read, and for round-robin the updateProviderConnection write) runs inside the held mutex"
+    - "The actual invariant that needs protecting is per-provider: round-robin's 'pick least-recently-used' read-then-write (lines 154-189) races if two concurrent picks for the SAME provider both read stale lastUsedAt before either writes it back, potentially double-assigning the same account. A per-connection or per-provider mutex would close that race; a single global mutex additionally serializes selection across every unrelated provider in the process"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["selectionMutex (module-scope Promise chain)"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Head-of-line blocking: a slow settings/DB read or a round-robin write while selecting an account for provider A stalls the selection step for a concurrent request to completely unrelated provider B, because both wait on the same selectionMutex chain — under load with many providers in flight this serializes a step that only needs per-provider isolation"
+  behavior: { streaming: false, cancellation: null, concurrency: "Global mutex serializes ALL getProviderCredentials calls process-wide, regardless of provider" }
+  edgeCases: []
+  evidence:
+    - { file: src/sse/services/auth.js, line: 10, note: "let selectionMutex = Promise.resolve() — single module-scope chain, not per-provider or per-connection" }
+    - { file: src/sse/services/auth.js, line: 34, note: "currentMutex = selectionMutex; selectionMutex reassigned to a new pending Promise before any real work starts" }
+    - { file: src/sse/services/auth.js, line: 40, note: "await currentMutex — every call queues behind the previous one, whatever provider it was for" }
+    - { file: src/sse/services/auth.js, line: 224, note: "finally { resolveMutex() } — mutex held for the full function body, including the round-robin DB write" }
+  newModule: connections
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: account.select-noauth-virtual-connection
+  group: Multi-account
+  feature: Multi-account selection
+  subFeature: "\"Public\" virtual connection injected for noAuth providers"
+  trigger: getProviderCredentials() called for a provider whose FREE_PROVIDERS entry has noAuth true
+  input: "provider id; settings.providerStrategies[providerId].rotateStrategy and .proxyPoolId; active proxy pools"
+  output: "A synthetic credentials object — id \"noauth\", connectionName \"Public\", accessToken the literal string \"public\", no real token fields at all"
+  businessRules:
+    - "noAuth providers never read the providerConnections table — there is no stored connection to select, so the function short-circuits before getProviderConnections() is even called"
+    - "Instead of a credential, the virtual connection carries proxy configuration: a rotateStrategy (\"none\"/round-robin/random, defaulting to \"none\") picks a proxyPoolId from the provider's active pools via pickProxyPoolId(), then resolveConnectionProxyConfig() resolves the actual proxy URL/no-proxy list/Vercel relay URL into providerSpecificData"
+    - "accessToken: \"public\" is a placeholder token, never sent upstream as a real bearer credential — executors for noAuth providers must not treat it as one"
+  state:
+    reads: ["settings.providerStrategies", "proxyPools table (only when rotateStrategy !== \"none\")"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["settings.defaults-and-merge"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A noAuth provider can never enter the 'all accounts unavailable' or model-lock paths — markAccountUnavailable() explicitly no-ops for connectionId \"noauth\" (auth.js line 240), so a noAuth provider's failures never trigger cooldown/lock state at the account layer"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 46, note: "FREE_PROVIDERS[providerId]?.noAuth check — short-circuits before any connection lookup" }
+    - { file: src/sse/services/auth.js, line: 49, note: "rotateStrategy resolution from settings.providerStrategies override" }
+    - { file: src/sse/services/auth.js, line: 54, note: "pickProxyPoolId(poolIds, strategy, providerId) selects the pool" }
+    - { file: src/sse/services/auth.js, line: 57, note: "returned object: id: \"noauth\", accessToken: \"public\" — no real credential fields" }
+    - { file: src/lib/network/connectionProxy.js, line: 18, note: "pickProxyPoolId — round-robin/random/none strategies over the pool id list" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: account.select-fill-first-default
+  group: Multi-account
+  feature: Multi-account selection
+  subFeature: "fill-first strategy — the default when no round-robin override applies"
+  trigger: getProviderCredentials() reaches strategy selection with no preferredConnectionId match and settings.fallbackStrategy (or providerOverride.fallbackStrategy) not equal to \"round-robin\"
+  input: "availableConnections (already priority-sorted by getProviderConnections)"
+  output: "availableConnections[0] — the lowest-priority-number available connection"
+  businessRules:
+    - "fill-first does no work of its own: it relies entirely on getProviderConnections() already returning the list sorted by ascending priority (connectionsRepo.js line 79), so 'fill-first' means 'always try the highest-priority account that is currently available, only overflow to the next when the first is excluded/locked'"
+    - "fill-first never writes lastUsedAt or consecutiveUseCount — those fields are round-robin-only bookkeeping"
+    - "Per-provider strategy override (settings.providerStrategies[providerId].fallbackStrategy) takes precedence over the global settings.fallbackStrategy, which itself defaults to \"fill-first\" when unset"
+  state:
+    reads: ["providerConnections table (priority-sorted)", "settings.fallbackStrategy", "settings.providerStrategies"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["settings.defaults-and-merge", "catalog.connection-listing"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because fill-first never updates any per-connection field, two concurrent fill-first selections for the same provider will both pick the exact same top-priority connection whenever it is available — there is no mechanism at the selection layer that marks a connection 'in use' to steer a second concurrent request elsewhere"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 136, note: "settings read + providerOverride.fallbackStrategy || settings.fallbackStrategy || \"fill-first\"" }
+    - { file: src/sse/services/auth.js, line: 190, note: "else branch: connection = availableConnections[0] — the fill-first path" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 79, note: "list.sort by ascending priority — the ordering fill-first depends on" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: account.select-round-robin-sticky
+  group: Multi-account
+  feature: Multi-account selection
+  subFeature: Round-robin strategy with sticky-session limit, and what clears stickiness
+  trigger: getProviderCredentials() reaches strategy selection, no preferredConnectionId match, and the effective fallbackStrategy is \"round-robin\"
+  input: "availableConnections; providerOverride.stickyRoundRobinLimit or settings.stickyRoundRobinLimit (default 3)"
+  output: "Either the same connection as last time (sticky continuation) or the least-recently-used available connection (rotation), with lastUsedAt/consecutiveUseCount updated in the DB before returning"
+  businessRules:
+    - "availableConnections is sorted by lastUsedAt descending to find the 'current' candidate — the most recently used connection is the sticky candidate, not an explicit session id"
+    - "Sticky continuation condition: current exists AND current.lastUsedAt is set AND current.consecutiveUseCount < stickyLimit — while true, the same connection keeps being returned and consecutiveUseCount increments by 1 each call"
+    - "Stickiness clears in exactly one way: once consecutiveUseCount reaches stickyLimit, the else branch runs instead — it re-sorts availableConnections by lastUsedAt ascending (oldest/never-used first, using priority as a tiebreak for two never-used connections) and picks that one, resetting consecutiveUseCount to 1 for the new connection. A never-used connection (no lastUsedAt) is also picked over any used one, since !a.lastUsedAt sorts it first in the ascending sort"
+    - "Locking a connection out of availableConnections (model lock or exclude-set) also implicitly breaks stickiness: if the current sticky connection becomes unavailable, it is filtered out upstream and round-robin's 'current' becomes whichever remaining connection has the most recent lastUsedAt"
+    - "Both the stick-with-current and the rotate-to-oldest branches await updateProviderConnection() before returning, so the DB write for bookkeeping happens synchronously with selection, not fire-and-forget"
+  state:
+    reads: ["providerConnections table (isActive=true, filtered by model lock)", "settings.stickyRoundRobinLimit", "settings.providerStrategies"]
+    writes: ["providerConnections.lastUsedAt", "providerConnections.consecutiveUseCount"]
+    runtimeOnly: []
+  dependencies: ["settings.defaults-and-merge", "catalog.connection-listing"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["providerConnections.lastUsedAt", "providerConnections.consecutiveUseCount"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "Two concurrent round-robin calls for the same provider both read availableConnections before either writes lastUsedAt back — both can independently decide the same connection is the sticky 'current' (or the same oldest connection is next), producing an unintended double-assignment; the global selectionMutex (account.select-mutex-global-scope) is the only thing preventing this today, by fully serializing the read+write per call" }
+  edgeCases:
+    - "priority is only consulted as a tiebreaker for two connections that both have no lastUsedAt (brand new accounts) — once any account has been used once, priority stops influencing round-robin order entirely"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 151, note: "round-robin branch entry, stickyLimit resolution" }
+    - { file: src/sse/services/auth.js, line: 155, note: "byRecency sort — most-recently-used first" }
+    - { file: src/sse/services/auth.js, line: 165, note: "sticky condition: current.lastUsedAt && currentCount < stickyLimit" }
+    - { file: src/sse/services/auth.js, line: 169, note: "updateProviderConnection — increment consecutiveUseCount, keep same connection" }
+    - { file: src/sse/services/auth.js, line: 175, note: "sortedByOldest — ascending lastUsedAt, priority tiebreak only for two unused connections" }
+    - { file: src/sse/services/auth.js, line: 185, note: "updateProviderConnection — consecutiveUseCount reset to 1 for the rotated-to connection" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: account.select-preferred-pin
+  group: Multi-account
+  feature: Multi-account selection
+  subFeature: options.preferredConnectionId pins selection to one connection, bypassing fill-first/round-robin
+  trigger: Caller of getProviderCredentials() passes { preferredConnectionId } and that connection is in availableConnections
+  input: "options.preferredConnectionId"
+  output: "The matching connection object, or falls through to the normal strategy if not found/not available"
+  businessRules:
+    - "The pin is a soft preference, not a hard requirement: availableConnections.find() only searches already-filtered (non-excluded, non-locked) connections, so a locked or excluded preferred connection silently falls through to fill-first/round-robin rather than erroring"
+    - "When the pin succeeds, neither lastUsedAt nor consecutiveUseCount is touched — round-robin bookkeeping is skipped entirely for a pinned selection, so a pinned request does not affect subsequent round-robin rotation state"
+  state:
+    reads: ["providerConnections table (already loaded as availableConnections)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "There is no dedicated error path for 'preferred connection not found' — the code silently falls back to the default strategy (connection stays undefined, later branches run) rather than surfacing that the pin was ignored"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 33, note: "preferredConnectionId destructured from options" }
+    - { file: src/sse/services/auth.js, line: 143, note: "availableConnections.find((c) => c.id === preferredConnectionId)" }
+    - { file: src/sse/services/auth.js, line: 149, note: "if (connection) { // skip strategy } — pin short-circuits fill-first/round-robin" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: account.select-locked-and-excluded-filter
+  group: Multi-account
+  feature: Multi-account selection
+  subFeature: Filtering candidates by exclude-set, active model lock, and (Antigravity only) cached live quota before any strategy runs
+  trigger: Every getProviderCredentials() call, right after connections are loaded, before fill-first/round-robin/pin decide among what's left
+  input: "connections (isActive=true rows for the provider); excludeConnectionIds; model; for antigravity, the in-process quota cache"
+  output: availableConnections — the subset eligible for this attempt
+  businessRules:
+    - "A connection is dropped if its id is in excludeSet (the caller's retry-with-next-account list), OR isModelLockActive(c, model) is true (an unexpired modelLock_${model} or the account-wide modelLock___all key), OR — Antigravity + model only — the in-memory quota cache says remainingPercentage <= 0 and resetAt is still in the future for that exact model"
+    - "isModelLockActive checks the model-specific key first, falling back to the account-wide '__all' key — either being unexpired blocks the connection for that model"
+    - "The Antigravity quota-cache check is a pure pre-filter: it never touches the DB and is populated lazily only after that account has already returned a 409/429 once (see account.antigravity-quota-prefilter) — a cold cache lets an about-to-fail account through until the first real failure updates the cache"
+  state:
+    reads: ["providerConnections table (isActive=true rows for provider)"]
+    writes: []
+    runtimeOnly: ["Antigravity quota cache (module-scope Map, antigravityQuota.js)"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Filtering is O(connections) per call with a per-connection Object.entries() scan inside getEarliestModelLockUntil/isModelLockActive for logging — fine at typical per-provider account counts, but scans the whole connection object (including unrelated fields) on every model-lock check rather than indexing lock keys separately"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "excludeSet accepts either a single id, a Set, or null/undefined and is normalized at the top of the function — a caller passing an array (not a Set) would silently produce an excludeSet of size 1 containing the array itself, since only `instanceof Set` is checked before falling to the single-value branch"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 30, note: "excludeSet normalization — instanceof Set check, else wraps as single-value Set" }
+    - { file: src/sse/services/auth.js, line: 85, note: "availableConnections filter — excludeSet.has, isModelLockActive, Antigravity quota cache check" }
+    - { file: open-sse/services/accountFallback.js, line: 119, note: "isModelLockActive — checks modelLock_${model} then modelLock___all fallback" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: account.select-all-unavailable-response
+  group: Multi-account
+  feature: Multi-account selection
+  subFeature: Distinguishing 'no accounts configured' from 'all accounts temporarily locked', with retry-after computed from the earliest lock
+  trigger: getProviderCredentials() finds availableConnections.length === 0 after filtering
+  input: connections (the pre-filter list, still containing the locked ones)
+  output: "Either { allRateLimited: true, retryAfter, retryAfterHuman, lastError, lastErrorCode } when at least one connection has a computable future expiry, or plain null when connections exist but none carry an expiry (or there were zero connections to begin with)"
+  businessRules:
+    - "The earliest expiry is computed across two independent sources merged into one list: modelLock_* expiries (getEarliestModelLockUntil per locked connection) and, for Antigravity, live quota-cache resetAt entries that are still in the future — the two are concatenated and sorted lexicographically (ISO-8601 strings sort correctly this way) before taking [0]"
+    - "lastError/lastErrorCode on the allRateLimited response come from lockedConns[0] (the first connection found to be locked in filter order), not necessarily the connection with the earliest expiry — the displayed error message and the displayed retry-after can reference two different accounts"
+    - "connections.length === 0 (no rows for the provider at all) returns plain null, same as 'all locked but no computable expiry' — callers distinguish 'never configured' from 'temporarily exhausted' only via the allRateLimited flag being absent in both cases, by checking excludeConnectionIds.size at the call site (src/sse/handlers/chat.js line 244) rather than anything in this function's return value"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: "retryAfter/retryAfterHuman surfaced to the caller so it can return a 503 with a human-readable cooldown" }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "all accounts for the provider are model-locked (or, for Antigravity, quota-cache-blocked) with a computable future expiry", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "no accounts exist for the provider at all, or none of the locked accounts carry a computable expiry", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "expiries.sort()[0] is a plain string sort with no numeric/date comparator — this only works because every value pushed into `expiries` is already an ISO-8601 UTC string, which happens to sort correctly lexicographically; a non-ISO expiry format anywhere in this list would silently break the 'earliest' calculation"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 110, note: "availableConnections.length === 0 branch entry" }
+    - { file: src/sse/services/auth.js, line: 112, note: "lockedConns + expiries built from modelLock expiries" }
+    - { file: src/sse/services/auth.js, line: 120, note: "expiries.sort()[0] — lexicographic sort on ISO strings" }
+    - { file: src/sse/services/auth.js, line: 124, note: "allRateLimited response shape" }
+    - { file: src/sse/handlers/chat.js, line: 244, note: "call site distinguishes 'never configured' vs 'exhausted' via excludeConnectionIds.size, not the return shape" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: account.mark-unavailable-lock-reasons
+  group: Provider account management
+  feature: Provider account management
+  subFeature: Every distinct reason markAccountUnavailable() locks an account+model pair, and that reason's expiry rule
+  trigger: A provider request for a given connection+model fails; the caller (e.g. src/sse/handlers/chat.js) calls markAccountUnavailable(connectionId, status, errorText, provider, model, resetsAtMs)
+  input: "connectionId, HTTP status, error text/body, provider id, model, optional resetsAtMs (provider-reported exact reset time in ms epoch)"
+  output: "{ shouldFallback, cooldownMs } — and, when shouldFallback, a modelLock_${model} (or modelLock___all) field written on the connection row with an ISO expiry"
+  businessRules:
+    - "Precedence when multiple rules could apply: the GitHub monthly case is checked first (via githubMonthlyResetMs), then a caller-supplied future resetsAtMs, then the generic text/status rule table (checkFallbackError) — the first match wins and the others are not evaluated"
+    - "GitHub monthly usage limit: provider resolves to \"github\", status is exactly 402, and errorText contains \"you've reached your additional usage limit for your plan\" (case-insensitive) — locks the ACCOUNT-WIDE modelLock___all key (model is forced to null via `githubResetAtMs ? null : model`) until 00:00 UTC on the 1st of the following month, computed with Date.UTC(year, month+1, 1); backoffLevel is reset to 0"
+    - "Provider-supplied exact reset (non-Antigravity, e.g. codex usage_limit_reached): resetsAtMs is in the future — cooldownMs = resetsAtMs - now, but capped at MAX_RATE_LIMIT_COOLDOWN_MS (30 minutes) even if the provider reports a reset many hours away; backoffLevel resets to 0"
+    - "Provider-supplied exact reset, Antigravity: same resetsAtMs path, but the 30-minute cap is explicitly skipped for provider === \"antigravity\" — the exact resetAt from Google's quota API is honored uncapped, however far in the future"
+    - "Backoff-rate-limit reasons (checkFallbackError, ERROR_RULES text match on \"rate limit\"/\"too many requests\"/\"quota exceeded\"/\"capacity\"/\"overloaded\", or HTTP 429): exponential cooldown = min(2000 * 2^(min(backoffLevel+1,15)-1), 300000) ms — i.e. 2s, 4s, 8s... capped at 5 minutes at level 15; backoffLevel is persisted and incremented on each hit"
+    - "Fixed 2-minute cooldown reasons: text \"no credentials\" or \"improperly formed request\", or HTTP status 401/402/403/404 — cooldownMs = 120000 flat, backoffLevel unchanged by this rule (no increment field returned, so the existing level carries over on the connection row)"
+    - "Fixed 5-second cooldown: text \"request not allowed\" — cooldownMs = 5000"
+    - "Default/unmatched: any error not matched by an ERROR_RULES entry gets TRANSIENT_COOLDOWN_MS (30 seconds)"
+    - "Every one of the above locks a model-scoped key modelLock_${model} — never a whole-account flag — except the GitHub monthly case, which is the one reason that explicitly forces the account-wide modelLock___all key regardless of which model triggered it"
+  state:
+    reads: ["providerConnections table (row by connectionId, for its current backoffLevel)"]
+    writes: ["providerConnections.modelLock_${model} or .modelLock___all", "providerConnections.testStatus", "providerConnections.lastError", "providerConnections.errorCode", "providerConnections.lastErrorAt", "providerConnections.backoffLevel"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "Exponential backoff for rate-limit-class errors, 2s base doubling to a 5 min cap over 15 levels", timeout: null, quota: "GitHub: locked until 1st of next UTC month. Antigravity: exact provider resetAt, uncapped. Other providers with resetsAtMs: capped at 30 minutes" }
+  errorCases:
+    - { code: RATE_LIMIT, when: "text matches rate limit/too many requests/quota exceeded/capacity/overloaded, or status is 429 — exponential backoff", partial: false }
+    - { code: AUTH_ERROR, when: "status is 401 or 403, or text contains \"no credentials\" — fixed 2 minute cooldown", partial: false }
+    - { code: QUOTA_EXHAUSTED, when: "status is 402 (payment required) and NOT the GitHub-monthly text match — fixed 2 minute cooldown", partial: false }
+    - { code: MODEL_UNAVAILABLE, when: "status is 404 — fixed 2 minute cooldown", partial: false }
+    - { code: INVALID_REQUEST, when: "text contains \"improperly formed request\" — fixed 2 minute cooldown", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "text contains \"request not allowed\" — fixed 5 second cooldown", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "no ERROR_RULES entry matches — default 30 second transient cooldown", partial: false }
+    - { code: QUOTA_EXHAUSTED, when: "caller supplies a future resetsAtMs for a non-Antigravity provider (e.g. codex usage_limit_reached) — cooldown = resetsAtMs - now, capped at 30 minutes", partial: false }
+    - { code: QUOTA_EXHAUSTED, when: "caller supplies a future resetsAtMs for Antigravity — cooldown = resetsAtMs - now, uncapped exact reset", partial: false }
+    - { code: QUOTA_EXHAUSTED, when: "GitHub 402 with the additional-usage-limit-for-your-plan message — locked account-wide until the 1st of next UTC month", partial: false }
+  sideEffects: ["console.error(\"❌ provider [status]: reason\") on every successful lock, independent of the log.warn call"]
+  persistence: ["providerConnections row: modelLock_* key(s), testStatus, lastError, errorCode, lastErrorAt, backoffLevel"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "reason (the stored lastError text) is errorText.slice(0, 100) — a long provider error body is silently truncated in the persisted lastError field, though the full text is still what drove the ERROR_RULES match beforehand"
+    - "connectionId === \"noauth\" is an explicit no-op guard at the top — the virtual Public connection (account.select-noauth-virtual-connection) can never be locked"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 14, note: "githubMonthlyResetMs — provider===github, status===402, text match, Date.UTC(year, month+1, 1)" }
+    - { file: src/sse/services/auth.js, line: 239, note: "markAccountUnavailable signature; noauth guard" }
+    - { file: src/sse/services/auth.js, line: 246, note: "githubResetAtMs computed first" }
+    - { file: src/sse/services/auth.js, line: 254, note: "resetsAtMs branch — antigravity uncapped vs MAX_RATE_LIMIT_COOLDOWN_MS cap for others" }
+    - { file: src/sse/services/auth.js, line: 262, note: "else branch — checkFallbackError(status, errorText, backoffLevel) for the generic rule table" }
+    - { file: src/sse/services/auth.js, line: 267, note: "buildModelLockUpdate(githubResetAtMs ? null : model, cooldownMs) — GitHub forces the account-wide key" }
+    - { file: src/sse/services/auth.js, line: 269, note: "updateProviderConnection — the actual DB write of the lock + error fields" }
+    - { file: open-sse/services/accountFallback.js, line: 30, note: "checkFallbackError — iterates ERROR_RULES top-to-bottom, text rules before status rules" }
+    - { file: open-sse/services/accountFallback.js, line: 12, note: "getQuotaCooldown — exponential backoff formula, base*2^level capped at max" }
+    - { file: open-sse/config/errorConfig.js, line: 60, note: "ERROR_RULES table — every text/status rule and its cooldown/backoff flag" }
+    - { file: open-sse/config/errorConfig.js, line: 39, note: "MAX_RATE_LIMIT_COOLDOWN_MS = 30 minutes — the cap skipped for Antigravity" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: account.lock-storage-persistence
+  group: Provider account management
+  feature: Provider account management
+  subFeature: Where modelLock_* (and all other per-connection state) is stored, and whether it survives a restart
+  trigger: Any read/write of a providerConnections row (selection filter, markAccountUnavailable, clearAccountError)
+  input: connectionId
+  output: The connection object with dynamically-named modelLock_${model} keys alongside its fixed columns
+  businessRules:
+    - "providerConnections has a small set of real SQL columns (id, provider, authType, name, email, priority, isActive, createdAt, updatedAt); every other field — including every modelLock_${model} key, since the model name is caller-supplied and unbounded — is folded into a single JSON `data` TEXT column via connToRow's `{ id, provider, ..., ...rest }` destructure, where `rest` is stringified as JSON"
+    - "rowToConn reverses this by parsing `data` first and spreading it, then overwriting with the fixed columns — so a modelLock_* key set by markAccountUnavailable is written into and read back from that JSON blob, not a dedicated schema column, and a lock key can never collide with a real column name since fixed columns are applied last"
+    - "The SQLite file itself (data.sqlite under DATA_DIR/db) is the persistence boundary for all four driver adapters (bun:sqlite, better-sqlite3, node:sqlite, sql.js) — even the pure-JS sql.js fallback, which has no native file handle, debounces writes back to that same file with fs.writeFileSync — so a modelLock_* lock, once its updateProviderConnection() call resolves, survives a process restart under every adapter, not just the native ones"
+  state:
+    reads: ["providerConnections.data (JSON blob column)"]
+    writes: ["providerConnections.data (JSON blob column)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["providerConnections.data JSON blob, on disk at DATA_DIR/db/data.sqlite"]
+  performanceConcerns:
+    - "Every field read/write round-trips through JSON.parse/JSON.stringify of the whole blob, even when only one modelLock_* key changes — updateProviderConnection reads the full row, spreads the new partial on top in JS, and re-stringifies the entire object back, so lock churn on a connection with many stale modelLock_* keys (one per model ever attempted) grows the blob and the parse/stringify cost per write"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "modelLock_* keys accumulate one per distinct model ever locked on that connection and are only removed by clearAccountError's lazy sweep of expired keys on a subsequent success — a connection that is tried against many different model names and never succeeds again keeps growing this JSON blob indefinitely"
+  evidence:
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 13, note: "rowToConn — parseJson(row.data) spread first, then fixed columns applied on top" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 30, note: "connToRow — { id, provider, ..., ...rest } destructure; rest (incl. modelLock_* keys) becomes the data column" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 40, note: "data: stringifyJson(rest) — the actual JSON serialization" }
+    - { file: src/lib/db/paths.js, line: 6, note: "DATA_FILE = DATA_DIR/db/data.sqlite — the on-disk file backing every adapter" }
+    - { file: src/lib/db/adapters/sqljsAdapter.js, line: 26, note: "fs.writeFileSync(filePath, ...) — even the pure-JS in-memory adapter persists to the same disk file" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: account.clear-error-on-success
+  group: Provider account management
+  feature: Provider account management
+  subFeature: clearAccountError — lazy cleanup of expired locks and conditional error-state reset on a successful request
+  trigger: A request against a connection+model succeeds (called from the handler's onRequestSuccess callback, e.g. src/sse/handlers/chat.js)
+  input: "connectionId, currentConnection (a credentials object carrying _connection, or a raw connection row), model"
+  output: "An updateProviderConnection() call clearing the succeeded model's lock plus any already-expired locks, and — only if no active lock remains — resetting testStatus/lastError/errorCode/lastErrorAt/backoffLevel"
+  businessRules:
+    - "Early exit: if the connection has no testStatus, no lastError, and zero modelLock_* keys at all, nothing is written — clearAccountError is a no-op on an already-clean connection"
+    - "keysToClear = every modelLock_* key that either (a) is the exact key for the model that just succeeded, (b) is the account-wide modelLock___all key (cleared whenever ANY model succeeds, since an account-wide lock blocks every model), or (c) has already expired (expiry <= now) — this is the 'lazy-cleans any other expired modelLock_* keys' sweep, opportunistic on every success rather than on a timer"
+    - "testStatus/lastError/errorCode/lastErrorAt/backoffLevel are reset to their clean values ONLY if remainingActiveLocks (locks not in keysToClear, still unexpired) is empty — a connection that is locked for model A but just succeeded on model B has its modelLock_A key left untouched and its account-level error/backoff state left untouched too, even though model B now works"
+    - "connectionId === \"noauth\" is a no-op guard, matching markAccountUnavailable's treatment of the virtual Public connection"
+  state:
+    reads: ["currentConnection._connection or currentConnection (in-memory, already fetched by the caller — not re-read from DB)"]
+    writes: ["providerConnections: cleared modelLock_* keys; conditionally testStatus/lastError/errorCode/lastErrorAt/backoffLevel"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["providerConnections row: modelLock_* keys cleared, error/backoff fields conditionally reset"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "clearAccountError reads its lock-key snapshot from the credentials object the caller already holds (currentConnection._connection), not a fresh DB read — if another request updated the same connection's locks between when this caller fetched credentials and when clearAccountError runs, this call can clear a stale view of the locks (e.g. re-clear a key another request already cleared, or miss a key added since fetch), though the underlying updateProviderConnection write is still an atomic read-merge-write against the current DB row so no lock is left in a half-written state"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 298, note: "clearAccountError signature; noauth guard" }
+    - { file: src/sse/services/auth.js, line: 302, note: "allLockKeys = Object.keys(conn).filter(startsWith modelLock_) — read from the caller-held connection snapshot" }
+    - { file: src/sse/services/auth.js, line: 307, note: "keysToClear — succeeded model, account-wide __all, or already-expired" }
+    - { file: src/sse/services/auth.js, line: 317, note: "remainingActiveLocks — locks not being cleared that are still unexpired" }
+    - { file: src/sse/services/auth.js, line: 326, note: "conditional reset of testStatus/lastError/errorCode/lastErrorAt/backoffLevel only when remainingActiveLocks is empty" }
+    - { file: src/sse/handlers/chat.js, line: 304, note: "onRequestSuccess callback — clearAccountError(credentials.connectionId, credentials, model) on success" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: account.antigravity-quota-prefilter
+  group: Multi-account
+  feature: Multi-account selection
+  subFeature: In-memory Antigravity live-quota cache that pre-filters accounts before a request is even attempted
+  trigger: getProviderCredentials() for provider antigravity with a model specified; the cache is populated/updated separately whenever a live 409/429 occurs
+  input: "connectionId, model; cache keyed connectionId -> { [model]: { remainingPercentage, resetAt } }"
+  output: A connection is excluded from availableConnections if its cached entry for that model shows remainingPercentage <= 0 and an unexpired resetAt
+  businessRules:
+    - "The cache is lazy: getAntigravityQuotaCache() is only consulted, never proactively populated, by the selection filter — a connection with no cache entry yet (cold start, or never having hit 409/429) is always let through regardless of its true upstream quota state"
+    - "The cache lives entirely in process memory (a module-scope Map in antigravityQuota.js, not global._-prefixed), separate from the persisted modelLock_* mechanism — a cache hit skips upstream calls without ever writing a DB lock, so this filtering is invisible to any code that only inspects the connection row"
+    - "A strike-based circuit breaker layered on top of the same cache (STRIKE_THRESHOLD=3 429s within a 60s window) additionally blocks a connection+model pair for 15 minutes when the optimistic quota reading disagrees with repeated live 429s — this is a second, independent reason a connection can be filtered here beyond the plain remainingPercentage<=0 check"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["Antigravity quota cache (Map, connectionId -> per-model quota)", "strike counts and strike blocks (Map, per connection+model)"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because the cache is a plain module-scope Map rather than hung off global._ (the pattern CLAUDE.md documents as deliberate for usageRepo's live counters, precisely because Next.js can re-evaluate a module more than once per process), a Next.js dev hot-reload can silently reset this cache mid-session, temporarily re-admitting an account the live API had already reported as exhausted until the next 409/429 repopulates it"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 81, note: "isAntigravity + model gate before consulting the cache" }
+    - { file: src/sse/services/auth.js, line: 89, note: "cache lookup, remainingPercentage<=0 and resetAt-in-future check" }
+    - { file: src/sse/services/antigravityQuota.js, line: 11, note: "const quotaCache = new Map() — module-scope, not global._-prefixed" }
+    - { file: src/sse/services/antigravityQuota.js, line: 24, note: "strikeCounts/strikeBlocks Maps and STRIKE_THRESHOLD/STRIKE_BLOCK_MS constants for the circuit breaker" }
+  newModule: connections
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: account.concurrent-refresh-race
+  group: Multi-account
+  feature: Multi-account selection
+  subFeature: Whether two concurrent requests against the same connection can both trigger a token refresh
+  trigger: Two client requests routed to the same provider+model close enough together that both select the same connection (most likely under fill-first, the default strategy) while its token is expired or the upstream returns 401/403
+  input: Two independent in-memory credentials snapshots for the same connectionId, each captured by a separate call to getProviderCredentials/checkAndRefreshToken
+  output: "Both requests independently call the provider's refresh endpoint with their own copy of refreshToken; for providers whose refresh token is single-use and rotates on every call, the second call's refresh fails"
+  businessRules:
+    - "There is no per-connection refresh lock anywhere in this path: getProviderCredentials()'s selectionMutex only wraps the SELECTION step and releases before the caller even starts using the credentials (see account.select-mutex-global-scope) — nothing serializes the subsequent refresh-and-retry, at either the proactive layer (checkAndRefreshToken, called unconditionally after every selection in src/sse/handlers/chat.js line 253) or the reactive layer (chatCore.js's 401/403 handler, line 402)"
+    - "Fill-first (the default strategy) always returns the same top-priority connection to every concurrent caller as long as it's available — it does not mark a connection 'checked out', so two requests arriving within the same tens-of-milliseconds window before either has refreshed routinely receive identical credentials.refreshToken values"
+    - "Each caller mutates only its own local `credentials` object across refreshWithRetry's internal retry attempts (chatCore.js lines 404-413, explicitly commented as fixing rotation WITHIN one call's own retries) — this local mutation does nothing for a second, separate concurrent request, which still holds the pre-refresh refreshToken value it captured at selection time"
+    - "The DB write itself (updateProviderCredentials -> connectionsRepo.updateProviderConnection) is atomic per call (read-merge-write inside one db.transaction), so the stored row is never corrupted — the race is entirely about which in-memory refreshToken each concurrent request's refresh call sends upstream, not about a corrupted database write"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["auth.refresh-generic-grant", "auth.refresh-provider-specific", "account.select-fill-first-default"]
+  providerInteraction: "Each concurrent request independently POSTs to the provider's OAuth refresh endpoint with its own in-memory refreshToken snapshot"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "a provider with single-use rotating refresh tokens (the code names xAI/grok-cli explicitly) receives a second concurrent refresh call using a refreshToken already consumed by the first — the provider returns invalid_grant and refreshWithRetry's 3 attempts all fail on the stale token", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "No cross-request lock guards token refresh for a given connection; only refresh attempts WITHIN a single request's own refreshWithRetry loop see each other's rotated token" }
+  edgeCases:
+    - "This is most likely to surface as a burst failure right at token-expiry time: many concurrent requests for a busy provider/model all pass isTokenExpiringSoon() at once, all trigger checkAndRefreshToken proactively, and for a rotating-refresh-token provider only the first to complete its POST gets a token that survives — the rest fail with invalid_grant and (depending on classifyOAuthRefreshError) may mark the connection unavailable via markAccountUnavailable even though a different request just successfully refreshed it seconds earlier"
+  evidence:
+    - { file: src/sse/services/auth.js, line: 10, note: "selectionMutex releases (finally block) before caller code runs — mutex does not extend into the refresh/retry phase" }
+    - { file: src/sse/handlers/chat.js, line: 253, note: "checkAndRefreshToken called unconditionally on every selection, no per-connection gate" }
+    - { file: open-sse/handlers/chatCore.js, line: 402, note: "401/403 handler calls executor.refreshCredentials(credentials, log) independently per request" }
+    - { file: open-sse/handlers/chatCore.js, line: 404, note: "comment explicitly scoping the rotation fix to 'refreshWithRetry's 2nd/3rd attempt' — i.e. within one call, not across requests" }
+    - { file: src/sse/services/tokenRefresh.js, line: 233, note: "checkAndRefreshToken proactive path — same no-lock pattern, runs on every request whose token is near expiry" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 192, note: "updateProviderConnection — the DB write itself is atomic per call, ruling out a corrupted-row race" }
+  newModule: connections
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Two concurrent requests hitting an expired/rejected token on the same connection should converge on one valid refreshed token — either serialized so the second reuses the first's fresh token, or each refresh is independently idempotent regardless of which refreshToken value it started from"
+    actual: "No per-connection lock exists around either the proactive (checkAndRefreshToken) or reactive (chatCore.js 401/403) refresh call; each concurrent request refreshes using its own in-memory refreshToken snapshot with no coordination with other in-flight requests for the same connection"
+    impact: "For providers with single-use rotating refresh tokens (the code names xAI and grok-cli explicitly), a burst of concurrent requests around token-expiry time causes all but the first refresh to fail with invalid_grant, which can further trigger markAccountUnavailable and lock the connection out even though it was just successfully refreshed by a sibling request"
+
+- id: connection.create-dedup-and-priority-assignment
+  group: Provider account management
+  feature: Provider account management
+  subFeature: createProviderConnection — identity-based dedup on re-import, and automatic priority assignment for new connections
+  trigger: A new connection is imported/created (OAuth callback, API-key add, access-token add) via createProviderConnection(data)
+  input: "data.provider, data.authType, data.email, data.name, data.priority, data.providerSpecificData (incl. per-provider identity fields like chatgptAccountId/username/githubLogin)"
+  output: "Either the existing matching connection merged with the incoming data (dedup hit), or a brand-new connection row with an assigned id/name/priority"
+  businessRules:
+    - "Dedup only applies to authType oauth (matched by email, with provider-specific identity tie-breaks) or authType apikey (matched by exact name) — access_token connections are NEVER deduped ('user manages duplicates manually', per the inline comment), so re-adding the same access-token twice always creates a second row"
+    - "OAuth dedup for codex specifically requires BOTH rows to expose the same chatgptAccountId to collapse onto an existing row — this exists because Codex/OpenAI can issue multiple OAuth grants for the same email with single-use refresh tokens, and collapsing a new login onto an existing bare-email row would overwrite the first account's still-valid token pair, silently breaking it"
+    - "Non-Codex workspace providers match on chatgptAccountId when both sides have it; if only one side has it, they're treated as distinct (not deduped). Non-workspace providers fall back to matching on (email + username) requiring both sides to have username, else treated as distinct — the fallback bare-email match only applies when NEITHER side has a username"
+    - "A new connection's priority defaults to max(existing priorities for that provider) + 1 when not explicitly supplied — new accounts are appended to the back of the fill-first queue by default, never inserted ahead of existing ones"
+    - "A dedup hit runs upsert() but skips reorderInTx entirely — priority renumbering only happens for genuinely new connections, not merges"
+  state:
+    reads: ["providerConnections table (all rows for the provider, inside the transaction)"]
+    writes: ["providerConnections (new row, or merged existing row)"]
+    runtimeOnly: []
+  dependencies: ["catalog.connection-detail-crud"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["providerConnections row: full connection record"]
+  performanceConcerns:
+    - "Every create loads ALL existing connections for the provider into memory (db.all(...).map(rowToConn)) to run the dedup scan — fine at typical per-provider account counts, but it's a full table scan per provider on every single import"
+  behavior: { streaming: false, cancellation: null, concurrency: "The whole dedup-scan + insert/merge runs inside one db.transaction (synchronous callback), so two concurrent creates for the same provider cannot race past each other mid-scan — one transaction fully commits (including the priority reorder) before the next transaction's dedup scan reads the table" }
+  edgeCases:
+    - "For a brand-new connection, connectionName falls back to deriveConnectionName() only for oauth/access_token authTypes — an apikey connection with no explicit name gets `name: null` (connectionName stays null), since deriveConnectionName is never called for that authType and there's no other fallback string"
+  evidence:
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 102, note: "createProviderConnection — db.transaction wraps the entire dedup-scan + insert/merge" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 122, note: "codex-specific dedup: both rows must share chatgptAccountId" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 137, note: "non-codex workspace-id and username+email dedup branches" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 160, note: "connectionPriority default: max existing + 1" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 156, note: "connectionName derivation only for oauth/access_token" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: connection.update-atomic-merge-and-reorder
+  group: Provider account management
+  feature: Provider account management
+  subFeature: updateProviderConnection — atomic read-merge-write per connection, and priority reorder triggered by a priority change
+  trigger: Any partial update to a connection — dashboard edit, token refresh write, lock/unlock, round-robin bookkeeping
+  input: "id, data (any subset of connection fields, including dynamically-named modelLock_* keys)"
+  output: "The merged connection object, or null if id doesn't exist"
+  businessRules:
+    - "The whole operation (SELECT existing row, spread-merge `{ ...existing, ...data }`, UPSERT) runs inside one db.transaction — a concurrent second updateProviderConnection() call for the same id cannot interleave its own read between this call's read and write, because the underlying SQLite driver serializes transactions; this is what makes the modelLock_* read-merge-write safe against corruption even though the JS-level merge logic has no explicit locking of its own"
+    - "reorderInTx (re-numbering every connection's priority for that provider by ascending priority, tie-broken by most-recently-updated first) runs ONLY when data.priority !== undefined — an update that doesn't touch priority never triggers a reorder, so token-refresh/lock writes (which never set priority) are cheaper than a dashboard priority-reorder request"
+    - "A partial update genuinely merges rather than replaces: only keys present in `data` overwrite the existing row's corresponding key, so this is the mechanism that lets markAccountUnavailable set one modelLock_* key without touching any other field, and lets clearAccountError null out only the specific locks it decided to clear"
+  state:
+    reads: ["providerConnections table (row by id)"]
+    writes: ["providerConnections table (row by id, merged)"]
+    runtimeOnly: []
+  dependencies: ["catalog.connection-detail-crud"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "id does not correspond to an existing row — result stays null, no error thrown", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections row: whatever keys `data` supplies, merged onto the existing row"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "Per-connection read-merge-write is atomic (single db.transaction) — safe against two updates to the SAME connection corrupting each other's fields. It does NOT protect against the higher-level races in account.select-round-robin-sticky or account.concurrent-refresh-race, where the race is in which VALUES two callers decide to write, not in whether the write itself is safe" }
+  edgeCases: []
+  evidence:
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 192, note: "updateProviderConnection — db.transaction wraps SELECT, spread-merge, UPSERT" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 199, note: "merged = { ...existing, ...data, updatedAt: now } — partial merge, not replace" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 201, note: "reorderInTx called only if data.priority !== undefined" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 90, note: "reorderInTx — re-sorts by priority then updatedAt, renumbers 1..N" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: connection.delete-and-reorder
+  group: Provider account management
+  feature: Provider account management
+  subFeature: deleteProviderConnection — row removal followed by a priority renumber for the remaining accounts of that provider
+  trigger: DELETE /api/providers/[id] (catalog.connection-detail-crud) or any other caller of deleteProviderConnection(id)
+  input: id
+  output: "true if a row was found and deleted, false if id didn't exist (no error thrown either way)"
+  businessRules:
+    - "The provider id is read from the row being deleted BEFORE the DELETE runs (`SELECT provider FROM ... WHERE id = ?`), so the subsequent reorderInTx(db, row.provider) still knows which provider's remaining connections to renumber even after the row is gone"
+    - "reorderInTx renumbers the survivors to a dense 1..N sequence — deleting priority-2 out of 1/2/3 leaves 1/2 (not 1/3), so priority values are never stable identifiers across deletes, only a live ordering"
+    - "Delete + reorder run inside one db.transaction, same atomicity guarantee as update — no window where the table has a gap in priority numbers visible to a concurrent read"
+  state:
+    reads: ["providerConnections table (provider column of the row being deleted)"]
+    writes: ["providerConnections (row deleted; remaining rows for that provider renumbered)"]
+    runtimeOnly: []
+  dependencies: ["catalog.connection-detail-crud"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "id does not correspond to an existing connection", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections: row removed, remaining provider rows' priority renumbered"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "deleteProviderConnectionsByProvider (bulk delete-all-for-provider, used when a provider is fully disconnected) does NOT call reorderInTx at all — there's nothing left to reorder once every row for that provider is gone, so this is intentional, not a missed call"
+  evidence:
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 207, note: "deleteProviderConnection — SELECT provider before DELETE, then reorderInTx" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 220, note: "deleteProviderConnectionsByProvider — bulk delete, no reorder call" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: connection.storage-shape-json-blob
+  group: Provider account management
+  feature: Provider account management
+  subFeature: The providerConnections row shape — fixed SQL columns vs. an open-ended JSON blob for everything else
+  trigger: Any read or write of a connection row (rowToConn / connToRow, used by every function in connectionsRepo.js)
+  input: A raw SQLite row, or a JS connection object to persist
+  output: A JS connection object with all fields flattened to top level, regardless of which storage tier they came from
+  businessRules:
+    - "Exactly 9 fields are real columns: id, provider, authType, name, email, priority, isActive, createdAt, updatedAt — isActive is stored as SQLite 0/1 and coerced back to boolean on read (row.isActive === 1 || row.isActive === true, the `=== true` arm covering adapters that return native booleans)"
+    - "Everything else a connection carries — accessToken, refreshToken, apiKey, expiresAt, providerSpecificData, testStatus, lastError, backoffLevel, every modelLock_* key, consecutiveUseCount, lastUsedAt, etc. — is opaque JSON in the single `data` column, with no schema enforcement on that blob's shape beyond what application code happens to read/write"
+    - "cleanupProviderConnections() is a maintenance sweep that deletes null/undefined values for a fixed list of known optional fields (and drops an empty providerSpecificData object entirely) from the JSON blob — this is the only place that actively shrinks the blob; nothing else in the repo ever removes a stale key from `data` on its own (matching the modelLock_* accumulation edge case noted in account.lock-storage-persistence)"
+  state:
+    reads: ["providerConnections (9 fixed columns + data JSON blob)"]
+    writes: ["providerConnections.data (JSON blob)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["providerConnections: 9 fixed columns + data JSON blob"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because the JSON blob has no schema, a typo'd field name written by one code path (e.g. a hypothetical `modellock_` lowercase) would silently store as a distinct key never read by isModelLockActive's `modelLock_` prefix check — there is no validation layer between application code and this blob to catch that class of mistake"
+  evidence:
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 13, note: "rowToConn — 9 fixed columns applied after the parsed JSON blob spread" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 24, note: "isActive coercion: row.isActive === 1 || row.isActive === true" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 232, note: "cleanupProviderConnections — the only active shrink of the JSON blob, fixed field list" }
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 252, note: "empty providerSpecificData object dropped entirely during cleanup" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

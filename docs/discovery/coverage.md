@@ -1,6 +1,6 @@
 # Discovery coverage
 
-Entries: 46
+Entries: 62
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
@@ -9,22 +9,22 @@ Entries: 46
 | providers | 8/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, antigravity, api-airforce, assemblyai … +106 |
 | executors | 4/29 | antigravity, azure, codebuddy-cn, codebuddy-intl, codex, commandcode, cursor, devin-cli … +17 |
 | translators | 0/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +40 |
-| repos | 2/11 | aliasRepo, combosRepo, connectionsRepo, disabledModelsRepo, nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo … +1 |
-| settingsKeys | 6/52 | capacityAdapter, cavemanEnabled, cavemanLevel, cloudEnabled, comboStickyRoundRobinLimit, comboStrategies, comboStrategy, dnsToolEnabled … +38 |
+| repos | 3/11 | aliasRepo, combosRepo, disabledModelsRepo, nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo, usageRepo |
+| settingsKeys | 8/52 | capacityAdapter, cavemanEnabled, cavemanLevel, cloudEnabled, comboStickyRoundRobinLimit, comboStrategies, comboStrategy, dnsToolEnabled … +36 |
 
 ## Entries per bounded context
 
 - apikeys: 9
 - catalog: 7
-- connections: 22
+- connections: 38
 - identity: 1
 - settings: 7
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 1
-- REFERENCE_BEHAVIOR: 42
-- SUSPECTED_BUG: 3
+- IMPLEMENTATION_ACCIDENT: 3
+- REFERENCE_BEHAVIOR: 55
+- SUSPECTED_BUG: 4
 
 ## Missing — routes
 
@@ -393,7 +393,6 @@ Entries: 46
 
 - aliasRepo
 - combosRepo
-- connectionsRepo
 - disabledModelsRepo
 - nodesRepo
 - pricingRepo
@@ -427,7 +426,6 @@ Entries: 46
 - oidcScopes
 - ponytailEnabled
 - ponytailLevel
-- providerStrategies
 - pxpipeAutoInstall
 - pxpipeEnabled
 - pxpipeMinChars
@@ -442,7 +440,6 @@ Entries: 46
 - samlIssuer
 - samlLoginLabel
 - ssoType
-- stickyRoundRobinLimit
 - tailscaleEnabled
 - tailscaleUrl
 - tunnelDashboardAccess
