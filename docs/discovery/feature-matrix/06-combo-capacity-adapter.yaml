@@ -1,0 +1,646 @@
+# Trace: Model combo modes (fallback / round-robin / fusion) and the capacity
+# adapter (Task 11).
+# 9router reference read at E:\9router. Read-only; every evidence line was
+# read directly, not inferred from names (behavioral.md §7).
+#
+# Entry points read in full: open-sse/services/combo.js (625 lines),
+# open-sse/services/capacityAdapter.js (173), src/lib/db/repos/combosRepo.js (73),
+# src/app/api/combos/route.js (48), src/app/api/combos/[id]/route.js (81), plus
+# src/lib/db/schema.js (combos table DDL) and the combo call sites in
+# src/sse/handlers/chat.js / fetch.js / search.js for cross-lane context.
+# routing.combo-dispatch and routing.capacity-adapter-solo (05) already record
+# the hand-off points from the main request chain; this file goes deep on what
+# happens once combo.js/capacityAdapter.js take over. settings.combo-rotation-reset
+# (01) already records the settings-PATCH trigger; this file adds the CRUD-triggered
+# resets that PATCH doesn't cover.
+#
+# Q1 (three combo modes + fusion completion rule):
+#   combo.mode-fallback                  sequential try-until-success
+#   combo.mode-round-robin               sticky rotation across requests
+#   combo.mode-fusion-panel-completion   quorum + straggler grace + hard timeout
+#   combo.mode-fusion-degrade            0/1/2+ surviving-answer handling
+#   combo.judge-prompt-synthesis         anonymized-source judge synthesis
+#   combo.tool-history-flatten           tool turns -> prose before panel calls
+# Q2 (fusion concurrency bound): combo.fusion-panel-concurrency-unbounded — IMPLEMENTATION_ACCIDENT.
+# Q3 (what detectRequiredCapabilities misses): combo.detect-required-capabilities (edgeCases).
+# Q4 (reorderByCapabilities tiers): combo.reorder-by-capabilities-tiers.
+# Q5 (stripHistoryForContext budget formula): capacity.strip-history-budget-formula.
+# Q6 (comboRotationState resets + durability): combo.rotation-state-lifecycle.
+# Capacity adapter internals: capacity.capability-pool-config, capacity.pool-models-and-strategy,
+#   capacity.augment-models-priority-prepend, capacity.wrap-stripping-per-model.
+# Storage/CRUD: combo.storage-shape, combo.api-crud.
+
+- id: combo.mode-fallback
+  group: Model combo
+  feature: Model combo
+  subFeature: "\"Fallback\" strategy — sequential try-until-success across combo members"
+  trigger: A combo dispatch (routing.combo-dispatch) resolves to comboStrategy "fallback" (the default) or any non-"round-robin"/"fusion" value
+  input: "rotatedModels (post rotation + capability auto-switch), body, handleSingleModel callback"
+  output: The first successful (2xx) member Response, or an aggregate error/503 Response after every member is exhausted
+  businessRules:
+    - "handleComboChat tries rotatedModels[0], [1], ... in order; it moves to the next model when handleSingleModel throws, OR when the non-2xx result's checkFallbackError classification says shouldFallback:true"
+    - "checkFallbackError's shouldFallback:false path (per fallback.error-classification: noAuth connections, or pre-dispatch validation errors) returns that failing Response to the client immediately — the remaining combo members are never tried"
+    - "A 502/503/504 whose classifier cooldownMs is > 0 and <= 5000 ms is awaited in-process (await new Promise(setTimeout)) before moving to the next model, giving a briefly-overloaded member one grace window; longer cooldowns are not waited on before falling through"
+    - "When every member fails: the returned status is the last member's status (or 503 if none set one), UNLESS the last error text contains 'no credentials' (case-insensitive), which forces status 503 regardless of what the last member actually returned"
+    - "retryAfter in the final aggregate error is the earliest of any member's parsed retryAfter across the whole loop, not just the last member's"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.combo-dispatch", "fallback.error-classification", "combo.rotation-state-lifecycle"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "In-place retry per member belongs to fallback.executor-retry-budget; this loop only decides next-member fallback", timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "handleSingleModel throws, or returns a non-2xx result the classifier says to fall back from, for every model in rotatedModels", partial: false }
+    - { code: INVALID_REQUEST, when: "the first attempted member's classifier returns shouldFallback:false (e.g. a pre-dispatch validation error) — returned to the client immediately without trying later members", partial: false }
+  sideEffects: ["log.info per attempt (COMBO tag, 1-based index/total); log.warn on a member failure or thrown error; log.warn 'All models failed' once the loop exhausts every member"]
+  persistence: []
+  performanceConcerns:
+    - "Fully sequential — attempt N+1 does not start until attempt N's Response (and any transient-cooldown wait) resolves; there is no deadline across the whole combo beyond each member's own executor retry budget"
+  behavior: { streaming: true, cancellation: null, concurrency: "One member in flight at a time — the opposite of fusion's fan-out" }
+  edgeCases:
+    - "A failing member's Response body is read via result.clone().json() (the clone, not the original) so the original Response is still consumable — but only the success branch actually returns the original Response object onward; a failing one is discarded after its clone is inspected"
+    - "If parsing the failing member's JSON body throws (non-JSON error body), the parse error is silently swallowed and the raw statusText is used as errorText instead"
+  evidence:
+    - { file: open-sse/services/combo.js, line: 300, note: "for loop over rotatedModels, one member per iteration" }
+    - { file: open-sse/services/combo.js, line: 308, note: "result.ok -> return result immediately (success)" }
+    - { file: open-sse/services/combo.js, line: 335, note: "checkFallbackError(result.status, errorText) reused from accountFallback.js" }
+    - { file: open-sse/services/combo.js, line: 337, note: "shouldFallback false -> return this failing result to the client, no further members tried" }
+    - { file: open-sse/services/combo.js, line: 345, note: "transient 502/503/504 with cooldownMs<=5000 -> await cooldown before next member" }
+    - { file: open-sse/services/combo.js, line: 367, note: "allDisabled ('no credentials' in lastError) forces status 503 on the aggregate error" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: combo.mode-round-robin
+  group: Model combo
+  feature: Model combo
+  subFeature: "\"Round-robin\" strategy — sticky rotation of the starting member across requests"
+  trigger: comboStrategy resolves to exactly "round-robin" (per-combo comboStrategies[name].fallbackStrategy, else global settings.comboStrategy) and models.length > 1
+  input: "models array, comboName (rotation key), stickyLimit (settings.comboStickyRoundRobinLimit, default 1)"
+  output: rotatedModels — same members, rotated so the current rotation index is first; handleComboChat then falls through them exactly like the fallback strategy
+  businessRules:
+    - "getRotatedModels no-ops (returns models unchanged) when models.length<=1 or strategy isn't exactly 'round-robin' — any other strategy string is treated as plain fallback ordering"
+    - "Rotation state per combo name is {index, consecutiveUseCount}; normalizeStickyLimit parses stickyLimit and falls back to 1 for any non-finite or non-positive input"
+    - "consecutiveUseCount counts requests served at the CURRENT index; once it reaches normalizedStickyLimit, the index advances (mod models.length) and the counter resets to 0 for the next request — otherwise the counter increments and the index holds"
+    - "Every request still tries the FULL member list on failure: round-robin only changes which member is tried first (rotateModelsFromIndex rotates the whole array), it never removes a member from the fallback chain"
+    - "Legacy state shape: an existing Map value that is a bare number (older format) is treated as {index: thatNumber, consecutiveUseCount: 0}"
+    - "The read-modify-write of the Map entry is synchronous (no await inside getRotatedModels), so two requests for the same combo processed back-to-back on Node's single event-loop thread cannot interleave mid-update — each call completes atomically relative to the others"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["comboRotationState Map entry for this comboName — { index, consecutiveUseCount }"]
+  dependencies: ["combo.rotation-state-lifecycle"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: "Synchronous read-modify-write on a shared Map; see businessRules — no lock needed because there is no await between read and write" }
+  edgeCases:
+    - "Removing a combo member out from under an in-progress rotation index is handled only by the normal update path resetting rotation state (combo.rotation-state-lifecycle) — there is no independent bounds-check here beyond the modulo wrap"
+  evidence:
+    - { file: open-sse/services/combo.js, line: 187, note: "normalizeStickyLimit — non-finite/non-positive falls back to 1" }
+    - { file: open-sse/services/combo.js, line: 191, note: "rotateModelsFromIndex — shift+push rotation of the full array" }
+    - { file: open-sse/services/combo.js, line: 220, note: "currentIndex = state.index % models.length" }
+    - { file: open-sse/services/combo.js, line: 224, note: "nextUseCount >= normalizedStickyLimit -> advance index, reset counter" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: combo.mode-fusion-panel-completion
+  group: Model combo
+  feature: Model combo
+  subFeature: "\"Fusion\" strategy — panel completion rule (minPanel quorum, straggler grace, hard timeout)"
+  trigger: comboStrategy resolves to "fusion" and models.length > 1 (single-model fusion short-circuits — see combo.mode-fusion-degrade)
+  input: "panel model list, body, cfg = FUSION_DEFAULTS merged with comboStrategies[name].fusionTuning"
+  output: A sparse `out` array from collectPanel — each slot is a Response, {__timeout:true}, {__error}, or left undefined (never settled in time)
+  businessRules:
+    - "minPanel is clamped to between 2 and panel.length via Math.min(Math.max(2, cfg.minPanel), panel.length) — a configured minPanel of 0 or 1 is silently raised to 2 (or to panel.length if the panel itself has only 2 members)"
+    - "The panel is considered complete at the FIRST of: (a) every call has settled, (b) at least minPanel calls have succeeded (ok>=minPanel) AND the stragglerGraceMs grace timer — started the instant quorum is first reached — has elapsed, or (c) panelHardTimeoutMs elapses from panel start, regardless of how many succeeded"
+    - "Each panel call is independently wrapped in withTimeout(call, panelHardTimeoutMs) as well, so an individual call can resolve to {__timeout:true} using the same panelHardTimeoutMs constant that also bounds collectPanel's own hard timer"
+    - "Only one grace timer is ever started (guarded by `!graceTimer`) since `ok` only increases monotonically"
+    - "A call that resolves after finish() has already fired is not observable to the fusion caller (collectPanel's promise resolves exactly once) — but the underlying handleSingleModel call itself is not aborted, it keeps running to completion unused"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["combo.mode-fusion-degrade", "combo.fusion-panel-concurrency-unbounded"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: "panelHardTimeoutMs (default 90000 ms) absolute cap; stragglerGraceMs (default 8000 ms) grace once minPanel (default 2, floor 2) have succeeded", quota: null }
+  errorCases: []
+  sideEffects: ["log.info panel size/members/judge/quorum at fan-out start", "log.info elapsed ms once collectPanel resolves"]
+  persistence: []
+  performanceConcerns:
+    - "Best-case wall time is roughly (time for the fastest minPanel members) + stragglerGraceMs; a slow provider under panelHardTimeoutMs still occupies the event loop and the upstream connection until it eventually settles even though its result is discarded"
+  behavior: { streaming: false, cancellation: "No AbortController anywhere in the panel path — a straggler keeps running server-side after being dropped, it is only ignored, not cancelled", concurrency: "See combo.fusion-panel-concurrency-unbounded" }
+  edgeCases:
+    - "If exactly minPanel calls succeed and others are still in flight when the grace timer fires, those in-flight slots stay `undefined` in `out` (not {__timeout} or {__error}) — the caller's loop treats an undefined slot identically to a straggler/timeout drop"
+  evidence:
+    - { file: open-sse/services/combo.js, line: 472, note: "FUSION_DEFAULTS: minPanel 2, stragglerGraceMs 8000, panelHardTimeoutMs 90000" }
+    - { file: open-sse/services/combo.js, line: 479, note: "withTimeout — resolves {__timeout:true} at ms if the wrapped promise hasn't settled" }
+    - { file: open-sse/services/combo.js, line: 509, note: "collectPanel hard timer set to panelHardTimeoutMs" }
+    - { file: open-sse/services/combo.js, line: 518, note: "ok >= minPanel && !graceTimer -> start the stragglerGraceMs grace timer" }
+    - { file: open-sse/services/combo.js, line: 562, note: "minPanel clamp: Math.min(Math.max(2, cfg.minPanel), panel.length)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: combo.fusion-panel-concurrency-unbounded
+  group: Model combo
+  feature: Model combo
+  subFeature: Fusion fan-out has no explicit concurrency cap independent of panel size
+  trigger: Every fusion request with more than one panel member
+  input: panel array — length is whatever an admin configured as the combo's members
+  output: One outbound handleSingleModel call per panel member, all started in the same synchronous Array.map, i.e. all in parallel
+  businessRules:
+    - "handleFusionChat builds `calls` via `panel.map((m) => withTimeout(handleSingleModel(panelBody, m, true), cfg.panelHardTimeoutMs))` — every panel member's call is invoked immediately and unconditionally; there is no batching, queueing, or semaphore anywhere in the fan-out"
+    - "The only limit on simultaneous in-flight upstream calls for one fusion request is how many models the combo lists — there is no server-side concurrency cap independent of combo size"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["combo.mode-fusion-panel-completion"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "A large fusion combo (e.g. 10+ panel members) fans out 10+ simultaneous upstream requests for a single client request, each occupying an account/connection slot, with no admission control — AIGate must bound this explicitly rather than inherit 'as many as the combo lists'"
+  behavior: { streaming: false, cancellation: null, concurrency: "Bounded only by panel.length (combo member count) — not independently configurable" }
+  edgeCases: []
+  evidence:
+    - { file: open-sse/services/combo.js, line: 581, note: "panel.map(...) starts every panel member's handleSingleModel call with no concurrency limiter" }
+  newModule: routing
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: combo.mode-fusion-degrade
+  group: Model combo
+  feature: Model combo
+  subFeature: Fusion panel body shaping and graceful degradation by number of surviving answers
+  trigger: handleFusionChat invoked for a fusion-strategy combo
+  input: "body (client format), panel models"
+  output: "400 (no models), a direct handleSingleModel passthrough (1 configured model, or exactly 1 surviving answer), 503 (0 surviving answers), or a judge-synthesized Response (>=2 surviving answers)"
+  businessRules:
+    - "panel.length===0 -> 400 'Fusion combo has no models' before any network call is made"
+    - "panel.length===1 -> handleSingleModel(body, panel[0]) is called directly with the ORIGINAL body: no flattening, no forced non-streaming, no fan-out — a true single-model passthrough, not a 1-member fusion round"
+    - "For panel.length>1: tools/tool_choice/stream_options are stripped and stream is forced false for every panel call; messages/input arrays go through flattenToolHistory first (panelBody)"
+    - "answers.length===0 (every panel call failed, timed out, threw, or returned unparseable/empty content) -> 503 'All fusion panel models failed'"
+    - "answers.length===1 -> handleSingleModel(body, thatModel) is invoked AGAIN with the ORIGINAL body (streaming/tools intact), rather than returning the already-fetched non-streaming panel Response — the sole surviving model answers the prompt a second time so the client gets its real streaming/tool behavior"
+    - "answers.length>=2 -> judge synthesis (combo.judge-prompt-synthesis)"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["combo.mode-fusion-panel-completion", "combo.tool-history-flatten"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "fusion combo configured with zero models", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "every panel member fails, times out, throws, or returns unparseable/empty content", partial: false }
+  sideEffects: ["log.warn per failed/timed-out/thrown/empty-content panel member", "log.info per successful panel member with response length in chars"]
+  persistence: []
+  performanceConcerns:
+    - "The answers.length===1 path pays for that model twice: once in the panel fan-out (whose Response is discarded) and again via the direct re-invocation — deliberate (correct streaming/tools beats efficiency here), but worth knowing when reasoning about combo cost"
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "extractPanelText returns '' for a response shape it doesn't recognize, which is logged and treated identically to a real empty-content success ('returned empty content') rather than distinguished from a parse failure"
+  evidence:
+    - { file: open-sse/services/combo.js, line: 549, note: "panel.length===0 -> 400 before any call" }
+    - { file: open-sse/services/combo.js, line: 557, note: "panel.length===1 -> direct handleSingleModel(body, panel[0]) passthrough" }
+    - { file: open-sse/services/combo.js, line: 571, note: "panelBody: tools/tool_choice/stream_options stripped, stream:false" }
+    - { file: open-sse/services/combo.js, line: 609, note: "answers.length===0 -> 503 'All fusion panel models failed'" }
+    - { file: open-sse/services/combo.js, line: 618, note: "answers.length===1 -> handleSingleModel(body, answers[0].model) re-invoked with the original body" }
+    - { file: open-sse/services/combo.js, line: 396, note: "extractPanelText — OpenAI/Claude/Gemini/Responses shapes; falls through to ''" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: combo.judge-prompt-synthesis
+  group: Model combo
+  feature: Model combo
+  subFeature: Judge model synthesizes one final answer from anonymized panel responses
+  trigger: Fusion panel produced 2 or more usable answers
+  input: "answers=[{model,text}] in panel order, judgeModel override (comboStrategies[name].judgeModel), the ORIGINAL body"
+  output: handleSingleModel(judgeBody, judge) — an ordinary single-model call, so the judge's answer streams/uses tools per the client's original request
+  businessRules:
+    - "buildJudgePrompt labels each answer '[Source N]' in panel order — the judge is never told which underlying model produced which answer, to avoid brand-reputation bias skewing its analysis"
+    - "The judge is instructed to internally analyze consensus / contradictions / partial coverage / unique insights / blind spots, THEN write one answer — per the design comment, it does not merge or vote; most of fusion's quality lift is attributed to this synthesis step"
+    - "judgeModel falls back to panel[0] (the first CONFIGURED panel member, not the fastest responder or the actual judge answerer) whenever comboStrategies[name].judgeModel is unset or blank after trim"
+    - "appendUserTurn appends the judge prompt as a new trailing user turn onto the ORIGINAL body (not panelBody) — preserving the client's original conversation, system prompt, tools and stream flag for the judge call; it branches on messages/input/contents, or synthesizes a fresh single-message array if the body has none of those three"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["combo.mode-fusion-degrade"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["log.info before invoking the judge, naming answer count and the resolved judge model"]
+  persistence: []
+  performanceConcerns:
+    - "The judge call is an ordinary handleSingleModel invocation with its own full account-fallback loop (routing.account-fallback-loop) — a judge failure is not caught here, it propagates as the fusion request's actual outcome"
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "appendUserTurn's else-branch (fresh `messages: [{role:'user', content:text}]`) only triggers when the body has none of messages/input/contents — a malformed body in that shape silently loses every other original field for the judge call"
+  evidence:
+    - { file: open-sse/services/combo.js, line: 452, note: "buildJudgePrompt — panel answers labeled '[Source N]', anonymized" }
+    - { file: open-sse/services/combo.js, line: 459, note: "instruction: do not mention multiple models, do not refer to sources" }
+    - { file: open-sse/services/combo.js, line: 428, note: "appendUserTurn — format branching, preserves the original body" }
+    - { file: open-sse/services/combo.js, line: 563, note: "judge = judgeModel && judgeModel.trim() ? judgeModel.trim() : panel[0]" }
+    - { file: open-sse/services/combo.js, line: 622, note: "judgeBody = appendUserTurn(body, buildJudgePrompt(answers)); handleSingleModel(judgeBody, judge)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: combo.tool-history-flatten
+  group: Model combo
+  feature: Model combo
+  subFeature: flattenToolHistory converts tool_use/tool_result/tool_calls turns to prose before panel calls
+  trigger: A fusion panel call (panel.length>1) whose panelBody has an array messages or input field
+  input: "messages/input array in OpenAI tool-role, Claude tool_use/tool_result content-block, or assistant.tool_calls shapes"
+  output: A same-length array with every tool-bearing turn rewritten as plain assistant text
+  businessRules:
+    - "A role 'tool' or 'function' message becomes {role:'assistant', content:'[Tool result: <extracted text>]'}; extractTextContent's fallback to String(content) means even a non-text tool result still produces some text rather than an empty string"
+    - "An assistant message with a tool_calls array has that array stripped entirely (the rest of the message is spread without it) and gets a '[Called tools: name1, name2]' suffix appended to its text content"
+    - "Claude-style content-block arrays containing type:'tool_use' or type:'tool_result' blocks are rebuilt into one string: all text blocks joined first, then one combined '[Called tools: ...]' line, then one combined '[Tool result: ...]' line — this discards the original interleaved block ordering"
+    - "A message with neither shape (plain text, or an array with no tool_use/tool_result blocks) passes through completely unchanged"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A single message containing BOTH a tool_use block and a tool_result block (unusual but not excluded by the per-block loop) collapses to text + one combined tools line + one combined result line, losing which result belonged to which call"
+    - "flattenToolHistory only filters out falsy messages (`.filter((msg) => msg)`) — it does not otherwise validate role/content shape, so an unrecognized role passes through verbatim"
+  evidence:
+    - { file: open-sse/services/combo.js, line: 25, note: "role tool/function -> assistant with '[Tool result: ...]' text" }
+    - { file: open-sse/services/combo.js, line: 28, note: "assistant.tool_calls stripped, '[Called tools: ...]' suffix appended" }
+    - { file: open-sse/services/combo.js, line: 41, note: "Claude content-block loop separating text / tool_use / tool_result parts" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: combo.detect-required-capabilities
+  group: Model combo
+  feature: Model combo
+  subFeature: detectRequiredCapabilities scans only the trailing user turn for modality requirements
+  trigger: Every combo dispatch (handleComboChat's autoSwitch) and every capacity-adapter-solo check — called once per incoming request
+  input: "body.messages / body.input / body.contents, whichever array the client's format uses"
+  output: A Set drawn from {vision, pdf, audioInput, videoInput} ("search" is recognized in the code's design but not currently emitted)
+  businessRules:
+    - "trailingUserItems walks backward from the end of the array until it hits an assistant/model-role item, then returns everything after that boundary — i.e. only the messages contributed since the model's last reply"
+    - "Recognizes modality hints across many client shapes within that trailing run: OpenAI/Claude/Gemini content blocks (image_url/image/input_image, input_audio/audio_url/audio, input_video/video_url/video, file/document/input_file with mime sniffing), Ollama/Hermes m.images array, Vercel AI SDK/Hermes attachments, direct message-level image_url/audio_url fields, Gemini inlineData/fileData mimeType, and string content containing an embedded data: URI"
+    - "A generic file/document block with no recoverable mime defaults to 'pdf' (mime sniffing is tried first via addByMime; the pdf default only fires when no mime could be determined)"
+    - "'search' capability detection is explicitly disabled — a code comment marks it 'temporarily disabled in auto-switch (feature not wired yet)'"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["combo.reorder-by-capabilities-tiers", "capacity.augment-models-priority-prepend"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Only the CURRENT user turn (since the last assistant reply) is scanned. In a multi-turn conversation, an image/PDF/audio/video attachment sent in an EARLIER turn is invisible to this function even though that attachment is still present in the message array sent upstream — a follow-up text-only turn referencing an earlier image will not trigger auto-switch or capacity-adapter routing to a vision-capable model, even though the upstream call still carries that earlier image"
+    - "A request whose only multimodal content lives in a system/developer message (some clients attach reference files there) is also missed, since scanning starts at the trailing user run, never the full array"
+    - "'search' detection being disabled means a combo/capacity-adapter reorder never happens purely because a request wants web search — only vision/pdf/audioInput/videoInput are auto-switch triggers today"
+  evidence:
+    - { file: open-sse/services/combo.js, line: 94, note: "trailingUserItems — walk back to the last assistant/model turn" }
+    - { file: open-sse/services/combo.js, line: 105, note: "detectRequiredCapabilities entry point" }
+    - { file: open-sse/services/combo.js, line: 176, note: "messages/input/contents all restricted to trailingUserItems(...)" }
+    - { file: open-sse/services/combo.js, line: 181, note: "'search: temporarily disabled in auto-switch (feature not wired yet)'" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: combo.reorder-by-capabilities-tiers
+  group: Model combo
+  feature: Model combo
+  subFeature: reorderByCapabilities — 3-tier stable sort of combo/pool members by capability fit
+  trigger: handleComboChat's autoSwitch (default true, always true from current chat.js call sites) with a non-empty required Set, run after rotation and before the fallback loop
+  input: "rotatedModels, required Set (hard = vision/pdf/audioInput/videoInput; soft = any other capability, currently unreachable — see edgeCases)"
+  output: The same models, stably reordered into 3 tiers; no member is ever dropped
+  businessRules:
+    - "Tier 0: satisfies every required HARD capability AND every required SOFT capability"
+    - "Tier 1: satisfies every required hard capability but not all required soft capabilities"
+    - "Tier 2: fails at least one required hard capability — pushed to the back but never removed from the list"
+    - "No-op short-circuits when required is empty/absent, models is not an array, or models.length<=1"
+    - "The sort is stable via an explicit index tiebreaker (a.i-b.i in addition to a.t-b.t) — members within the same tier keep their pre-sort relative order, so a round-robin rotation's ordering survives a capability reorder on top of it"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["combo.detect-required-capabilities", "catalog.capability-tier-fallback"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["log.info 'auto-switch for [...] -> model' only when the winning model actually changed (reordered[0] !== rotatedModels[0])"]
+  persistence: []
+  performanceConcerns:
+    - "getCapabilitiesForModel is looked up once per model per request with no memoization across the sort — cheap since it is a static-table/pattern lookup, not an I/O call"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "HARD_CAPS in combo.js is currently the same 4-capability set detectRequiredCapabilities ever emits, and 'search' (a would-be soft capability) is disabled there — so the tier-0-vs-tier-1 (soft-satisfied vs soft-missing) split is implemented but currently unreachable; every real request that reaches this function only ever produces tier 1 or tier 2 members, never tier 0 via a soft distinction"
+  evidence:
+    - { file: open-sse/services/combo.js, line: 10, note: "HARD_CAPS = vision/pdf/audioInput/videoInput, with comment distinguishing hard vs soft" }
+    - { file: open-sse/services/combo.js, line: 68, note: "tierOf: hard.every(...) false -> tier 2, else soft.every(...) ? 0 : 1" }
+    - { file: open-sse/services/combo.js, line: 80, note: "stable sort by (tier, original index)" }
+    - { file: open-sse/services/combo.js, line: 285, note: "handleComboChat's autoSwitch call site into reorderByCapabilities" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: combo.rotation-state-lifecycle
+  group: Model combo
+  feature: Model combo
+  subFeature: comboRotationState Map — ownership, every reset trigger, and non-durability across restart
+  trigger: "Any of: a settings PATCH touching comboStrategy/comboStickyRoundRobinLimit/comboStrategies (settings.combo-rotation-reset); a combo PUT (any field, not just a rename); a combo DELETE"
+  input: comboName, or none for a full clear
+  output: One Map entry removed, or the whole Map cleared
+  businessRules:
+    - "comboRotationState is a module-level `const comboRotationState = new Map()` inside open-sse/services/combo.js — process memory only, never written to the DB"
+    - "resetComboRotation(comboName) deletes just that key; resetComboRotation() with no argument clears every combo's rotation state at once (used by the settings-PATCH path, settings.combo-rotation-reset)"
+    - "PUT /api/combos/[id] calls resetComboRotation(prev.name) unconditionally after ANY successful update — even one that only changes the models array, not the name — and additionally calls resetComboRotation(combo.name) when the name actually changed, so a rename resets both the old and new name's state"
+    - "DELETE /api/combos/[id] calls resetComboRotation(prev.name) after the row is removed, so a later combo re-created with the same name always starts rotation fresh"
+    - "Not durable: a process restart (deploy, crash, Next.js module re-evaluation) wipes the Map entirely with no reload-from-DB step — every combo's round-robin sequence silently restarts at index 0 on the next boot"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["comboRotationState Map (open-sse/services/combo.js) — full contents, never persisted"]
+  dependencies: ["settings.combo-rotation-reset"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Any combo mid-round-robin cycle for the touched name(s) loses its position and restarts from the strategy's initial index"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Editing a combo's models array WITHOUT renaming it still resets that combo's rotation index to 0 on the very next request — there is no attempt to preserve the round-robin position across an edit that keeps the same name"
+  evidence:
+    - { file: open-sse/services/combo.js, line: 88, note: "comboRotationState = new Map() — module-level, in-memory only" }
+    - { file: open-sse/services/combo.js, line: 243, note: "resetComboRotation(comboName) — targeted delete vs full clear()" }
+    - { file: "src/app/api/combos/[id]/route.js", line: 53, note: "PUT: resetComboRotation(prev.name) unconditionally, plus resetComboRotation(combo.name) if renamed" }
+    - { file: "src/app/api/combos/[id]/route.js", line: 74, note: "DELETE: resetComboRotation(prev.name)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: combo.storage-shape
+  group: Model combo
+  feature: Model combo
+  subFeature: Combo persistence shape — id / unique name / kind / models(JSON) / timestamps
+  trigger: Any combosRepo call (getCombos, getComboById, getComboByName, createCombo, updateCombo, deleteCombo)
+  input: "{name, models, kind} for create/update; id or name for lookups"
+  output: A combo row with `models` parsed back from JSON into a real array
+  businessRules:
+    - "combos.name carries a DB-level UNIQUE NOT NULL constraint (schema.js) — this is the actual backstop against duplicate names, not just the API layer's getComboByName pre-check (see combo.api-crud)"
+    - "models is stored as a JSON TEXT column; parseJson(row.models, []) defaults to an empty array on parse failure or a null/missing cell, so a corrupted models value degrades to 'no members' rather than throwing on read"
+    - "kind is stored and returned by every read path but is not consumed anywhere in the combo dispatch/fallback/fusion logic traced in this file — it is metadata with no traced runtime effect on request routing"
+    - "updateCombo runs inside a single db.transaction: it re-reads the current row, merges the incoming `data` on top of it (untouched fields survive a partial PUT body), and writes the merged result — two concurrent PUTs to the same id serialize at the DB transaction boundary rather than lost-update racing in application code"
+  state:
+    reads: ["combos table"]
+    writes: ["combos table"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["combos table row per combo: id, name (unique), kind, models (JSON array), createdAt, updatedAt"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "updateCombo's read-merge-write is wrapped in one db.transaction, serializing concurrent updates to the same id" }
+  edgeCases:
+    - "kind is a free-form nullable TEXT column with no enum/CHECK constraint at the DB layer — any string, or null, is accepted and round-tripped verbatim"
+  evidence:
+    - { file: src/lib/db/schema.js, line: 92, note: "name: \"TEXT UNIQUE NOT NULL\"" }
+    - { file: src/lib/db/repos/combosRepo.js, line: 5, note: "rowToCombo — models parsed via parseJson(row.models, [])" }
+    - { file: src/lib/db/repos/combosRepo.js, line: 56, note: "updateCombo — db.transaction: read, merge, write" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: combo.api-crud
+  group: Model combo
+  feature: Model combo
+  subFeature: "/api/combos CRUD routes — name validation, a duplicate pre-check race, and reuse outside the chat lane"
+  trigger: "GET/POST /api/combos; GET/PUT/DELETE /api/combos/[id]"
+  input: "{name, models, kind} body for POST/PUT; id path param for the [id] routes"
+  output: "Combo JSON on success, or 400 (bad name format / missing name / duplicate name), 404 (not found), 500 (unhandled)"
+  businessRules:
+    - "Name format is restricted to [a-zA-Z0-9_.-]+ (VALID_NAME_REGEX, duplicated verbatim in both route files) — combo lookups elsewhere (getComboModels, getComboModelsFromData) do not re-validate this charset, they trust whatever string is already stored"
+    - "POST's duplicate check (getComboByName) is a separate SELECT from the later INSERT: under a race, two POSTs with the same name can both pass the pre-check; the DB's UNIQUE constraint (combo.storage-shape) then rejects the second INSERT, which createCombo does not special-case, so that request's outer try/catch returns the generic 500 'Failed to create combo' instead of the friendlier 400 'Combo name already exists'"
+    - "PUT's duplicate check excludes the current id (existing.id !== id), so renaming a combo to its own current name is allowed and is not treated as a collision"
+    - "Combos are consumed not only by the chat lane (routing.combo-dispatch) but also by src/sse/handlers/fetch.js and search.js via getComboModelsFromData — this CRUD surface is shared across modalities, not chat-only"
+  state:
+    reads: ["combos table"]
+    writes: ["combos table"]
+    runtimeOnly: []
+  dependencies: ["combo.storage-shape", "combo.rotation-state-lifecycle"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "POST/PUT name fails VALID_NAME_REGEX, POST is missing name, or POST/PUT name collides with an existing combo per the pre-check", partial: false }
+    - { code: INTERNAL_ERROR, when: "any thrown error in the route's try/catch, including a UNIQUE-constraint violation the pre-check race missed", partial: false }
+  sideEffects: ["PUT/DELETE trigger resetComboRotation as a side effect of an otherwise pure CRUD write (combo.rotation-state-lifecycle)"]
+  persistence: ["combos table"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "GET /api/combos and GET /api/combos/[id] return the raw stored shape (kind included, models as a real array) with no narrower list/summary projection"
+  evidence:
+    - { file: src/app/api/combos/route.js, line: 7, note: "VALID_NAME_REGEX = /^[a-zA-Z0-9_.\\-]+$/" }
+    - { file: src/app/api/combos/route.js, line: 36, note: "getComboByName pre-check before createCombo — separate query from the INSERT" }
+    - { file: src/app/api/combos/route.js, line: 46, note: "generic catch -> 500 'Failed to create combo' (would also catch a raced UNIQUE-constraint failure)" }
+    - { file: "src/app/api/combos/[id]/route.js", line: 39, note: "PUT duplicate check excludes the current id" }
+    - { file: open-sse/services/combo.js, line: 254, note: "getComboModelsFromData — the lookup fetch.js/search.js reuse outside the chat lane" }
+    - { file: src/sse/handlers/fetch.js, line: 93, note: "fetch.js calling getComboModelsFromData(providerInput, combos)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: capacity.capability-pool-config
+  group: Capacity adapter
+  feature: Capacity adapter
+  subFeature: Per-capability adapter pool config (enabled/roundRobin/models) with legacy-array back-compat and empty-pool fallback
+  trigger: Any augmentModelsWithCapacityAdapter or getActiveAdapterStrategy call — i.e. every combo dispatch and every capacity-adapter-solo check
+  input: "settings.capacityAdapter[cap] for cap in vision/pdf/audioInput/videoInput"
+  output: "{enabled, roundRobin, models} for that capability"
+  businessRules:
+    - "normalizeCapEntry accepts two shapes: the legacy bare array [{model, enabled}] (treated as enabled:true, roundRobin:false, models mapped from entry.model||entry), or the current object shape {enabled, roundRobin, models}; anything else (undefined, wrong type) normalizes to fully disabled with an empty pool"
+    - "Object-shape `enabled` defaults to true unless explicitly `false` (entry.enabled !== false) — an object with no 'enabled' key at all is treated as enabled"
+    - "getCapacityAdapterConfig upgrades an enabled-but-empty-models pool to models:[DEFAULT_FALLBACK_MODEL] ('oc/mimo-v2.5-free') so turning the toggle on is never a silent no-op"
+  state:
+    reads: ["settings.capacityAdapter"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.capacity-adapter-solo"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "DEFAULT_FALLBACK_MODEL is a single hardcoded model string; there is no validation here that it still exists in the provider registry — if it were ever removed, an enabled-but-unconfigured pool would simply fail at request time with no earlier warning"
+  evidence:
+    - { file: open-sse/services/capacityAdapter.js, line: 13, note: "CAPABILITY_KEYS = [vision, pdf, audioInput, videoInput]" }
+    - { file: open-sse/services/capacityAdapter.js, line: 15, note: "DEFAULT_FALLBACK_MODEL = \"oc/mimo-v2.5-free\"" }
+    - { file: open-sse/services/capacityAdapter.js, line: 19, note: "normalizeCapEntry — legacy array vs object-shape handling" }
+    - { file: open-sse/services/capacityAdapter.js, line: 37, note: "enabled+empty-models pool upgraded to [DEFAULT_FALLBACK_MODEL]" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: capacity.pool-models-and-strategy
+  group: Capacity adapter
+  feature: Capacity adapter
+  subFeature: Flattened deduped adapter pool across all 4 capabilities, and active-strategy resolution
+  trigger: augmentModelsWithCapacityAdapter needs the pool; routing.combo-dispatch needs the active strategy for a solo-adapter combo
+  input: settings.capacityAdapter (all 4 capability keys)
+  output: "getCapacityAdapterModels -> one ordered, deduped model list; getActiveAdapterStrategy -> \"fallback\" | \"round-robin\""
+  businessRules:
+    - "getCapacityAdapterModels iterates CAPABILITY_KEYS in the fixed order [vision, pdf, audioInput, videoInput], including a capability's models only if that capability's pool is enabled; a model already seen from an earlier capability in that fixed order is skipped, so a model listed under both 'vision' and 'pdf' pools appears once, at its 'vision' position"
+    - "getActiveAdapterStrategy scans the request's required HARD capabilities in whatever order detectRequiredCapabilities happened to add them to the Set, and returns the strategy ('round-robin' if enabled+roundRobin, else 'fallback') of the FIRST capability whose pool is both enabled and non-empty — it does not consider every required capability's strategy, only the first eligible one, defaulting to 'fallback' if none qualify"
+  state:
+    reads: ["settings.capacityAdapter"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["capacity.capability-pool-config", "combo.detect-required-capabilities"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "If a single request requires BOTH vision and audioInput, and each capability is configured with a different strategy, getActiveAdapterStrategy silently picks whichever capability was added first to detectRequiredCapabilities' Set (scan order: messages before input before contents, images before audio within a message) — the other required capability's strategy preference is ignored entirely for that request"
+  evidence:
+    - { file: open-sse/services/capacityAdapter.js, line: 44, note: "getCapacityAdapterModels — fixed key order, dedup by string identity" }
+    - { file: open-sse/services/capacityAdapter.js, line: 68, note: "getActiveAdapterStrategy — first enabled+non-empty hard capability wins" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: capacity.augment-models-priority-prepend
+  group: Capacity adapter
+  feature: Capacity adapter
+  subFeature: augmentModelsWithCapacityAdapter prepends adapter models first — the file's own header comment says the opposite
+  trigger: routing.capacity-adapter-solo (single model) or routing.combo-dispatch (combo members) when none of the original models satisfy a required hard capability
+  input: "models (original combo members, or the single requested model), requiredCapabilities Set, settings"
+  output: "[...pool, ...models] when augmentation applies, otherwise `models` returned unchanged"
+  businessRules:
+    - "No-op (returns models unchanged) when there are no required hard capabilities, models is not a non-empty array, OR at least one original model already satisfies every required hard capability — reorderByCapabilities (combo.reorder-by-capabilities-tiers), not this function, handles floating an already-present capable member to the front in that case"
+    - "When augmentation does apply: `pool` is built from getCapacityAdapterModels filtered to models not already in the list AND that satisfy the hard capabilities, then the function returns `[...pool, ...models]` — pool models come FIRST, original models follow as fallback"
+    - "The module's own top-of-file comment (capacityAdapter.js line 5) describes the pool as being 'appended... behind whatever models were already going to be tried', with reorderByCapabilities supposedly floating a pool model to the front only as needed — this describes the OPPOSITE of what the code does. The function's own docstring immediately above it (line 88, 'Adapter models go FIRST (priority); the original models follow as fallback') correctly matches the implementation. The file header is stale relative to the code"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["capacity.pool-models-and-strategy", "combo.reorder-by-capabilities-tiers"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because adapter models are prepended, a capacity-adapter-augmented request tries the pool BEFORE the client's originally-requested model (or any other combo member) whenever none of the originals cover the required capability — the client's chosen model is demoted to last resort in that case. This matches the function's own docstring intent (answer correctly beats keeping the requested model) but a reader trusting only the file's header comment (line 5-9) would expect the opposite priority order"
+  evidence:
+    - { file: open-sse/services/capacityAdapter.js, line: 5, note: "header comment: pool models 'appended... behind' the originals" }
+    - { file: open-sse/services/capacityAdapter.js, line: 88, note: "function docstring: 'Adapter models go FIRST (priority)' — contradicts line 5" }
+    - { file: open-sse/services/capacityAdapter.js, line: 99, note: "return [...pool, ...models] — pool models placed first" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: capacity.strip-history-budget-formula
+  group: Capacity adapter
+  feature: Capacity adapter
+  subFeature: stripHistoryForContext — the exact token-budget formula, what is always kept, and what is dropped first
+  trigger: withCapacityAdapterStripping wraps a call to a model that is a member of the adapter pool, immediately before invoking handleSingleModel for it
+  input: "body (any client format with messages/input/contents), contextWindow (from getCapabilitiesForModel(provider, model) for that specific adapter model)"
+  output: The original body unchanged, or a new body whose array is [systemMsgs..., trimmedHead..., tail]
+  businessRules:
+    - "Budget formula: budgetChars = (contextWindow || 200000) * 0.8 * CHARS_PER_TOKEN(4) — 80% of the adapter model's token context window (falling back to 200000 tokens if contextWindow is falsy), converted to characters at a fixed 4 chars/token estimate (no real tokenizer); length is measured by blockLength — string length for plain text, or the sum of text-block lengths plus a flat 50-char placeholder per non-text block (e.g. an image) for array content"
+    - "ALWAYS kept, unconditionally, regardless of budget: every system/developer-role message (systemMsgs), and the 'tail' — every message from the current user turn onward (the trailing run after the last assistant/model-role message) — which is exactly where the media that triggered the capacity-adapter switch lives"
+    - "The middle ('older' = everything between the system messages and the tail) is handled in two passes. Pass 1 (unconditional, budget-independent): only the FIRST HEAD_KEEP=6 messages of `older` (headKept) are even candidates to survive — everything in `older` beyond the first 6 is dropped outright, before any length check runs"
+    - "Pass 2 (only if systemMsgs+headKept(6)+tail still exceeds budgetChars): messages are popped off the END of headKept one at a time — i.e. the 6th kept message first, working backward toward the 1st — dropping the ones CLOSEST to the tail/middle first and preserving the very earliest instructions longest, until the total fits or headKept is empty"
+    - "If nothing was actually dropped (head.length === older.length, meaning `older` already had <=6 messages), the ORIGINAL body object is returned unchanged, not a copy"
+    - "Only messages/input/contents array shapes are recognized (checked in that order); a body using none of them is returned unmodified"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["capacity.wrap-stripping-per-model"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "CHARS_PER_TOKEN=4 is a rough heuristic chosen to avoid a tokenizer dependency — for token-dense content (code, non-English text) the true token count can exceed this character-based estimate, so a trimmed request can still overflow the adapter model's real context window in the worst case"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The tail (current turn, holding the triggering media) is NEVER trimmed, even if it alone exceeds budgetChars — the function only ever removes messages from `head`; an oversized single current turn is still sent whole and can overflow the real context window despite the 80% budget cap"
+    - "Dropping everything in `older` beyond the first 6 messages is unconditional and independent of the budget check — it happens even when systemMsgs+headKept+tail is nowhere near budgetChars, so a conversation with e.g. 20 older turns always loses turns 7-20 regardless of whether the model could actually have fit them all"
+  evidence:
+    - { file: open-sse/services/capacityAdapter.js, line: 102, note: "CHARS_PER_TOKEN=4, HEAD_KEEP=6" }
+    - { file: open-sse/services/capacityAdapter.js, line: 134, note: "tail = current-user-turn run — always kept; older = everything before it" }
+    - { file: open-sse/services/capacityAdapter.js, line: 140, note: "budgetChars = (contextWindow || 200000) * 0.8 * CHARS_PER_TOKEN" }
+    - { file: open-sse/services/capacityAdapter.js, line: 144, note: "headKept = older.slice(0, HEAD_KEEP) — everything past index 6 dropped unconditionally" }
+    - { file: open-sse/services/capacityAdapter.js, line: 149, note: "while total > budgetChars: head.pop() — drop from the end of head (closest to the middle) first" }
+    - { file: open-sse/services/capacityAdapter.js, line: 154, note: "no-op return when head.length === older.length (nothing actually dropped)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: capacity.wrap-stripping-per-model
+  group: Capacity adapter
+  feature: Capacity adapter
+  subFeature: withCapacityAdapterStripping — per-call wrapper that strips history only for models actually drawn from the adapter pool
+  trigger: Every handleSingleModel invocation inside a capacity-adapter-augmented combo (produced by routing.capacity-adapter-solo, or a combo augmented via combo-dispatch)
+  input: "the base handleSingleModel callback, adapterModels (the pool list that was prepended)"
+  output: A wrapped callback with the identical (body, modelStr, ...rest) signature
+  businessRules:
+    - "Returns the original handleSingleModel completely UNCHANGED (not even wrapped) when adapterModels is empty — a pure passthrough when there is no adapter pool in play for this request"
+    - "For a non-empty pool, the wrapper strips history via stripHistoryForContext only when modelStr is a member of adapterSet — the client's originally-requested model (or any other non-pool combo member) never has its history stripped by this wrapper, only the adapter-added fallback candidates do"
+    - "contextWindow for the strip budget is looked up fresh per call via getCapabilitiesForModel(provider, model) for that specific modelStr, so each adapter-pool model can be trimmed to a different budget"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["capacity.strip-history-budget-formula", "capacity.augment-models-priority-prepend"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "If the same model string happens to be both an adapter-pool model for one capability AND the client's originally-requested model, it is still treated as 'adapter' (history gets stripped) purely because it is present in adapterSet — membership is by string identity only, with no way to distinguish 'coincidentally also in the pool' from 'added because of the pool'"
+  evidence:
+    - { file: open-sse/services/capacityAdapter.js, line: 160, note: "withCapacityAdapterStripping — empty-pool passthrough, per-call adapterSet.has(modelStr) check" }
+    - { file: open-sse/services/capacityAdapter.js, line: 168, note: "contextWindow looked up per call from getCapabilitiesForModel(provider, model)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

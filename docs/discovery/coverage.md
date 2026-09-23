@@ -1,16 +1,16 @@
 # Discovery coverage
 
-Entries: 111
+Entries: 128
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 37/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +109 |
+| routes | 39/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +107 |
 | pages | 1/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind] … +19 |
 | providers | 14/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +100 |
 | executors | 6/29 | azure, codebuddy-cn, codebuddy-intl, commandcode, cursor, devin-cli, gemini-cli, github … +15 |
 | translators | 2/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +38 |
-| repos | 6/11 | combosRepo, nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo |
-| settingsKeys | 12/52 | capacityAdapter, cavemanEnabled, cavemanLevel, cloudEnabled, dnsToolEnabled, enableObservability, headroomCompressUserMessages, headroomEnabled … +32 |
+| repos | 7/11 | nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo |
+| settingsKeys | 13/52 | cavemanEnabled, cavemanLevel, cloudEnabled, dnsToolEnabled, enableObservability, headroomCompressUserMessages, headroomEnabled, headroomTimeoutMs … +31 |
 
 ## Entries per bounded context
 
@@ -18,13 +18,13 @@ Entries: 111
 - catalog: 21
 - connections: 38
 - identity: 1
-- routing: 35
+- routing: 52
 - settings: 7
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 3
-- REFERENCE_BEHAVIOR: 93
+- IMPLEMENTATION_ACCIDENT: 4
+- REFERENCE_BEHAVIOR: 109
 - SUSPECTED_BUG: 15
 
 ## Missing — routes
@@ -58,8 +58,6 @@ Entries: 111
 - api/cli-tools/kilo-settings
 - api/cli-tools/openclaw-settings
 - api/cli-tools/opencode-settings
-- api/combos
-- api/combos/[id]
 - api/headroom/extras
 - api/headroom/proxy/[...path]
 - api/headroom/restart
@@ -365,7 +363,6 @@ Entries: 111
 
 ## Missing — repos
 
-- combosRepo
 - nodesRepo
 - pricingRepo
 - proxyPoolsRepo
@@ -373,7 +370,6 @@ Entries: 111
 
 ## Missing — settingsKeys
 
-- capacityAdapter
 - cavemanEnabled
 - cavemanLevel
 - cloudEnabled
