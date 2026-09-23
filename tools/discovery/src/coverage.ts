@@ -19,7 +19,7 @@ export type CoverageReport = {
  * How an inventory item maps to the evidence path that would cover it.
  * null means the item has no file of its own and is matched in prose.
  */
-const EVIDENCE_PATH = {
+const EVIDENCE_PATH: Record<keyof Inventory, (item: string) => string | null> = {
   routes: (r: string) => `src/app/${r}/route.js`,
   pages: (p: string) => `src/app/${p}/page.js`,
   providers: (p: string) => `open-sse/providers/registry/${p}.js`,
@@ -27,7 +27,7 @@ const EVIDENCE_PATH = {
   translators: (t: string) => t,
   repos: (r: string) => `src/lib/db/repos/${r}.js`,
   settingsKeys: () => null,
-} as const;
+};
 
 export function computeCoverage(
   entries: FeatureEntry[],
@@ -44,7 +44,7 @@ export function computeCoverage(
     ])
     .join("\n");
 
-  const inventoryKeys = ["routes", "pages", "providers", "executors", "translators", "repos", "settingsKeys"] as const;
+  const inventoryKeys = ["routes", "pages", "providers", "executors", "translators", "repos", "settingsKeys"] as const satisfies readonly (keyof Inventory)[];
 
   const dimensions: Dimension[] = inventoryKeys.map((name) => {
     const items = inv[name];
