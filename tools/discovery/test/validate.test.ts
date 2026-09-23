@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterAll } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { validateMatrix } from "../src/validate.js";
+import { validateMatrix, countLines } from "../src/validate.js";
 
 const dirs: string[] = [];
 let dir: string;
@@ -93,38 +93,42 @@ describe("validateMatrix", () => {
     expect(r.errors.join("\n")).toMatch(/must be a list/);
   });
 
-  it("accepts evidence citing the last line of a file with trailing newline", () => {
-    // apiKey.js has 98 real lines (ends with \r\n)
-    writeFileSync(
-      join(dir, "a.yaml"),
-      JSON.stringify([
-        entry({
-          evidence: [
-            { file: "src/shared/utils/apiKey.js", line: 98, note: "last line" },
-          ],
-        }),
-      ]),
-    );
-    const r = validateMatrix(dir);
-    expect(r.ok).toBe(true);
-    expect(r.errors).toEqual([]);
+});
+
+describe("countLines", () => {
+  it("returns 0 for empty string", () => {
+    expect(countLines("")).toBe(0);
   });
 
-  it("rejects evidence citing beyond the last line (trailing newline should not count)", () => {
-    // apiKey.js has 98 real lines (the trailing \n/\r\n does not create a line 99)
-    writeFileSync(
-      join(dir, "a.yaml"),
-      JSON.stringify([
-        entry({
-          id: "apikey.beyond",
-          evidence: [
-            { file: "src/shared/utils/apiKey.js", line: 99, note: "beyond" },
-          ],
-        }),
-      ]),
-    );
-    const r = validateMatrix(dir);
-    expect(r.ok).toBe(false);
-    expect(r.errors.join("\n")).toMatch(/line 99/);
+  it("counts a single line without trailing newline", () => {
+    expect(countLines("a")).toBe(1);
+  });
+
+  it("counts a single line with LF trailing newline", () => {
+    expect(countLines("a\n")).toBe(1);
+  });
+
+  it("counts a single blank line (just newline)", () => {
+    expect(countLines("\n")).toBe(1);
+  });
+
+  it("counts multiple lines separated by LF", () => {
+    expect(countLines("a\nb\nc")).toBe(3);
+  });
+
+  it("counts multiple lines with trailing LF (trailing newline does not add line)", () => {
+    expect(countLines("a\nb\nc\n")).toBe(3);
+  });
+
+  it("counts multiple blank lines", () => {
+    expect(countLines("\n\n")).toBe(2);
+  });
+
+  it("handles CRLF line endings", () => {
+    expect(countLines("a\r\nb\r\n")).toBe(2);
+  });
+
+  it("handles mixed CR/LF line endings", () => {
+    expect(countLines("a\rb\nc")).toBe(3);
   });
 });

@@ -10,6 +10,23 @@ export type ValidationResult = {
   errors: string[];
 };
 
+/** Count real lines in a string: normalize CRLF/LF, strip trailing newline, count lines.
+ * Examples: "" → 0, "a" → 1, "a\n" → 1, "\n" → 1, "a\nb" → 2, "a\nb\n" → 2 */
+export function countLines(content: string): number {
+  if (!content) return 0;
+  // Normalize line endings (CRLF -> LF, CR -> LF)
+  content = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (!content) return 0;
+  // Special case: a single newline is one blank line
+  if (content === "\n") return 1;
+  // Remove trailing newline if present, then count
+  if (content.endsWith("\n")) {
+    content = content.slice(0, -1);
+  }
+  // Count lines by splitting on newlines
+  return content.length === 0 ? 0 : content.split("\n").length;
+}
+
 /** Cache line counts so a file cited by 20 entries is read once. */
 const lineCounts = new Map<string, number>();
 
@@ -22,13 +39,8 @@ function lineCount(refPath: string): number {
     if (!existsSync(abs)) {
       n = -1;
     } else {
-      // Normalize line endings (CRLF -> LF), remove trailing newline, count real lines
-      let content = readFileSync(abs, "utf8");
-      content = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-      if (content.endsWith("\n")) {
-        content = content.slice(0, -1);
-      }
-      n = content.length === 0 ? 0 : content.split("\n").length;
+      const content = readFileSync(abs, "utf8");
+      n = countLines(content);
     }
   } catch {
     n = -1; // path escaped the 9router root
