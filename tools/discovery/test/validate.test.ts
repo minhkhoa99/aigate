@@ -92,4 +92,39 @@ describe("validateMatrix", () => {
     expect(r.ok).toBe(false);
     expect(r.errors.join("\n")).toMatch(/must be a list/);
   });
+
+  it("accepts evidence citing the last line of a file with trailing newline", () => {
+    // apiKey.js has 98 real lines (ends with \r\n)
+    writeFileSync(
+      join(dir, "a.yaml"),
+      JSON.stringify([
+        entry({
+          evidence: [
+            { file: "src/shared/utils/apiKey.js", line: 98, note: "last line" },
+          ],
+        }),
+      ]),
+    );
+    const r = validateMatrix(dir);
+    expect(r.ok).toBe(true);
+    expect(r.errors).toEqual([]);
+  });
+
+  it("rejects evidence citing beyond the last line (trailing newline should not count)", () => {
+    // apiKey.js has 98 real lines (the trailing \n/\r\n does not create a line 99)
+    writeFileSync(
+      join(dir, "a.yaml"),
+      JSON.stringify([
+        entry({
+          id: "apikey.beyond",
+          evidence: [
+            { file: "src/shared/utils/apiKey.js", line: 99, note: "beyond" },
+          ],
+        }),
+      ]),
+    );
+    const r = validateMatrix(dir);
+    expect(r.ok).toBe(false);
+    expect(r.errors.join("\n")).toMatch(/line 99/);
+  });
 });

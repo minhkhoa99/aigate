@@ -19,7 +19,17 @@ function lineCount(refPath: string): number {
   let n = -1;
   try {
     const abs = resolveRef(refPath);
-    n = existsSync(abs) ? readFileSync(abs, "utf8").split("\n").length : -1;
+    if (!existsSync(abs)) {
+      n = -1;
+    } else {
+      // Normalize line endings (CRLF -> LF), remove trailing newline, count real lines
+      let content = readFileSync(abs, "utf8");
+      content = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      if (content.endsWith("\n")) {
+        content = content.slice(0, -1);
+      }
+      n = content.length === 0 ? 0 : content.split("\n").length;
+    }
   } catch {
     n = -1; // path escaped the 9router root
   }
@@ -28,7 +38,11 @@ function lineCount(refPath: string): number {
 }
 
 export function validateMatrix(dir: string): ValidationResult {
-  const files = fg.sync("*.yaml", { cwd: dir, absolute: true }).sort();
+  const files = fg.sync("*.yaml", {
+    cwd: dir,
+    absolute: true,
+    ignore: ["**/node_modules/**", "**/.git/**"],
+  }).sort();
   const entries: FeatureEntry[] = [];
   const errors: string[] = [];
   const seen = new Map<string, string>();
