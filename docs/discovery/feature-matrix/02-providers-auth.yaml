@@ -1,0 +1,1052 @@
+# Trace: Providers, Provider authentication, OAuth providers, API-key providers (Task 7)
+# 9router reference read at E:\9router. Read-only; every evidence line was
+# read directly, not inferred from names (behavioral.md §7).
+#
+# Inventory confirmed by glob before writing:
+#   - src/app/api/oauth/**/route.js -> 14 files: 1 generic ([provider]/[action]) + 13 specific.
+#   - open-sse/providers/registry/*.js (excluding index.js and REGISTRY_TEMPLATE.js) -> 122 files
+#     (119 wired into the active REGISTRY array + 3 fully commented out: trae... no, see below).
+#     registry/index.js imports p0..p122; p102 (trae), p104 (windsurf), p114 (devin-cli) are commented
+#     out of BOTH the import list and the array (hidden providers), leaving 119 active entries; the
+#     122 count in the task brief is the total number of registry/*.js FILES on disk (119 active +
+#     3 hidden-but-present), matched exactly by `ls registry/*.js | grep -v index/TEMPLATE | wc -l`.
+#     One entry per mechanism, not per vendor (brief Step 1) - individual providers are named only
+#     inside businessRules/edgeCases as examples.
+
+- id: catalog.registry-build
+  group: Providers
+  feature: Provider catalog
+  subFeature: Build PROVIDERS / PROVIDER_OAUTH / PROVIDER_MEDIA from the per-provider registry at module load
+  trigger: First import of open-sse/providers/index.js (or any module re-exporting it) in a process
+  input: "REGISTRY — the auto-generated static-import array of all registry/{id}.js default exports"
+  output: "Three module-level objects keyed by provider id: PROVIDERS (transport config), PROVIDER_OAUTH (oauth config), PROVIDER_MEDIA (non-chat service config), plus PROVIDER_MODELS"
+  businessRules:
+    - "A single top-level for-loop over REGISTRY populates all four exported objects in one pass; buildTransport(entry.transport, entry.oauth) re-applies the shared default format:\"openai\" when a provider doesn't declare one, then injects OAUTH_INJECT_FIELDS (clientId, clientSecret, tokenUrl) from entry.oauth into the transport object only for fields the provider's own transport left undefined"
+    - "entry.transports (plural — a per-client-format array of endpoint overrides, e.g. deepseek/glm/minimax/kimi exposing both an openai-shaped and a claude-shaped endpoint for the same account) is copied onto PROVIDERS[id].transports verbatim, untouched by buildTransport"
+    - "PROVIDER_MEDIA[id] is assembled from two overlapping sources for the same entry: any of the flat MEDIA_KEYS (serviceKinds, ttsConfig, sttConfig, embeddingConfig, imageConfig, imageToTextConfig, videoConfig, musicConfig, searchViaChat, searchConfig, fetchConfig, modelsFetcher, mediaPriority, hiddenKinds) declared at the entry's top level, then entry.media (a legacy nested object) is spread over the top of that — so a top-level field and the same key inside entry.media can both exist, and entry.media wins"
+    - "PROVIDER_OAUTH[id] is only ever set when entry.oauth is truthy — a provider with no oauth block (e.g. gemini, which is authModes:[\"apikey\"] only) simply has no key in PROVIDER_OAUTH at all, not an empty object"
+  state:
+    reads: ["REGISTRY (open-sse/providers/registry/index.js, static import list)"]
+    writes: []
+    runtimeOnly: ["PROVIDERS, PROVIDER_MODELS, PROVIDER_OAUTH, PROVIDER_MEDIA module-level objects — built once per process, held in memory for the process lifetime"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "The loop runs once at module evaluation (Next.js may re-evaluate the module more than once per process for different route bundles, per CLAUDE.md's usageRepo global note, but each re-evaluation just rebuilds the same objects from the same static REGISTRY — not a per-request cost)"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "REGISTRY_TEMPLATE.js documents the field contract but is deliberately NOT imported by registry/index.js (its own header comment says so) — copying it into registry/{id}.js is the documented way to add a provider; the template itself contributes zero entries"
+    - "registry/index.js hides 3 registered-but-disabled providers (trae, devin-cli, windsurf) by commenting out both their import line and their array slot with an inline reason (e.g. \"devin-cli — hidden, spawns local agent with shell/fs access\"); their registry/{id}.js files still exist on disk and still contain full transport/oauth blocks, they are simply excluded from REGISTRY at build time"
+  evidence:
+    - { file: open-sse/providers/index.js, line: 9, note: "OAUTH_INJECT_FIELDS = [clientId, clientSecret, tokenUrl]" }
+    - { file: open-sse/providers/index.js, line: 12, note: "buildTransport — re-apply format default, inject oauth-canonical fields" }
+    - { file: open-sse/providers/index.js, line: 34, note: "for (const entry of REGISTRY) — the single build pass" }
+    - { file: open-sse/providers/index.js, line: 37, note: "entry.transports copied verbatim onto PROVIDERS[id].transports" }
+    - { file: open-sse/providers/index.js, line: 40, note: "PROVIDER_OAUTH[entry.id] = entry.oauth — only set when entry.oauth is truthy" }
+    - { file: open-sse/providers/index.js, line: 42, note: "mediaFields built from MEDIA_KEYS then entry.media spread over it (legacy wins)" }
+    - { file: open-sse/providers/registry/index.js, line: 105, note: "// import p102 from \"./trae.js\" — commented import for a hidden provider" }
+    - { file: open-sse/providers/registry/index.js, line: 229, note: "// p102, // trae — hidden, no tool calling — commented array slot with reason" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.registry-frozen-after-load
+  group: Providers
+  feature: Provider catalog
+  subFeature: Whether PROVIDERS / PROVIDER_OAUTH / PROVIDER_MEDIA are ever mutated after the initial build
+  trigger: Any runtime read of PROVIDERS[id] / PROVIDER_OAUTH[id] / PROVIDER_MEDIA[id] anywhere in the app
+  input: none
+  output: "The same object references built once at module load; no code path writes to them afterward"
+  businessRules:
+    - "A repo-wide search for assignment into PROVIDERS[...]/PROVIDER_OAUTH[...]/PROVIDER_MEDIA[...] (the bracket-index `= ` pattern) finds exactly the three assignment sites inside providers/index.js's own build loop — no other file in src/ or open-sse/ ever writes to these objects"
+    - "The objects are plain mutable JS objects, not Object.freeze()'d — nothing technically prevents a future caller from mutating PROVIDERS.foo.baseUrl at runtime, but no current caller does; every other module only reads (PROVIDERS[provider], PROVIDER_OAUTH[provider], PROVIDER_MEDIA[provider])"
+    - "Per-connection data (API keys, OAuth tokens, providerSpecificData) lives entirely in the providerConnections DB table, never on the PROVIDERS registry object — the registry describes the provider (shared across every connection to it), the DB row describes one credential"
+  state:
+    reads: ["PROVIDERS/PROVIDER_OAUTH/PROVIDER_MEDIA module objects, in-memory, every request"]
+    writes: []
+    runtimeOnly: ["PROVIDERS/PROVIDER_OAUTH/PROVIDER_MEDIA — process-lifetime, rebuilt only by a process restart or module re-evaluation"]
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Because nothing is frozen, a coding mistake that does `PROVIDERS[id].something = x` inside a request handler would silently corrupt shared state for every subsequent request/connection using that provider until the next restart — there is no runtime guard against this class of bug today"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Adding a provider requires editing registry/index.js's generated import list (via the migration scripts named in CLAUDE.md) and restarting the process — there is no hot-reload or admin-API path to register a provider without a restart"
+  evidence:
+    - { file: open-sse/providers/index.js, line: 30, note: "export const PROVIDERS = {} — mutable plain object, no Object.freeze" }
+    - { file: open-sse/executors/default.js, line: 67, note: "PROVIDERS[provider] read (never written) to construct a DefaultExecutor" }
+    - { file: open-sse/config/providers.js, line: 3, note: "PROVIDERS/PROVIDER_OAUTH re-exported read-only from providers/index.js" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.registry-entry-shape
+  group: Providers
+  feature: Provider catalog
+  subFeature: Canonical per-provider registry entry contract (REGISTRY_TEMPLATE.js)
+  trigger: A developer adding or reading a provider definition (design-time, not a runtime trigger)
+  input: none
+  output: "A documented object shape: identity (id/alias/category), auth hints (authType/hasOAuth/authModes/noAuth), display, transport, oauth, media, models, features/thinkingConfig/passthroughModels"
+  businessRules:
+    - "Only id and category are required; every other block is optional and independently omittable — a media-only provider (tts/stt/embedding) drops transport.baseUrl and models entirely and fills media.*Config instead, per the template's own \"Quick recipes\" comment"
+    - "transport must declare ONLY fields that differ from PROVIDER_DEFAULTS (format:\"openai\" etc.) — the template explicitly warns not to duplicate clientId/clientSecret/tokenUrl in transport since those are injected from oauth"
+    - "authType/hasOAuth/authModes are advisory hints read by UI/validation code (e.g. src/app/api/providers/route.js's supportsApiKeyMode check on AI_PROVIDERS[provider]?.authModes) — they are declared independently of, and must be kept consistent with, whether an oauth block or transport.auth is actually present"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The template is a documentation artifact only (never imported); a copy-pasted provider file that drifts from the template's shape is only caught by whatever the individual builder functions (buildTransport, the MEDIA_KEYS allow-list) happen to read — there is no schema validator run over registry/*.js at build or load time"
+  evidence:
+    - { file: open-sse/providers/REGISTRY_TEMPLATE.js, line: 3, note: "header comment: NOT imported by registry/index.js, copy into registry/{id}.js" }
+    - { file: open-sse/providers/REGISTRY_TEMPLATE.js, line: 18, note: "id — REQUIRED, kebab-case, unique" }
+    - { file: open-sse/providers/REGISTRY_TEMPLATE.js, line: 22, note: "category — REQUIRED" }
+    - { file: open-sse/providers/REGISTRY_TEMPLATE.js, line: 45, note: "transport block — declare ONLY what differs from PROVIDER_DEFAULTS" }
+    - { file: open-sse/providers/REGISTRY_TEMPLATE.js, line: 57, note: "comment: clientId/clientSecret/tokenUrl injected from oauth, do NOT duplicate here" }
+    - { file: open-sse/providers/schema.js, line: 5, note: "RegistryEntry JSDoc typedef — only id + category REQUIRED, everything else optional/derived" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.multi-format-variants
+  group: Providers
+  feature: Provider catalog
+  subFeature: A provider exposing more than one wire format for the same account (transport.transports[])
+  trigger: A chat request whose detected sourceFormat matches one of a provider's declared alternate transports
+  input: "sourceFormat (openai/claude/gemini/...) detected from the inbound client request shape"
+  output: "credentials.runtimeTransport set to the matching transports[] entry; buildUrl/buildHeaders in DefaultExecutor prefer it over the provider's default transport"
+  businessRules:
+    - "A provider like deepseek declares a default transport (openai-format chat/completions) plus a transports[] array with one entry per additional native format it also understands (e.g. a claude-format /anthropic/v1/messages endpoint on the same account) — this exists specifically to let a client whose native format already matches skip the lossy double-hop through the OpenAI pivot (see open-sse/AGENTS.md's direct-route guidance)"
+    - "resolveTransport(provider, sourceFormat) in services/provider.js picks the transports[] entry whose format matches; chatCore.js only uses it when the model's modelSupportedFormats also includes that sourceFormat, otherwise it falls back to translation through the default transport"
+    - "Once selected, runtimeTransport's own baseUrl/headers/auth completely replace the provider's default transport fields for that request (DefaultExecutor.buildUrl/buildHeaders check credentials.runtimeTransport first) — the two formats are not merged"
+  state:
+    reads: ["PROVIDERS[id].transports (built once from the registry)", "model's modelSupportedFormats"]
+    writes: []
+    runtimeOnly: ["credentials.runtimeTransport — set per-request, not persisted"]
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: "Same upstream account, alternate native-format endpoint (e.g. DeepSeek's /anthropic/v1/messages) instead of the default endpoint"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Bypassing the OpenAI-pivot translation for a matched format avoids the lossy double-hop, but each transports[] entry needs its own auth descriptor declared explicitly (it does not inherit the parent transport.auth) — a provider that adds a new format variant without also declaring auth for it would fall through to resolveAuthDescriptor's generic BEARER default"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A provider can declare different auth schemes per format variant (deepseek: Authorization Bearer for its openai-format endpoint, x-api-key raw for its claude-format endpoint) even though both endpoints authenticate the same underlying account with the same stored credential value"
+  evidence:
+    - { file: open-sse/providers/registry/deepseek.js, line: 30, note: "transports[] — comment: pick the transport matching client sourceFormat to skip translation" }
+    - { file: open-sse/providers/registry/deepseek.js, line: 34, note: "openai-format variant: Authorization Bearer" }
+    - { file: open-sse/providers/registry/deepseek.js, line: 40, note: "claude-format variant: x-api-key raw, same account" }
+    - { file: open-sse/services/provider.js, line: 146, note: "comment: multi-endpoint providers (transport.transports[]) pick the entry matching sourceFormat" }
+    - { file: open-sse/handlers/chatCore.js, line: 88, note: "runtimeTransport = resolveTransport(provider, sourceFormat)" }
+    - { file: open-sse/handlers/chatCore.js, line: 100, note: "credentials.runtimeTransport = useTransport, only when the model also supports that format" }
+    - { file: open-sse/executors/default.js, line: 106, note: "buildUrl reads credentials.runtimeTransport.baseUrl first" }
+    - { file: open-sse/executors/default.js, line: 150, note: "buildHeaders reads credentials.runtimeTransport.headers/.auth first" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.usage-feature-flag
+  group: Providers
+  feature: Provider catalog
+  subFeature: features.usage / features.usageApikey — which providers get a quota/usage card and live usage fetch
+  trigger: Dashboard usage page render, or GET /api/usage/[connectionId]
+  input: "connection.provider, connection.authType"
+  output: "USAGE_SUPPORTED_PROVIDERS / USAGE_APIKEY_PROVIDERS arrays (derived from the registry) gate both UI display and the usage-fetch endpoint's eligibility check"
+  businessRules:
+    - "USAGE_SUPPORTED_PROVIDERS and USAGE_APIKEY_PROVIDERS are computed once by filtering REGISTRY on r.features?.usage / r.features?.usageApikey respectively — a plain array derived from the same static registry as PROVIDERS, not stored anywhere else"
+    - "isUsageEligible / the GET /api/usage/[connectionId] gate requires BOTH: the provider is in USAGE_SUPPORTED_PROVIDERS, AND (the connection's authType is oauth OR the provider is additionally in USAGE_APIKEY_PROVIDERS) — features.usage alone only ever enables usage for OAuth connections; usageApikey is the separate opt-in that extends the same eligibility to apikey/api_key-authenticated connections of that provider"
+    - "Providers with features.usage but no usageApikey (e.g. claude, codex, antigravity, github, grok-cli, gemini-cli, zed) show/fetch usage only for their oauth connections; providers with both (deepseek, glm, groq, kimi, kiro, minimax, ollama, qoder, vercel-ai-gateway, codebuddy-cn/-intl) show/fetch it for apikey connections too"
+  state:
+    reads: ["REGISTRY (features.usage/usageApikey per entry)", "providerConnections table (provider, authType)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: "Determines whether GET /api/usage/[connectionId] is even allowed to make the upstream quota call for that connection"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A provider absent from USAGE_SUPPORTED_PROVIDERS entirely (no features.usage) never gets a usage card regardless of authType — the dashboard's ProviderLimits component and the /api/usage/[connectionId] gate both key off the same derived array, so there is exactly one place to add a provider to unlock usage, not two"
+  evidence:
+    - { file: open-sse/providers/registry/kimi.js, line: 86, note: "features: { usage: true, ... } with a comment explaining why usageApikey is also needed" }
+    - { file: src/shared/constants/providers.js, line: 159, note: "USAGE_SUPPORTED_PROVIDERS = REGISTRY.filter(r => r.features?.usage).map(r => r.id)" }
+    - { file: src/shared/constants/providers.js, line: 163, note: "USAGE_APIKEY_PROVIDERS = REGISTRY.filter(r => r.features?.usageApikey).map(r => r.id)" }
+    - { file: "src/app/api/usage/[connectionId]/route.js", line: 141, note: "isApikeyEligible = isApikeyAuth && USAGE_APIKEY_PROVIDERS.includes(connection.provider)" }
+    - { file: "src/app/api/usage/[connectionId]/route.js", line: 144, note: "gate: return early unless isOAuth or isApikeyEligible" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.connection-listing
+  group: Providers
+  feature: Provider catalog
+  subFeature: GET /api/providers — list stored connections for the dashboard, with secrets stripped
+  trigger: Dashboard providers/connections page load
+  input: none
+  output: "200 { connections: [...] } — every stored connection with apiKey/accessToken/refreshToken/idToken set to undefined"
+  businessRules:
+    - "For OpenAI-compatible or Anthropic-compatible custom nodes, the displayed name is resolved from (in order) the connection's own name, the matching provider node's name looked up via getProviderNodes(), then providerSpecificData.nodeName, then the raw provider id — a plain apikey/oauth provider just uses its stored name"
+    - "The four credential fields are stripped by explicit key deletion on a shallow copy (apiKey/accessToken/refreshToken/idToken: undefined), not by a field allow-list — a new secret field added to the connection shape later would leak through this endpoint unless this deletion list is updated too"
+  state:
+    reads: ["providerConnections table (all rows)", "providerNodes table (for compatible-node name enrichment)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "getProviderConnections() throws", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "getProviderNodes() runs on every GET purely to build a small id->name map for compatible providers, wrapped in its own try/catch so a nodes-table failure degrades to falling back on providerSpecificData.nodeName rather than failing the whole listing"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "delete-by-key-name stripping (rather than a positive field allow-list) is the same pattern already flagged as a risk in apikey.legacy-format-unenforced-style entries elsewhere in this inventory: it protects only the four fields named today"
+  evidence:
+    - { file: src/app/api/providers/route.js, line: 50, note: "GET — getProviderConnections(), builds nodeNameMap, strips 4 secret fields per connection" }
+    - { file: src/app/api/providers/route.js, line: 64, note: "safeConnections map — name resolution order for compatible providers" }
+    - { file: src/app/api/providers/route.js, line: 72, note: "apiKey/accessToken/refreshToken/idToken: undefined — the actual stripping" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.connection-detail-crud
+  group: Providers
+  feature: Provider catalog
+  subFeature: GET/PUT/DELETE /api/providers/[id] — single-connection read, update, delete
+  trigger: Dashboard connection detail view, edit, or delete action
+  input: "id path param; PUT body: name/priority/globalPriority/defaultModel/isActive/apiKey/testStatus/lastError/lastErrorAt/providerSpecificData/proxy fields"
+  output: "200 { connection } (secrets stripped) on GET/PUT, 200 { message } on DELETE, 404 if id not found"
+  businessRules:
+    - "PUT only ever overwrites apiKey when the body supplies one AND the existing connection's authType is exactly \"apikey\" — an oauth or api_key-authType connection's credential cannot be overwritten through this generic body field, it must go through its own import/refresh flow"
+    - "providerSpecificData is merged (existing spread, then incoming spread on top), not replaced — proxy fields (connectionProxyEnabled/Url/NoProxy) and proxyPoolId are folded into that same merged object only when the request body actually touched one of those keys (hasOwnProperty checks), so an unrelated PUT can't accidentally reset proxy settings to their defaults"
+    - "GET/PUT both strip the same four credential fields (apiKey/accessToken/refreshToken/idToken) as the list endpoint before returning the connection"
+  state:
+    reads: ["providerConnections table (row by id)", "proxyPools table (when proxyPoolId is supplied)"]
+    writes: ["providerConnections table (row by id, partial update)", "providerConnections table (row removed, DELETE)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "id does not correspond to an existing connection (GET/PUT/DELETE)", partial: false }
+    - { code: INVALID_REQUEST, when: "PUT body names a proxyPoolId that doesn't exist", partial: false }
+    - { code: INVALID_REQUEST, when: "PUT/POST enables connectionProxyEnabled without a connectionProxyUrl", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections row (all mutable fields listed above)"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "lastError/lastErrorAt are accepted as plain client-suppliable PUT fields with no validation beyond `!== undefined` — a dashboard bug or a scripted client can overwrite a connection's recorded error state arbitrarily"
+  evidence:
+    - { file: "src/app/api/providers/[id]/route.js", line: 63, note: "GET — strips apiKey/accessToken/refreshToken/idToken" }
+    - { file: "src/app/api/providers/[id]/route.js", line: 125, note: "PUT — apiKey only applied when existing.authType === \"apikey\"" }
+    - { file: "src/app/api/providers/[id]/route.js", line: 138, note: "providerSpecificData merge: existing spread + incoming spread" }
+    - { file: "src/app/api/providers/[id]/route.js", line: 179, note: "DELETE — 404 when deleteProviderConnection returns falsy" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: auth.transport-auth-combined-bearer
+  group: Provider authentication
+  feature: Provider authentication
+  subFeature: "transport.auth: { combined: true, header: \"Authorization\", scheme: \"bearer\" } — the majority-case header"
+  trigger: Any chat request routed through DefaultExecutor for a provider whose transport.auth uses scheme \"bearer\"
+  input: "credentials.apiKey or credentials.accessToken"
+  output: "Authorization: Bearer <token> header, always set (even when both apiKey and accessToken are absent, producing the literal string \"Bearer undefined\")"
+  businessRules:
+    - "AUTH_DESCRIPTORS is built once from Object.entries(PROVIDERS).filter(([,t]) => t.auth) — only providers that declare a transport.auth block at all get an entry; providers without one fall through to resolveAuthDescriptor's hardcoded default (also BEARER unless the provider's format is \"claude\" or its id starts with \"anthropic-compatible-\")"
+    - "combined:true means a single header always carries whichever of apiKey/accessToken is truthy (apiKey preferred): setAuth always writes the header even if the resulting value is `Bearer undefined` for a misconfigured/noAuth-flagged connection — this is legacy behavior the code comment explicitly calls out as intentional parity with the pre-refactor implementation"
+    - "This is by far the most common shape in the registry — every plain \"apikey\"-category chat provider that doesn't override format defaults to combined Bearer unless it explicitly declares otherwise"
+  state:
+    reads: ["PROVIDERS[provider].auth (built once at module load)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: "Sets the Authorization header on the outbound request to that provider's API"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A connection with neither apiKey nor accessToken set (should not normally exist, but the code has no defensive check here) still gets an Authorization header sent upstream with the literal value \"Bearer undefined\" rather than the request being rejected client-side before the fetch"
+  evidence:
+    - { file: open-sse/executors/default.js, line: 14, note: "AUTH_DESCRIPTORS built from PROVIDERS entries that declare .auth" }
+    - { file: open-sse/executors/default.js, line: 21, note: "setAuth — Bearer prefix only when scheme === \"bearer\", raw token otherwise" }
+    - { file: open-sse/executors/default.js, line: 27, note: "applyAuth combined branch — always sets the header, comment: legacy behavior incl. noAuth -> Bearer undefined" }
+    - { file: open-sse/providers/registry/deepseek.js, line: 34, note: "combined bearer example" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: auth.transport-auth-combined-raw
+  group: Provider authentication
+  feature: Provider authentication
+  subFeature: "transport.auth: { combined: true, header: \"x-api-key\"|other, scheme: \"raw\" } — token sent unprefixed"
+  trigger: Any chat request routed through DefaultExecutor for a provider whose transport.auth uses scheme \"raw\"
+  input: "credentials.apiKey or credentials.accessToken"
+  output: "<header-name>: <token> with no scheme prefix (e.g. x-api-key: sk-... rather than Bearer sk-...)"
+  businessRules:
+    - "setAuth's only branch on scheme is `scheme === \"bearer\"`; every other scheme value (raw, or a provider-documented custom string like trae's \"Cloud-IDE-JWT\") is treated identically by the generic path — the header is set to the bare token with no transformation"
+    - "The header name itself varies per provider even within \"raw\": x-api-key for Anthropic-shaped providers (deepseek's claude-format variant, minimax/minimax-cn/glm/kimi's claude-format variants, kimchi), x-goog-api-key for gemini's split apiKey branch"
+    - "anthropicVersion:true on a descriptor (set alongside scheme:\"raw\"/header:\"x-api-key\") makes applyAuth also set anthropic-version if not already present — a second, unconditional side effect of the same descriptor"
+  state:
+    reads: ["PROVIDERS[provider].auth"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: "Sets a raw (unprefixed) credential header on the outbound request"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because setAuth only special-cases the literal string \"bearer\", a registry entry that documents a fully custom scheme name (trae's \"Cloud-IDE-JWT\", zed's \"<user_id> <access_token>\") would, if ever routed through the generic DefaultExecutor path, be treated as plain \"raw\" and lose the intended custom formatting — in practice this never happens because both trae and zed are wired to their own dedicated executor classes (see auth.transport-auth-custom-executor-override) that never consult AUTH_DESCRIPTORS at all"
+  evidence:
+    - { file: open-sse/executors/default.js, line: 21, note: "setAuth — anything other than \"bearer\" is written raw" }
+    - { file: open-sse/executors/default.js, line: 30, note: "applyAuth combined branch also sets anthropic-version when desc.anthropicVersion is set" }
+    - { file: open-sse/providers/registry/deepseek.js, line: 40, note: "x-api-key raw example, claude-format variant" }
+    - { file: open-sse/providers/registry/gemini.js, line: 28, note: "x-goog-api-key raw — a different header name under the same \"raw\" scheme" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: auth.transport-auth-split-branch
+  group: Provider authentication
+  feature: Provider authentication
+  subFeature: "transport.auth: { apiKey: {...}, oauth: {...} } — dual-auth providers with a distinct header per credential type"
+  trigger: Any chat request for a provider whose transport.auth declares separate apiKey/oauth sub-descriptors (no top-level combined:true)
+  input: "credentials.apiKey (preferred) or credentials.accessToken"
+  output: "Only ONE of the two branches' headers is set, chosen by which credential is present — never both"
+  businessRules:
+    - "applyAuth's non-combined branch is a strict either/or: `if (credentials.apiKey) setAuth(headers, desc.apiKey, ...) else if (credentials.accessToken) setAuth(headers, desc.oauth, ...)` — a connection that somehow carries both fields only ever gets the apiKey-shaped header applied"
+    - "claude is the canonical example: apiKey credentials get x-api-key (raw) + anthropic-version, oauth (accessToken) credentials get Authorization Bearer + the same anthropic-version — same upstream API, two different header shapes depending on how the connection was created"
+    - "If neither apiKey nor accessToken is present, this branch sets no auth header at all (unlike the combined branch's always-set-even-if-undefined behavior) — the code comment calls this out explicitly as matching legacy anthropic-compatible skip-when-both-absent behavior"
+  state:
+    reads: ["PROVIDERS[provider].auth.apiKey / .oauth"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: "Chooses between two upstream-recognized credential header shapes for the same provider"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "gemini declares this split shape (apiKey -> x-goog-api-key, oauth -> Authorization Bearer) even though gemini has no oauth block in its own registry entry (PROVIDER_OAUTH.gemini is never populated) and no code path ever creates a gemini connection with an accessToken/refreshToken — the oauth branch of gemini's auth descriptor is therefore declared but currently unreachable in practice"
+  evidence:
+    - { file: open-sse/executors/default.js, line: 33, note: "applyAuth split branch — apiKey preferred, else accessToken, else neither" }
+    - { file: open-sse/providers/registry/claude.js, line: 43, note: "split auth: apiKey -> x-api-key raw, oauth -> Authorization bearer" }
+    - { file: open-sse/providers/registry/gemini.js, line: 27, note: "split auth: apiKey -> x-goog-api-key raw, oauth -> Authorization bearer (oauth branch unreachable, no oauth block on this entry)" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: auth.transport-auth-custom-executor-override
+  group: Provider authentication
+  feature: Provider authentication
+  subFeature: transport.auth documented for tooling but bypassed by a provider-specific executor's own buildHeaders
+  trigger: Any chat request for a provider whose id is mapped to a dedicated executor class in open-sse/executors/index.js
+  input: "credentials (provider-specific shape)"
+  output: "Headers built entirely by the provider's own buildHeaders override; the registry's transport.auth block is never read for these providers"
+  businessRules:
+    - "getExecutor(provider) returns the mapped dedicated instance (e.g. trae, gemini-cli, kiro, cursor, github, iflow, qoder, ...) when one exists; only providers absent from that map fall through to a cached DefaultExecutor instance — this decides whether AUTH_DESCRIPTORS / applyAuth ever run for a given provider at all"
+    - "trae's registry entry documents scheme: \"Cloud-IDE-JWT\" purely as a marker for config-driven tooling (its own comment says so) — the real header (`Authorization: Cloud-IDE-JWT <jwt>`) is built by TraeExecutor.buildHeaders, a full override that never calls the shared setAuth/applyAuth helpers"
+    - "zed's registry entry documents scheme: \"<user_id> <access_token>\" as an explicit placeholder (\"real value built in executor\") because Zed's Authorization header format is `<user_id> <access_token>` plus a duplicate x-zed-cloud-token header — verified against Zed's own zed_account.rs — which the generic combined/raw setAuth logic cannot express"
+  state:
+    reads: ["open-sse/executors/index.js executors map"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: "Provider-specific header shape sent to that provider's upstream API"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A registry entry's transport.auth block for one of these providers is documentation/tooling metadata only — it does not describe what actually happens on the wire unless the provider is verified NOT to have a dedicated executor; reading transport.auth alone (without also checking executors/index.js) can give a wrong answer for these providers"
+  evidence:
+    - { file: open-sse/executors/index.js, line: 65, note: "getExecutor — executors[provider] wins over DefaultExecutor when mapped" }
+    - { file: open-sse/executors/index.js, line: 57, note: "trae: new TraeExecutor() — dedicated instance, never reaches DefaultExecutor" }
+    - { file: open-sse/providers/registry/trae.js, line: 36, note: "scheme: \"Cloud-IDE-JWT\" documented on the registry entry" }
+    - { file: open-sse/executors/trae.js, line: 53, note: "TraeExecutor.buildHeaders — the actual Authorization: Cloud-IDE-JWT <jwt> construction" }
+    - { file: open-sse/providers/registry/zed.js, line: 32, note: "comment: non-standard auth scheme verified against zed_account.rs, executor builds both headers" }
+    - { file: open-sse/providers/registry/zed.js, line: 38, note: "scheme: \"<user_id> <access_token>\" — explicit placeholder comment" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: auth.oauth-client-creds-shared
+  group: Provider authentication
+  feature: Provider authentication
+  subFeature: OAUTH_INJECT_FIELDS — clientId/clientSecret/tokenUrl injected from the oauth block, not stored per connection
+  trigger: Every provider build pass (catalog.registry-build) and every OAuth token refresh
+  input: "entry.oauth.clientId / clientSecret / tokenUrl declared once per provider in its registry file"
+  output: "PROVIDERS[id].clientId / .clientSecret / .tokenUrl available on the transport object for executors to read, without duplicating the values in transport"
+  businessRules:
+    - "OAUTH_INJECT_FIELDS = [\"clientId\", \"clientSecret\", \"tokenUrl\"] — buildTransport copies each of these from entry.oauth into the transport object only when the transport object doesn't already define that field itself, so a provider CAN still override one specific field in transport while inheriting the rest from oauth"
+    - "These three fields describe the OAuth application registration (the client_id/client_secret the 9router app itself registered with the upstream, and the token endpoint URL) — they are identical for every connection to that provider, unlike a user's individual accessToken/refreshToken, which is why they live once on the provider's registry entry rather than being duplicated into every providerConnections row"
+    - "Refresh code reads these two ways depending on the path: the generic REFRESH_GRANTS table (open-sse/executors/default.js) reads them off PROVIDER_OAUTH[id] directly (o.clientId, ex.config.clientId for the special-cased gemini id branch); provider-specific refreshers (refreshIflow, refreshKiro, refreshCline, refreshKimi) read PROVIDERS[provider].clientId — i.e. the already-injected transport copy — instead"
+  state:
+    reads: ["entry.oauth.clientId/clientSecret/tokenUrl at build time", "PROVIDERS[id]/PROVIDER_OAUTH[id] at refresh time"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: "Client credentials sent to the provider's OAuth token endpoint during authorize/exchange/refresh"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Rotating a provider's OAuth client_id/client_secret (e.g. after 9router's own app registration changes) is a one-line registry edit plus a restart, affecting every existing connection to that provider at once — there is no per-connection override and no migration needed for already-stored connections, since they never held a copy of these fields"
+    - "gemini declares clientId/clientSecret directly in transport (not via an oauth block, since it has none) — the only registry entry observed doing this outside the standard oauth-block injection path, making it an exception to the \"declare in oauth, not transport\" convention the template documents"
+  evidence:
+    - { file: open-sse/providers/index.js, line: 9, note: "OAUTH_INJECT_FIELDS definition" }
+    - { file: open-sse/providers/index.js, line: 16, note: "injection loop — only fills fields transport left undefined" }
+    - { file: open-sse/executors/default.js, line: 58, note: "REFRESH_GRANTS params — non-gemini branch reads client_id from o.clientId (PROVIDER_OAUTH)" }
+    - { file: open-sse/executors/default.js, line: 271, note: "refreshIflow reads PROVIDERS.iflow.clientId/.clientSecret (the injected transport copy)" }
+    - { file: open-sse/providers/registry/gemini.js, line: 24, note: "clientId/clientSecret declared directly in transport, bypassing oauth-block injection (no oauth block exists on this entry)" }
+    - { file: open-sse/providers/schema.js, line: 28, note: "TransportConfig doc: clientId/clientSecret/tokenUrl injected from oauth, single source" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: auth.refresh-generic-grant
+  group: Provider authentication
+  feature: Provider authentication
+  subFeature: Config-driven generic OAuth refresh (REFRESH_GRANTS / refreshFromGrant) for the standard refresh_token grant shape
+  trigger: A chat request whose stored OAuth credential is due for proactive refresh, or fails and needsRefresh signals a retry
+  input: "credentials.refreshToken; PROVIDER_OAUTH[provider].refresh.{encoding,scope} and .clientId/.tokenUrl"
+  output: "New { accessToken, refreshToken, expiresIn } from the provider's token endpoint, or null on any non-2xx/failure"
+  businessRules:
+    - "REFRESH_GRANTS is built once from Object.entries(PROVIDER_OAUTH).filter(([,o]) => o.refresh) — any provider whose oauth block declares a refresh sub-object gets an entry, independent of whether that provider is ever actually routed through DefaultExecutor"
+    - "The refreshers dispatch map inside refreshCredentials only wires refreshFromGrant for three provider ids explicitly: claude, codex, gemini — every other provider with a REFRESH_GRANTS entry (e.g. gemini-cli, trae, both of which declare oauth.refresh in their own registry files) is never reached through this path because gemini-cli and trae are mapped to their own dedicated executor classes (see auth.transport-auth-custom-executor-override) whose refreshCredentials, if any, is implemented separately"
+    - "gemini itself has no oauth block at all (see auth.oauth-client-creds-shared), so REFRESH_GRANTS.gemini is never actually built despite `gemini` being listed in the refreshers dispatch map and REFRESH_GRANTS.params containing a gemini-specific branch (`id === \"gemini\" ? {client_id: ex.config.clientId, ...} : ...`) — that branch can only run if PROVIDER_OAUTH.gemini existed with a .refresh block, which it does not in the current registry"
+    - "encoding (\"form\" vs \"json\") picks refreshWithForm vs refreshWithJSON — form posts application/x-www-form-urlencoded with grant_type=refresh_token, refresh_token, client_id[, scope]; json posts the same fields as a JSON body"
+  state:
+    reads: ["PROVIDER_OAUTH[provider].refresh/.clientId/.tokenUrl"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["auth.oauth-client-creds-shared"]
+  providerInteraction: "POST to the provider's OAuth token endpoint with grant_type=refresh_token"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "the refresh endpoint returns a non-ok response (returns null, caller must treat the connection as needing re-auth)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The refreshCredentials dispatcher and the REFRESH_GRANTS config table are built from two independent sources (a hardcoded id list vs. a registry-driven filter) that happen to overlap only for claude/codex/gemini today — gemini-cli's and trae's REFRESH_GRANTS entries are dead configuration, never read, because those two provider ids never reach DefaultExecutor.refreshCredentials at all; this is inert (no observable behavior difference) rather than a live bug, confirmed by tracing getExecutor's dedicated-instance map"
+  evidence:
+    - { file: open-sse/executors/default.js, line: 48, note: "REFRESH_GRANTS built from every PROVIDER_OAUTH entry with a .refresh block" }
+    - { file: open-sse/executors/default.js, line: 58, note: "gemini-specific params branch, unreachable since PROVIDER_OAUTH.gemini is never set" }
+    - { file: open-sse/executors/default.js, line: 219, note: "refreshCredentials — early return null when credentials.refreshToken is absent" }
+    - { file: open-sse/executors/default.js, line: 222, note: "refreshers map — only claude/codex/gemini wired to refreshFromGrant" }
+    - { file: open-sse/executors/index.js, line: 32, note: "gemini-cli mapped to its own GeminiCLIExecutor instance" }
+    - { file: open-sse/executors/index.js, line: 57, note: "trae mapped to its own TraeExecutor instance" }
+    - { file: open-sse/providers/registry/codex.js, line: 85, note: "codex oauth.refresh: { encoding: \"form\", scope: ... }" }
+  newModule: connections
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: auth.refresh-provider-specific
+  group: Provider authentication
+  feature: Provider authentication
+  subFeature: Hand-written per-provider refresh methods for providers whose token endpoint doesn't fit the generic grant shape
+  trigger: refreshCredentials() dispatch for iflow, kiro, cline, clinepass, kimi/kimi-coding, or kilocode
+  input: "credentials.refreshToken, plus provider-specific extras (kimi: providerSpecificData.deviceId)"
+  output: "New { accessToken, refreshToken, expiresIn } shaped per-provider, or null"
+  businessRules:
+    - "refreshIflow sends HTTP Basic auth (base64 clientId:clientSecret) in the Authorization header alongside a form body — the only refresher that authenticates the refresh call itself, rather than just including client_id in the body"
+    - "refreshKiro posts a JSON body ({ refreshToken }) with a hardcoded User-Agent \"kiro-cli/1.0.0\" to PROVIDERS.kiro.tokenUrl and reads back accessToken/refreshToken/expiresIn in camelCase (not the OAuth-standard access_token/refresh_token/expires_in snake_case every other refresher expects)"
+    - "refreshCline rewrites the returned accessToken to be prefixed \"workos:\" if it isn't already, and computes expiresIn itself from a returned absolute expiresAt ISO timestamp rather than receiving expires_in directly from the upstream — a response-shape adaptation unique to this provider"
+    - "refreshKimi builds the same buildKimiHeaders(deviceId) fingerprint used on live chat requests (X-Msh-* headers, stable device_id) and sends it on the refresh call too, so refresh looks like it comes from the same device that originally authenticated"
+    - "refreshKilocode always returns null — kilocode's registry comment confirms it uses device-code flow with no refresh-token support at all, so a kilocode credential can never be silently refreshed, only re-imported via a fresh device-code flow"
+  state:
+    reads: ["PROVIDERS[provider].clientId/.tokenUrl/.refreshUrl (injected transport copies)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["auth.oauth-client-creds-shared"]
+  providerInteraction: "Provider-specific POST to that provider's token/refresh endpoint"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "the provider's refresh endpoint returns a non-ok response", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "kilocode's refresher is a permanent no-op (always null) rather than being absent from the refreshers map entirely — needsRefresh()/refreshCredentials() will still be invoked for a kilocode connection and always get null back, which callers must already treat the same as \"could not refresh, needs re-auth\""
+  evidence:
+    - { file: open-sse/executors/default.js, line: 270, note: "refreshIflow — Basic auth header + form body" }
+    - { file: open-sse/executors/default.js, line: 282, note: "refreshKiro — JSON body, camelCase response fields, hardcoded User-Agent" }
+    - { file: open-sse/executors/default.js, line: 293, note: "refreshCline — workos: prefix rewrite, expiresIn derived from expiresAt" }
+    - { file: open-sse/executors/default.js, line: 312, note: "refreshKimi — buildKimiHeaders(deviceId) fingerprint reused on refresh" }
+    - { file: open-sse/executors/default.js, line: 331, note: "refreshKilocode — always returns null, comment: device code flow, no refresh token support" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: auth.base-executor-default-headers
+  group: Provider authentication
+  feature: Provider authentication
+  subFeature: BaseExecutor's own buildHeaders fallback — used by dedicated-executor providers that don't override header construction
+  trigger: A chat request for a provider mapped to a dedicated executor class that inherits BaseExecutor.buildHeaders without overriding it
+  input: "credentials.apiKey / credentials.accessToken"
+  output: "Authorization: Bearer <token> for most providers; x-api-key (or Bearer if only accessToken present) plus anthropic-version for anthropic-compatible-* provider ids"
+  businessRules:
+    - "BaseExecutor.buildHeaders is a simpler, hardcoded twin of DefaultExecutor's registry-driven buildHeaders — it does not consult transport.auth/AUTH_DESCRIPTORS at all, it only special-cases provider ids starting with \"anthropic-compatible-\" (x-api-key preferred, Bearer fallback, anthropic-version default) and otherwise always prefers accessToken over apiKey for a plain Bearer header"
+    - "needsRefresh(credentials) delegates to the shared shouldRefreshCredentials(provider, credentials) service for every executor (base and subclasses alike) — refresh-due detection is centralized even though the actual refresh call (refreshCredentials) is overridden per-provider"
+    - "shouldRetry(status, urlIndex) only ever triggers on HTTP 429 and only when another base URL remains in getBaseUrls() — this is the base retry policy every executor inherits unless it overrides shouldRetry itself"
+  state:
+    reads: ["credentials.apiKey/.accessToken"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "Default Authorization header construction for any dedicated executor that relies on the inherited implementation"
+  fallback: { hasFallback: true, retry: "429 only, when a fallback base URL exists", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "This fallback path is a completely separate code path from DefaultExecutor's AUTH_DESCRIPTORS/applyAuth logic — a provider's transport.auth block in the registry has zero effect on a request that goes through BaseExecutor.buildHeaders unmodified, since that method never reads transport.auth"
+  evidence:
+    - { file: open-sse/executors/base.js, line: 46, note: "buildHeaders — hardcoded anthropic-compatible-* special case, else Bearer(accessToken||apiKey)" }
+    - { file: open-sse/executors/base.js, line: 83, note: "shouldRetry — 429 only, requires a remaining fallback URL" }
+    - { file: open-sse/executors/base.js, line: 92, note: "needsRefresh delegates to shouldRefreshCredentials(provider, credentials)" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.generic-provider-action-route
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "The generic /api/oauth/[provider]/[action] route — authorize/device-code/exchange/poll and proxy-session actions shared across most OAuth providers"
+  trigger: Dashboard \"Connect\" flow for any OAuth-category provider not covered by a specific route
+  input: "provider + action path params; GET query params (redirect_uri, state, app_port, start_url, region, ...) or POST JSON body (code, redirectUri, codeVerifier, state, deviceCode, extraData, meta)"
+  output: "authorize -> { authUrl, codeVerifier, state, ... }; device-code -> { deviceCode, userCode, verificationUri, codeVerifier }; exchange/poll -> { success, connection } on success, a new providerConnections row created"
+  businessRules:
+    - "One handler serves every provider whose OAuth mechanics fit one of: authorization_code+PKCE (exchange), device_code (device-code + poll), or a local-proxy callback (start-proxy/poll-status/stop-proxy/register-session, used by codex/xai/trae/windsurf/zed) — provider-specific quirks are handled by small inline branches (noPkceDeviceProviders, noPkceExchangeProviders lists) rather than per-provider files"
+    - "exchange auto-detects a raw ChatGPT JWT access token pasted as `code` (starts with \"eyJ\" and contains a \".\") and short-circuits straight to creating an access_token-authType connection, decoding the JWT for email/account/plan — this is the same JWT-decode logic codex/import-token also implements independently (see oauth.codex-import-token)"
+    - "poll's noPkceProviders list (github, kimi, kimi-coding, kilocode, codebuddy-cn, codebuddy-intl) and kiro/qoder need special-cased extraData/codeVerifier handling that this single handler absorbs inline rather than delegating"
+  state:
+    reads: []
+    writes: ["providerConnections table (new row on successful exchange/poll/manual-code)"]
+    runtimeOnly: ["in-memory proxy session state (registerCodexSession/registerXaiSession/registerTraeSession/registerWindsurfSession/registerZedSession) keyed by state, for the local-callback-server providers"]
+  dependencies: []
+  providerInteraction: "authorize/device-code/exchange/poll all call through to src/lib/oauth/providers.js's per-provider config to build URLs and perform the actual token exchange against that provider's OAuth endpoints"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "action is not one of the recognized values", partial: false }
+    - { code: INVALID_REQUEST, when: "poll/exchange is missing deviceCode/code/redirectUri/codeVerifier as required for that provider's flow", partial: false }
+    - { code: AUTH_ERROR, when: "poll returns authorization_pending/slow_down (surfaced as pending:true, not a hard error)", partial: true }
+  sideEffects: []
+  persistence: ["providerConnections row created on successful exchange/poll/manual-code"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "manual-code is hardcoded to only accept provider === \"xai\" — it exists inside the generic route (rather than as its own specific route file) because it's a small addition (~15 lines) to the existing xai device-flow session state already managed here, not because it fits the general authorize/exchange/poll shape"
+  evidence:
+    - { file: "src/app/api/oauth/[provider]/[action]/route.js", line: 91, note: "authorize action" }
+    - { file: "src/app/api/oauth/[provider]/[action]/route.js", line: 189, note: "device-code action, with noPkceDeviceProviders special-case list" }
+    - { file: "src/app/api/oauth/[provider]/[action]/route.js", line: 268, note: "exchange action, incl. raw-JWT auto-detect shortcut" }
+    - { file: "src/app/api/oauth/[provider]/[action]/route.js", line: 376, note: "poll action, with noPkceProviders/kiro/qoder special cases" }
+    - { file: "src/app/api/oauth/[provider]/[action]/route.js", line: 441, note: "manual-code action, xai-only" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.codex-bulk-import
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "POST /api/oauth/codex/bulk-import — import many pre-obtained codex OAuth token JSON blobs in one call"
+  trigger: Operator pastes an array (or single object, or {accounts:[...]}) of previously-exported codex account JSON into the bulk-import UI
+  input: "Array | single object | { accounts: [...] } — each item needs at least accessToken; email/chatgptAccountId/chatgptPlanType are optional"
+  output: "{ success, failed, results: [{ index, ok, id? , error? }] } — one outcome per input item, never a single all-or-nothing result"
+  businessRules:
+    - "The generic [provider]/[action] exchange/poll routes only ever create ONE connection per call, driven by an interactive browser/device flow; bulk-import exists specifically because an operator migrating N already-authenticated codex accounts (e.g. from another tool's local storage) has no authorization code or device code to feed the generic route at all — only the resulting token JSON"
+    - "The import loop is intentionally SERIAL, not Promise.all — the code comment explains createProviderConnection reads max(priority) and reorders rows inside a transaction, so parallel calls would race on priority assignment"
+    - "Server-controlled fields (id, provider, authType, createdAt, updatedAt) are stripped from each incoming item before it's merged into the createProviderConnection call, so a malicious or stale export can't set its own id or spoof authType"
+    - "Missing email/chatgptAccountId/chatgptPlanType are best-effort backfilled per item from the JWT in idToken (or accessToken if no idToken) via extractCodexAccountInfo — a failure to decode just leaves those fields absent rather than failing the item"
+  state:
+    reads: []
+    writes: ["providerConnections table (one row per successfully validated item)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "body is not valid JSON, or normalizes to an empty/non-array account list", partial: false }
+    - { code: INVALID_REQUEST, when: "an individual item is not an object or is missing accessToken", partial: true }
+  sideEffects: []
+  persistence: ["providerConnections row per successful item, authType: \"oauth\", provider: \"codex\""]
+  performanceConcerns:
+    - "Serial per-item DB writes (by design, to avoid a priority-assignment race) mean a large bulk import scales linearly with item count rather than batching"
+  behavior: { streaming: false, cancellation: null, concurrency: "Deliberately serialized to avoid a priority-reordering race in createProviderConnection" }
+  edgeCases:
+    - "Tokens are never echoed back in the response (the doc comment states this explicitly) — only { index, ok, id } or { index, ok:false, error } per item, so a client cannot recover a submitted accessToken from the response even accidentally"
+  evidence:
+    - { file: src/app/api/oauth/codex/bulk-import/route.js, line: 30, note: "normalize body to an accounts array (array / single / {accounts:[]})" }
+    - { file: src/app/api/oauth/codex/bulk-import/route.js, line: 53, note: "comment + for-loop: SERIAL to avoid createProviderConnection priority race" }
+    - { file: src/app/api/oauth/codex/bulk-import/route.js, line: 63, note: "strip server-controlled fields (id/provider/authType/createdAt/updatedAt)" }
+    - { file: src/app/api/oauth/codex/bulk-import/route.js, line: 82, note: "backfill email/chatgptAccountId/chatgptPlanType from JWT via extractCodexAccountInfo" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.codex-import-token
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "POST /api/oauth/codex/import-token — import a single ChatGPT access token, bypassing the OAuth refresh flow entirely"
+  trigger: Operator pastes a ChatGPT access token (created from chatgpt.com account settings) into the import UI
+  input: "{ accessToken, name? }"
+  output: "{ success, connection: { id, provider, email, name, workspace, plan } }"
+  businessRules:
+    - "The generic route's exchange action needs an authorization code + PKCE verifier from a live browser redirect; this route exists because a chatgpt.com-issued access token has neither — it is a standalone bearer credential the user copies manually, with no refresh token and no OAuth handshake to perform"
+    - "The connection is stored with authType: \"access_token\" (not \"oauth\") specifically because there is no refreshToken to pair with it — refreshCredentials()'s early `if (!credentials.refreshToken) return null` guard means this connection can never be silently refreshed; it must be re-imported by hand once it expires"
+    - "Email/workspace/plan are extracted by manually base64-decoding the JWT's middle segment and reading either the OpenAI-specific `https://api.openai.com/auth` / `.../profile` claims or top-level account_id/plan_type/email fields, with extractCodexAccountInfo as a fallback if that manual decode doesn't yield an email — the same dual-decode strategy the generic route's raw-JWT exchange shortcut also implements independently"
+  state:
+    reads: []
+    writes: ["providerConnections table (new row)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "accessToken is missing or not a string", partial: false }
+    - { code: INTERNAL_ERROR, when: "createProviderConnection throws", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections row: authType access_token, provider codex, no refreshToken"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "JWT decoding is wrapped in its own try/catch and silently degraded (\"Not a JWT or malformed — still allow import as raw token\") — a non-JWT access token is still stored successfully, just without any derived email/workspace/plan metadata"
+  evidence:
+    - { file: src/app/api/oauth/codex/import-token/route.js, line: 30, note: "manual JWT payload decode for email/chatgpt_account_id/chatgpt_plan_type" }
+    - { file: src/app/api/oauth/codex/import-token/route.js, line: 61, note: "extractCodexAccountInfo fallback when the manual decode found no email" }
+    - { file: src/app/api/oauth/codex/import-token/route.js, line: 71, note: "createProviderConnection with authType: \"access_token\", no refreshToken" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.cursor-auto-import
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "GET /api/oauth/cursor/auto-import — auto-detect and read Cursor IDE's own locally-stored access token from its SQLite state DB"
+  trigger: Operator clicks \"Auto-detect from Cursor\" in the dashboard connect flow
+  input: none (reads local filesystem only)
+  output: "{ found: true, accessToken, machineId } | { found: false, error } | { found: false, windowsManual: true, dbPath }"
+  businessRules:
+    - "This route makes ZERO network calls to Cursor or any OAuth endpoint — it locates Cursor's own state.vscdb SQLite file (platform-specific candidate paths for darwin/win32/linux) and reads two keys out of its itemTable: cursorAuth/accessToken (or the legacy cursorAuth/token) and one of three machine-id keys — because Cursor has no public OAuth authorize/token endpoint the generic route could call at all"
+    - "Extraction is tried via three strategies in order: better-sqlite3 (bundled native binding) first, then a shell-out to the sqlite3 CLI if the native binding is unavailable, then falls back to `{ found:false, windowsManual:true }` asking the user to paste values manually — the generic route has no equivalent multi-strategy local-file-read fallback chain"
+    - "On Linux specifically, the route additionally verifies Cursor is actually installed (`which cursor` or a .desktop file) before attempting extraction, to avoid treating leftover config from an uninstalled Cursor as a valid source"
+  state:
+    reads: ["Cursor's local state.vscdb SQLite file (platform-specific path), read-only"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "no candidate state.vscdb path is readable on this machine", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "This route only ever discovers and returns the raw token/machineId pair — it does not itself create a providerConnection; the client must call oauth.cursor-import next with the discovered values to actually persist a connection, a two-step split not present in any other provider's import flow in this inventory"
+  evidence:
+    - { file: src/app/api/oauth/cursor/auto-import/route.js, line: 79, note: "extractTokensViaBetterSqlite — direct itemTable query via bundled native binding" }
+    - { file: src/app/api/oauth/cursor/auto-import/route.js, line: 120, note: "extractTokensViaCLI — sqlite3 CLI fallback via execFile" }
+    - { file: src/app/api/oauth/cursor/auto-import/route.js, line: 200, note: "Linux-only installed-check before attempting extraction" }
+    - { file: src/app/api/oauth/cursor/auto-import/route.js, line: 250, note: "final fallback: found:false, windowsManual:true, asks for manual paste" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.cursor-import
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "POST /api/oauth/cursor/import — validate a manually-supplied (or auto-detected) Cursor accessToken+machineId pair and persist it"
+  trigger: Submission of the accessToken+machineId pair, whether hand-pasted or pre-filled by oauth.cursor-auto-import
+  input: "{ accessToken, machineId }"
+  output: "{ success, connection: { id, provider, email } }"
+  businessRules:
+    - "machineId is a required, separate credential component alongside accessToken — Cursor's API validates the pair together (CursorService.validateImportToken makes the actual upstream API call to confirm the token is live), unlike a normal OAuth exchange where only the token/code matters"
+    - "refreshToken is explicitly stored as null with the comment \"Cursor doesn't have public refresh endpoint\" — this connection can never be silently refreshed by any of the auth.refresh-* mechanisms; expiresAt is set from the validated token's own expiresIn"
+    - "GET on the same route (no body) returns static instructions + a requiredFields schema for the dashboard's manual-entry form — the generic route has no equivalent self-describing GET for a specific credential-pair form"
+  state:
+    reads: []
+    writes: ["providerConnections table (new row)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "CursorService.validateImportToken calls Cursor's own API to confirm the token/machineId pair is valid before persisting"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "accessToken or machineId missing/not a string", partial: false }
+    - { code: AUTH_ERROR, when: "CursorService.validateImportToken rejects the pair", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections row: authType oauth, provider cursor, refreshToken: null"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "providerSpecificData.provider is literally set to the string \"Imported\" (authMethod: \"imported\") — a display-label marker distinguishing this path from a hypothetical direct-OAuth cursor connection, even though no direct-OAuth cursor flow exists elsewhere in this inventory"
+  evidence:
+    - { file: src/app/api/oauth/cursor/import/route.js, line: 34, note: "CursorService.validateImportToken(accessToken, machineId) — the live upstream check" }
+    - { file: src/app/api/oauth/cursor/import/route.js, line: 47, note: "refreshToken: null, comment: Cursor doesn't have public refresh endpoint" }
+    - { file: src/app/api/oauth/cursor/import/route.js, line: 77, note: "GET — static instructions + requiredFields for the manual-entry form" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.gitlab-pat
+  group: API-key providers
+  feature: API-key providers
+  subFeature: "POST /api/oauth/gitlab/pat — authenticate GitLab Duo with a Personal Access Token instead of an OAuth code/device flow"
+  trigger: Operator pastes a GitLab PAT (and optionally a self-hosted GitLab baseUrl) into the connect UI
+  input: "{ token, baseUrl? }"
+  output: "{ success: true } on a verified token; 401 with the upstream error text on a bad token"
+  businessRules:
+    - "GitLab does support a real OAuth authorize/token flow elsewhere in the registry (gitlab.js has an oauth block with authorizeUrlPath/tokenUrlPath) — this route is the alternate, code-flow-free path for users who prefer a long-lived PAT over an interactive OAuth login, verified by calling GET {baseUrl}/api/v4/user with a Private-Token header rather than any OAuth endpoint"
+    - "baseUrl defaults to https://gitlab.com but accepts any self-hosted GitLab instance URL (trailing slash stripped) — the PAT path is also how self-hosted GitLab is supported at all through this connect flow, since PATs are the standard cross-instance credential"
+    - "Despite bypassing OAuth entirely, the resulting connection is stored with authType: \"oauth\" (not \"apikey\") — an inconsistency with how the connection is actually authenticated (a static Private-Token header, not a bearer OAuth token), noted here as an oddity rather than a functional bug since nothing currently branches on authType===\"oauth\" specifically for gitlab in a way that would misbehave"
+  state:
+    reads: []
+    writes: ["providerConnections table (new row)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "GET {baseUrl}/api/v4/user with Private-Token header, to confirm the PAT is valid and to read the user's email/name/username"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "token is missing/empty", partial: false }
+    - { code: AUTH_ERROR, when: "GitLab's /api/v4/user rejects the token (non-ok response)", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections row: authType oauth (see edge case), accessToken = the raw PAT, providerSpecificData.authKind: personal_access_token"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "authType is recorded as \"oauth\" even though the credential is a static PAT with no expiry and no refresh flow — expiresAt is explicitly null, so none of the auth.refresh-* mechanisms would ever fire for this connection even if something mistakenly tried, since needsRefresh ultimately still requires a refreshToken that this connection never has"
+  evidence:
+    - { file: src/app/api/oauth/gitlab/pat/route.js, line: 27, note: "GET {base}/api/v4/user with Private-Token header — the live PAT verification" }
+    - { file: src/app/api/oauth/gitlab/pat/route.js, line: 39, note: "createProviderConnection — authType: \"oauth\", accessToken: token, refreshToken: null" }
+    - { file: open-sse/providers/registry/gitlab.js, line: 18, note: "gitlab's normal transport.auth (combined bearer) — the OAuth-flow path this route bypasses" }
+    - { file: open-sse/providers/registry/gitlab.js, line: 24, note: "gitlab's real oauth block (authorizeUrlPath/tokenUrlPath) — proof a full OAuth flow exists as the alternative to this PAT route" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.grok-cli-bulk-import
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "POST /api/oauth/grok-cli/bulk-import — import many pre-obtained Grok CLI (device-code) account JSON objects in one call"
+  trigger: Operator pastes an array/single-object/{accounts:[...]} of previously-obtained grok-cli token JSON
+  input: "Each item accepts BOTH snake_case (access_token, refresh_token, id_token, expires_in) and camelCase (accessToken, refreshToken, idToken, expiresIn) field names, plus email"
+  output: "{ total, success, failed, results: [{ index, ok, id?, email?, error? }] }"
+  businessRules:
+    - "Same rationale as oauth.codex-bulk-import: grok-cli tokens are normally obtained through the generic route's device-code + poll actions one at a time; this route exists for migrating already-obtained tokens (e.g. from another local tool's storage) where there is no device code to poll, only the resulting token JSON, and the source JSON's casing convention is unknown up front so both are accepted"
+    - "email is resolved through a three-step fallback: the item's own email field, else decodeXaiIdTokenEmail(idToken), else extractEmailFromAccessToken(accessToken) — unlike codex-bulk-import which relies solely on extractCodexAccountInfo"
+    - "Unlike codex-bulk-import, this loop is not explicitly commented as serial-for-priority-race reasons, but is still a plain sequential for-loop calling createProviderConnection one item at a time"
+  state:
+    reads: []
+    writes: ["providerConnections table (one row per successfully validated item)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "body is not valid JSON, or normalizes to an empty account list", partial: false }
+    - { code: INVALID_REQUEST, when: "an individual item is not an object or is missing access_token/accessToken", partial: true }
+  sideEffects: []
+  persistence: ["providerConnections row per successful item, authType oauth, provider grok-cli"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "expiresAt is computed from expires_at/expiresAt if present, else derived from expires_in/expiresIn — accepting four different possible input key spellings for the same logical expiry value across the whole item shape"
+  evidence:
+    - { file: src/app/api/oauth/grok-cli/bulk-import/route.js, line: 61, note: "snake_case/camelCase dual field-name acceptance" }
+    - { file: src/app/api/oauth/grok-cli/bulk-import/route.js, line: 70, note: "three-step email fallback: item.email -> decodeXaiIdTokenEmail -> extractEmailFromAccessToken" }
+    - { file: src/app/api/oauth/grok-cli/bulk-import/route.js, line: 77, note: "expiresAt computed from either expires_at/expiresAt or expires_in/expiresIn" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.iflow-cookie
+  group: API-key providers
+  feature: API-key providers
+  subFeature: "POST /api/oauth/iflow/cookie — derive an iFlow API key from a pasted browser session cookie, no OAuth handshake at all"
+  trigger: Operator pastes an iFlow browser cookie string (containing BXAuth=...) into the connect UI
+  input: "{ cookie: \"BXAuth=xxx; ...\" }"
+  output: "{ success, connection: { id, provider, email, apiKey (masked to first 10 chars + ...), expireTime } }"
+  businessRules:
+    - "iflow does support a standard OAuth flow through the generic route (open-sse/providers/registry/iflow.js has clientId/clientSecret/tokenUrl/authorizeUrl) — this route is a completely separate mechanism for users who only have browser session access (BXAuth cookie) and no OAuth app credential context, common for iFlow's web-only platform features"
+    - "The flow is a two-step dance against iFlow's own web API, not an OAuth endpoint: GET /api/openapi/apikey with the cookie to read the existing key's name, then POST the same endpoint with that name to force a key refresh/rotation and get back the actual apiKey value — the cookie itself is never the stored credential, only the vehicle to mint an apiKey"
+    - "Only the BXAuth=... segment is extracted from the (possibly larger) pasted cookie string via regex and re-normalized with a trailing semicolon before being stored in providerSpecificData.cookie — the rest of the pasted cookie header is discarded"
+    - "The resulting connection is stored with authType: \"cookie\" — a third authType value distinct from both \"oauth\" and \"apikey\"/\"api_key\" used elsewhere in this inventory, reflecting that neither the transport.auth (raw apiKey) model nor the OAuth refresh model fits: the credential is an apiKey, but obtaining/renewing it requires re-supplying the cookie, which none of the auth.refresh-* mechanisms know how to do automatically"
+  state:
+    reads: []
+    writes: ["providerConnections table (new row)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "Two sequential calls to iFlow's platform.iflow.cn/api/openapi/apikey web API (GET then POST), authenticated by the pasted cookie, not an API key or OAuth token"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "cookie is missing, not a string, or doesn't contain BXAuth=", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "the GET or POST to iFlow's apikey endpoint returns a non-ok response", partial: false }
+    - { code: INVALID_REQUEST, when: "iFlow's own API returns success:false in its JSON body (both GET and POST steps)", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections row: authType cookie, apiKey = the newly-minted key, providerSpecificData.cookie = the extracted BXAuth segment only"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The POST step deliberately rotates/refreshes the API key every time this route is called — re-submitting the same cookie a second time does not return the same apiKey as the first call, it mints a new one, which would silently invalidate any connection already using the previous key if the operator re-runs this flow expecting an idempotent \"check my cookie\" action"
+  evidence:
+    - { file: src/app/api/oauth/iflow/cookie/route.js, line: 19, note: "cookie must contain BXAuth= or the request is rejected" }
+    - { file: src/app/api/oauth/iflow/cookie/route.js, line: 29, note: "step 1: GET /api/openapi/apikey with the cookie, to read the key name" }
+    - { file: src/app/api/oauth/iflow/cookie/route.js, line: 66, note: "step 2: POST /api/openapi/apikey with that name — mints/rotates the actual key" }
+    - { file: src/app/api/oauth/iflow/cookie/route.js, line: 104, note: "regex-extract only the BXAuth= segment before storing" }
+    - { file: src/app/api/oauth/iflow/cookie/route.js, line: 109, note: "createProviderConnection — authType: \"cookie\"" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.kiro-api-key
+  group: API-key providers
+  feature: API-key providers
+  subFeature: "POST /api/oauth/kiro/api-key — import a long-lived Kiro/Amazon Q headless API key, no OAuth or refresh token model"
+  trigger: Operator pastes a Kiro headless API key (and optional AWS region) into the connect UI
+  input: "{ apiKey, region? }"
+  output: "{ success, connection: { id, provider, email } }"
+  businessRules:
+    - "Kiro's normal path is a full AWS SSO OIDC device/social OAuth flow (see oauth.kiro-import / oauth.kiro-social-authorize / oauth.kiro-social-exchange) — this route exists for Kiro's separate \"headless auth\" API-key mechanism, a completely different Amazon Q credential type with no authorization code, device code, or refresh token involved at all"
+    - "The key is validated up front by KiroService.validateApiKey against the same Amazon Q model-catalog surface used for live inference — an invalid key is rejected before any connection row is written"
+    - "Because API keys never expire on a fixed schedule and have no refresh token, expiresAt is hardcoded to now + 365 days purely so the proactive-refresh scheduling path (which requires a refreshToken to do anything) is naturally skipped for this connection, not because the key is contractually valid for exactly one year"
+    - "On any validation failure, the route returns a generic \"API key validation failed\" message rather than echoing KiroService's actual error — the code comment marks this as deliberate SSRF hardening (don't reflect an upstream response body driven by user-supplied region/key back to the client)"
+  state:
+    reads: []
+    writes: ["providerConnections table (new row)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "KiroService.validateApiKey calls the Amazon Q model catalog to confirm the key works before persisting"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "apiKey is missing/empty", partial: false }
+    - { code: AUTH_ERROR, when: "KiroService.validateApiKey rejects the key/region pair", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections row: authType api_key, provider kiro, refreshToken: null, expiresAt: +365 days"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The error-response hardening here (generic message, no upstream body reflected) is not applied uniformly across the other 12 specific routes in this file — several others (cursor/import, gitlab/pat, iflow/cookie) do surface upstream error text or messages directly to the client"
+  evidence:
+    - { file: src/app/api/oauth/kiro/api-key/route.js, line: 25, note: "KiroService.validateApiKey — the live validation call" }
+    - { file: src/app/api/oauth/kiro/api-key/route.js, line: 40, note: "expiresAt hardcoded to +365 days, refreshToken: null" }
+    - { file: src/app/api/oauth/kiro/api-key/route.js, line: 61, note: "generic error message, comment: SSRF hardening, do not reflect upstream body" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.kiro-auto-import
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "GET /api/oauth/kiro/auto-import — auto-detect a Kiro refresh token from the local AWS SSO cache, including IDC client-credential resolution"
+  trigger: Operator clicks \"Auto-detect from Kiro IDE\" in the connect UI
+  input: none (reads local filesystem only)
+  output: "{ found, refreshToken, source, clientId, clientSecret, region, authMethod, profileArn }"
+  businessRules:
+    - "This route makes zero network calls — it reads ~/.aws/sso/cache, first checking a known kiro-auth-token.json filename, then scanning every other .json file in that directory for one whose refreshToken starts with the literal prefix \"aorAAAAAG\" (Kiro's own token format marker) — the generic route has no equivalent local-cache-scan capability"
+    - "For IDC (organization) tokens specifically, the cached token file references a clientIdHash; this route resolves that hash to a second cache file ({hash}.json) to recover the clientId/clientSecret needed to refresh an IDC token via the regional AWS OIDC endpoint — a social/builder-id token has no such linkage and is refreshed differently (see oauth.kiro-import)"
+    - "profileArn is read from a separate Kiro-IDE-specific profile.json (checked at two OS-dependent candidate paths) and its region is force-normalized to us-east-1 in the ARN string regardless of the IDC region, because the comment states the runtime gateway requires us-east-1 in the ARN specifically"
+  state:
+    reads: ["~/.aws/sso/cache/*.json (local filesystem)", "Kiro IDE's profile.json (two OS-dependent candidate paths)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "~/.aws/sso/cache does not exist (readdir throws)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Scans every .json file in the SSO cache directory sequentially (bounded by however many SSO sessions the OS has cached, not attacker-controlled)"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Like oauth.cursor-auto-import, this route only discovers values — it does not persist a connection itself; the client must follow up with oauth.kiro-import, passing along the discovered refreshToken/clientId/clientSecret/region/profileArn"
+  evidence:
+    - { file: src/app/api/oauth/kiro/auto-import/route.js, line: 36, note: "refreshToken must start with \"aorAAAAAG\" to be accepted as a Kiro token" }
+    - { file: src/app/api/oauth/kiro/auto-import/route.js, line: 79, note: "IDC clientIdHash -> {hash}.json resolution for clientId/clientSecret" }
+    - { file: src/app/api/oauth/kiro/auto-import/route.js, line: 106, note: "profileArn region forced to us-east-1 regardless of the IDC region" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.kiro-import-cli-proxy
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "POST /api/oauth/kiro/import-cli-proxy — import a CLIProxyAPI auth JSON blob for Kiro Microsoft external_idp accounts"
+  trigger: Operator pastes a CLIProxyAPI-format auth JSON (a third-party tool's exported Kiro credential) for a Microsoft-external-identity Kiro account
+  input: "{ cliProxyAuth } | { auth } | { json } | a bare object — the route accepts several wrapper key names"
+  output: "{ success, connection: { id, provider, email } }"
+  businessRules:
+    - "This route exists because Kiro accounts authenticated via Microsoft's external_idp path produce a token JSON shape specific to the CLIProxyAPI tool, not the shape either the generic route's exchange action or oauth.kiro-import's manual refresh-token import expect — normalizeKiroExternalIdpAuth() is the dedicated shape-adapter for this one source format"
+    - "The route accepts the payload under any of four different top-level key names (cliProxyAuth, auth, json, or no wrapper at all) via a single nullish-coalescing chain, tolerating whatever shape the pasting tool happens to wrap its export in"
+  state:
+    reads: []
+    writes: ["providerConnections table (new row)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "normalizeKiroExternalIdpAuth throws on an unrecognized/malformed shape", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections row: authType oauth, provider kiro"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Unlike every other route in this file, error responses here return the raw error.message with a 400 status (not a generic message or 500) — no SSRF-style hardening is applied, consistent with this being a pure local-shape-parsing failure rather than a call to an external, user-influenced URL"
+  evidence:
+    - { file: src/app/api/oauth/kiro/import-cli-proxy/route.js, line: 12, note: "rawAuth resolved from cliProxyAuth/auth/json/body via nullish-coalescing chain" }
+    - { file: src/app/api/oauth/kiro/import-cli-proxy/route.js, line: 13, note: "normalizeKiroExternalIdpAuth(rawAuth) — the CLIProxyAPI-shape adapter" }
+    - { file: src/app/api/oauth/kiro/import-cli-proxy/route.js, line: 35, note: "raw error.message returned with 400 status, no generic-message hardening" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.kiro-import
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "POST /api/oauth/kiro/import — persist a manually-supplied (or auto-detected) Kiro refresh token, supporting both social/builder-id and IDC (org) shapes"
+  trigger: Submission of a refreshToken (and, for IDC accounts, clientId/clientSecret/region), whether hand-pasted or pre-filled by oauth.kiro-auto-import
+  input: "{ refreshToken, clientId?, clientSecret?, region?, authMethod?, profileArn? }"
+  output: "{ success, connection: { id, provider, email } }"
+  businessRules:
+    - "isIdc = !!(clientId && clientSecret) branches the entire flow: IDC (organization) tokens refresh via the regional AWS OIDC endpoint using those client credentials, while social/builder-id tokens use Kiro's own standard social refresh endpoint with no client credentials — the same route handles both shapes rather than splitting into two routes, because both ultimately produce the same kiro-provider connection shape"
+    - "kiroService.refreshToken is called immediately during import (not deferred to the first real chat request) specifically to validate the supplied refreshToken actually works and to obtain a fresh accessToken/expiresIn/profileArn before ever persisting the connection"
+    - "profileArn is resolved with a specific precedence: the client-supplied profileArn body field first, then whatever kiroService.refreshToken's response returned, else null — allowing an auto-imported profileArn (from oauth.kiro-auto-import's separate profile.json read) to be threaded through even though the refresh call itself may not return one"
+  state:
+    reads: []
+    writes: ["providerConnections table (new row)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "kiroService.refreshToken calls Kiro's social refresh endpoint or the regional AWS OIDC endpoint (IDC) to validate the token and obtain a fresh accessToken"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "refreshToken is missing/not a string", partial: false }
+    - { code: AUTH_ERROR, when: "kiroService.refreshToken rejects the supplied token/client credentials", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections row: authType oauth, provider kiro, providerSpecificData.authMethod idc|imported"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "expiresAt is computed from tokenData.expiresIn with a hardcoded 3600-second fallback if the refresh response omits it — unlike oauth.kiro-api-key's fixed 365-day horizon, this connection IS expected to be refreshed again later via the normal auth.refresh-provider-specific (refreshKiro) path since it does have a refreshToken"
+  evidence:
+    - { file: src/app/api/oauth/kiro/import/route.js, line: 23, note: "isIdc = !!(clientId && clientSecret) — branches IDC vs social refresh" }
+    - { file: src/app/api/oauth/kiro/import/route.js, line: 31, note: "kiroService.refreshToken called during import to validate + obtain a fresh accessToken" }
+    - { file: src/app/api/oauth/kiro/import/route.js, line: 36, note: "profileArn precedence: body field, then refresh response, else null" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.kiro-social-authorize
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "GET /api/oauth/kiro/social-authorize — build a Google/GitHub social-login URL using Kiro's kiro:// custom protocol callback"
+  trigger: Operator picks \"Sign in with Google\" or \"Sign in with GitHub\" for Kiro in the connect UI
+  input: "?provider=google|github query param"
+  output: "{ authUrl, state, codeVerifier, codeChallenge, provider }"
+  businessRules:
+    - "The generic route's authorize action builds a redirect_uri from a plain HTTP query param intended for a normal browser-redirect OAuth flow; Kiro's social login instead requires a kiro:// custom URL protocol callback (kiro://kiro.kiroAgent/authenticate-success?code=...&state=...) mandated by AWS Cognito's config for this specific identity provider chain, which the generic route's redirect_uri handling has no special case for"
+    - "Only \"google\" and \"github\" are accepted as the provider query param — any other value is rejected before any URL is built or PKCE material generated"
+    - "codeVerifier is generated and returned directly in the JSON response (not stored server-side) — the client is responsible for holding onto it and passing it back unchanged to oauth.kiro-social-exchange"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "provider is missing or not google/github", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because codeVerifier is round-tripped through the client rather than kept server-side, a client that loses it between authorize and exchange (e.g. a page reload) has no way to recover the PKCE flow and must restart from social-authorize"
+  evidence:
+    - { file: src/app/api/oauth/kiro/social-authorize/route.js, line: 15, note: "provider must be exactly google or github" }
+    - { file: src/app/api/oauth/kiro/social-authorize/route.js, line: 26, note: "kiroService.buildSocialLoginUrl(provider, codeChallenge, state) — the kiro:// callback URL" }
+    - { file: src/app/api/oauth/kiro/social-authorize/route.js, line: 34, note: "codeVerifier returned directly in the response body, not stored server-side" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.kiro-social-exchange
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "POST /api/oauth/kiro/social-exchange — exchange the kiro:// callback code for tokens after Google/GitHub social login"
+  trigger: The dashboard captures the kiro:// custom-protocol redirect and extracts code/state from it, then calls this route
+  input: "{ code, codeVerifier, provider }"
+  output: "{ success, connection: { id, provider, email } }"
+  businessRules:
+    - "This is the exchange counterpart to oauth.kiro-social-authorize — it cannot use the generic route's exchange action because that action expects a standard redirectUri to be supplied and re-validated, while this flow's redirect_uri is the fixed kiro:// callback handled internally inside kiroService.exchangeSocialCode rather than passed per-request"
+    - "provider (google|github) is stored verbatim (capitalized) into providerSpecificData.provider and also as providerSpecificData.authMethod — used later purely as a display/diagnostic label distinguishing which social identity produced this Kiro connection, not as a functional branch in the refresh path (auth.refresh-provider-specific's refreshKiro treats every Kiro connection identically regardless of how it was obtained)"
+  state:
+    reads: []
+    writes: ["providerConnections table (new row)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "kiroService.exchangeSocialCode calls Kiro/Cognito's token endpoint with the code+codeVerifier to obtain accessToken/refreshToken/expiresIn/profileArn"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "code or codeVerifier missing", partial: false }
+    - { code: INVALID_REQUEST, when: "provider is missing or not google/github", partial: false }
+    - { code: AUTH_ERROR, when: "kiroService.exchangeSocialCode rejects the code/verifier pair", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections row: authType oauth, provider kiro, providerSpecificData.authMethod google|github"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Once persisted, this connection is indistinguishable in the refresh path from one created via oauth.kiro-import or oauth.kiro-import-cli-proxy — the social-login provenance is display-only metadata, confirmed by refreshKiro in auth.refresh-provider-specific never reading providerSpecificData.authMethod"
+  evidence:
+    - { file: src/app/api/oauth/kiro/social-exchange/route.js, line: 31, note: "kiroService.exchangeSocialCode(code, codeVerifier) — redirect_uri handled internally, not passed per-request" }
+    - { file: src/app/api/oauth/kiro/social-exchange/route.js, line: 49, note: "providerSpecificData.authMethod set to the social provider name (google|github), display-only" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

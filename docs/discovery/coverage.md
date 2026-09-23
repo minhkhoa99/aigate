@@ -1,26 +1,29 @@
 # Discovery coverage
 
-Entries: 17
+Entries: 46
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 4/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +142 |
+| routes | 21/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +125 |
 | pages | 0/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind] … +20 |
-| providers | 0/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, antigravity, api-airforce, assemblyai … +114 |
-| executors | 0/29 | antigravity, azure, base, codebuddy-cn, codebuddy-intl, codex, commandcode, cursor … +21 |
+| providers | 8/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, antigravity, api-airforce, assemblyai … +106 |
+| executors | 4/29 | antigravity, azure, codebuddy-cn, codebuddy-intl, codex, commandcode, cursor, devin-cli … +17 |
 | translators | 0/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +40 |
 | repos | 2/11 | aliasRepo, combosRepo, connectionsRepo, disabledModelsRepo, nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo … +1 |
-| settingsKeys | 5/52 | authMode, capacityAdapter, cavemanEnabled, cavemanLevel, cloudEnabled, comboStickyRoundRobinLimit, comboStrategies, comboStrategy … +39 |
+| settingsKeys | 6/52 | capacityAdapter, cavemanEnabled, cavemanLevel, cloudEnabled, comboStickyRoundRobinLimit, comboStrategies, comboStrategy, dnsToolEnabled … +38 |
 
 ## Entries per bounded context
 
 - apikeys: 9
+- catalog: 7
+- connections: 22
 - identity: 1
 - settings: 7
 
 ## Labels
 
-- REFERENCE_BEHAVIOR: 14
+- IMPLEMENTATION_ACCIDENT: 1
+- REFERENCE_BEHAVIOR: 42
 - SUSPECTED_BUG: 3
 
 ## Missing — routes
@@ -79,26 +82,10 @@ Entries: 17
 - api/models/custom
 - api/models/disabled
 - api/models/test
-- api/oauth/[provider]/[action]
-- api/oauth/codex/bulk-import
-- api/oauth/codex/import-token
-- api/oauth/cursor/auto-import
-- api/oauth/cursor/import
-- api/oauth/gitlab/pat
-- api/oauth/grok-cli/bulk-import
-- api/oauth/iflow/cookie
-- api/oauth/kiro/api-key
-- api/oauth/kiro/auto-import
-- api/oauth/kiro/import
-- api/oauth/kiro/import-cli-proxy
-- api/oauth/kiro/social-authorize
-- api/oauth/kiro/social-exchange
 - api/pricing
 - api/provider-nodes
 - api/provider-nodes/[id]
 - api/provider-nodes/validate
-- api/providers
-- api/providers/[id]
 - api/providers/[id]/models
 - api/providers/[id]/test
 - api/providers/[id]/test-models
@@ -139,7 +126,6 @@ Entries: 17
 - api/tunnel/tailscale-disable
 - api/tunnel/tailscale-enable
 - api/tunnel/tailscale-install
-- api/usage/[connectionId]
 - api/usage/[connectionId]/codex-reset-credits
 - api/usage/chart
 - api/usage/history
@@ -229,20 +215,17 @@ Entries: 17
 - cartesia
 - cerebras
 - chutes
-- claude
 - cline
 - clinepass
 - cloudflare-ai
 - codebuddy-cn
 - codebuddy-intl
-- codex
 - cohere
 - comfyui
 - commandcode
 - coqui
 - cursor
 - deepgram
-- deepseek
 - devin-cli
 - edge-tts
 - elevenlabs
@@ -252,10 +235,8 @@ Entries: 17
 - firecrawl
 - fireworks
 - fish-audio
-- gemini
 - gemini-cli
 - github
-- gitlab
 - glm
 - glm-cn
 - google-pse
@@ -272,7 +253,6 @@ Entries: 17
 - kilo-gateway
 - kilocode
 - kimchi
-- kimi
 - kiro
 - linkup
 - llm7
@@ -317,7 +297,6 @@ Entries: 17
 - tokenrouter
 - topaz
 - tortoise
-- trae
 - venice
 - vercel-ai-gateway
 - vertex
@@ -330,26 +309,22 @@ Entries: 17
 - xiaomi-tokenplan
 - xquik
 - youcom
-- zed
 
 ## Missing — executors
 
 - antigravity
 - azure
-- base
 - codebuddy-cn
 - codebuddy-intl
 - codex
 - commandcode
 - cursor
-- default
 - devin-cli
 - gemini-cli
 - github
 - grok-cli
 - grok-web
 - iflow
-- index
 - kimchi
 - kiro
 - mimo-free
@@ -358,7 +333,6 @@ Entries: 17
 - opencode-go
 - perplexity-web
 - qoder
-- trae
 - vertex
 - windsurf
 - xiaomi-tokenplan
@@ -429,7 +403,6 @@ Entries: 17
 
 ## Missing — settingsKeys
 
-- authMode
 - capacityAdapter
 - cavemanEnabled
 - cavemanLevel
