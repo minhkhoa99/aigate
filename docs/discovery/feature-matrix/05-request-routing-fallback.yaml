@@ -1,0 +1,1458 @@
+# Trace: Request routing, Auto fallback (Task 10)
+# 9router reference read at E:\9router. Read-only; every evidence line was
+# read directly, not inferred from names (behavioral.md §7).
+#
+# Entry points read in full: src/sse/handlers/chat.js (339 lines),
+# open-sse/handlers/chatCore.js (498), open-sse/executors/base.js (187),
+# open-sse/executors/index.js (102), open-sse/executors/default.js (337),
+# open-sse/translator/index.js (302), plus the chatCore/ sub-handlers
+# (streamingHandler.js, nonStreamingHandler.js, the usage parts of
+# sseToJsonHandler.js), open-sse/utils/streamHandler.js, open-sse/utils/error.js,
+# open-sse/services/accountFallback.js, open-sse/config/errorConfig.js,
+# open-sse/config/runtimeConfig.js and every chat-lane route under src/app/api/v1.
+#
+# Q1 (ordered decision points, request arrival -> first byte). One entry each:
+#   1  routing.lane-entry-routes           route handler + translator init
+#   2  routing.request-preflight           JSON parse, [1m] marker, API key, missing model
+#   3  routing.bypass-canned-responses     claude-cli warmup/title/count short-circuit
+#   4  routing.combo-dispatch              combo name -> handleComboChat / fusion (Task 11)
+#   5  routing.capacity-adapter-solo       single model lacking a hard capability -> adapter combo
+#   6  routing.model-resolution            provider/model parse, provider-node prefix, alias
+#   7  routing.account-fallback-loop       account selection + quota/lock filter, per-account loop
+#   8  routing.credential-preparation      proactive refresh + projectId cold-miss
+#   9  routing.source-format-detection     endpoint override, then body sniffing
+#  10  routing.target-format-transport     multi-endpoint transport vs model/provider target format
+#  11  routing.stream-mode-decision        stream flag, forceStream, Accept header
+#  12  routing.native-passthrough          same-ecosystem CLI -> skip translation
+#  13  routing.modality-strip-prefetch     drop unreadable media, inline remote images
+#  14  routing.request-translation         direct source:target route or OpenAI pivot
+#  15  routing.token-saver-pipeline        RTK / headroom / caveman / ponytail / pxpipe
+#  16  routing.executor-selection          getExecutor map, aliases, DefaultExecutor fallback
+#  17  routing.build-url                   compatible-prefix URL rule, runtime transport URL
+#  18  fallback.executor-url-loop          multi-baseUrl loop + connect timeout
+#  19  fallback.executor-retry-budget      tryRetry / computeRetryDelay
+#  20  fallback.auth-refresh-retry         401/403 refresh then single re-execute
+#  21  fallback.upstream-error-result      non-2xx -> parsed error result
+#  22  fallback.error-classification       retry / next account / next model / return table
+#  23  fallback.accounts-exhausted-response  what the client gets when the loop runs dry
+#  24  routing.response-mode-dispatch      forced SSE->JSON vs non-stream vs stream
+#  25  routing.streaming-pipeline          transform + stall watchdog -> first byte
+#  26  routing.non-streaming-response      JSON parse, response translation, return
+# Post-first-byte behavior: fallback.partial-stream-failure,
+# routing.client-disconnect-propagation, routing.usage-recording-timing,
+# routing.success-callback-timing. Lane variants: routing.responses-compact-lane,
+# routing.ollama-lane-transform, routing.count-tokens-estimate, routing.v1-root-alias.
+# SUSPECTED_BUG: routing.default-executor-openai-fallback.
+
+- id: routing.lane-entry-routes
+  group: Request routing
+  feature: Request routing
+  subFeature: Chat-lane route handlers that hand the request to handleChat
+  trigger: "POST /v1/chat/completions, /v1/messages or /v1/responses (after the next.config.mjs rewrite to /api/v1/*)"
+  input: "The raw Next Request (headers + JSON body)"
+  output: "Whatever handleChat returns — a JSON or SSE Response"
+  businessRules:
+    - "All three chat-shaped routes are identical: they call initTranslators() once per module instance, then return handleChat(request) unchanged — the route itself does no parsing, auth or format detection"
+    - "The three endpoints are NOT distinguished by the route: the endpoint path is re-read later by detectFormatByEndpoint (see routing.source-format-detection) to pick the client wire format"
+    - "OPTIONS preflight on each route returns Access-Control-Allow-Origin: * with GET, POST, OPTIONS and any header"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["per-route module-scope `initialized` flag"]
+  dependencies: ["endpoint.rewrite-lanes"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "initTranslators() is a no-op (translator/index.js line 276-278): translators already self-register through the static imports at the bottom of translator/index.js, so the per-route `initialized` flag guards nothing — a leftover from the lazy-init era"
+  evidence:
+    - { file: src/app/api/v1/chat/completions/route.js, line: 33, note: "POST returns handleChat(request) after ensureInitialized()" }
+    - { file: src/app/api/v1/messages/route.js, line: 34, note: "POST /v1/messages — same handleChat call, Claude format auto-detected downstream" }
+    - { file: src/app/api/v1/responses/route.js, line: 29, note: "POST /v1/responses — same handleChat call, Responses format detected downstream" }
+    - { file: open-sse/translator/index.js, line: 276, note: "initTranslators() only calls the empty ensureInitialized()" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.request-preflight
+  group: Request routing
+  feature: Request routing
+  subFeature: Body parse, 1M-context marker strip, API-key gate, missing-model check
+  trigger: First thing handleChat does for every chat-lane request
+  input: "Request JSON body (body.model), Authorization / x-api-key headers, settings.requireApiKey"
+  output: "Either an early error Response or a parsed body with body.model stripped of a trailing [1m] marker"
+  businessRules:
+    - "Order is fixed: (1) request.json() — failure returns 400 \"Invalid JSON body\"; (2) build clientRawRequest {endpoint, body, headers} for logging; (3) strip a Claude Code `<model>[1m]` context marker from body.model; (4) API-key enforcement; (5) missing model -> 400 \"Missing model\""
+    - "The [1m] marker is removed before any combo/alias/provider lookup because it matches none of them; the capability itself still travels in the anthropic-beta header, which is forwarded unchanged"
+    - "API key enforcement only runs when settings.requireApiKey is true — missing key and invalid key both return 401 (details in endpoint.enforce-require-api-key)"
+    - "The model check runs AFTER the API-key check, so an unauthenticated request with no model gets 401, not 400"
+  state:
+    reads: ["settings.requireApiKey", "apiKeys table (only when requireApiKey)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["endpoint.extract-header-order", "endpoint.enforce-require-api-key", "settings.hot-path-read-no-cache"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "body is not valid JSON — 400 Invalid JSON body", partial: false }
+    - { code: AUTH_ERROR, when: "requireApiKey is true and the key is missing or invalid — 401", partial: false }
+    - { code: INVALID_REQUEST, when: "body.model is empty after marker strip — 400 Missing model", partial: false }
+  sideEffects: ["log.debug of the masked API key"]
+  persistence: []
+  performanceConcerns:
+    - "getSettings() is read here and again inside the per-account loop (chat.js line 266) — at least two uncached settings reads per request"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "clientRawRequest.headers is a plain object of ALL client headers (including Authorization); it is passed down to request logging and to translators/executors as credentials.rawHeaders"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 36, note: "body = await request.json(); catch returns 400 Invalid JSON body at line 39" }
+    - { file: src/sse/handlers/chat.js, line: 54, note: "stripModelContextMarker(body.model) — [1m] removed before resolution" }
+    - { file: open-sse/utils/modelMarkers.js, line: 19, note: "returns model without the marker and the lowercased marker text" }
+    - { file: src/sse/handlers/chat.js, line: 71, note: "if (settings.requireApiKey) — missing/invalid key both 401" }
+    - { file: src/sse/handlers/chat.js, line: 83, note: "if (!modelStr) return 400 Missing model — after the auth gate" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.bypass-canned-responses
+  group: Request routing
+  feature: Request routing
+  subFeature: Claude-CLI warmup / title / count requests answered locally without any provider call
+  trigger: "user-agent contains claude-cli and the message list matches one of the bypass patterns"
+  input: "body.messages, model string, user-agent, settings.ccFilterNaming"
+  output: "A canned assistant response in the client's format (stream or JSON), never touching an account"
+  businessRules:
+    - "Bypass is checked BEFORE combo expansion so that warmup traffic does not consume a combo round-robin slot"
+    - "Patterns: last assistant message text is exactly \"{\" (title extraction), first message text is \"Warmup\", single user message \"count\", any SKIP_PATTERNS text, and (with ccFilterNaming) the naming prompt — which gets a synthetic {isNewTopic, title} built from the first 3 words of the user message"
+    - "Only user-agents containing claude-cli are ever bypassed; every other client goes to a real provider"
+    - "The same check runs a second time inside handleChatCore with the provider-stripped model name (belt and braces for callers that enter chatCore directly)"
+  state:
+    reads: ["settings.ccFilterNaming"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The bypass stream flag is body.stream !== false, the same default-to-streaming rule described in routing.stream-mode-decision"
+    - "No usage row and no request detail are written for bypassed requests — they are invisible in usage stats"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 90, note: "handleBypassRequest before getComboModels — avoids wasting rotation slots" }
+    - { file: open-sse/utils/bypassHandler.js, line: 12, note: "only claude-cli user-agents are eligible" }
+    - { file: open-sse/utils/bypassHandler.js, line: 29, note: "title-extraction pattern: last assistant text is \"{\"" }
+    - { file: open-sse/utils/bypassHandler.js, line: 76, note: "stream = body.stream !== false" }
+    - { file: open-sse/handlers/chatCore.js, line: 77, note: "second bypass check inside handleChatCore" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.combo-dispatch
+  group: Request routing
+  feature: Request routing
+  subFeature: Combo detection and hand-off to the combo/fusion engine
+  trigger: body.model has no "/" and names a combo row with at least one model
+  input: "Combo name, body, settings.comboStrategies[name], settings.comboStrategy, settings.comboStickyRoundRobinLimit"
+  output: "The Response of the first combo member that succeeds (or the fusion result, or an all-failed error)"
+  businessRules:
+    - "Required capabilities (vision/audio/etc.) are detected from the body once, before combo lookup"
+    - "Strategy precedence: combo-specific comboStrategies[name].fallbackStrategy, then global settings.comboStrategy, then \"fallback\""
+    - "\"fusion\" goes to handleFusionChat with the ORIGINAL combo list (no capacity-adapter augmentation); panel calls get a clientRawRequest with tools/tool_choice stripped"
+    - "Every other strategy goes to handleComboChat with the capacity-adapter-augmented list; each member is executed through handleSingleModelChat, i.e. the full per-account loop below runs once per combo member"
+    - "The same combo branch is duplicated inside handleSingleModelChat for the case where getModelInfo returns provider null for a combo name reached through an alias"
+    - "Combo ordering, rotation, fusion and per-model fallback rules are traced by Task 11; this entry records only the hand-off point"
+  state:
+    reads: ["combos table", "settings.comboStrategies", "settings.comboStrategy", "settings.comboStickyRoundRobinLimit"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.account-fallback-loop", "fallback.error-classification"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Nested fallback: combo members x accounts per member x executor retries per account — no overall deadline across the nesting (see fallback.executor-retry-budget)"
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "getComboModels returns null for any string containing \"/\", so a combo can never be named like a provider/model pair"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 93, note: "detectRequiredCapabilities(body) before combo lookup" }
+    - { file: src/sse/handlers/chat.js, line: 101, note: "strategy precedence combo-specific -> global -> \"fallback\"" }
+    - { file: src/sse/handlers/chat.js, line: 105, note: "fusion branch uses comboModels, not augmentedModels" }
+    - { file: src/sse/handlers/chat.js, line: 127, note: "handleComboChat with handleSingleModelChat as the per-member executor" }
+    - { file: src/sse/handlers/chat.js, line: 171, note: "duplicate combo branch inside handleSingleModelChat when provider is null" }
+    - { file: src/sse/services/model.js, line: 87, note: "getComboModels returns null for any model containing \"/\"" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.capacity-adapter-solo
+  group: Request routing
+  feature: Request routing
+  subFeature: Single-model request silently widened into an adapter combo when the model lacks a hard capability
+  trigger: A non-combo request whose body needs a hard capability (e.g. an image) that the requested model does not satisfy
+  input: "modelStr, required capabilities, settings (capacity adapter models)"
+  output: "Either the plain single-model path, or a handleComboChat run over [requested model, adapter models...]"
+  businessRules:
+    - "augmentModelsWithCapacityAdapter returns the list unchanged when there are no hard capabilities required or any listed model already satisfies them"
+    - "Otherwise adapter models that satisfy the capability are appended; if the result has more than one model the request is run as a combo named after the requested model, using the adapter's active strategy"
+    - "withCapacityAdapterStripping wraps the per-model executor so adapter-added models get the adapter-specific body treatment"
+  state:
+    reads: ["settings (capacity adapter configuration)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.combo-dispatch", "catalog.capability-tier-fallback"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["log.info naming the adapter models tried"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The client asked for one model and may be answered by a different model without any response header saying so"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 143, note: "soloAugmented = augmentModelsWithCapacityAdapter([modelStr], ...)" }
+    - { file: src/sse/handlers/chat.js, line: 147, note: "length > 1 -> handleComboChat with the adapter strategy" }
+    - { file: open-sse/services/capacityAdapter.js, line: 95, note: "returns models unchanged when any model already satisfies the hard caps" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.model-resolution
+  group: Request routing
+  feature: Request routing
+  subFeature: Model string to {provider, model}
+  trigger: handleSingleModelChat entry, once per model tried
+  input: "\"provider/model\", \"alias/model\", \"nodePrefix/model\", or a bare alias/combo name"
+  output: "{ provider, model } — provider null means combo, or unresolvable"
+  businessRules:
+    - "\"x/y\": x is resolved through ALIAS_TO_PROVIDER_ID (registry id, alias, aliases[]); unknown x is kept as-is as the provider id"
+    - "If x is not a reserved built-in prefix, openai-compatible, then anthropic-compatible, then custom-embedding provider nodes are matched by their user-defined prefix and the node id becomes the provider"
+    - "A bare name is checked as a combo first, then as a model alias (alias semantics in catalog.alias-resolve-before-capability)"
+    - "provider null and not a combo -> 400 \"Invalid model format\""
+    - "An unknown provider prefix is not rejected here; it fails later at account selection with 404 \"No active credentials\""
+  state:
+    reads: ["providerNodes table", "combos table", "modelAliases"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.alias-resolve-before-capability", "catalog.alias-dual-convention-collision", "catalog.alias-disabled-model-bypass"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "bare name that is neither a combo nor an alias — 400 Invalid model format", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Up to three uncached providerNodes queries per model string (one per node type) on the hot path"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "custom-embedding node prefixes are matched on the CHAT lane too, producing a chat request routed to an embedding-only node id (consequence in routing.default-executor-openai-fallback)"
+    - "Disabled models are not checked here (see catalog.alias-disabled-model-bypass)"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 167, note: "getModelInfo(modelStr) per model" }
+    - { file: open-sse/services/model.js, line: 44, note: "resolveProviderAlias(providerOrAlias) — unknown prefix passes through" }
+    - { file: src/sse/services/model.js, line: 44, note: "provider-node prefixes only when not a reserved built-in prefix" }
+    - { file: src/sse/services/model.js, line: 57, note: "custom-embedding nodes matched on every lane, including chat" }
+    - { file: src/sse/services/model.js, line: 71, note: "bare name checked as combo before alias" }
+    - { file: src/sse/handlers/chat.js, line: 218, note: "400 Invalid model format" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.account-fallback-loop
+  group: Auto fallback
+  feature: Auto fallback
+  subFeature: Per-provider account loop — select, execute, classify, exclude, repeat
+  trigger: Every resolved {provider, model} pair (once per combo member)
+  input: "provider, model, the growing excludeConnectionIds set"
+  output: "The first successful Response, a non-fallback error Response, or an exhaustion error (fallback.accounts-exhausted-response)"
+  businessRules:
+    - "while(true): getProviderCredentials(provider, excludeConnectionIds, model) picks one account; locked (modelLock_*) and excluded accounts are filtered out inside the selector (see account.select-locked-and-excluded-filter)"
+    - "The quota check happens here, not before dispatch: the only pre-dispatch quota signal is an active modelLock_* written by a previous failure, plus the Antigravity live-quota cache — there is no proactive quota query for other providers"
+    - "On a failed result the account's fate is decided by markAccountUnavailable (fallback.error-classification). shouldFallback -> add connectionId to excludeConnectionIds, remember lastError/lastStatus, loop. Not shouldFallback -> return result.response to the client"
+    - "Antigravity special case: a 409/429 triggers a live quota refresh; if it yields a reset time the account is excluded WITHOUT writing a persistent modelLock (RAM cache only)"
+    - "The loop is bounded only by the number of active connections for the provider — each iteration excludes one more account"
+  state:
+    reads: ["providerConnections table", "settings.fallbackStrategy / providerStrategies"]
+    writes: ["providerConnections lock fields (via markAccountUnavailable)"]
+    runtimeOnly: ["excludeConnectionIds Set (per request)", "lastError / lastStatus (per request)"]
+  dependencies: ["account.select-fill-first-default", "account.select-round-robin-sticky", "account.select-locked-and-excluded-filter", "account.select-all-unavailable-response", "account.mark-unavailable-lock-reasons", "account.antigravity-quota-prefilter", "account.select-mutex-global-scope"]
+  providerInteraction: "One full handleChatCore dispatch per account tried"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: "Pre-dispatch: modelLock_* expiry and Antigravity quota cache only. Post-failure: lock written per error-classification table" }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "every account is excluded/locked — see fallback.accounts-exhausted-response", partial: false }
+  sideEffects: ["log.warn FALLBACK line per account switch"]
+  persistence: ["providerConnections modelLock_* / testStatus / lastError / errorCode / backoffLevel on each failed account"]
+  performanceConcerns:
+    - "Account switching is sequential — N accounts means up to N full upstream round-trips (each with its own retry budget) before the client hears anything"
+  behavior: { streaming: false, cancellation: "None — the loop never checks whether the client is still connected before trying the next account", concurrency: "Selection is serialized by the global selectionMutex; the dispatch itself is not" }
+  edgeCases:
+    - "A successful stream returns as soon as upstream headers are OK — a stream that dies afterwards never re-enters this loop (fallback.partial-stream-failure)"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 233, note: "while (true) account loop" }
+    - { file: src/sse/handlers/chat.js, line: 234, note: "getProviderCredentials(provider, excludeConnectionIds, model)" }
+    - { file: src/sse/handlers/chat.js, line: 315, note: "Antigravity 409/429 live quota refresh" }
+    - { file: src/sse/handlers/chat.js, line: 327, note: "markAccountUnavailable(...).shouldFallback decides the account's fate" }
+    - { file: src/sse/handlers/chat.js, line: 331, note: "excludeConnectionIds.add + continue" }
+    - { file: src/sse/handlers/chat.js, line: 337, note: "non-fallback error returned to client as-is" }
+    - { file: src/sse/services/auth.js, line: 87, note: "isModelLockActive filter — the only pre-dispatch quota gate" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.credential-preparation
+  group: Request routing
+  feature: Request routing
+  subFeature: Proactive token refresh and project-id cold miss before dispatch
+  trigger: After an account is selected, before handleChatCore
+  input: "provider, the selected credentials"
+  output: "refreshedCredentials passed to handleChatCore; onCredentialsRefreshed / onRequestSuccess callbacks bound to this connection"
+  businessRules:
+    - "checkAndRefreshToken runs unconditionally after every selection (mechanics in auth.refresh-generic-grant / auth.refresh-provider-specific)"
+    - "antigravity and gemini-cli need a real projectId: if missing it is fetched synchronously on the request path, then persisted in the background (fire-and-forget, errors swallowed)"
+    - "onCredentialsRefreshed persists reactive refresh results with testStatus active; onRequestSuccess clears the account's error/lock for this model and the Antigravity strike counter"
+    - "Per-request toggles read from settings here: providerThinking[provider], rtk/headroom/caveman/ponytail/pxpipe flags, ccFilterNaming"
+  state:
+    reads: ["providerConnections (credentials)", "settings.providerThinking and token-saver flags"]
+    writes: ["providerConnections.projectId (background)", "providerConnections tokens (on refresh)"]
+    runtimeOnly: []
+  dependencies: ["auth.refresh-generic-grant", "auth.refresh-provider-specific", "account.clear-error-on-success", "account.concurrent-refresh-race"]
+  providerInteraction: "Token endpoint (only when the token is near expiry) and the project-id endpoint (antigravity/gemini-cli cold miss)"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["providerConnections.projectId"]
+  performanceConcerns:
+    - "A getSettings() read inside the account loop — repeated for every account tried"
+  behavior: { streaming: false, cancellation: null, concurrency: "No per-connection refresh lock (account.concurrent-refresh-race)" }
+  edgeCases: []
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 253, note: "checkAndRefreshToken(provider, credentials) after each selection" }
+    - { file: src/sse/handlers/chat.js, line: 256, note: "antigravity/gemini-cli projectId cold-miss fetch" }
+    - { file: src/sse/handlers/chat.js, line: 261, note: "projectId persisted in background, errors swallowed" }
+    - { file: src/sse/handlers/chat.js, line: 296, note: "onCredentialsRefreshed persists refreshed tokens" }
+    - { file: src/sse/handlers/chat.js, line: 303, note: "onRequestSuccess -> clearAccountError + clearAntigravityStrikes" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.source-format-detection
+  group: Request routing
+  feature: Request routing
+  subFeature: Deciding the client's wire format
+  trigger: handleChatCore entry
+  input: "Request pathname and body"
+  output: "sourceFormat — openai, openai-responses, claude, gemini, antigravity"
+  businessRules:
+    - "Endpoint wins first: a path containing /v1/responses is openai-responses; /v1/messages is claude; /v1/chat/completions with an input[] array is openai (Cursor CLI sends a Responses body to the chat endpoint)"
+    - "Otherwise body sniffing, in order: input (array or string) without messages -> openai-responses; request.contents + userAgent antigravity -> antigravity; contents[] -> gemini; any OpenAI-only field (stream_options, response_format, logprobs, n, penalties, logit_bias, user) -> openai; Claude-shaped content blocks or system/anthropic_version -> claude; default openai"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Matching is substring-based (pathname.includes), so /v1/responses/compact and /v1/messages/... also match"
+    - "On /v1/chat/completions a plain OpenAI body with a top-level system field and string content is sniffed as claude"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 295, note: "sourceFormatOverride = detectFormatByEndpoint(pathname, body)" }
+    - { file: open-sse/translator/formats.js, line: 24, note: "/v1/responses -> openai-responses" }
+    - { file: open-sse/translator/formats.js, line: 30, note: "/v1/chat/completions + input[] -> openai" }
+    - { file: open-sse/handlers/chatCore.js, line: 74, note: "sourceFormat = sourceFormatOverride || detectFormat(body)" }
+    - { file: open-sse/services/provider.js, line: 37, note: "body sniff: input without messages -> openai-responses" }
+    - { file: open-sse/services/provider.js, line: 110, note: "default openai" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.target-format-transport
+  group: Request routing
+  feature: Request routing
+  subFeature: Choosing the upstream format and endpoint (runtime transport)
+  trigger: handleChatCore, after source-format detection
+  input: "provider, model, sourceFormat, credentials"
+  output: "targetFormat, upstreamModel id, strip list, and (multi-endpoint providers) credentials.runtimeTransport"
+  businessRules:
+    - "Multi-endpoint providers declare transports[]; the one whose format equals sourceFormat is chosen so the request needs zero translation"
+    - "Per-model guard: when the model declares supportedFormats, the source-matched transport is only used if sourceFormat is in that list (opencode-go kimi/glm only do /chat/completions)"
+    - "Precedence: matched transport format > model-level targetFormat > provider format (openai-compatible -> openai or openai-responses by apiType; anthropic-compatible -> claude; else PROVIDERS[provider].format, else openai)"
+    - "The chosen transport is attached to credentials.runtimeTransport and later overrides URL, headers and auth in DefaultExecutor"
+    - "getModelUpstreamId maps the catalog model id to the vendor's wire id; provider-level thinking mode (on/off/effort) is injected here only if the client did not set its own"
+  state:
+    reads: ["PROVIDERS registry", "PROVIDER_MODELS (targetFormat, supportedFormats, strip, upstream id)", "settings.providerThinking"]
+    writes: []
+    runtimeOnly: ["credentials.runtimeTransport (mutated onto the per-request credentials object)"]
+  dependencies: ["catalog.multi-format-variants", "catalog.registry-entry-shape"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["console.log when the provider-level thinking override is injected"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "runtimeTransport is written onto the credentials object that the account loop reuses; a later account iteration builds fresh credentials, so it does not leak across accounts"
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 88, note: "resolveTransport(provider, sourceFormat)" }
+    - { file: open-sse/handlers/chatCore.js, line: 93, note: "supportedFormats guard on the transport" }
+    - { file: open-sse/handlers/chatCore.js, line: 99, note: "targetFormat precedence transport > model > provider" }
+    - { file: open-sse/handlers/chatCore.js, line: 100, note: "credentials.runtimeTransport = useTransport" }
+    - { file: open-sse/services/provider.js, line: 152, note: "transports.find(t => t.format === sourceFormat) || null" }
+    - { file: open-sse/services/provider.js, line: 136, note: "openai-compatible target by apiType" }
+    - { file: open-sse/handlers/chatCore.js, line: 106, note: "providerThinking injected only when client did not set thinking/effort" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.stream-mode-decision
+  group: Request routing
+  feature: Request routing
+  subFeature: Whether the upstream call streams, and whether the client gets SSE
+  trigger: handleChatCore, before translation
+  input: "body.stream, sourceFormat, PROVIDERS[provider].forceStream, model type, detected client tool, Accept header"
+  output: "stream (upstream mode) and clientRequestedStreaming (drives the SSE->JSON collapse)"
+  businessRules:
+    - "clientRequestedStreaming is true only when body.stream === true or the source format is antigravity/gemini/gemini-cli (always-streaming protocols)"
+    - "stream = true when the provider forces streaming; otherwise body.stream !== false — an OMITTED stream flag means streaming"
+    - "Image-generation models on antigravity/gemini-cli are forced non-streaming"
+    - "deepseek-tui without an explicit stream:true is forced non-streaming"
+    - "Accept: application/json without text/event-stream, and no explicit stream:true, and no forceStream -> non-streaming (AI SDK compatibility)"
+    - "forceStream provider + client did not request streaming -> upstream streams, response is collapsed to JSON (routing.response-mode-dispatch)"
+  state:
+    reads: ["PROVIDERS[provider].forceStream", "model type"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A client that omits stream and sends Accept */* (curl, many HTTP libraries) receives an SSE body although OpenAI Chat Completions and Anthropic Messages both default to non-streaming"
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 118, note: "clientRequestedStreaming only for stream === true or gemini-family sources" }
+    - { file: open-sse/handlers/chatCore.js, line: 120, note: "stream = providerRequiresStreaming ? true : (body.stream !== false)" }
+    - { file: open-sse/handlers/chatCore.js, line: 125, note: "image-gen on antigravity/gemini-cli forced non-stream" }
+    - { file: open-sse/handlers/chatCore.js, line: 133, note: "deepseek-tui forced non-stream" }
+    - { file: open-sse/handlers/chatCore.js, line: 140, note: "Accept application/json without SSE -> non-stream" }
+  newModule: routing
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "An omitted stream flag means non-streaming, as in the OpenAI and Anthropic APIs this endpoint emulates"
+    actual: "stream = body.stream !== false, so undefined means streaming; only an Accept: application/json header turns it off"
+    impact: "Clients that omit stream and do not send Accept: application/json get an SSE body where they expected one JSON object and fail to parse it"
+
+- id: routing.native-passthrough
+  group: Request routing
+  feature: Request routing
+  subFeature: Same-ecosystem CLI to provider — skip translation
+  trigger: The detected client tool and the provider belong to the same ecosystem (isNativePassthrough)
+  input: "clientRawRequest headers + body, provider"
+  output: "translatedBody = client body with only the model swapped (and codex reasoning effort / Claude passthrough normalization)"
+  businessRules:
+    - "Passthrough skips modality stripping, image prefetch and translateRequest entirely — only the model id (with any thinking suffix removed) changes, and the Bearer is swapped by the executor"
+    - "codex passthrough: a thinking suffix on the model becomes body.reasoning.effort and top-level reasoning_effort is deleted"
+    - "claude passthrough: normalizeClaudePassthrough rewrites newer Cowork/Claude Code beta shapes the API rejects; after all token savers run, anchorClaudeCache re-pins cache breakpoints on the final body"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["credentials.rawHeaders = client headers (exposed to executors for session id)"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Token savers still run in passthrough, on the source-shaped body (finalFormat = sourceFormat)"
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 152, note: "passthrough = isNativePassthrough(clientTool, provider)" }
+    - { file: open-sse/handlers/chatCore.js, line: 155, note: "credentials.rawHeaders = client headers" }
+    - { file: open-sse/handlers/chatCore.js, line: 175, note: "translatedBody = { ...body, model: stripThinkingSuffix(upstreamModel) }" }
+    - { file: open-sse/handlers/chatCore.js, line: 189, note: "normalizeClaudePassthrough for claude clients" }
+    - { file: open-sse/handlers/chatCore.js, line: 302, note: "anchorClaudeCache after token savers" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.modality-strip-prefetch
+  group: Request routing
+  feature: Request routing
+  subFeature: Drop media the model cannot read; inline remote images for targets that cannot fetch URLs
+  trigger: Every non-passthrough request, before translation
+  input: "body, sourceFormat, targetFormat, capabilities of provider/model"
+  output: "body mutated in place — unsupported vision/audio/pdf blocks removed, remote image URLs replaced by base64"
+  businessRules:
+    - "Capabilities come from getCapabilitiesForModel on the already-resolved provider/model (catalog.capability-tier-fallback)"
+    - "Stripping is silent: no error is returned to the client when media is removed"
+    - "Image prefetch failure is caught and logged; the request continues with the URL untouched (fail-open)"
+  state:
+    reads: ["capability tables"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.capability-tier-fallback", "catalog.capability-refine-additive-only"]
+  providerInteraction: "Outbound HTTP fetch of each remote image URL during prefetch"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Outbound fetches to client-supplied image URLs"]
+  persistence: []
+  performanceConcerns:
+    - "Image prefetch is awaited on the request path before dispatch"
+  behavior: { streaming: false, cancellation: "prefetchRemoteImages is called with signal: undefined — a client disconnect cannot cancel image downloads", concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 160, note: "stripUnsupportedModalities(body, sourceFormat, caps)" }
+    - { file: open-sse/handlers/chatCore.js, line: 165, note: "prefetchRemoteImages with signal: undefined" }
+    - { file: open-sse/handlers/chatCore.js, line: 167, note: "prefetch failure only logged" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.request-translation
+  group: Request routing
+  feature: Request routing
+  subFeature: translateRequest — direct source:target route or OpenAI pivot
+  trigger: Non-passthrough request, sourceFormat and targetFormat known
+  input: "sourceFormat, targetFormat, upstream model, body, stream, credentials, provider, strip list"
+  output: "translatedBody (target-shaped), with _toolNameMap / _customToolNames side channels lifted off by chatCore"
+  businessRules:
+    - "Translators self-register by register(from, to, reqFn, resFn) as an import side effect; the static import list at the bottom of translator/index.js is the registry"
+    - "Pre-steps for every translation: strip opt-in content types, normalizeThinkingConfig, ensureToolCallIds, fixMissingToolResponses (skipped for kiro), capture thinking intent and session id from the untranslated body"
+    - "Same format -> no translator runs. Different format -> if requestRegistry has the exact `${source}:${target}` key it runs as a direct route (e.g. claude:kiro); otherwise source->openai then openai->target"
+    - "Post-steps: applyThinking to the target format (skipped when kiro translators map it themselves), filterToOpenAIFormat for openai targets, prepareClaudeRequest for claude targets, tool-name cloaking for providers flagged cloakToolsOnOAuth when the token is an sk-ant-oat OAuth token"
+    - "chatCore then forces translatedBody.model to the thinking-suffix-free upstream id and strips encrypted_content continuity fields so they never reach upstream"
+  state:
+    reads: ["requestRegistry / responseRegistry (module Maps)", "PROVIDERS quirks"]
+    writes: []
+    runtimeOnly: ["credentials._clientSessionId"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "translateRequest returns a falsy body — createErrorResult 400, which the account loop then treats as an account failure (fallback.error-classification)", partial: false }
+    - { code: INTERNAL_ERROR, when: "a translator throws — not caught in handleChatCore; propagates out of handleSingleModelChat (single model: unhandled, route returns 500; combo: caught and next member tried)", partial: false }
+  sideEffects: ["reqLogger.logOpenAIRequest of the pivot body"]
+  persistence: []
+  performanceConcerns:
+    - "Two-hop pivot on every cross-format request that has no direct route"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A missing leg is silent: if source:openai or openai:target is not registered, that step is skipped and the untranslated body is sent upstream"
+  evidence:
+    - { file: open-sse/translator/index.js, line: 22, note: "register() keys translators as `${from}:${to}`" }
+    - { file: open-sse/translator/index.js, line: 87, note: "direct route lookup for the exact source:target pair" }
+    - { file: open-sse/translator/index.js, line: 93, note: "pivot step 1 source -> openai, skipped silently when unregistered" }
+    - { file: open-sse/translator/index.js, line: 103, note: "pivot step 2 openai -> target" }
+    - { file: open-sse/translator/index.js, line: 138, note: "cloakToolsOnOAuth only with an sk-ant-oat token" }
+    - { file: open-sse/translator/index.js, line: 281, note: "static side-effect imports are the translator registry" }
+    - { file: open-sse/handlers/chatCore.js, line: 191, note: "translateRequest call" }
+    - { file: open-sse/handlers/chatCore.js, line: 194, note: "falsy result -> createErrorResult 400" }
+    - { file: open-sse/handlers/chatCore.js, line: 201, note: "stripContinuityFields on the outbound body" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.token-saver-pipeline
+  group: Request routing
+  feature: Request routing
+  subFeature: Final-body mutations before dispatch (tool dedupe, RTK, headroom, caveman, ponytail, pxpipe)
+  trigger: After translation/passthrough, every request
+  input: "translatedBody, finalFormat, settings token-saver flags, x-9router-token-saver header"
+  output: "translatedBody mutated in place (or replaced by pxpipe)"
+  businessRules:
+    - "Fixed order: Claude-client tool dedupe, TTS tool stripping, default Claude tool type, RTK, headroom, caveman, ponytail, pxpipe (pxpipe is last so it sees the final body)"
+    - "Header x-9router-token-saver: off disables RTK, headroom, caveman and ponytail for this request; pxpipe is gated only by its own setting"
+    - "All savers are fail-open — headroom absence is logged as skipped, pxpipe event reporting errors are swallowed"
+  state:
+    reads: ["settings.rtkEnabled / headroom* / caveman* / ponytail* / pxpipe*"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "headroom is an external HTTP proxy call when enabled"
+  fallback: { hasFallback: false, retry: null, timeout: "headroomTimeoutMs / pxpipeTimeoutMs from settings", quota: null }
+  errorCases: []
+  sideEffects: ["onPxpipeEvent stats append", "console/log lines for each saver"]
+  persistence: []
+  performanceConcerns:
+    - "headroom and pxpipe are awaited on the request path, adding their latency before the upstream call"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The x-9router-token-saver header is not stripped by the saver step, but upstream headers are built by the executor, not copied from the client, so it does not leak upstream"
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 251, note: "tokenSaverEnabled from x-9router-token-saver header" }
+    - { file: open-sse/handlers/chatCore.js, line: 254, note: "RTK compressMessages" }
+    - { file: open-sse/handlers/chatCore.js, line: 260, note: "headroom compression, fail-open" }
+    - { file: open-sse/handlers/chatCore.js, line: 287, note: "pxpipe gated only by pxpipeEnabled, last saver" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.executor-selection
+  group: Request routing
+  feature: Request routing
+  subFeature: getExecutor — specialized map, aliases, DefaultExecutor fallback
+  trigger: handleChatCore just before dispatch
+  input: "resolved provider id"
+  output: "An executor instance"
+  businessRules:
+    - "A fixed map holds one singleton instance per specialized provider (antigravity, azure, gemini-cli, github, iflow, qoder, kiro, kimchi, codex, cursor, vertex, vertex-partner, opencode, opencode-go, grok-web, grok-cli, perplexity-web, ollama-local, commandcode, xiaomi-tokenplan, mimo-free, codebuddy-cn, codebuddy-intl, trae, zed, windsurf, devin-cli)"
+    - "Alias keys cu, gcli, gb and mmf map to SEPARATE new instances of the cursor, grok-cli and mimo-free executors"
+    - "Any provider id not in the map falls back to new DefaultExecutor(provider), cached per id in defaultCache for the process lifetime"
+    - "DefaultExecutor's config is PROVIDERS[provider], or PROVIDERS.openai when the id has no registry entry"
+    - "Q7: the fallback is correct for registry providers (their transport config drives URL/auth) and for openai-compatible-* / anthropic-compatible-* nodes (URL comes from providerSpecificData.baseUrl). It is wrong for an id with no PROVIDERS entry that is not a compatible node — see routing.default-executor-openai-fallback"
+  state:
+    reads: ["PROVIDERS registry"]
+    writes: []
+    runtimeOnly: ["executors singleton map", "defaultCache Map (unbounded, per provider id)"]
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "Executors are process-wide singletons shared by concurrent requests; any per-request state stored on `this` races (see routing.responses-compact-lane)" }
+  edgeCases:
+    - "The alias keys are defensive only on the chat lane: parseModel already resolves cu/gcli/gb/mmf to registry ids before getExecutor is called"
+  evidence:
+    - { file: open-sse/executors/index.js, line: 29, note: "specialized executor singleton map" }
+    - { file: open-sse/executors/index.js, line: 40, note: "cu alias is a second CursorExecutor instance" }
+    - { file: open-sse/executors/index.js, line: 66, note: "map hit returns the specialized executor" }
+    - { file: open-sse/executors/index.js, line: 67, note: "miss -> new DefaultExecutor(provider), cached in defaultCache" }
+    - { file: open-sse/executors/default.js, line: 67, note: "config = PROVIDERS[provider] || PROVIDERS.openai" }
+    - { file: open-sse/handlers/chatCore.js, line: 304, note: "getExecutor(provider) in chatCore" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.default-executor-openai-fallback
+  group: Request routing
+  feature: Request routing
+  subFeature: Unregistered provider id silently inherits the OpenAI transport config
+  trigger: "A chat request whose resolved provider id has no PROVIDERS entry and is not openai-compatible-* / anthropic-compatible-*, while an active connection exists for it — reachable today via a custom-embedding node prefix on /v1/chat/completions"
+  input: "model \"<embeddingNodePrefix>/<model>\""
+  output: "A POST to https://api.openai.com/v1/chat/completions carrying that node's API key as Bearer"
+  businessRules:
+    - "getModelInfo maps custom-embedding node prefixes to the node id (custom-embedding-...) on every lane, including chat"
+    - "getProviderCredentials finds the node's connection, so the account loop proceeds"
+    - "getExecutor has no entry -> DefaultExecutor(provider) with config PROVIDERS.openai because the id is not in the registry"
+    - "DefaultExecutor.buildUrl only reads providerSpecificData.baseUrl for openai-compatible-* and anthropic-compatible-* prefixes; for custom-embedding-* it falls through to this.config.baseUrl, i.e. OpenAI's chat URL"
+  state:
+    reads: ["providerNodes", "providerConnections"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.model-resolution", "routing.executor-selection"]
+  providerInteraction: "api.openai.com instead of the node's own baseUrl"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "OpenAI rejects the foreign key with 401 — then the node's account is locked 2 minutes", partial: false }
+  sideEffects: ["The node's secret is sent to a third party the user never configured"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The same fallback applies to any future provider id added to connections without a registry file"
+  evidence:
+    - { file: src/sse/services/model.js, line: 57, note: "custom-embedding nodes matched by prefix on the chat lane" }
+    - { file: open-sse/executors/index.js, line: 67, note: "DefaultExecutor for the unknown id" }
+    - { file: open-sse/executors/default.js, line: 67, note: "PROVIDERS[provider] || PROVIDERS.openai" }
+    - { file: open-sse/executors/default.js, line: 110, note: "baseUrl override only for openai-compatible- prefix (anthropic-compatible- at 116)" }
+    - { file: open-sse/executors/default.js, line: 129, note: "falls through to this.config.baseUrl" }
+    - { file: open-sse/providers/registry/openai.js, line: 27, note: "OpenAI chat baseUrl https://api.openai.com/v1/chat/completions" }
+  newModule: routing
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A provider id with no transport config is rejected (or an embedding-only node is refused on the chat lane) before any upstream call"
+    actual: "DefaultExecutor silently adopts PROVIDERS.openai and posts the request, with the node's credential, to api.openai.com"
+    impact: "Credential disclosure to OpenAI and a confusing 401 that locks the node's account; the request never reaches the node the user configured"
+
+- id: routing.build-url
+  group: Request routing
+  feature: Request routing
+  subFeature: Upstream URL construction (compatible-prefix rule, runtime transport, gemini path, accountId template)
+  trigger: Every attempt inside executor.execute (called per baseUrl index, including retries)
+  input: "model, stream, urlIndex, credentials (providerSpecificData.baseUrl / apiType, runtimeTransport)"
+  output: "The absolute upstream URL"
+  businessRules:
+    - "Q6 exact rule: for openai-compatible-* the base is providerSpecificData.baseUrl (default https://api.openai.com/v1), ONE trailing slash is removed with replace(/\\/$/, \"\"), then \"/responses\" (apiType responses) or \"/chat/completions\" is appended. No /v1 detection of any kind: \"https://x/v1\" -> \"https://x/v1/chat/completions\", \"https://x\" -> \"https://x/chat/completions\" (no /v1 added), \"https://x/v1/chat/completions\" -> \"https://x/v1/chat/completions/chat/completions\""
+    - "anthropic-compatible-*: same single trailing-slash strip, then \"/messages\" (default base https://api.anthropic.com/v1). Node creation strips a pasted trailing /messages, but the openai-compatible create path does not strip a pasted /chat/completions"
+    - "DefaultExecutor order: runtimeTransport baseUrl(+urlSuffix) first, then the compatible prefixes, then gemini-format `${baseUrl}/${model}:streamGenerateContent?alt=sse | :generateContent`, then registry urlSuffix, then {accountId} template substitution (throws if accountId missing), else config.baseUrl"
+    - "BaseExecutor (specialized executors that do not override buildUrl) returns baseUrls[urlIndex] || baseUrls[0] || config.baseUrl"
+    - "apiType resolution: stored providerSpecificData.apiType chat|responses wins; otherwise a provider id containing \"responses\" means responses"
+  state:
+    reads: ["credentials.providerSpecificData.baseUrl / apiType / accountId", "credentials.runtimeTransport", "PROVIDERS[provider] transport config"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.target-format-transport", "connection.create-dedup-and-priority-assignment"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl contains {accountId} but providerSpecificData.accountId is empty — buildUrl throws, surfacing as a 502 from chatCore's catch", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Only a single trailing slash is stripped; \"https://x/v1//\" keeps one slash and yields \"https://x/v1//chat/completions\""
+  evidence:
+    - { file: open-sse/executors/base.js, line: 32, note: "openai-compatible base = providerSpecificData.baseUrl || OPENAI_COMPAT_BASE" }
+    - { file: open-sse/executors/base.js, line: 33, note: "baseUrl.replace(/\\/$/, \"\") — one trailing slash only" }
+    - { file: open-sse/executors/base.js, line: 35, note: "`${normalized}${path}` — no /v1 handling" }
+    - { file: open-sse/executors/base.js, line: 43, note: "baseUrls[urlIndex] || baseUrls[0] || config.baseUrl" }
+    - { file: open-sse/executors/default.js, line: 107, note: "runtimeTransport baseUrl wins first" }
+    - { file: open-sse/executors/default.js, line: 123, note: "gemini-format :streamGenerateContent?alt=sse / :generateContent" }
+    - { file: open-sse/executors/default.js, line: 132, note: "{accountId} missing -> throw" }
+    - { file: open-sse/providers/shared.js, line: 75, note: "OPENAI_COMPAT_BASE = https://api.openai.com/v1" }
+    - { file: open-sse/services/provider.js, line: 30, note: "apiType fallback: provider id containing \"responses\"" }
+    - { file: src/app/api/provider-nodes/route.js, line: 85, note: "anthropic-compatible create strips trailing /messages (openai-compatible create at line 58 does not strip a path)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: fallback.executor-url-loop
+  group: Auto fallback
+  feature: Auto fallback
+  subFeature: BaseExecutor.execute — multi-baseUrl loop and connect timeout
+  trigger: Every executor.execute call (all executors that do not fully override execute)
+  input: "model, body, stream, credentials, signal (streamController.signal), proxyOptions"
+  output: "{ response, url, headers, transformedBody } for the first URL that is not retried away, or a thrown error"
+  businessRules:
+    - "For each urlIndex: buildUrl, then transformRequest, then buildHeaders (note the order — buildUrl runs BEFORE transformRequest)"
+    - "Connect timeout: a per-attempt AbortController aborts after config.timeoutMs or FETCH_CONNECT_TIMEOUT_MS (env, default 60000 ms) if response HEADERS have not arrived; the timer is cleared as soon as fetch resolves, so it never bounds body reading"
+    - "The connect signal is merged with the caller signal via AbortSignal.any"
+    - "Moving to the next baseUrl happens only for (a) HTTP 429 when another URL exists (shouldRetry) or (b) a network error / connect timeout after in-place retries are exhausted; a 5xx after its retries is RETURNED, never tried on the next URL"
+    - "A caller-initiated AbortError (not the connect timeout) is re-thrown immediately with no retry"
+    - "Loop exhaustion throws the last error, or `All N URLs failed with status S`"
+  state:
+    reads: ["this.config.baseUrls / baseUrl / timeoutMs / retry"]
+    writes: []
+    runtimeOnly: ["retryAttemptsByUrl (per call)"]
+  dependencies: ["auth.base-executor-default-headers"]
+  providerInteraction: "HTTP POST via proxyAwareFetch (proxy/relay options from the connection)"
+  fallback: { hasFallback: true, retry: "See fallback.executor-retry-budget", timeout: "FETCH_CONNECT_TIMEOUT_MS (default 60 s) to response headers, per attempt; no body timeout here", quota: null }
+  errorCases:
+    - { code: TIMEOUT, when: "no response headers within the connect timeout — converted to a retryable network error (502 retry config)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "network error on the last URL after retries — thrown, becomes 502 in chatCore", partial: false }
+    - { code: RATE_LIMIT, when: "429 with another baseUrl available — next URL (kiro has 3)", partial: false }
+  sideEffects: ["dbg FETCH lines with url, body size, ttft"]
+  persistence: []
+  performanceConcerns:
+    - "Only kiro (3 URLs) and antigravity (1 URL) declare baseUrls; for every other provider the loop is a single URL"
+  behavior: { streaming: true, cancellation: "The merged signal lets a streamController abort cancel an in-flight fetch; see routing.client-disconnect-propagation for when that controller is actually aborted", concurrency: null }
+  edgeCases:
+    - "FETCH_CONNECT_TIMEOUT_MS is read once at module load; changing the env var needs a restart"
+  evidence:
+    - { file: open-sse/executors/base.js, line: 127, note: "for urlIndex < fallbackCount" }
+    - { file: open-sse/executors/base.js, line: 128, note: "buildUrl before transformRequest (line 129)" }
+    - { file: open-sse/executors/base.js, line: 137, note: "connect timer aborts with \"fetch connect timeout\"" }
+    - { file: open-sse/executors/base.js, line: 138, note: "AbortSignal.any([signal, connectCtrl.signal])" }
+    - { file: open-sse/executors/base.js, line: 150, note: "clearTimeout once headers arrive" }
+    - { file: open-sse/executors/base.js, line: 157, note: "shouldRetry -> next URL (429 only)" }
+    - { file: open-sse/executors/base.js, line: 170, note: "non-timeout AbortError re-thrown" }
+    - { file: open-sse/executors/base.js, line: 175, note: "network error -> next URL if any, else throw" }
+    - { file: open-sse/executors/base.js, line: 84, note: "shouldRetry = status 429 && another URL exists" }
+    - { file: open-sse/config/runtimeConfig.js, line: 59, note: "FETCH_CONNECT_TIMEOUT_MS env, default 60 s" }
+    - { file: open-sse/providers/registry/kiro.js, line: 20, note: "kiro declares 3 baseUrls" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: fallback.executor-retry-budget
+  group: Auto fallback
+  feature: Auto fallback
+  subFeature: In-place retry (tryRetry) and computeRetryDelay, and the end-to-end retry ceiling
+  trigger: A response status or network error for which retryConfig[status] has attempts > 0
+  input: "HTTP status (network errors use key 502), DEFAULT_RETRY_CONFIG merged with the provider's transport.retry"
+  output: "Same URL retried after a delay, or the response handed back to the caller"
+  businessRules:
+    - "DEFAULT_RETRY_CONFIG: 429 {0 attempts}, 502 {3, 3000 ms}, 503 {3, 2000 ms}, 504 {2, 3000 ms}; every other status 0. A numeric entry means attempts with the legacy 2000 ms delay"
+    - "Provider overrides: antigravity 429/500/503 x3; grok-cli 429 x2 @2000, 502/503 x2 @1500; vercel-ai-gateway 429 x2 @2000; kiro 429 x0"
+    - "The attempt counter is per URL and shared across status codes: attempts for the CURRENT status are compared against the combined count, so one URL gets at most max(attempts) retries in total"
+    - "Delay is fixed per status (no exponential backoff, no jitter) unless the executor defines computeRetryDelay — only antigravity does"
+    - "Antigravity computeRetryDelay: Retry-After header, then retry hints in the error body; a hint <= 10 s is used, > 10 s vetoes the retry (return false -> fallback); no hint -> non-transient status/message vetoes; transient -> min(1000 * 2^attempt, cap) with cap 10 s for 429 and 15 s otherwise. So computeRetryDelay IS bounded: at most 15 s per wait"
+    - "Retries happen before any status classification — they are purely status-code driven; no idempotency or body inspection in the base executor"
+  state:
+    reads: ["DEFAULT_RETRY_CONFIG", "PROVIDERS[provider].retry"]
+    writes: []
+    runtimeOnly: ["retryAttemptsByUrl"]
+  dependencies: []
+  providerInteraction: "Repeated POSTs of the same body to the same URL"
+  fallback: { hasFallback: true, retry: "Status-keyed fixed-delay retries (502 x3 @3s, 503 x3 @2s, 504 x2 @3s by default); antigravity exponential capped at 10/15 s", timeout: "Each attempt has its own 60 s connect timeout", quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "502/503/504 or network error — retried in place up to the configured attempts", partial: false }
+    - { code: RATE_LIMIT, when: "429 — no in-place retry by default; antigravity/grok-cli/vercel-ai-gateway retry", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Q3 per-URL ceiling (default config): 4 attempts x 60 s connect timeout + 3 x 3 s delays = 249 s before the executor gives up on one URL when the upstream never answers"
+    - "There is NO overall request deadline. Worst case multiplies: per-URL ceiling x baseUrls (kiro 3) x 2 (the 401/403 path re-executes once with the full budget, plus refreshWithRetry's 3 attempts with 1 s + 2 s sleeps) x number of active accounts for the provider x number of combo members"
+    - "A retried response is discarded without response.body.cancel(), leaving the upstream socket open until garbage collection"
+    - "The retry sleep is a bare setTimeout, not tied to the abort signal — a cancelled request still waits out the delay before the next fetch fails fast on the aborted signal"
+  behavior: { streaming: false, cancellation: "Retry sleeps ignore the abort signal", concurrency: null }
+  edgeCases:
+    - "Antigravity reads response.clone().text() inside computeRetryDelay, so the body is buffered once for inspection before the retry decision"
+  evidence:
+    - { file: open-sse/executors/base.js, line: 107, note: "retryConfig = { ...DEFAULT_RETRY_CONFIG, ...this.config.retry }" }
+    - { file: open-sse/executors/base.js, line: 113, note: "attempts <= 0 or counter >= attempts -> no retry (counter shared across statuses)" }
+    - { file: open-sse/executors/base.js, line: 117, note: "computeRetryDelay hook; false vetoes" }
+    - { file: open-sse/executors/base.js, line: 123, note: "bare setTimeout sleep" }
+    - { file: open-sse/executors/base.js, line: 155, note: "status retry: urlIndex-- and continue, response discarded" }
+    - { file: open-sse/executors/base.js, line: 173, note: "network errors use the 502 retry entry" }
+    - { file: open-sse/config/runtimeConfig.js, line: 78, note: "DEFAULT_RETRY_CONFIG 429/502/503/504" }
+    - { file: open-sse/config/runtimeConfig.js, line: 88, note: "numeric entry -> attempts with 2000 ms delay" }
+    - { file: open-sse/executors/antigravity.js, line: 433, note: "Retry-After <= MAX_RETRY_AFTER_MS (10 s) else veto" }
+    - { file: open-sse/executors/antigravity.js, line: 440, note: "Math.min(1000 * 2 ** attempt, cap)" }
+    - { file: open-sse/executors/antigravity.js, line: 21, note: "ANTIGRAVITY_TRANSIENT_RETRY_MAX_MS = 15000" }
+    - { file: open-sse/providers/registry/grok-cli.js, line: 64, note: "grok-cli retry overrides" }
+    - { file: open-sse/providers/registry/antigravity.js, line: 28, note: "antigravity 429 x3 (500/503 x3 follow)" }
+    - { file: open-sse/providers/registry/vercel-ai-gateway.js, line: 25, note: "vercel-ai-gateway 429 x2" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: fallback.auth-refresh-retry
+  group: Auto fallback
+  feature: Auto fallback
+  subFeature: Reactive 401/403 handling — refresh credentials, re-execute once
+  trigger: Upstream returns 401 or 403 and the executor is not noAuth
+  input: "The failed response, credentials, executor.refreshCredentials"
+  output: "Either a successful retry response replacing the original, or the ORIGINAL 401/403 response continuing to error handling"
+  businessRules:
+    - "refreshWithRetry(fn, 3): up to 3 refresh attempts with 1 s then 2 s sleeps; a null result counts as a failure and is retried"
+    - "Rotating refresh tokens (xAI / grok-cli) are written back onto credentials between attempts so attempt 2/3 do not reuse a consumed token"
+    - "On success: credentials are merged, onCredentialsRefreshed persists them, and the request is executed ONCE more with the full executor retry budget"
+    - "The retry response is adopted only if response.ok; a non-ok retry (e.g. 429 after refresh) is dropped and the original 401/403 is what gets classified"
+  state:
+    reads: ["credentials.refreshToken"]
+    writes: ["providerConnections tokens (via onCredentialsRefreshed)"]
+    runtimeOnly: ["credentials object mutated in place"]
+  dependencies: ["auth.refresh-generic-grant", "auth.refresh-provider-specific", "account.concurrent-refresh-race"]
+  providerInteraction: "Provider token endpoint, then one repeated upstream call"
+  fallback: { hasFallback: true, retry: "refreshWithRetry: 3 attempts, 1 s and 2 s sleeps; then one re-execute", timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "refresh yields nothing or the retry is not ok — original 401/403 flows to fallback.error-classification (2 min lock, next account)", partial: false }
+  sideEffects: ["log line TOKEN REFRESHED"]
+  persistence: ["providerConnections access/refresh tokens"]
+  performanceConcerns:
+    - "The non-ok retry response is discarded without cancelling its body"
+  behavior: { streaming: false, cancellation: null, concurrency: "No lock shared with concurrent requests on the same connection (account.concurrent-refresh-race)" }
+  edgeCases:
+    - "403 is treated exactly like 401 even though providers use 403 for quota/permission errors that no refresh can fix"
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 402, note: "!executor.noAuth && status 401 or 403" }
+    - { file: open-sse/handlers/chatCore.js, line: 408, note: "refreshWithRetry(..., 3, log)" }
+    - { file: open-sse/handlers/chatCore.js, line: 410, note: "rotating refresh token written back between attempts" }
+    - { file: open-sse/handlers/chatCore.js, line: 423, note: "single re-execute with the refreshed credentials" }
+    - { file: open-sse/handlers/chatCore.js, line: 434, note: "retry adopted only if ok" }
+    - { file: open-sse/services/tokenRefresh.js, line: 258, note: "delay = attempt * 1000 between attempts" }
+    - { file: open-sse/services/tokenRefresh.js, line: 265, note: "null result is not a success — loop continues" }
+    - { file: open-sse/executors/default.js, line: 220, note: "refreshCredentials returns null immediately when there is no refreshToken (API-key accounts)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A 401/403 on an account that has nothing to refresh (API-key credentials, or a provider with no refresher) fails fast to the next account"
+    actual: "refreshCredentials returns null instantly, but refreshWithRetry treats null as a retryable failure and sleeps 1 s + 2 s before giving up — an unrecoverable error is retried (behavioral.md §20)"
+    impact: "Every 401/403 on an API-key account adds ~3 s before the account is locked and the next account is tried; with N bad keys the client waits ~3N s"
+
+- id: fallback.upstream-error-result
+  group: Auto fallback
+  feature: Auto fallback
+  subFeature: Turning an executor exception or non-2xx response into an error result
+  trigger: executor.execute throws, or the (possibly refreshed) response is not ok
+  input: "The thrown error or the upstream Response"
+  output: "{ success: false, status, error, resetsAtMs, response } via createErrorResult"
+  businessRules:
+    - "Thrown AbortError -> status 499 \"Request aborted\"; any other throw -> 502 with message `[502]: <message> (cause: <code>)`"
+    - "Non-2xx: parseUpstreamError reads the body once; an executor parseError override may return a different status and a resetsAtMs (e.g. codex usage_limit_reached); default message is error.message || message || error || raw body text"
+    - "The upstream status is preserved into the client error (e.g. upstream 400 -> result.status 400) and the body is re-wrapped in the OpenAI error shape {error:{message,type,code}} using ERROR_TYPES"
+    - "Every failure path writes a request-detail row with status error and zero tokens; appendRequestLog is called too but is a no-op"
+  state:
+    reads: []
+    writes: ["requestDetails table (error row)"]
+    runtimeOnly: ["pending request counters decremented"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "executor throws (network, connect timeout after retries, buildUrl throw) — 502", partial: false }
+    - { code: INTERNAL_ERROR, when: "AbortError from the caller signal — 499", partial: false }
+  sideEffects: ["errorLine log with provider/model/latency/url"]
+  persistence: ["requestDetails error row"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The upstream error text is echoed to the client inside the message field, prefixed with [status]"
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 376, note: "catch around executor.execute" }
+    - { file: open-sse/handlers/chatCore.js, line: 392, note: "AbortError -> createErrorResult(499)" }
+    - { file: open-sse/handlers/chatCore.js, line: 398, note: "other throw -> 502" }
+    - { file: open-sse/handlers/chatCore.js, line: 451, note: "parseUpstreamError(providerResponse, executor)" }
+    - { file: open-sse/handlers/chatCore.js, line: 470, note: "createErrorResult(statusCode, errMsg, resetsAtMs)" }
+    - { file: open-sse/utils/error.js, line: 69, note: "executor parseError override may supply status/resetsAtMs" }
+    - { file: open-sse/utils/error.js, line: 98, note: "createErrorResult shape" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 740, note: "appendRequestLog is an empty no-op" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: fallback.error-classification
+  group: Auto fallback
+  feature: Auto fallback
+  subFeature: Which upstream outcomes retry, switch account, switch combo model, or return to the client
+  trigger: Any failed single-model attempt (result.success false) in handleSingleModelChat, and any non-2xx member Response in handleComboChat
+  input: "result.status, result.error text, resetsAtMs, provider, model, the connection's backoffLevel"
+  output: "shouldFallback + a model-scoped lock; the combo engine re-runs the same classifier on the final Response"
+  businessRules:
+    - "Q2 TABLE. Columns = in-place retry (executor, same URL) | next baseUrl | next ACCOUNT (chat.js loop, lock written) | next combo MODEL (combo.js) | returned to client immediately"
+    - "400 generic (bad params, context too long, schema): no | no | YES, 30 s transient lock | YES | no"
+    - "400 containing 'improperly formed request' (kiro): no | no | YES, 2 min lock | YES | no"
+    - "400 from local translation failure (chatCore translateRequest returned nothing): n/a (no upstream call) | no | YES, 30 s lock | YES | no"
+    - "401 / 403: no; first a 3-attempt refresh + one re-execute (fallback.auth-refresh-retry) | no | YES, 2 min lock | YES | no"
+    - "402: no | no | YES, 2 min lock (GitHub monthly-limit text: account-wide lock until the 1st of next UTC month) | YES | no"
+    - "404: no | no | YES, 2 min lock | YES | no"
+    - "409 / 422 / other 4xx: no (antigravity 409 triggers a live quota refresh) | no | YES, 30 s lock (antigravity with reset: RAM-only exclusion) | YES | no"
+    - "429: default no (antigravity x3, grok-cli x2, vercel-ai-gateway x2) | YES if another baseUrl (kiro) | YES, exponential lock 2 s..5 min, or provider resetsAtMs capped 30 min (antigravity uncapped) | YES | no"
+    - "500: only antigravity x3 | no | YES, 30 s lock | YES | no"
+    - "502: x3 @3 s | no | YES, 30 s lock | YES (combo waits first only when the cooldown is <= 5 s, i.e. only for backoff-text matches) | no"
+    - "503: x3 @2 s | no | YES, 30 s lock, or exponential if the text contains 'overloaded'/'capacity' | YES | no"
+    - "504: x2 @3 s | no | YES, 30 s lock | YES | no"
+    - "Network error / connect timeout: x3 @3 s (502 entry) | YES if another baseUrl | YES as 502, 30 s lock | YES | no"
+    - "Caller AbortError: no | no | YES as 499, 30 s lock | YES | no"
+    - "2xx with non-SSE, non-JSON content type on a streaming request: no | no | YES, 30 s lock (status is the 2xx code) | YES | no"
+    - "2xx then failure mid-stream: no | no | no | no | the truncated stream IS the answer (fallback.partial-stream-failure)"
+    - "Text rules win over status rules: any status whose message contains 'rate limit', 'too many requests', 'quota exceeded', 'capacity' or 'overloaded' gets exponential backoff; 'no credentials' 2 min; 'request not allowed' 5 s"
+    - "Returned to the client immediately (no retry, no fallback): ONLY (a) noAuth providers — markAccountUnavailable returns shouldFallback false for connectionId noauth, so the upstream error is passed straight through; and (b) errors raised before dispatch (invalid JSON, missing/invalid API key, missing model, invalid model format, no credentials 404). checkFallbackError itself NEVER returns shouldFallback false — its final line is a catch-all `{ shouldFallback: true, cooldownMs: 30 s }`"
+    - "'Fallback to another provider' exists only as 'next combo member' (combo.js); a single-model request never changes provider. The combo `if (!shouldFallback) return result` branch is dead code because the classifier always says true"
+  state:
+    reads: ["ERROR_RULES", "providerConnections.backoffLevel"]
+    writes: ["providerConnections modelLock_* / testStatus / lastError / errorCode / backoffLevel"]
+    runtimeOnly: []
+  dependencies: ["account.mark-unavailable-lock-reasons", "routing.account-fallback-loop", "fallback.executor-retry-budget", "fallback.auth-refresh-retry"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "In-place retry is decided earlier in the executor (fallback.executor-retry-budget); this classifier only decides account/model fallback", timeout: null, quota: "Lock durations per the table above" }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "upstream 400 or local translation failure — treated as an account failure: 30 s lock and next account", partial: false }
+    - { code: AUTH_ERROR, when: "401/403 after refresh — 2 min lock, next account", partial: false }
+    - { code: QUOTA_EXHAUSTED, when: "402, or text 'quota exceeded', or provider resetsAtMs", partial: false }
+    - { code: MODEL_UNAVAILABLE, when: "404 — 2 min lock, next account", partial: false }
+    - { code: RATE_LIMIT, when: "429 or rate-limit text — exponential lock, next account", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "5xx / network — after in-place retries, 30 s lock, next account", partial: false }
+    - { code: TIMEOUT, when: "connect timeout — handled as a 502 network error", partial: false }
+  sideEffects: ["console.error line per lock"]
+  persistence: ["providerConnections lock fields"]
+  performanceConcerns:
+    - "Deterministic client errors cost one full upstream round-trip per account (and per combo member) before the client hears anything"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The error text used for text rules is the formatted `[status]: message` string, so a 400 whose message merely mentions 'capacity' or 'rate limit' is treated as a rate limit"
+    - "Locks are model-scoped (modelLock_<model>), so a bad request for model A does not block model B on the same account"
+  evidence:
+    - { file: open-sse/services/accountFallback.js, line: 30, note: "text rules matched first" }
+    - { file: open-sse/services/accountFallback.js, line: 39, note: "status rules" }
+    - { file: open-sse/services/accountFallback.js, line: 49, note: "catch-all: shouldFallback true, TRANSIENT_COOLDOWN_MS" }
+    - { file: open-sse/config/errorConfig.js, line: 59, note: "ERROR_RULES — no rule for 400/5xx, no rule ever returns shouldFallback false" }
+    - { file: open-sse/config/errorConfig.js, line: 39, note: "TRANSIENT_COOLDOWN_MS = 30 s" }
+    - { file: src/sse/services/auth.js, line: 240, note: "noauth -> shouldFallback false, the only immediate-return path" }
+    - { file: src/sse/services/auth.js, line: 262, note: "checkFallbackError when no GitHub/resetsAtMs special case" }
+    - { file: src/sse/handlers/chat.js, line: 327, note: "every failed result goes through markAccountUnavailable, no status filter" }
+    - { file: open-sse/services/combo.js, line: 335, note: "combo re-classifies the member Response with the same function" }
+    - { file: open-sse/services/combo.js, line: 337, note: "!shouldFallback branch — unreachable" }
+    - { file: open-sse/services/combo.js, line: 345, note: "combo waits only when cooldown <= 5 s on 502/503/504" }
+  newModule: routing
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Terminal, request-caused errors (400 invalid request, 404 unknown model, local translation failure, 499 client abort) are returned to the client once, without locking the account (behavioral.md §20: no blind fallback)"
+    actual: "checkFallbackError has a catch-all shouldFallback:true, so every failure — including a malformed request — locks the account for that model and is replayed on every other account and every combo member"
+    impact: "One bad request (e.g. context too long) locks every account of the provider for that model for 30 s (2 min for 404) and the client receives 503 with Retry-After instead of its 400 (fallback.accounts-exhausted-response); unrelated valid requests for the same model get 503 until the locks expire"
+
+- id: fallback.accounts-exhausted-response
+  group: Auto fallback
+  feature: Auto fallback
+  subFeature: What the client receives when the account loop runs out
+  trigger: getProviderCredentials returns null or allRateLimited inside the account loop
+  input: "credentials result, excludeConnectionIds size, lastError, lastStatus"
+  output: "503 with Retry-After, 404, or the last upstream status"
+  businessRules:
+    - "allRateLimited (every non-excluded account carries an active model lock): 503 `[provider/model] <lastError or stored lastError>` with a Retry-After header computed from the earliest lock expiry"
+    - "null on the first iteration (no active connections at all): 404 `No active credentials for provider: X`"
+    - "null after at least one account was excluded (remaining accounts neither available nor locked): lastStatus || 503 with lastError"
+    - "Because a failed account is BOTH excluded and locked, the allRateLimited branch is what normally fires after the last account fails — so the client gets 503, not the upstream status"
+  state:
+    reads: ["providerConnections lock fields"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["account.select-all-unavailable-response", "fallback.error-classification"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: "Retry-After = earliest modelLock expiry, minimum 1 s" }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "all accounts locked — 503 with Retry-After", partial: false }
+    - { code: AUTH_ERROR, when: "no active connection for the provider — 404", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "unavailableResponse omits Access-Control-Allow-Origin, unlike errorResponse — browser clients cannot read the 503 body"
+    - "The 503 body is {error:{message}} without type/code, a different shape from every other error"
+    - "The original upstream status is lost: an upstream 400 surfaces as 503 `[provider/model] [400]: ...`"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 237, note: "!credentials || credentials.allRateLimited" }
+    - { file: src/sse/handlers/chat.js, line: 242, note: "unavailableResponse 503 with retryAfter" }
+    - { file: src/sse/handlers/chat.js, line: 246, note: "404 No active credentials" }
+    - { file: src/sse/handlers/chat.js, line: 249, note: "lastStatus || 503" }
+    - { file: src/sse/services/auth.js, line: 124, note: "allRateLimited when every connection is locked" }
+    - { file: open-sse/utils/error.js, line: 119, note: "unavailableResponse — Retry-After header, no CORS header" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.response-mode-dispatch
+  group: Request routing
+  feature: Request routing
+  subFeature: Choosing forced SSE-to-JSON, plain JSON, or streaming handling for a 2xx response
+  trigger: Upstream response is ok
+  input: "clientRequestedStreaming, providerRequiresStreaming, stream"
+  output: "The result object from one of the three handlers"
+  businessRules:
+    - "Provider forces streaming and the client did not ask for it -> handleForcedSSEToJson collapses the SSE into one JSON body"
+    - "stream false -> handleNonStreamingResponse"
+    - "Otherwise -> buildOnStreamComplete + handleStreamingResponse"
+    - "Pending-request counters (dashboard live view) are incremented before dispatch and decremented on each terminal path; the decrement clamps at 0 so double decrements are harmless"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["global pending request counters (byModel / byAccount)"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The translation-failure path decrements the pending counter without ever having incremented it — masked by the clamp"
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 305, note: "trackPendingRequest(..., true) before dispatch" }
+    - { file: open-sse/handlers/chatCore.js, line: 478, note: "forced SSE -> JSON branch" }
+    - { file: open-sse/handlers/chatCore.js, line: 484, note: "non-streaming branch" }
+    - { file: open-sse/handlers/chatCore.js, line: 492, note: "streaming branch" }
+    - { file: src/lib/db/repos/usageRepo.js, line: 157, note: "Math.max(0, ...) clamp on the pending counter" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.streaming-pipeline
+  group: Request routing
+  feature: Request routing
+  subFeature: Upstream SSE -> transform -> disconnect-aware stream -> client (first byte)
+  trigger: Streaming response branch
+  input: "providerResponse, sourceFormat, targetFormat (or the executor's responseFormat), provider"
+  output: "{ success: true, response: new Response(transformedBody, SSE headers) } — returned as soon as headers are ok, before any token is read"
+  businessRules:
+    - "Non-SSE guard: if the 2xx content-type is neither text/event-stream nor application/json (e.g. a Cloudflare HTML page), the body is read, the <title> is extracted and sanitized (tags removed, 160 chars) and a success:false JSON error is returned instead of piping HTML"
+    - "Response translation choice: Responses-format providers (codex) translate Responses SSE into the client's format via CODEX_SOURCE_TO_TARGET (droid/codex-cli user agents excluded); otherwise translate when targetFormat != sourceFormat; else passthrough with usage/[DONE] fix-ups"
+    - "Response translation mirrors the request side: direct `${target}:${source}` translator if registered, else target->openai->source pivot; same format only decloaks tool names"
+    - "Stall watchdog: any upstream byte re-arms a timer of PROVIDERS[provider].stallTimeoutMs or STREAM_STALL_TIMEOUT_MS (env, default 360 s); on expiry the stream is errored and the upstream fetch aborted. The timer starts when piping starts, so it is also the only time-to-first-token bound on the generic lane (STREAM_FIRST_CHUNK_TIMEOUT_MS is used only by kiro)"
+    - "A placeholder request-detail row ('[Streaming in progress...]') is saved immediately; buildOnStreamComplete later overwrites it by id"
+  state:
+    reads: ["PROVIDERS[provider].format / stallTimeoutMs"]
+    writes: ["requestDetails placeholder row"]
+    runtimeOnly: ["stall timer", "per-stream translation state"]
+  dependencies: ["routing.request-translation"]
+  providerInteraction: "Reads the upstream SSE body incrementally"
+  fallback: { hasFallback: false, retry: null, timeout: "Inter-chunk stall timeout, default 360 s (env STREAM_STALL_TIMEOUT_MS)", quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "2xx with an HTML/text content type — success:false with the 2xx status, which the account loop then treats as an account failure", partial: false }
+    - { code: TIMEOUT, when: "no upstream bytes for the stall timeout — stream aborted", partial: true }
+  sideEffects: []
+  persistence: ["requestDetails row (placeholder, then final)"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: "See routing.client-disconnect-propagation", concurrency: null }
+  edgeCases:
+    - "Passthrough mode drops any data: line that is not JSON (e.g. an in-stream plain-text rate-limit message), so upstream error text inside a 200 stream never reaches the client"
+    - "[DONE] is appended in passthrough flush for every provider except antigravity/gemini/vertex, whose clients reject it"
+  evidence:
+    - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 63, note: "non-SSE, non-JSON content-type guard" }
+    - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 73, note: "returns success:false with the upstream status" }
+    - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 29, note: "codex Responses SSE translation (droid/codex-cli excluded)" }
+    - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 87, note: "stallTimeoutMs provider override or STREAM_STALL_TIMEOUT_MS" }
+    - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 104, note: "success:true returned before any token is read" }
+    - { file: open-sse/utils/streamHandler.js, line: 204, note: "stall timer: handleError + abort on expiry" }
+    - { file: open-sse/config/runtimeConfig.js, line: 53, note: "STREAM_STALL_TIMEOUT_MS default 360 s" }
+    - { file: open-sse/translator/index.js, line: 179, note: "response direct route `${targetFormat}:${sourceFormat}`" }
+    - { file: open-sse/utils/stream.js, line: 224, note: "non-JSON data lines skipped silently" }
+    - { file: open-sse/utils/stream.js, line: 400, note: "[DONE] suppressed for gemini-family providers" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.non-streaming-response
+  group: Request routing
+  feature: Request routing
+  subFeature: Non-streaming response parse, translation and return
+  trigger: stream is false and upstream is ok
+  input: "providerResponse (JSON, or SSE text when the upstream streamed anyway)"
+  output: "{ success: true, response: JSON } in the client's format"
+  businessRules:
+    - "An SSE content-type is parsed into one OpenAI response; parse failure -> 502 'Invalid SSE response for non-streaming request'. JSON parse failure -> 502 'Invalid JSON response from <provider>'"
+    - "Tool names are decloaked on the raw body before translation; translateNonStreamingResponse runs when target != source"
+    - "Post-fixes: finish_reason forced to tool_calls when tool_calls exist; object/created filled; Azure prompt_filter_results/content_filter_results removed; usage buffered and filtered to the client format; reasoning_content dropped when content is non-empty"
+  state:
+    reads: []
+    writes: ["usageHistory (via saveUsageStats)", "requestDetails"]
+    runtimeOnly: []
+  dependencies: ["routing.usage-recording-timing"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "2xx body is not parseable JSON/SSE — 502, which then locks the account 30 s and tries the next (fallback.error-classification)", partial: false }
+  sideEffects: []
+  persistence: ["usageHistory row", "requestDetails row"]
+  performanceConcerns:
+    - "The whole upstream body is buffered; there is no body-read timeout on this path (the connect timer is cleared at headers and the stall watchdog only exists on the streaming path)"
+  behavior: { streaming: false, cancellation: "None — no signal observes the client while the body is being read", concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 292, note: "invalid SSE -> 502" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 303, note: "invalid JSON -> 502" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 324, note: "translateNonStreamingResponse when formats differ" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 338, note: "finish_reason forced to tool_calls" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 392, note: "success result with JSON Response" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: fallback.partial-stream-failure
+  group: Auto fallback
+  feature: Auto fallback
+  subFeature: Upstream failure after tokens have already reached the client
+  trigger: The upstream SSE body errors, resets, or stalls after the streaming Response has been returned
+  input: "Upstream read error (ECONNRESET, socket hang up, ETIMEDOUT, EPIPE, UND_ERR_SOCKET, AbortError from the stall watchdog, or any other error)"
+  output: "A truncated stream — closed cleanly or errored, never resumed on another account"
+  businessRules:
+    - "Q5: there is no mid-stream retry or fallback. handleSingleModelChat already returned result.response when headers were ok, so the account loop and the combo loop have both exited"
+    - "Network-class errors and aborts (including the stall watchdog, which marks the controller disconnected before aborting) close the client stream cleanly; only Responses-API passthrough gets a synthesized response.failed + [DONE] terminal"
+    - "Any other error while still connected calls controller.error(), so the client sees a broken chunked response"
+    - "onRequestSuccess has already fired at header time, so the account's error state and locks are cleared even though the answer was cut off"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.streaming-pipeline", "routing.success-callback-timing", "routing.usage-recording-timing"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: "Stall timeout 360 s default", quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "upstream connection resets after first byte — stream closed gracefully, no error event, no [DONE] on OpenAI/Claude formats", partial: true }
+    - { code: TIMEOUT, when: "stall watchdog fires mid-stream — treated as a graceful close", partial: true }
+    - { code: INTERNAL_ERROR, when: "non-network error while connected — controller.error(), client connection errors", partial: true }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The request-detail row stays as the 'Streaming in progress' placeholder with status success because the completion callback never runs"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 310, note: "result.success -> return; the loop is gone once headers are ok" }
+    - { file: open-sse/utils/streamHandler.js, line: 143, note: "network-close classification" }
+    - { file: open-sse/utils/streamHandler.js, line: 158, note: "graceful close (with optional synthesized terminal)" }
+    - { file: open-sse/utils/streamHandler.js, line: 162, note: "controller.error(error) for other errors" }
+    - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 86, note: "synthesized terminal only for Responses passthrough" }
+    - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 47, note: "onRequestSuccess fired at header time" }
+  newModule: routing
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A stream cut off mid-answer is signalled to the client as an error (error event or missing terminal it can detect), and the account is not marked healthy"
+    actual: "Resets and stall timeouts close the stream cleanly with no error event for OpenAI/Claude clients, and the account's error state was already cleared when headers arrived"
+    impact: "Clients can accept a truncated answer as complete, and a flaky account keeps being picked first because it looks healthy"
+
+- id: routing.client-disconnect-propagation
+  group: Request routing
+  feature: Request routing
+  subFeature: Cancelling the upstream request when the client goes away
+  trigger: The client closes the connection at any point in the request
+  input: "Next's cancellation of the returned response body; request.signal (never read)"
+  output: "Upstream fetch aborted — only in the streaming phase"
+  businessRules:
+    - "The only link from client to upstream is streamController: its AbortController signal is merged into every fetch, and it is aborted by handleDisconnect, which is called from the ReadableStream cancel() of the returned SSE body"
+    - "handleDisconnect delays the abort by 500 ms to allow cleanup, then aborts; cancel() also cancels the reader chain, which cancels the upstream body"
+    - "request.signal is never read on the chat lane (the video lane is the only one that passes it), and handleChat never passes onDisconnect to handleChatCore"
+    - "Q4: before the streaming Response is returned (translation, image prefetch, headroom/pxpipe, up to 249 s of connect timeouts and retries per URL, token refresh, trying further accounts and combo members) a client disconnect is NOT propagated — work continues and further accounts may be tried and locked for nobody. Non-streaming requests are never cancelled"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["streamController disconnected flag / abort timeout"]
+  dependencies: ["routing.streaming-pipeline"]
+  providerInteraction: "Abort of the in-flight upstream fetch (streaming phase only)"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Abandoned requests keep consuming upstream quota and retries, and can lock accounts, after the client has gone"
+  behavior: { streaming: true, cancellation: "Propagated only after the SSE Response has been returned (body cancel -> 500 ms -> abort). Not propagated during pre-response work, retries, account/combo fallback, or any non-streaming request — request.signal is never wired", concurrency: null }
+  edgeCases:
+    - "Because nothing aborts the controller before response time, the 499 'Request aborted' branch in chatCore is effectively unreachable on this lane"
+  evidence:
+    - { file: open-sse/utils/streamHandler.js, line: 19, note: "per-request AbortController — the only cancellation source" }
+    - { file: open-sse/utils/streamHandler.js, line: 49, note: "abort delayed 500 ms in handleDisconnect" }
+    - { file: open-sse/utils/streamHandler.js, line: 169, note: "ReadableStream cancel() -> handleDisconnect" }
+    - { file: open-sse/handlers/chatCore.js, line: 366, note: "streamController.signal passed to executor.execute" }
+    - { file: open-sse/handlers/chatCore.js, line: 61, note: "handleChatCore accepts onDisconnect" }
+    - { file: src/sse/handlers/chat.js, line: 268, note: "handleChatCore called without onDisconnect or request.signal" }
+    - { file: src/sse/handlers/videoGeneration.js, line: 143, note: "contrast: video lane passes request.signal" }
+  newModule: routing
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A client disconnect cancels the upstream call and stops retry/fallback at any stage"
+    actual: "Cancellation only works once the SSE body has been returned; before that, and for all non-streaming requests, request.signal is ignored"
+    impact: "Wasted upstream spend and quota, account locks caused by requests nobody is waiting for, and long-lived zombie requests under client timeouts"
+
+- id: routing.usage-recording-timing
+  group: Request routing
+  feature: Request routing
+  subFeature: When token usage is persisted relative to the response being flushed
+  trigger: Successful non-streaming, forced-JSON, or streaming completion
+  input: "Usage extracted from the upstream response or accumulated from the stream (estimated when absent)"
+  output: "A usageHistory row via saveUsageStats -> saveRequestUsage (fire-and-forget), plus a requestDetails row"
+  businessRules:
+    - "Q8 non-streaming: usage is extracted and saveUsageStats is called BEFORE the response is translated and returned — i.e. before the flush; the write itself is not awaited (it runs concurrently with the return)"
+    - "Q8 forced SSE->JSON: onRequestSuccess is awaited, then usage saved, then the JSON Response is returned — before the flush"
+    - "Q8 streaming: finalizeStream runs AFTER the terminal bytes are enqueued — in flush() for normal ends, or inside transform() on the Responses terminal event (because Responses clients close right after it and flush never runs). The save runs concurrently with the final flush to the client"
+    - "When the upstream sends no usage, it is estimated from the request body and emitted content length"
+    - "Rows with zero input and zero output tokens are not written at all"
+  state:
+    reads: []
+    writes: ["usageHistory / usageDaily (saveRequestUsage)", "requestDetails"]
+    runtimeOnly: []
+  dependencies: ["routing.non-streaming-response", "routing.streaming-pipeline"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "stream errors or is cancelled before its terminal event — flush never runs, usage is never recorded", partial: true }
+  sideEffects: []
+  persistence: ["usageHistory row", "requestDetails row"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: "A client disconnect on OpenAI/Claude streams before [DONE] skips flush, so no usage is written", concurrency: "All usage writes are fire-and-forget; failures are swallowed" }
+  edgeCases:
+    - "logUsage in the stream tail is console-only; persistence happens only through onStreamComplete -> saveUsageStats"
+  evidence:
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 321, note: "saveUsageStats before translation and return (line 392)" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 207, note: "forced SSE->JSON saves usage before returning at 228" }
+    - { file: open-sse/utils/stream.js, line: 83, note: "finalizeStream — callable from transform and flush" }
+    - { file: open-sse/utils/stream.js, line: 239, note: "Responses terminal event triggers finalize inside transform" }
+    - { file: open-sse/utils/stream.js, line: 407, note: "passthrough flush: [DONE] enqueued, then finalizeStream" }
+    - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 139, note: "onStreamComplete -> saveUsageStats" }
+    - { file: open-sse/handlers/chatCore/requestDetail.js, line: 109, note: "zero/zero usage is not saved" }
+    - { file: open-sse/handlers/chatCore/requestDetail.js, line: 124, note: "saveRequestUsage not awaited, errors swallowed" }
+  newModule: routing
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Tokens the provider billed are recorded even when the stream ends abnormally or the client leaves"
+    actual: "Streaming usage is written only from flush() or a Responses terminal event; an errored, stalled or client-cancelled stream writes nothing"
+    impact: "Usage and cost dashboards under-count exactly the failing/abandoned traffic, which is still billed upstream"
+
+- id: routing.success-callback-timing
+  group: Request routing
+  feature: Request routing
+  subFeature: When an account is marked healthy (onRequestSuccess)
+  trigger: A 2xx response reaches a response handler
+  input: "onRequestSuccess from chat.js (clearAccountError + clearAntigravityStrikes)"
+  output: "Account error/lock state for this model cleared"
+  businessRules:
+    - "Streaming: fired as a microtask at the top of handleStreamingResponse — before the non-SSE guard and before any token is read"
+    - "Non-streaming: fired (not awaited) after the body has been parsed successfully"
+    - "Forced SSE->JSON: awaited after the SSE has been collapsed"
+  state:
+    reads: []
+    writes: ["providerConnections error/lock fields (clearAccountError)"]
+    runtimeOnly: ["Antigravity strike counter"]
+  dependencies: ["account.clear-error-on-success"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["providerConnections"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: "In the non-SSE-guard case, clearAccountError (microtask) and markAccountUnavailable (account loop) run for the same connection concurrently; last write wins" }
+  edgeCases:
+    - "A 200 HTML page on the streaming path both clears and then re-locks the account in the same request"
+  evidence:
+    - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 47, note: "onRequestSuccess scheduled before the non-SSE guard" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 308, note: "fired after body parse" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 203, note: "awaited in forced SSE->JSON" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.responses-compact-lane
+  group: Request routing
+  feature: Request routing
+  subFeature: POST /v1/responses/compact — compaction via the same pipeline with body._compact
+  trigger: POST /v1/responses/compact
+  input: "Responses-API body"
+  output: "handleChat result; for codex the upstream URL should gain /compact"
+  businessRules:
+    - "The route parses the body, sets body._compact = true, rebuilds a Request with the original headers and hands it to handleChat — full routing/fallback applies"
+    - "Only CodexExecutor consumes the flag: transformRequest stores this._isCompact and deletes body._compact; buildUrl appends /compact when this._isCompact is true"
+    - "BaseExecutor.execute calls buildUrl BEFORE transformRequest, so the URL of a request is computed from the _isCompact value left by the PREVIOUS codex request on this singleton executor"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["CodexExecutor._isCompact (instance field on a process-wide singleton)"]
+  dependencies: ["routing.lane-entry-routes", "routing.executor-selection", "fallback.executor-url-loop"]
+  providerInteraction: "codex /responses or /responses/compact"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "body is not JSON — request.json() throws in the route (unhandled, 500), unlike the 400 of the other lanes", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: "_isCompact is shared by all concurrent codex requests" }
+  edgeCases:
+    - "Non-codex providers never see /compact semantics; _compact may be forwarded upstream as an unknown field when no translator strips it"
+  evidence:
+    - { file: src/app/api/v1/responses/compact/route.js, line: 30, note: "body._compact = true" }
+    - { file: src/app/api/v1/responses/compact/route.js, line: 29, note: "request.json() without try/catch" }
+    - { file: open-sse/executors/codex.js, line: 394, note: "transformRequest sets this._isCompact" }
+    - { file: open-sse/executors/codex.js, line: 224, note: "buildUrl reads this._isCompact" }
+    - { file: open-sse/executors/base.js, line: 128, note: "buildUrl is called before transformRequest (line 129)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A compact request goes to .../responses/compact and a normal request to .../responses"
+    actual: "The URL is built before the flag is read, from state left by the previous request on a shared singleton"
+    impact: "The first compact request hits the normal endpoint and the following normal codex request (any user) hits /compact; under concurrency the mapping is arbitrary"
+
+- id: routing.ollama-lane-transform
+  group: Request routing
+  feature: Request routing
+  subFeature: POST /v1/api/chat — Ollama-native clients
+  trigger: POST /v1/api/chat (Ollama API path)
+  input: "Ollama chat body (model defaults to llama3.2 for the transform label)"
+  output: "NDJSON lines {model, message, done} built from the OpenAI-format SSE that handleChat returns"
+  businessRules:
+    - "The body is cloned to read the model name, then the request goes through handleChat unchanged; source format is body-sniffed (no endpoint override for this path)"
+    - "transformToOllama only understands `data:` SSE lines: content deltas become done:false lines, tool_call deltas are accumulated and emitted on finish_reason, and done:true is emitted on [DONE], on finish, and again in flush"
+    - "The outgoing Response defaults to status 200 and Content-Type application/x-ndjson whenever handleChat returned a body — the handleChat status is not copied in that case. Only when handleChat's response has NO body at all does the original status get copied through instead"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.lane-entry-routes", "routing.stream-mode-decision"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "handleChat returns an error JSON (which has a body) — it has no data: lines, so the client receives only {done:true} with HTTP 200", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A stream:false Ollama request gets a JSON body from handleChat, which also has no data: lines — the answer is dropped and only done:true is sent"
+    - "Multiple done:true lines can be emitted for one response (finish_reason stop, then flush)"
+    - "The 200-default only applies on the body-present branch; a bodyless handleChat response instead copies the original status through unchanged"
+  evidence:
+    - { file: src/app/api/v1/api/chat/route.js, line: 34, note: "const response = await handleChat(request)" }
+    - { file: src/app/api/v1/api/chat/route.js, line: 35, note: "return transformToOllama(response, modelName)" }
+    - { file: open-sse/utils/ollamaTransform.js, line: 14, note: "only data: lines are processed" }
+    - { file: open-sse/utils/ollamaTransform.js, line: 73, note: "flush always emits done:true" }
+    - { file: open-sse/utils/ollamaTransform.js, line: 81, note: "new Response without the original status on the body-present branch (status IS copied on the bodyless branch at line 79)" }
+  newModule: routing
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Upstream errors surface to Ollama clients with an error status, and non-streaming requests return the answer"
+    actual: "Status is always 200 and anything that is not an OpenAI SSE data: line is discarded"
+    impact: "Ollama clients see empty successful answers for every error and for every stream:false request"
+
+- id: routing.count-tokens-estimate
+  group: Request routing
+  feature: Request routing
+  subFeature: POST /v1/messages/count_tokens — local character-based estimate
+  trigger: POST /v1/messages/count_tokens (Claude Code preflight)
+  input: "Anthropic Messages body (system, tools, messages)"
+  output: "{ input_tokens: ceil(chars / 4) }"
+  businessRules:
+    - "Never routed to a provider and never touches accounts, API-key enforcement or usage"
+    - "Characters counted: system + tools (keys and values) + each message's content; text blocks count text, tool_use counts name + input, tool_result counts content, thinking counts thinking; total / 4 rounded up"
+    - "Invalid JSON -> 400 {error: 'Invalid JSON body'}"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "body is not JSON — 400", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Not gated by requireApiKey — the endpoint answers without authentication even when the rest of /v1 requires a key"
+  evidence:
+    - { file: src/app/api/v1/messages/count_tokens/route.js, line: 69, note: "Math.ceil(totalChars / 4)" }
+    - { file: src/app/api/v1/messages/count_tokens/route.js, line: 80, note: "invalid JSON -> 400" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: routing.v1-root-alias
+  group: Request routing
+  feature: Request routing
+  subFeature: GET /v1 re-exports the model listing
+  trigger: GET or OPTIONS /v1
+  input: "None"
+  output: "Same response as GET /v1/models"
+  businessRules:
+    - "The /v1 root route is a one-line re-export of the models route's GET and OPTIONS; it is not part of the chat routing chain"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.model-listing-live-override"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: src/app/api/v1/route.js, line: 1, note: "export { GET, OPTIONS } from \"./models/route\"" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

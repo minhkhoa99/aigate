@@ -1,16 +1,16 @@
 # Discovery coverage
 
-Entries: 76
+Entries: 111
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 29/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +117 |
+| routes | 37/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +109 |
 | pages | 1/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind] … +19 |
-| providers | 9/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, antigravity, api-airforce, assemblyai … +105 |
-| executors | 4/29 | antigravity, azure, codebuddy-cn, codebuddy-intl, codex, commandcode, cursor, devin-cli … +17 |
-| translators | 0/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +40 |
-| repos | 5/11 | combosRepo, nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo, usageRepo |
-| settingsKeys | 8/52 | capacityAdapter, cavemanEnabled, cavemanLevel, cloudEnabled, comboStickyRoundRobinLimit, comboStrategies, comboStrategy, dnsToolEnabled … +36 |
+| providers | 14/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +100 |
+| executors | 6/29 | azure, codebuddy-cn, codebuddy-intl, commandcode, cursor, devin-cli, gemini-cli, github … +15 |
+| translators | 2/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +38 |
+| repos | 6/11 | combosRepo, nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo |
+| settingsKeys | 12/52 | capacityAdapter, cavemanEnabled, cavemanLevel, cloudEnabled, dnsToolEnabled, enableObservability, headroomCompressUserMessages, headroomEnabled … +32 |
 
 ## Entries per bounded context
 
@@ -18,13 +18,14 @@ Entries: 76
 - catalog: 21
 - connections: 38
 - identity: 1
+- routing: 35
 - settings: 7
 
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 3
-- REFERENCE_BEHAVIOR: 67
-- SUSPECTED_BUG: 6
+- REFERENCE_BEHAVIOR: 93
+- SUSPECTED_BUG: 15
 
 ## Missing — routes
 
@@ -76,7 +77,6 @@ Entries: 76
 - api/media-providers/tts/minimax/voices
 - api/media-providers/tts/voices
 - api/pricing
-- api/provider-nodes
 - api/provider-nodes/[id]
 - api/provider-nodes/validate
 - api/providers/[id]/models
@@ -128,20 +128,13 @@ Entries: 76
 - api/usage/request-logs
 - api/usage/stats
 - api/usage/stream
-- api/v1
-- api/v1/api/chat
 - api/v1/audio/speech
 - api/v1/audio/transcriptions
 - api/v1/audio/voices
-- api/v1/chat/completions
 - api/v1/embeddings
 - api/v1/images/generations
-- api/v1/messages
-- api/v1/messages/count_tokens
 - api/v1/models/[...model]
 - api/v1/models/info
-- api/v1/responses
-- api/v1/responses/compact
 - api/v1/search
 - api/v1/videos/[id]
 - api/v1/videos/edits
@@ -191,7 +184,6 @@ Entries: 76
 - alims-intl
 - alitp-intl
 - anthropic
-- antigravity
 - api-airforce
 - assemblyai
 - aws-polly
@@ -232,7 +224,6 @@ Entries: 76
 - glm-cn
 - google-pse
 - google-tts
-- grok-cli
 - grok-web
 - groq
 - huggingface
@@ -244,7 +235,6 @@ Entries: 76
 - kilo-gateway
 - kilocode
 - kimchi
-- kiro
 - linkup
 - llm7
 - local-device
@@ -260,7 +250,6 @@ Entries: 76
 - ollama
 - ollama-local
 - ollama-search
-- openai
 - opencode
 - opencode-go
 - perplexity
@@ -288,7 +277,6 @@ Entries: 76
 - topaz
 - tortoise
 - venice
-- vercel-ai-gateway
 - vertex
 - vertex-partner
 - volcengine-ark
@@ -302,11 +290,9 @@ Entries: 76
 
 ## Missing — executors
 
-- antigravity
 - azure
 - codebuddy-cn
 - codebuddy-intl
-- codex
 - commandcode
 - cursor
 - devin-cli
@@ -344,13 +330,11 @@ Entries: 76
 - open-sse/translator/concerns/thinkingUnified.js
 - open-sse/translator/concerns/toolCall.js
 - open-sse/translator/concerns/usage.js
-- open-sse/translator/formats.js
 - open-sse/translator/formats/claude.js
 - open-sse/translator/formats/gemini.js
 - open-sse/translator/formats/maxTokens.js
 - open-sse/translator/formats/openai.js
 - open-sse/translator/formats/responsesApi.js
-- open-sse/translator/index.js
 - open-sse/translator/request/antigravity-to-openai.js
 - open-sse/translator/request/claude-to-kiro.js
 - open-sse/translator/request/claude-to-openai.js
@@ -386,7 +370,6 @@ Entries: 76
 - pricingRepo
 - proxyPoolsRepo
 - requestDetailsRepo
-- usageRepo
 
 ## Missing — settingsKeys
 
@@ -394,9 +377,6 @@ Entries: 76
 - cavemanEnabled
 - cavemanLevel
 - cloudEnabled
-- comboStickyRoundRobinLimit
-- comboStrategies
-- comboStrategy
 - dnsToolEnabled
 - enableObservability
 - headroomCompressUserMessages
@@ -420,7 +400,6 @@ Entries: 76
 - pxpipeTimeoutMs
 - quotaVisibility
 - requireLogin
-- rtkEnabled
 - samlAttributeEmail
 - samlAttributeName
 - samlCert
