@@ -3,6 +3,16 @@ import { buildInventory } from "../src/inventory.js";
 
 const inv = buildInventory();
 
+const KEYS = [
+  "routes",
+  "pages",
+  "providers",
+  "executors",
+  "translators",
+  "repos",
+  "settingsKeys",
+] as const;
+
 describe("buildInventory", () => {
   it("finds every API route", () => {
     expect(inv.routes).toHaveLength(154);
@@ -35,7 +45,7 @@ describe("buildInventory", () => {
   });
 
   it("returns sorted, de-duplicated arrays", () => {
-    for (const key of Object.keys(inv) as (keyof typeof inv)[]) {
+    for (const key of KEYS) {
       const arr = inv[key];
       expect([...arr].sort()).toEqual(arr);
       expect(new Set(arr).size).toBe(arr.length);
