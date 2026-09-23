@@ -322,8 +322,9 @@
   input: "Request path: /v1/*, /v1/v1/* (double-prefixing clients), /v1beta/* (Gemini-native), /codex/* and /responses (OpenAI Responses-shaped clients)"
   output: "Internally rewritten to /api/v1/*, /api/v1beta/*, or /api/v1/responses before Next.js route matching — all funnel through the same requireApiKey gate in their respective handlers"
   businessRules:
-    - "/v1/v1/* is matched and rewritten before the plain /v1/* rule, because Next applies rewrites in array order and a naive /v1/* rule would otherwise itself match the /v1/v1/... prefix as its own :path* capture, only ever hitting /api/v1/v1/... (double-prefixing clients would 404 without this ordering)"
-    - "/codex/* and the bare /responses path both collapse onto the single /api/v1/responses handler regardless of the trailing path segments — /codex/:path* discards :path*"
+    - "AIGate must accept all five client-compatible lanes: /v1/* (standard), /v1/v1/* (clients that double-prefix), /v1beta/* (Gemini-native clients), and /codex/* plus the bare /responses path (OpenAI Responses-API-shaped clients) — each is a real, distinct client-compatibility requirement, not incidental"
+    - "/codex/* and the bare /responses path both collapse onto the single /api/v1/responses handler regardless of the trailing path segments — /codex/:path* discards :path*, so any suffix a Codex-shaped client appends is intentionally dropped rather than forwarded"
+    - "/v1beta and /v1 both have a path-less exact-match rule in addition to the /:path* rule, so a request to exactly '/v1' or '/v1beta' (no trailing slash/segment) still reaches its handler — the bare-path case is a deliberate, separate rule, not a fallthrough"
   state:
     reads: []
     writes: []
@@ -334,17 +335,18 @@
   errorCases: []
   sideEffects: []
   persistence: []
-  performanceConcerns: []
+  performanceConcerns:
+    - "/v1/v1/:path* must be matched and rewritten before the plain /v1/:path* rule — Next.js applies rewrites in array order, and a naive /v1/* rule appearing first would itself match the /v1/v1/... prefix via its own :path* capture, only ever hitting /api/v1/v1/... This is a Next.js rewrite-engine ordering artifact (array position, not a distinguishing business rule), so any AIGate reimplementation must preserve 'double-prefix lane wins the match' but need not use array order specifically to get there"
   behavior: { streaming: false, cancellation: null, concurrency: null }
   edgeCases:
-    - "/v1beta and /v1 both have a path-less exact-match rule in addition to the /:path* rule, so a request to exactly '/v1' (no trailing slash/segment) still reaches /api/v1"
+    - "A router implementation that matches rules independently (e.g. a trie or first-specific-match router) rather than Next's ordered-array rewrite list must still ensure /v1/v1/* resolves distinctly from /v1/* — the two are business-distinct lanes even though 9router happens to encode the distinction as list order"
   evidence:
-    - { file: next.config.mjs, line: 60, note: "rewrites() — array order matters: /v1/v1/:path* precedes /v1/:path*" }
-    - { file: next.config.mjs, line: 70, note: "/codex/:path* and /responses both rewrite to the single /api/v1/responses handler" }
-    - { file: next.config.mjs, line: 78, note: "/v1beta/:path* rewrite for Gemini-native clients" }
+    - { file: next.config.mjs, line: 60, note: "rewrites() — returns the ordered array of five lane definitions" }
+    - { file: next.config.mjs, line: 71, note: "/codex/:path* source, rewritten to /api/v1/responses (destination on the next line)" }
+    - { file: next.config.mjs, line: 79, note: "/v1beta/:path* source, rewritten to /api/v1beta/:path* (destination on the next line)" }
   newModule: apikeys
   parityStatus: traced
-  labels: [IMPLEMENTATION_ACCIDENT]
+  labels: [REFERENCE_BEHAVIOR]
 
 - id: settings.defaults-and-merge
   group: Settings
