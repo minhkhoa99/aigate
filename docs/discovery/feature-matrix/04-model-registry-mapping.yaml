@@ -1,0 +1,480 @@
+# Trace: Model registry, Model mapping (Task 9)
+# 9router reference read at E:\9router. Read-only; every evidence line was
+# read directly, not inferred from names (behavioral.md §7).
+#
+# Scope: this file covers the MODEL side of the catalog (which model ids
+# exist, what they can do, how a short name resolves to one, and whether a
+# vendor's live list agrees with the static registry). The PROVIDER side
+# (registry build, transport/oauth shape, connection CRUD) is already traced
+# in 02-providers-auth.yaml under catalog.registry-* / catalog.connection-* —
+# referenced here via `dependencies`, not re-documented.
+#
+# Investigation notes (answers to the brief's 5 questions, entry ids in parens):
+#   Q1 four tiers, first-match-wins, no cross-tier merge -> catalog.capability-tier-fallback
+#   Q2 refine() additive-only, why -> catalog.capability-refine-additive-only
+#      (+ catalog.capability-catalog-sync-majority-vote for the untrusted external
+#      feed that makes additive-only necessary)
+#   Q3 NOT_VISION before VISION_NAME, concrete misclassified id -> catalog.capability-vision-pattern-order
+#      (real registry entry found by grep: openrouter.js's
+#      "nvidia/llama-nemotron-embed-vl-1b-v2:free", kind:"embedding", contains
+#      both "embed" (NOT_VISION) and "vl" (VISION_NAME))
+#   Q4 alias resolves before capability lookup; disabled-model gap -> catalog.alias-resolve-before-capability
+#      + catalog.alias-disabled-model-bypass (SUSPECTED_BUG — verified by grep that
+#      disabledModelsRepo/disabledModelsDb has zero importers under src/sse or
+#      open-sse, only the three listing routes)
+#   Q5 model list is a single global per-process object (not per-connection),
+#      but /v1/models' CLIENT-FACING listing is per-connection and can replace
+#      the static list with a live per-account fetch -> catalog.model-registry-global
+#      + catalog.model-listing-live-override
+#
+# Bonus finding while reading the alias CRUD surface: /api/models/alias PUT and
+# /api/models PUT both claim to "update model alias" against the same
+# `modelAliases` KV scope but pass arguments to setModelAlias(alias, model) in
+# opposite order -> catalog.alias-dual-convention-collision (SUSPECTED_BUG).
+
+- id: catalog.model-registry-global
+  group: Model registry
+  feature: Model catalog
+  subFeature: PROVIDER_MODELS / AI_MODELS are a single global, per-process table — not scoped per connection or account
+  trigger: Any lookup of a provider's static model list (getProviderModels/isValidModel/getModelsByProviderId, or a page building /api/models)
+  input: "providerAlias or providerId"
+  output: "array of model descriptor objects { id, name, kind?, ... } — identical for every connection to that provider"
+  businessRules:
+    - "PROVIDER_MODELS is imported directly from open-sse/providers/index.js (built once from the static REGISTRY at module load — see catalog.registry-build in 02-providers-auth.yaml) and re-exported verbatim by open-sse/config/providerModels.js and src/shared/constants/models.js; there is no per-connection or per-account copy of it"
+    - "AI_MODELS (src/shared/constants/models.js) is a flat array built once via Object.entries(PROVIDER_MODELS).flatMap — every account/connection to the same provider sees the identical static list"
+    - "getModelsByProviderId/getProviderModels index the table by provider ALIAS, not by connection id — two connections to the same provider (e.g. two separate OpenAI accounts) resolve to the exact same PROVIDER_MODELS[alias] array reference"
+  state:
+    reads: ["PROVIDER_MODELS in-memory object (built once by open-sse/providers/index.js)"]
+    writes: []
+    runtimeOnly: ["PROVIDER_MODELS/AI_MODELS held for the process lifetime, rebuilt only on restart or module re-evaluation"]
+  dependencies: ["catalog.registry-build"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Zero cost per lookup once built — a plain object index, no per-request assembly"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A provider with genuine per-account model variance (Kiro's comment in src/app/api/v1/models/route.js notes it 'returns dynamic -thinking/-agentic variants per account') cannot be represented in this global structure at all — see catalog.model-listing-live-override for how the client-facing listing compensates by fetching a live per-connection list instead of trusting this table"
+  evidence:
+    - { file: open-sse/config/providerModels.js, line: 12, note: "getProviderModels reads the single global PROVIDER_MODELS[aliasOrId]" }
+    - { file: src/shared/constants/models.js, line: 17, note: "import { PROVIDER_MODELS as MODELS } from open-sse/config/providerModels.js — same object, no connection parameter" }
+    - { file: src/shared/constants/models.js, line: 36, note: "AI_MODELS built once via Object.entries(MODELS).flatMap — global flat list" }
+    - { file: open-sse/providers/index.js, line: 30, note: "PROVIDERS/PROVIDER_MODELS built once at module load (catalog.registry-build)" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.model-listing-live-override
+  group: Model registry
+  feature: Model catalog
+  subFeature: /v1/models replaces the static per-provider model list with a live per-connection fetch when available, falling back to static on failure
+  trigger: "GET /v1/models (or /v1/models/{kind})"
+  input: none — reads the caller's own active provider connections
+  output: 'OpenAI-format { object:"list", data:[{ id, object, owned_by, capabilities?, context_length?, max_completion_tokens? }] }'
+  businessRules:
+    - "Only the FIRST active connection per provider id feeds the listing (activeConnectionByProvider Map keyed by provider, first-write-wins) — a second account on the same provider with a different enabledModels allow-list or live catalog is invisible to /v1/models even though account-selection/fallback can still dispatch chat requests to it"
+    - "For providers in LIVE_MODEL_RESOLVERS (kiro, qoder, kimchi, github, clinepass, grok-cli, cursor, zed — chosen because they return per-account dynamic model variants) a successful live fetch REPLACES rawModelIds outright rather than merging with PROVIDER_MODELS; on a thrown error, or when the connection has an explicit providerSpecificData.enabledModels allow-list, it falls back to that instead"
+    - "OpenAI/Anthropic-compatible custom providers with zero static or enabled models call fetchCompatibleModelIds to hit the account's own {baseUrl}/models endpoint directly — a second, independent live-list source with its own 5s timeout and a recursion-guard header for chained 9router-to-9router calls"
+    - "Live-catalog entries usually carry only { id, name } — no capability metadata — so context_length/max_completion_tokens are backfilled from the same static getCapabilitiesForModel(provider, modelId) pattern table used for static models, specifically so a live 372K-context model isn't guessed at a larger static default and silently overruns upstream"
+  state:
+    reads: ["providerConnections (isActive, providerSpecificData.enabledModels/prefix)", "modelAliases", "customModels", "disabledModels", "PROVIDER_MODELS static table"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.model-registry-global", "catalog.capability-tier-fallback"]
+  providerInteraction: "Live resolvers call the upstream account's own model-list/session endpoint (Kiro, Qoder, GitHub Copilot, Cursor, etc.); OpenAI/Anthropic-compatible custom providers call {baseUrl}/models directly"
+  fallback: { hasFallback: true, retry: null, timeout: "fetchCompatibleModelIds aborts via AbortController after 5000ms", quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "a live resolver throws or returns no models", partial: true }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "One live network round-trip per active provider connection on every /v1/models call — no caching of the live-resolver result (unlike providerModelsFetcher.js's 10-minute in-memory cache for the dashboard-only suggested-models fetch)"
+  behavior: { streaming: false, cancellation: "fetchCompatibleModelIds cancels its own request past 5s; a slow live resolver is not otherwise cancelled", concurrency: null }
+  edgeCases:
+    - "Multiple connections to the same provider: only the first one enumerated by getProviderConnections() feeds the listing; other accounts' enabledModels/live catalogs never surface even though account-selection can route requests to them"
+  evidence:
+    - { file: src/app/api/v1/models/route.js, line: 289, note: "activeConnectionByProvider.set only when not already present — first connection per provider wins" }
+    - { file: src/app/api/v1/models/route.js, line: 385, note: "liveResolver = LIVE_MODEL_RESOLVERS[providerId]" }
+    - { file: src/app/api/v1/models/route.js, line: 390, note: "rawModelIds = live.models.map(...) — live list replaces, not merges" }
+    - { file: src/app/api/v1/models/route.js, line: 402, note: "catch: live fetch failure falls back to whatever rawModelIds already holds" }
+    - { file: src/app/api/v1/models/route.js, line: 197, note: "AbortController 5000ms timeout on fetchCompatibleModelIds" }
+    - { file: src/app/api/v1/models/route.js, line: 502, note: "context_length/max_completion_tokens backfilled from static getCapabilitiesForModel when the live entry omits them" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.capability-tier-fallback
+  group: Model mapping
+  feature: Capability resolution
+  subFeature: getCapabilitiesForModel's 4-tier priority chain — first match wins, no cross-tier merge
+  trigger: Every call to getCapabilitiesForModel(provider, model) — chatCore.js modality stripping, /api/models and /v1/models listings
+  input: "provider id/alias, raw model id (optionally vendor-prefixed, e.g. anthropic/claude-opus-4.7)"
+  output: capabilities object, always merged over DEFAULT_CAPABILITIES so every field is present
+  businessRules:
+    - "Tier 1: PROVIDER_CAPABILITIES[provider][model] (exact model, then the vendor-prefix-stripped baseModel) — provider-specific override tables (NVIDIA, Codex, Kiro, CodeBuddy.cn, Qoder, Poolside)"
+    - "Tier 2: MODEL_CAPABILITIES[baseModel] then MODEL_CAPABILITIES[model] — canonical exact-id exceptions that a pattern would mis-match"
+    - "Tier 3: PATTERN_CAPABILITIES — an ordered glob list (specific families before generic, e.g. glm-4.6v before the generic glm-4 pattern); the first pattern to match baseModel OR the raw model string wins, then the result is passed through refine()"
+    - "Tier 4: refine(null, provider, model) — the DEFAULT_CAPABILITIES floor, also routed through refine() so even a completely uncatalogued model can still pick up a synced-catalog or vision-name signal"
+    - "Each tier RETURNS immediately inside its own if-block — there is no merging across tiers. When two tiers disagree, the higher-priority tier wins outright: a provider override with vision:false takes precedence even if the same model's exact-id or pattern entry says vision:true, because tier 1 short-circuits before tier 2/3/4 ever run"
+  state:
+    reads: ["PROVIDER_CAPABILITIES, MODEL_CAPABILITIES, PATTERN_CAPABILITIES module tables", "installed catalogSource (models.dev sync file, consulted only inside refine())"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "PATTERN_CAPABILITIES is a linear array (~90 entries) scanned front-to-back on every uncached tier-3 call — acceptable since resolution is memory-only with no I/O"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A vendor-prefixed id like 'anthropic/claude-opus-4.7' is stripped to baseModel before tiers 1-2 look it up, but tier 3's pattern loop tries matching BOTH baseModel and the original untouched string"
+  evidence:
+    - { file: open-sse/providers/capabilities.js, line: 458, note: "tier 1 PROVIDER_CAPABILITIES lookup, returns immediately on hit" }
+    - { file: open-sse/providers/capabilities.js, line: 464, note: "tier 2 MODEL_CAPABILITIES exact lookup, returns immediately on hit" }
+    - { file: open-sse/providers/capabilities.js, line: 469, note: "tier 3 PATTERN_CAPABILITIES loop, first match wins, routed through refine()" }
+    - { file: open-sse/providers/capabilities.js, line: 475, note: "tier 4 floor: refine(null, provider, model)" }
+    - { file: open-sse/providers/capabilities.js, line: 9, note: "header comment: the two refine() layers 'can[not] override the hand written tables above (steps 1-2 short-circuit before they are consulted)'" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.capability-refine-additive-only
+  group: Model mapping
+  feature: Capability resolution
+  subFeature: refine() may only turn a capability ON, never OFF
+  trigger: Every getCapabilitiesForModel call that reaches tier 3 (pattern match) or tier 4 (floor)
+  input: "base caps object from a matched pattern (tier 3) or null (tier 4), plus provider and model"
+  output: merged caps object with modality flags possibly flipped to true, and contextWindow/maxOutput possibly raised — never lowered or flipped to false
+  businessRules:
+    - "refine()'s modality loop only ever executes `result[key] = true` when the synced catalog positively asserts a modality — there is no matching branch that sets a key to false, so a hand-written tier-3 pattern's true value can never be overwritten to false by the catalog"
+    - "The vision-name heuristic follows the same rule: `if (!result.vision && looksLikeVisionModel(model)) result.vision = true` — it is only even evaluated when vision is still false, and can only flip it on"
+    - "Tiers 1-2 (PROVIDER_CAPABILITIES, MODEL_CAPABILITIES) never reach refine() at all, since getCapabilitiesForModel returns before refine() is called for those tiers — additivity only matters for the tier-3/4 path"
+    - "Why additive-only: the synced catalog is an unverified third-party feed (models.dev, refreshed daily and voted on across disagreeing gateways — see catalog.capability-catalog-sync-majority-vote). If refine() could remove a capability, a bad sync or a majority of mislabelling resellers could silently strip vision/tools/search from a model a maintainer hand-verified and shipped correctly in the tier-3 pattern table — a false POSITIVE (turning a capability on that isn't real) fails safely (the provider errors or ignores the extra field), but a false NEGATIVE (removing a real one) fails unsafely: chatCore.js's stripUnsupportedModalities would silently drop client-sent media for a model that actually supports it, producing a wrong response with no error surfaced anywhere"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.capability-tier-fallback"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "refine() runs even on tier 4 (no pattern matched at all) — so a totally custom/unrecognized model id can still gain vision from the name heuristic or from a synced-catalog entry, without ever having a hand-written table entry"
+  evidence:
+    - { file: open-sse/providers/capabilities.js, line: 433, note: "for (const key of MODALITY_KEYS) if (modalities[key] === true) result[key] = true — no false branch" }
+    - { file: open-sse/providers/capabilities.js, line: 445, note: "if (!result.vision && looksLikeVisionModel(model)) result.vision = true — only ever flips vision on" }
+    - { file: open-sse/providers/capabilities.js, line: 17, note: "header comment: 'Both only ever turn a capability ON'" }
+    - { file: open-sse/handlers/chatCore.js, line: 159, note: "getCapabilitiesForModel result feeds stripUnsupportedModalities — a false negative here silently drops client media" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.capability-catalog-sync-majority-vote
+  group: Model mapping
+  feature: Capability resolution
+  subFeature: Background models.dev sync — daily refresh, cross-gateway majority vote, tolerance band, fail-open
+  trigger: Server startup (60s delay), then every 24h, or a manual POST /api/models/catalog-sync
+  input: "https://models.dev/api.json (external feed, 145 providers / 4000+ models per capabilities.js's own doc comment)"
+  output: installed catalogSource consumed by capabilities.js's refine(); a slimmed CATALOG_FILE and raw CATALOG_RAW_FILE written to disk
+  businessRules:
+    - "A modality is only accepted when at least MIN_SHARE=50% of the gateways models.dev aggregates for a given model agree it's present — a single mislabelling reseller cannot flip a capability on"
+    - "A context/maxOutput limit difference under LIMIT_TOLERANCE=10% is ignored (gateways round 200000 vs 202752) — avoids replacing a stable value over rounding noise"
+    - "A PROVIDER_ALIASES table translates 9router's internal provider ids (glm, kimi, qwen, zhipu, hunyuan...) to models.dev's differently-named providers (zai, moonshotai, alibaba, tencent...) purely for the limits lookup — a provider absent from the map falls back to whatever the local PATTERN_CAPABILITIES table already resolves"
+    - "Sync failures are swallowed deliberately (per the module's own header comment) — a stale or missing catalog file just means refine() has nothing extra to apply; it is never surfaced as a request-time error"
+  state:
+    reads: []
+    writes: ["CATALOG_FILE (slimmed JSON next to the database)", "CATALOG_RAW_FILE (full upstream payload)"]
+    runtimeOnly: ["installed catalogSource, read by capabilities.js's refine()"]
+  dependencies: ["catalog.capability-refine-additive-only"]
+  providerInteraction: "GET https://models.dev/api.json with a 60s fetch timeout"
+  fallback: { hasFallback: true, retry: "RETRY_DELAY_MS=30 minutes after a failed sync", timeout: "FETCH_TIMEOUT_MS=60000", quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "the models.dev fetch fails or times out", partial: false }
+  sideEffects:
+    - "Writes two files under the database directory on every successful sync"
+  persistence: ["CATALOG_FILE / CATALOG_RAW_FILE on local disk, re-read by GET /api/models/catalog-sync on every call"]
+  performanceConcerns:
+    - "Raw catalog is ~4.3MB; slim() trims it to ~470KB (modalities + limits + reasoning only) before writing, kept for an 'add-models' skill as well as refine()"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "POST /api/models/catalog-sync lets an operator force a sync outside the 24h timer; it returns 503 with the last error if a sync is already in progress rather than queueing a second one"
+  evidence:
+    - { file: src/lib/modelCatalog/sync.js, line: 21, note: "MIN_SHARE=0.5 majority-vote threshold" }
+    - { file: src/lib/modelCatalog/sync.js, line: 23, note: "LIMIT_TOLERANCE=0.1 ignore-noise threshold" }
+    - { file: src/lib/modelCatalog/sync.js, line: 12, note: "FETCH_TIMEOUT_MS=60000" }
+    - { file: src/lib/modelCatalog/sync.js, line: 16, note: "RETRY_DELAY_MS=30 minutes on failure" }
+    - { file: src/lib/modelCatalog/sync.js, line: 4, note: "header comment: 'Failures are swallowed on purpose'" }
+    - { file: src/app/api/models/catalog-sync/route.js, line: 26, note: "POST triggers syncModelCatalog() on demand" }
+    - { file: src/app/api/models/catalog-sync/route.js, line: 28, note: "503 with lastError when a sync is already running" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.capability-vision-pattern-order
+  group: Model mapping
+  feature: Capability resolution
+  subFeature: NOT_VISION is tested before VISION_NAME in looksLikeVisionModel, and can only turn vision on
+  trigger: Tier 3/4 refine() fallback for a model absent from every hand-written table and the synced catalog
+  input: model id string
+  output: boolean vision flag (additive only — see catalog.capability-refine-additive-only)
+  businessRules:
+    - "looksLikeVisionModel tests NOT_VISION FIRST and returns false immediately on a match, before VISION_NAME is even evaluated — any model id containing an image-generation, embedding, rerank, guard/moderation, or audio keyword can never be classified as vision-input-capable by this heuristic, even if it also contains a vision-sounding token"
+    - "If the order were reversed (VISION_NAME checked first), a real registry entry — NVIDIA's 'nvidia/llama-nemotron-embed-vl-1b-v2:free', an EMBEDDING model (kind:\"embedding\" in openrouter.js's registry, not a vision-input chat model) — would match VISION_NAME on its 'vl' token and be misclassified as vision-capable, when NOT_VISION's 'embed' keyword correctly identifies it as a non-chat model first"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.capability-refine-additive-only"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "looksLikeVisionModel is name-only and last-resort — it never runs for a model already resolved by tiers 1-3, so the ordering only matters for genuinely uncatalogued or freshly-added custom model ids"
+  evidence:
+    - { file: open-sse/providers/visionPatterns.js, line: 40, note: "NOT_VISION.test(id) checked and returned false first" }
+    - { file: open-sse/providers/visionPatterns.js, line: 41, note: "VISION_NAME.test(id) only reached if NOT_VISION did not match" }
+    - { file: open-sse/providers/visionPatterns.js, line: 17, note: "NOT_VISION keyword list includes \"embed\"" }
+    - { file: open-sse/providers/visionPatterns.js, line: 28, note: "VISION_NAME matches the \"vl\" token" }
+    - { file: open-sse/providers/registry/openrouter.js, line: 35, note: "real registry entry nvidia/llama-nemotron-embed-vl-1b-v2:free, kind: \"embedding\" — contains both \"embed\" and \"vl\"" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.alias-resolve-before-capability
+  group: Model mapping
+  feature: Alias resolution
+  subFeature: A user-defined model alias resolves to a real provider/model pair before any capability lookup or dispatch happens
+  trigger: A chat request whose body.model is not in provider/model form
+  input: raw body.model string (candidate alias)
+  output: "resolved { provider, model } pair, which is what flows into capability lookup and the executor"
+  businessRules:
+    - "handleSingleModelChat calls getModelInfo(modelStr) before doing anything else with the model string — this resolves aliases via resolveModelAliasFromMap against the modelAliases DB table"
+    - "The resolved { provider, model } pair is what flows down into chatCore.js; getCapabilitiesForModel(provider, model) is only ever called there, on the ALREADY-RESOLVED pair — capability lookup structurally cannot see an unresolved alias string"
+    - "If the string is also a registered combo name, combo lookup runs before/alongside alias resolution and takes priority (a null provider from getModelInfo triggers a combo-name check, not an alias re-check)"
+  state:
+    reads: ["modelAliases table (via getModelAliases)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "the resolved provider is null and the string isn't a valid combo name either", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "One full getModelAliases() DB read per chat request just to check for an alias, even when the incoming string is already a qualified provider/model — no request-scoped cache"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A model string with no '/' that isn't found in modelAliases or as a combo name falls through to inferProviderFromModelName's regex prefix guesser rather than erroring immediately"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 167, note: "getModelInfo(modelStr) — alias resolution — is the first thing handleSingleModelChat does" }
+    - { file: src/sse/handlers/chat.js, line: 170, note: "only gate after resolution is '!modelInfo.provider' — no capability check yet" }
+    - { file: src/sse/services/model.js, line: 78, note: "getModelInfoCore(modelStr, getModelAliases) resolves the alias to { provider, model }" }
+    - { file: open-sse/services/model.js, line: 112, note: "resolveModelAliasFromMap(parsed.model, aliases) — the actual alias-table lookup" }
+    - { file: open-sse/handlers/chatCore.js, line: 159, note: "getCapabilitiesForModel(provider, model) called downstream, only on the already-resolved pair" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.alias-disabled-model-bypass
+  group: Model mapping
+  feature: Alias resolution
+  subFeature: Disabling a model only hides it from listing endpoints — an alias (or a direct provider/model string) pointing at a disabled model still routes normally
+  trigger: A chat request whose resolved { provider, model } matches an entry in the disabledModels table
+  input: alias or direct model string resolving to a disabled model id
+  output: request proceeds to the provider exactly as if the model were not disabled
+  businessRules:
+    - "getDisabledModels()/getDisabledByProvider() (disabledModelsRepo.js) is imported and consulted ONLY by listing/management code: /api/models (dashboard model list), /api/models/disabled (CRUD), and /v1/models (client-facing catalog) — never by src/sse/handlers/chat.js or any open-sse handler"
+    - "handleSingleModelChat's only post-resolution gate is 'is provider non-null' — there is no disabled-model check anywhere on the chat request path before dispatch"
+    - "A user-defined alias created via the alias-management endpoint that points at a disabled model.id resolves normally through resolveModelAliasFromMap and is dispatched exactly like any other model"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.alias-resolve-before-capability", "catalog.model-disabled-crud-api"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A combo built from a disabled model id has the identical gap — combo resolution (getComboModels) also never consults disabledModels"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 167, note: "getModelInfo (alias resolution) has no disabled-model check before or after it" }
+    - { file: src/sse/handlers/chat.js, line: 170, note: "only gate is '!modelInfo.provider' — no disabled check" }
+    - { file: src/app/api/models/route.js, line: 17, note: "disabled-list filtering exists only in the /api/models listing handler" }
+    - { file: src/app/api/v1/models/route.js, line: 284, note: "isDisabled() filter exists only in the /v1/models listing builder" }
+    - { file: src/lib/db/repos/disabledModelsRepo.js, line: 6, note: "getDisabledModels is the read primitive; a repo-wide grep shows only the three listing routes import it, never chat.js/chatCore.js" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A model marked disabled in the dashboard should be rejected if a request targets it — directly or via an alias — mirroring how it disappears from every model-listing endpoint (\"disable\" implies block, not just hide)"
+    actual: "The chat/routing path never reads the disabledModels table at all; only the discovery endpoints (/api/models, /v1/models) filter by it, so a disabled model keeps working for any client that already knows its id, or that reaches it through an alias or combo"
+    impact: "The 'disable' control only removes discoverability, not access — a compliance or cost-control use case ('stop routing to this expensive/broken model') is not actually enforced, silently, with no error surfaced to the operator who disabled it"
+
+- id: catalog.alias-dual-convention-collision
+  group: Model mapping
+  feature: Alias resolution
+  subFeature: Two different routes write the same modelAliases KV scope with opposite key/value conventions
+  trigger: "PUT /api/models/alias vs PUT /api/models, both described as 'update model alias'"
+  input: "PUT /api/models/alias body { model, alias } -> setModelAlias(alias, model); PUT /api/models body { model, alias } -> setModelAlias(model, alias)"
+  output: "a write into the same 'modelAliases' KV scope, but keyed in opposite directions depending on which route was called"
+  businessRules:
+    - "aliasRepo.js's own contract, per its header comment, is 'modelAliases: key=alias, value=modelString' and setModelAlias(alias, model) implements exactly that"
+    - "/api/models/alias's PUT calls setModelAlias(alias, model) — matches the documented contract (key=alias)"
+    - "/api/models's PUT calls setModelAlias(model, alias) — passes the real model string into the 'alias' parameter position and the real alias into the 'model' position, storing the row inverted (key=modelId, value=aliasName)"
+    - "The actual chat-routing consumer, resolveModelAliasFromMap(parsed.model, aliases), does aliases[parsed.model] and expects the key to be a short alias name and the value to be a 'provider/model' string — that only matches rows written by /api/models/alias's PUT; rows written by /api/models's PUT (keyed by full model id) are structurally invisible to routing"
+    - "/api/models's own GET reads modelAliases[fullModel] to populate the display-only 'alias' column — self-consistent with its own inverted PUT, but that means a routable alias set via /api/models/alias's PUT never shows up as that model's display label, and a display label set via /api/models's PUT never resolves as a routable alias during a chat request"
+  state:
+    reads: ["modelAliases KV table"]
+    writes: ["modelAliases KV table"]
+    runtimeOnly: []
+  dependencies: ["catalog.alias-resolve-before-capability"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "model or alias missing from either route's request body", partial: false }
+  sideEffects: []
+  persistence: ["modelAliases scope in the kv table (aliasRepo.js's makeKv('modelAliases'))"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "/api/models's PUT does check for alias-value collision (rejects if the alias string already appears as a VALUE under a different key) before writing; /api/models/alias's PUT has no such guard and silently overwrites any existing key"
+  evidence:
+    - { file: src/lib/db/repos/aliasRepo.js, line: 9, note: "header comment: 'modelAliases: key=alias, value=modelString'" }
+    - { file: src/lib/db/repos/aliasRepo.js, line: 14, note: "setModelAlias(alias, model) primitive signature" }
+    - { file: src/app/api/models/alias/route.js, line: 27, note: "setModelAlias(alias, model) — matches the documented key=alias contract" }
+    - { file: src/app/api/models/route.js, line: 96, note: "setModelAlias(model, alias) — arguments swapped relative to the sibling route" }
+    - { file: src/app/api/models/route.js, line: 29, note: "GET reads modelAliases[fullModel] — self-consistent with this route's own inverted PUT, but incompatible with the alias-route's convention" }
+    - { file: open-sse/services/model.js, line: 65, note: "resolveModelAliasFromMap does aliases[alias] expecting key=alias — matches only the /api/models/alias convention" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Both endpoints described as setting 'the alias for a model' should write the same KV shape so a value set through either surface is visible to the other, and to actual chat routing"
+    actual: "The two routes call the same setModelAlias(alias, model) primitive with swapped argument order, so /api/models/alias produces routable aliases (key=alias) while /api/models produces display-only rows (key=modelId) in the same table — each is invisible to the other's reader"
+    impact: "An alias set via the main /api/models list page's inline rename never actually works as a callable alias in a chat request (resolveModelAliasFromMap won't find it), while a routable alias created via the dedicated alias-management endpoint never appears as that model's display label in the main list — two silently disconnected features sharing one KV namespace"
+
+- id: catalog.model-disabled-crud-api
+  group: Model registry
+  feature: Model catalog
+  subFeature: "/api/models/disabled — per-provider disable/enable list with an atomic merge inside a DB transaction"
+  trigger: Dashboard "hide model" toggle
+  input: "POST { providerAlias, ids }; DELETE ?providerAlias=&id="
+  output: "{ success: true } or a 400/500 error body"
+  businessRules:
+    - "disableModels merges new ids into the existing array via new Set([...current, ...ids]) dedup, entirely inside a single db.transaction (no JS yield mid-transaction) — two concurrent disable calls for the same provider cannot lose one caller's ids to a race"
+    - "enableModels with an empty resulting list DELETEs the row entirely rather than storing an empty array, avoiding an ever-growing table of empty rows"
+    - "DELETE with no ?id= param passes an empty ids array into enableModels, which is the same 'clear the whole provider's disabled list' code path as an id-array wipe — 'remove one id' and 'clear everything' share one function, distinguished only by the argument"
+  state:
+    reads: ["kv table, scope='disabledModels'"]
+    writes: ["kv table, scope='disabledModels'"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "providerAlias missing on GET/DELETE, or providerAlias/ids[] missing on POST", partial: false }
+  sideEffects: []
+  persistence: ["disabledModels KV rows, one per providerAlias"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "transaction-guarded read-merge-write prevents a concurrent-disable race for the same provider" }
+  edgeCases:
+    - "GET with no providerAlias loads every provider's disabled list into memory unfiltered — this is what /api/models and /v1/models call to build their exclusion filter"
+  evidence:
+    - { file: src/lib/db/repos/disabledModelsRepo.js, line: 24, note: "db.transaction wraps the read-merge-write in disableModels" }
+    - { file: src/lib/db/repos/disabledModelsRepo.js, line: 27, note: "new Set([...current, ...ids]) dedup merge" }
+    - { file: src/lib/db/repos/disabledModelsRepo.js, line: 47, note: "enableModels deletes the row entirely once next.length === 0" }
+    - { file: src/app/api/models/disabled/route.js, line: 44, note: "DELETE route passes id ? [id] : [] — empty array clears the whole provider" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.model-custom-registration
+  group: Model registry
+  feature: Model catalog
+  subFeature: "/api/models/custom — operator-added custom models, atomic upsert that preserves unset fields"
+  trigger: Dashboard "add custom model" form
+  input: "POST { providerAlias, id, type, name, caps }"
+  output: "{ success: true, added: boolean }"
+  businessRules:
+    - "sanitizeCaps whitelists only boolean-valued keys present in CAPACITY_META (vision, reasoning) — any other key, or a non-boolean value, is silently dropped rather than rejected"
+    - "addCustomModel's re-add path (row already exists for the same composite key) merges { ...prev, ...(name?{name}:{}), ...(caps?{caps}:{}) } — re-adding an existing custom model updates only the fields actually supplied in this call, never resets an omitted field"
+    - "The composite key `${providerAlias}|${id}|${type}` lets the same id exist as two different custom models under two different types (e.g. llm vs embedding) for the same provider without colliding"
+  state:
+    reads: ["customModels KV table"]
+    writes: ["customModels KV table"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "providerAlias or id missing", partial: false }
+  sideEffects: []
+  persistence: ["customModels KV rows keyed by providerAlias|id|type"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "upsert runs inside db.transaction to avoid a duplicate-insert race on concurrent adds" }
+  edgeCases:
+    - "A custom model's saved caps ride into /api/models's response by spreading ...(m.caps || {}) LAST, after the name-heuristic caps — a saved custom capability always overrides getCapabilitiesForModel's guess"
+  evidence:
+    - { file: src/lib/db/repos/aliasRepo.js, line: 35, note: "customKey(providerAlias, id, type) — the composite key construction" }
+    - { file: src/lib/db/repos/aliasRepo.js, line: 42, note: "merge-on-re-add: { ...prev, ...(name?{name}:{}), ...(caps?{caps}:{}) } preserves fields omitted from the new call" }
+    - { file: src/app/api/models/custom/route.js, line: 11, note: "for (const key of Object.keys(CAPACITY_META)) — the actual whitelist loop" }
+    - { file: src/app/api/models/route.js, line: 62, note: "custom model caps spread last, overriding the heuristic caps" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.model-live-vendor-fetch-ui-only
+  group: Model registry
+  feature: Model catalog
+  subFeature: providerModelsFetcher.js — dashboard-only "suggested models" fetch, cached 10 minutes, never consulted for validity or routing
+  trigger: Opening a provider's detail page in the dashboard when the provider registry entry declares a modelsFetcher
+  input: "{ url, type } from PROVIDER_MEDIA[id].modelsFetcher"
+  output: "array of { id, name, contextLength? } suggestions rendered in the 'add model' UI"
+  businessRules:
+    - "fetchSuggestedModels proxies through /api/providers/suggested-models (server-side, avoiding browser CORS) and caches the result in an in-memory Map keyed by fetcher.url for 10 minutes"
+    - "This is the ONLY call site of fetchSuggestedModels in the codebase — it feeds a dropdown of suggestions when an operator adds a custom model; it never writes into PROVIDER_MODELS, never affects isValidModel, and is never consulted on the chat/routing path"
+    - "When a vendor's live list disagrees with the static PROVIDER_MODELS table (a reseller like openrouter/venice/tokenrouter ships a new model id before registry/*.js is regenerated), the disagreement is invisible to the router: isOpenAICompatibleProvider/passthrough providers already accept any model id unconditionally (isValidModel short-circuits to true), while a non-passthrough provider with a curated static list simply never offers the live-only id as a request-ready alias anywhere except this manual suggestion box — an operator must explicitly register it via /api/models/custom (catalog.model-custom-registration) before it becomes routable through the alias/model-list path"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["10-minute in-memory Map cache, scoped to the browser tab session"]
+  dependencies: ["catalog.model-registry-global", "catalog.model-custom-registration"]
+  providerInteraction: "GET to the provider's own models-style endpoint via a server-side proxy route"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "the proxy fetch fails or returns a non-OK response", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "10-minute cache avoids re-hitting the vendor endpoint on every page open"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Any fetch failure resolves to an empty array silently (the catch block swallows the error) rather than surfacing a 'couldn't fetch models' state to the operator"
+  evidence:
+    - { file: src/shared/utils/providerModelsFetcher.js, line: 16, note: "fetchSuggestedModels — checks the 10-minute cache before fetching" }
+    - { file: src/shared/utils/providerModelsFetcher.js, line: 21, note: "proxies via /api/providers/suggested-models to avoid CORS" }
+    - { file: "src/app/(dashboard)/dashboard/providers/[id]/page.js", line: 495, note: "only call site: fetchSuggestedModels(fetcher).then(setSuggestedModels)" }
+    - { file: open-sse/config/providerModels.js, line: 38, note: "isValidModel returns true unconditionally for passthrough/openai-compatible providers, independent of any live list" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

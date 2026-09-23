@@ -1,21 +1,21 @@
 # Discovery coverage
 
-Entries: 62
+Entries: 74
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 21/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +125 |
-| pages | 0/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind] … +20 |
-| providers | 8/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, antigravity, api-airforce, assemblyai … +106 |
+| routes | 27/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +119 |
+| pages | 1/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind] … +19 |
+| providers | 9/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, antigravity, api-airforce, assemblyai … +105 |
 | executors | 4/29 | antigravity, azure, codebuddy-cn, codebuddy-intl, codex, commandcode, cursor, devin-cli … +17 |
 | translators | 0/48 | open-sse/translator/concerns/chunk.js, open-sse/translator/concerns/finishReason.js, open-sse/translator/concerns/image.js, open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js … +40 |
-| repos | 3/11 | aliasRepo, combosRepo, disabledModelsRepo, nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo, usageRepo |
+| repos | 5/11 | combosRepo, nodesRepo, pricingRepo, proxyPoolsRepo, requestDetailsRepo, usageRepo |
 | settingsKeys | 8/52 | capacityAdapter, cavemanEnabled, cavemanLevel, cloudEnabled, comboStickyRoundRobinLimit, comboStrategies, comboStrategy, dnsToolEnabled … +36 |
 
 ## Entries per bounded context
 
 - apikeys: 9
-- catalog: 7
+- catalog: 19
 - connections: 38
 - identity: 1
 - settings: 7
@@ -23,8 +23,8 @@ Entries: 62
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 3
-- REFERENCE_BEHAVIOR: 55
-- SUSPECTED_BUG: 4
+- REFERENCE_BEHAVIOR: 65
+- SUSPECTED_BUG: 6
 
 ## Missing — routes
 
@@ -75,12 +75,7 @@ Entries: 62
 - api/media-providers/tts/inworld/voices
 - api/media-providers/tts/minimax/voices
 - api/media-providers/tts/voices
-- api/models
-- api/models/alias
 - api/models/availability
-- api/models/catalog-sync
-- api/models/custom
-- api/models/disabled
 - api/models/test
 - api/pricing
 - api/provider-nodes
@@ -145,7 +140,6 @@ Entries: 62
 - api/v1/images/generations
 - api/v1/messages
 - api/v1/messages/count_tokens
-- api/v1/models
 - api/v1/models/[...model]
 - api/v1/models/info
 - api/v1/responses
@@ -178,7 +172,6 @@ Entries: 62
 - (dashboard)/dashboard/mitm
 - (dashboard)/dashboard/profile
 - (dashboard)/dashboard/providers
-- (dashboard)/dashboard/providers/[id]
 - (dashboard)/dashboard/providers/new
 - (dashboard)/dashboard/proxy-pools
 - (dashboard)/dashboard/pxpipe
@@ -272,7 +265,6 @@ Entries: 62
 - openai
 - opencode
 - opencode-go
-- openrouter
 - perplexity
 - perplexity-agent
 - perplexity-web
@@ -391,9 +383,7 @@ Entries: 62
 
 ## Missing — repos
 
-- aliasRepo
 - combosRepo
-- disabledModelsRepo
 - nodesRepo
 - pricingRepo
 - proxyPoolsRepo
