@@ -19,9 +19,7 @@ export function renderCapabilities(entries: FeatureEntry[]): string {
   }
 
   for (const [group, list] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
-    const capabilities = list
-      .filter((e) => !e.labels.includes("SUSPECTED_BUG"))
-      .sort((a, b) => a.id.localeCompare(b.id));
+    const capabilities = [...list].sort((a, b) => a.id.localeCompare(b.id));
     if (capabilities.length === 0) continue;
 
     out.push(`## ${group}`, "");
@@ -42,6 +40,14 @@ export function renderCapabilities(entries: FeatureEntry[]): string {
             e.errorCases.map((c) => `\`${c.code}\` (${c.when})`).join(", "),
         );
       }
+      // Suspected-bug entries are still capabilities AIGate must have — the
+      // defect they carry in 9router does not exempt the underlying behavior
+      // from being required. State what AIGate must do; never restate
+      // 9router's actual (buggy) behavior here — that lives only in the
+      // "Suspected bugs" table below.
+      if (e.labels.includes("SUSPECTED_BUG") && e.suspicion) {
+        out.push(`- **AIGate required behavior:** ${e.suspicion.expected}`);
+      }
       if (e.labels.includes("IMPLEMENTATION_ACCIDENT")) {
         out.push(
           "- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.",
@@ -60,9 +66,16 @@ export function renderCapabilities(entries: FeatureEntry[]): string {
     for (const b of bugs) {
       const s = b.suspicion;
       if (!s) continue;
-      out.push(`| \`${b.id}\` | ${s.expected} | ${s.actual} | ${s.impact} |`);
+      out.push(
+        `| \`${cell(b.id)}\` | ${cell(s.expected)} | ${cell(s.actual)} | ${cell(s.impact)} |`,
+      );
     }
     out.push("");
   }
   return out.join("\n");
+}
+
+/** Escape `|` so an interpolated value can't break a markdown table row's column count. */
+function cell(s: string): string {
+  return s.replace(/\|/g, "\\|");
 }

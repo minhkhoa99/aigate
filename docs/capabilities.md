@@ -73,6 +73,50 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Because a failed account is BOTH excluded and locked, the allRateLimited branch is what normally fires after the last account fails — so the client gets 503, not the upstream status
 - **Errors:** `PROVIDER_UNAVAILABLE` (all accounts locked — 503 with Retry-After), `AUTH_ERROR` (no active connection for the provider — 404)
 
+### Reactive 401/403 handling — refresh credentials, re-execute once
+
+- **id:** `fallback.auth-refresh-retry` · **module:** `routing`
+- **Trigger:** Upstream returns 401 or 403 and the executor is not noAuth
+- **Input:** The failed response, credentials, executor.refreshCredentials
+- **Output:** Either a successful retry response replacing the original, or the ORIGINAL 401/403 response continuing to error handling
+- **Rules:**
+  - refreshWithRetry(fn, 3): up to 3 refresh attempts with 1 s then 2 s sleeps; a null result counts as a failure and is retried
+  - Rotating refresh tokens (xAI / grok-cli) are written back onto credentials between attempts so attempt 2/3 do not reuse a consumed token
+  - On success: credentials are merged, onCredentialsRefreshed persists them, and the request is executed ONCE more with the full executor retry budget
+  - The retry response is adopted only if response.ok; a non-ok retry (e.g. 429 after refresh) is dropped and the original 401/403 is what gets classified
+- **Errors:** `AUTH_ERROR` (refresh yields nothing or the retry is not ok — original 401/403 flows to fallback.error-classification (2 min lock, next account))
+- **AIGate required behavior:** A 401/403 on an account that has nothing to refresh (API-key credentials, or a provider with no refresher) fails fast to the next account
+
+### Which upstream outcomes retry, switch account, switch combo model, or return to the client
+
+- **id:** `fallback.error-classification` · **module:** `routing`
+- **Trigger:** Any failed single-model attempt (result.success false) in handleSingleModelChat, and any non-2xx member Response in handleComboChat
+- **Input:** result.status, result.error text, resetsAtMs, provider, model, the connection's backoffLevel
+- **Output:** shouldFallback + a model-scoped lock; the combo engine re-runs the same classifier on the final Response
+- **Rules:**
+  - Q2 TABLE. Columns = in-place retry (executor, same URL) | next baseUrl | next ACCOUNT (chat.js loop, lock written) | next combo MODEL (combo.js) | returned to client immediately
+  - 400 generic (bad params, context too long, schema): no | no | YES, 30 s transient lock | YES | no
+  - 400 containing 'improperly formed request' (kiro): no | no | YES, 2 min lock | YES | no
+  - 400 from local translation failure (chatCore translateRequest returned nothing): n/a (no upstream call) | no | YES, 30 s lock | YES | no
+  - 401 / 403: no; first a 3-attempt refresh + one re-execute (fallback.auth-refresh-retry) | no | YES, 2 min lock | YES | no
+  - 402: no | no | YES, 2 min lock (GitHub monthly-limit text: account-wide lock until the 1st of next UTC month) | YES | no
+  - 404: no | no | YES, 2 min lock | YES | no
+  - 409 / 422 / other 4xx: no (antigravity 409 triggers a live quota refresh) | no | YES, 30 s lock (antigravity with reset: RAM-only exclusion) | YES | no
+  - 429: default no (antigravity x3, grok-cli x2, vercel-ai-gateway x2) | YES if another baseUrl (kiro) | YES, exponential lock 2 s..5 min, or provider resetsAtMs capped 30 min (antigravity uncapped) | YES | no
+  - 500: only antigravity x3 | no | YES, 30 s lock | YES | no
+  - 502: x3 @3 s | no | YES, 30 s lock | YES (combo waits first only when the cooldown is <= 5 s, i.e. only for backoff-text matches) | no
+  - 503: x3 @2 s | no | YES, 30 s lock, or exponential if the text contains 'overloaded'/'capacity' | YES | no
+  - 504: x2 @3 s | no | YES, 30 s lock | YES | no
+  - Network error / connect timeout: x3 @3 s (502 entry) | YES if another baseUrl | YES as 502, 30 s lock | YES | no
+  - Caller AbortError: no | no | YES as 499, 30 s lock | YES | no
+  - 2xx with non-SSE, non-JSON content type on a streaming request: no | no | YES, 30 s lock (status is the 2xx code) | YES | no
+  - 2xx then failure mid-stream: no | no | no | no | the truncated stream IS the answer (fallback.partial-stream-failure)
+  - Text rules win over status rules: any status whose message contains 'rate limit', 'too many requests', 'quota exceeded', 'capacity' or 'overloaded' gets exponential backoff; 'no credentials' 2 min; 'request not allowed' 5 s
+  - Returned to the client immediately (no retry, no fallback): ONLY (a) noAuth providers — markAccountUnavailable returns shouldFallback false for connectionId noauth, so the upstream error is passed straight through; and (b) errors raised before dispatch (invalid JSON, missing/invalid API key, missing model, invalid model format, no credentials 404). checkFallbackError itself NEVER returns shouldFallback false — its final line is a catch-all `{ shouldFallback: true, cooldownMs: 30 s }`
+  - 'Fallback to another provider' exists only as 'next combo member' (combo.js); a single-model request never changes provider. The combo `if (!shouldFallback) return result` branch is dead code because the classifier always says true
+- **Errors:** `INVALID_REQUEST` (upstream 400 or local translation failure — treated as an account failure: 30 s lock and next account), `AUTH_ERROR` (401/403 after refresh — 2 min lock, next account), `QUOTA_EXHAUSTED` (402, or text 'quota exceeded', or provider resetsAtMs), `MODEL_UNAVAILABLE` (404 — 2 min lock, next account), `RATE_LIMIT` (429 or rate-limit text — exponential lock, next account), `PROVIDER_UNAVAILABLE` (5xx / network — after in-place retries, 30 s lock, next account), `TIMEOUT` (connect timeout — handled as a 502 network error)
+- **AIGate required behavior:** Terminal, request-caused errors (400 invalid request, 404 unknown model, local translation failure, 499 client abort) are returned to the client once, without locking the account (behavioral.md §20: no blind fallback)
+
 ### In-place retry (tryRetry) and computeRetryDelay, and the end-to-end retry ceiling
 
 - **id:** `fallback.executor-retry-budget` · **module:** `routing`
@@ -103,6 +147,21 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Loop exhaustion throws the last error, or `All N URLs failed with status S`
 - **Streaming:** yes
 - **Errors:** `TIMEOUT` (no response headers within the connect timeout — converted to a retryable network error (502 retry config)), `PROVIDER_UNAVAILABLE` (network error on the last URL after retries — thrown, becomes 502 in chatCore), `RATE_LIMIT` (429 with another baseUrl available — next URL (kiro has 3))
+
+### Upstream failure after tokens have already reached the client
+
+- **id:** `fallback.partial-stream-failure` · **module:** `routing`
+- **Trigger:** The upstream SSE body errors, resets, or stalls after the streaming Response has been returned
+- **Input:** Upstream read error (ECONNRESET, socket hang up, ETIMEDOUT, EPIPE, UND_ERR_SOCKET, AbortError from the stall watchdog, or any other error)
+- **Output:** A truncated stream — closed cleanly or errored, never resumed on another account
+- **Rules:**
+  - Q5: there is no mid-stream retry or fallback. handleSingleModelChat already returned result.response when headers were ok, so the account loop and the combo loop have both exited
+  - Network-class errors and aborts (including the stall watchdog, which marks the controller disconnected before aborting) close the client stream cleanly; only Responses-API passthrough gets a synthesized response.failed + [DONE] terminal
+  - Any other error while still connected calls controller.error(), so the client sees a broken chunked response
+  - onRequestSuccess has already fired at header time, so the account's error state and locks are cleared even though the answer was cut off
+- **Streaming:** yes
+- **Errors:** `PROVIDER_UNAVAILABLE` (upstream connection resets after first byte — stream closed gracefully, no error event, no [DONE] on OpenAI/Claude formats), `TIMEOUT` (stall watchdog fires mid-stream — treated as a graceful close), `INTERNAL_ERROR` (non-network error while connected — controller.error(), client connection errors)
+- **AIGate required behavior:** A stream cut off mid-answer is signalled to the client as an error (error event or missing terminal it can detect), and the account is not marked healthy
 
 ### Turning an executor exception or non-2xx response into an error result
 
@@ -213,6 +272,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - DELETE also strips OPENAI_API_KEY and auth_mode from auth.json (a file this integration never wrote to), deleting the whole file if it becomes empty
 - **Errors:** `INVALID_REQUEST` (baseUrl, apiKey or model missing — 400), `INTERNAL_ERROR` (unexpected fs/TOML error)
 
+### Array-based upsert into chatLanguageModels.json, and a missing install-detection step
+
+- **id:** `clitools.copilot-settings-array-upsert` · **module:** `tooling`
+- **Trigger:** Dashboard "Copilot" card — GET/POST/DELETE
+- **Input:** POST body { baseUrl, apiKey, models[] }
+- **Output:** { success, message, configPath }
+- **Rules:**
+  - Config is an array of provider entries (not a keyed object like every other tool); the 9Router entry is found/replaced/appended by name === '9Router'
+  - vendor is hardcoded to 'azure' and each model entry is given a fixed toolCalling:true, vision:false, maxInputTokens:128000, maxOutputTokens:16000 regardless of the model's real capabilities
+  - apiKey defaults to the literal string 'sk_9router' when the caller supplies none
+  - URL is built as `${baseUrl}/chat/completions#models.ai.azure.com` — a different suffix convention than the /v1 rule used by every other tool (see clitools.baseurl-v1-suffix-normalization), because VS Code's Copilot Chat model picker keys entries by this azure-style URL fragment
+- **Errors:** `INVALID_REQUEST` (baseUrl missing or models[] empty — 400), `INTERNAL_ERROR` (unexpected fs error)
+- **AIGate required behavior:** Like every other cli-tools GET handler (claude, codex, cline, droid, kilo, etc.), Copilot's GET should reflect a real detection check — a `where`/`which` lookup or a marker-file probe — before reporting installed: true, so the dashboard only shows Copilot as available on a machine that actually has it.
+
 ### Registry fetch (with in-memory cache) and per-server tool-list probe (with SSRF guard), consumed by McpMarketplaceModal
 
 - **id:** `clitools.cowork-mcp-marketplace-fetch` · **module:** `tooling`
@@ -242,6 +315,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - cleanup1pLegacy best-effort removes any of LOCAL_STDIO_PLUGINS' names from the FIRST-PARTY (1p) claude_desktop_config.json's mcpServers, in case an older 9router version wrote stdio entries there directly
   - DELETE does not remove the instance file or _meta.json; it overwrites the active configLibrary/<uuid>.json with an empty object {} — Cowork keeps pointing at the same (now-empty) instance
 - **Errors:** `INVALID_REQUEST` (baseUrl/apiKey missing, or models[] resolves empty — 400), `INTERNAL_ERROR` (unexpected fs error on any of the four files touched)
+
+### Both POST and DELETE replace the entire config.toml with a fixed template, discarding unrelated content
+
+- **id:** `clitools.deepseek-tui-full-overwrite` · **module:** `tooling`
+- **Trigger:** Dashboard "DeepSeek TUI" card — GET/POST/DELETE
+- **Input:** POST body { baseUrl, apiKey, model }
+- **Output:** { success, message, configPath }
+- **Rules:**
+  - GET uses a hand-rolled regex TOML parser (parseToml) rather than a real TOML library (contrast with codex-settings and jcode-settings, which use confbox) — it only understands flat `key = "value"` lines and `[section]` headers, storing dotted-section content under a single flat key like config['providers.openai'] rather than a nested object
+  - POST does NOT read the existing config.toml at all before writing: build9RouterConfig() returns a brand-new fixed template string (`provider = "openai"\n[providers.openai]\n...`) that is written verbatim, replacing the entire file
+  - DELETE writes the hardcoded DEFAULT_CONFIG string (`provider = "deepseek"\n`) verbatim, again replacing the entire file
+- **Errors:** `INVALID_REQUEST` (baseUrl or model missing — 400), `INTERNAL_ERROR` (unexpected fs error)
+- **AIGate required behavior:** Like every other tool's Apply/Reset in this set (codex, droid, opencode, openclaw, grok-build, hermes, jcode, kilo, cline, cowork all read-merge-write or perform a targeted key removal), DeepSeek TUI's POST should merge 9router's fields into whatever config.toml already contains, and DELETE should remove only what 9router added — preserving any other DeepSeek TUI settings the user configured.
 
 ### The one tool in the set with GET only — no config file is ever written
 
@@ -340,6 +426,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - PATCH supports a narrow clearActiveModel-only operation that blanks config.model without touching the provider/models map
   - DELETE supports removing a single model (?model=<id>) — if it was the active model, the first remaining model becomes active; if models becomes empty, the whole provider entry and config.model are removed. With no ?model, the whole 9router provider and agent.explorer subagent are removed
 - **Errors:** `INVALID_REQUEST` (baseUrl missing or no models resolved on POST — 400), `INTERNAL_ERROR` (unexpected fs/JSON error on any of GET/POST/PATCH/DELETE)
+
+### Every cli-tools write is a single non-atomic fs.writeFile with no on-disk backup
+
+- **id:** `clitools.write-not-atomic` · **module:** `tooling`
+- **Trigger:** Any POST/DELETE/PATCH across all 13 write-capable cli-tools routes
+- **Input:** Any tool-config write triggered by that tool's own POST/DELETE/PATCH handler
+- **Output:** The write either lands intact or, on a mid-write failure, leaves the target file truncated/corrupted with no recovery path
+- **Rules:**
+  - Q2 answer: the write is NOT atomic. Every route (claude-settings, cline-settings, codex-settings, copilot-settings, cowork-settings, deepseek-tui-settings, droid-settings, grok-build-settings, hermes-settings, jcode-settings, kilo-settings, openclaw-settings, opencode-settings — including openclaw's per-agent models.json files and cowork's per-instance configLibrary/*.json) calls fs.writeFile(path, content) directly on the FINAL path. None use a temp-file-then-rename swap, and none write a recoverable .bak copy of the previous content
+  - The codebase already has an atomic-write helper for this exact purpose elsewhere: src/lib/mitmAliasCache.js's writeAtomic() writes to '<file>.tmp' then fs.renameSync()s over the real file — that pattern is simply not used for any of the user's own CLI/IDE config files
+- **Errors:** `INTERNAL_ERROR` (process dies, disk fills, or power is lost between fs.writeFile's buffer flush and the OS completing the write)
+- **AIGate required behavior:** Given every one of these writes targets the user's own IDE/CLI configuration file (not 9router's own data), and one of the affected routes' own comment explicitly promises 'Backup old fields and write new settings', a crash mid-write should not be able to corrupt or truncate that file — either via a temp-file-then-rename swap (the exact pattern already implemented in this codebase at src/lib/mitmAliasCache.js:15-21 for 9router's own alias cache) or an actual on-disk backup copy.
 
 ## Combo / Vision Adapter
 
@@ -632,6 +730,29 @@ Every item below is a capability AIGate must have. Derived from tracing
   - New key defaults isActive: true
 - **Errors:** `INVALID_REQUEST` (name is missing from the request body), `INTERNAL_ERROR` (DB insert throws)
 
+### Legacy sk-{random8} keys and the never-invoked CRC/format validation
+
+- **id:** `apikey.legacy-format-unenforced` · **module:** `apikeys`
+- **Trigger:** A request bearing a pre-machineId-era key, or any hand-crafted string
+- **Input:** sk-{random8} (2 dash-separated parts) or any other string
+- **Output:** Accepted iff the exact string exists as an active row in apiKeys; format is never inspected
+- **Rules:**
+  - parseApiKey() recognizes two shapes (4-part new format with CRC check, 2-part legacy format with no CRC) and isNewFormatKey/verifyApiKeyCrc build on it, but grepping the whole src tree shows none of the three is called from anywhere except inside apiKey.js itself — apiKeysRepo.createApiKey calls generateApiKeyWithMachine (write path only), and validateApiKey (read/auth path) never imports apiKey.js at all
+  - Legacy sk-{random8} keys are therefore accepted for as long as their row remains in the apiKeys table with isActive true — there is no migration, expiry, or forced-rotation step
+- **Errors:** `AUTH_ERROR` (a malformed/tampered key does not match any DB row)
+- **AIGate required behavior:** Given generateCrc/parseApiKey/verifyApiKeyCrc exist specifically to bind a key to a machineId and detect tampering, the request-time auth path (validateApiKey / isValidApiKey) calls verifyApiKeyCrc (or parseApiKey) to reject a key whose embedded CRC doesn't match its machineId+keyId before or in addition to the DB lookup
+
+### List all API keys (GET /api/keys)
+
+- **id:** `apikey.list-keys` · **module:** `apikeys`
+- **Trigger:** Dashboard loads the API keys page
+- **Input:** none
+- **Output:** 200 { keys: [{ id, key, name, machineId, isActive, createdAt }, ...] } ordered by createdAt ASC
+- **Rules:**
+  - The full plaintext key is returned in the list response — there is no masking of previously-issued keys
+- **Errors:** `INTERNAL_ERROR` (DB query throws)
+- **AIGate required behavior:** A key-management list endpoint masks or omits the secret value after initial issuance (standard practice, and consistent with GET /api/settings stripping password/oidcClientSecret)
+
 ### Toggle a key's isActive flag (PUT /api/keys/[id])
 
 - **id:** `apikey.update-key-status` · **module:** `apikeys`
@@ -790,6 +911,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - GET /v1/models filters imageToText models into the LLM list when the caller also requested the llm kind (kindFilter.includes(LLM_KIND)) — imageToText-kind models are presented to clients as vision-capable chat models, not as a separate catalog of image-understanding endpoints
   - The dashboard still gives imageToText its own MEDIA_PROVIDER_KINDS entry, page route, and provider-card grid (getProvidersByKind("imageToText")) purely for discoverability/UI grouping — the underlying request that a click on "Try it" builds is a chat completion, not a call to a dedicated imageToText backend (see media.kind-endpoint-map-mismatch for where that UI wiring is actually broken)
 
+### Two independently-maintained kind→endpoint maps disagree for imageToText and webFetch
+
+- **id:** `media.kind-endpoint-map-mismatch` · **module:** `media`
+- **Trigger:** GET /v1/models/info (builds a model's endpoint field from KIND_ENDPOINT); the media-providers connection detail page's GenericExampleCard (builds a curl example AND performs a live "Try it" fetch from MEDIA_PROVIDER_KINDS[kind].endpoint)
+- **Input:** kind id (imageToText or webFetch)
+- **Output:** Two different, both-consumed path strings for the same kind
+- **Rules:**
+  - MEDIA_PROVIDER_KINDS.imageToText.endpoint.path is "/v1/images/understanding" — a path that does not exist anywhere else in the codebase (grep for "understanding" across src/ and open-sse/ finds only this one declaration); the real route imageToText models resolve to is /v1/chat/completions, which models/info/route.js's own independently-hand-written KIND_ENDPOINT map gets right
+  - KIND_ENDPOINT.webFetch is "/v1/fetch" (missing the /web/ segment); the real route is /v1/web/fetch (src/app/api/v1/web/fetch/route.js), which MEDIA_PROVIDER_KINDS.webFetch.endpoint.path gets right — the mismatch runs the opposite direction from the imageToText case (here it's models/info that's wrong)
+  - GenericExampleCard.js's handleRun doesn't just render a curl string for imageToText: it actually calls fetch(`/api${apiPathWithQuery}`, { method: kindConfig.endpoint.method, ... }) using MEDIA_PROVIDER_KINDS' path — so the dashboard's "Try it" button for any imageToText-kind provider/model POSTs to /api/v1/images/understanding, a route that returns 404, not the working /v1/chat/completions
+- **Errors:** `INVALID_REQUEST` (GenericExampleCard's "Try it" is used against an imageToText-kind provider — the built request 404s against a route that was never implemented)
+- **AIGate required behavior:** MEDIA_PROVIDER_KINDS and models/info's KIND_ENDPOINT should agree, and both should name a route that actually exists, for every kind.
+
 ### MEDIA_PROVIDER_KINDS — the 9 kinds, their labels/icons, and each kind's declared REST endpoint
 
 - **id:** `media.kind-registry-and-endpoints` · **module:** `media`
@@ -849,6 +983,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - GET /v1/audio/voices (the OpenAI-style public listing) proxies to a hardcoded PROVIDER_API map covering elevenlabs/deepgram/inworld/edge-tts/local-device but omits minimax — minimax's own dedicated voices route exists and works when called directly, but is not reachable through the public /v1/audio/voices listing endpoint
 - **Errors:** `INVALID_REQUEST` (generic route's provider query param has no matching VOICE_FETCHERS entry), `AUTH_ERROR` (dedicated route's provider has no active stored connection), `PROVIDER_UNAVAILABLE` (the upstream voices/models call itself fails (non-ok response))
 
+### POST /v1/videos/{generations,edits,extensions} + GET /v1/videos/[id] — async job proxy, xAI-only in practice
+
+- **id:** `media.video-lane` · **module:** `media`
+- **Trigger:** POST /v1/videos/generations|edits|extensions, or GET /v1/videos/{request_id} to poll
+- **Input:** JSON or multipart body forwarded byte-for-byte (model may carry a provider/ prefix); x-connection-id header pins polling to the creating account
+- **Output:** Upstream JSON passed through verbatim (request_id/status/video.url/error), with x-9router-connection-id echoed back on create so the client can pin subsequent polls
+- **Rules:**
+  - Only xai declares both serviceKinds:["video"] and a videoConfig block; DEFAULT_VIDEO_PROVIDER="xai" is the fallback target for a bare model id with no provider prefix — the handler's own comment states "Video generation is xAI-only today"
+  - Creation POSTs are treated as billable and are NEVER auto-retried on a network error (the job may already exist upstream) — the only retry is a single auth-refresh-and-resend on 401/403/429 (CREATE_ROTATION_STATUSES), which only fires before the upstream could have created the job
+  - GET polls are pinned to the creating account (x-connection-id) with explicitly no cross-account rotation, since a video job lives only on the account that created it — this is a materially different fallback shape from every other media lane's per-request account rotation
+- **Errors:** `INVALID_REQUEST` (model resolves to a provider with no videoConfig and the model string included an explicit provider/ prefix), `INVALID_REQUEST` (model resolves to a combo (combos are not supported for video generation)), `PROVIDER_UNAVAILABLE` (all xai accounts rate-limited/locked on create)
+- **AIGate required behavior:** A model the catalog lists with kind:"video" should be reachable through the video-generation lane (or should not be listed as kind:video at all).
+
 ### POST /v1/web/fetch — URL extraction, account-selection loop scoped to a webfetch-specific lock key
 
 - **id:** `media.webfetch-lane` · **module:** `media`
@@ -875,6 +1022,33 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Errors:** `INVALID_REQUEST` (missing provider/model or query), `INVALID_REQUEST` (resolved provider has neither searchConfig nor searchViaChat), `PROVIDER_UNAVAILABLE` (all accounts (own + credentialFallback) rate-limited/locked under the websearch lock key)
 
 ## Model mapping
+
+### Disabling a model only hides it from listing endpoints — an alias (or a direct provider/model string) pointing at a disabled model still routes normally
+
+- **id:** `catalog.alias-disabled-model-bypass` · **module:** `catalog`
+- **Trigger:** A chat request whose resolved { provider, model } matches an entry in the disabledModels table
+- **Input:** alias or direct model string resolving to a disabled model id
+- **Output:** request proceeds to the provider exactly as if the model were not disabled
+- **Rules:**
+  - getDisabledModels()/getDisabledByProvider() (disabledModelsRepo.js) is imported and consulted ONLY by listing/management code: /api/models (dashboard model list), /api/models/disabled (CRUD), and /v1/models (client-facing catalog) — never by src/sse/handlers/chat.js or any open-sse handler
+  - handleSingleModelChat's only post-resolution gate is 'is provider non-null' — there is no disabled-model check anywhere on the chat request path before dispatch
+  - A user-defined alias created via the alias-management endpoint that points at a disabled model.id resolves normally through resolveModelAliasFromMap and is dispatched exactly like any other model
+- **AIGate required behavior:** A model marked disabled in the dashboard should be rejected if a request targets it — directly or via an alias — mirroring how it disappears from every model-listing endpoint ("disable" implies block, not just hide)
+
+### Two different routes write the same modelAliases KV scope with opposite key/value conventions
+
+- **id:** `catalog.alias-dual-convention-collision` · **module:** `catalog`
+- **Trigger:** PUT /api/models/alias vs PUT /api/models, both described as 'update model alias'
+- **Input:** PUT /api/models/alias body { model, alias } -> setModelAlias(alias, model); PUT /api/models body { model, alias } -> setModelAlias(model, alias)
+- **Output:** a write into the same 'modelAliases' KV scope, but keyed in opposite directions depending on which route was called
+- **Rules:**
+  - aliasRepo.js's own contract, per its header comment, is 'modelAliases: key=alias, value=modelString' and setModelAlias(alias, model) implements exactly that
+  - /api/models/alias's PUT calls setModelAlias(alias, model) — matches the documented contract (key=alias)
+  - /api/models's PUT calls setModelAlias(model, alias) — passes the real model string into the 'alias' parameter position and the real alias into the 'model' position, storing the row inverted (key=modelId, value=aliasName)
+  - The actual chat-routing consumer, resolveModelAliasFromMap(parsed.model, aliases), does aliases[parsed.model] and expects the key to be a short alias name and the value to be a 'provider/model' string — that only matches rows written by /api/models/alias's PUT; rows written by /api/models's PUT (keyed by full model id) are structurally invisible to routing
+  - /api/models's own GET reads modelAliases[fullModel] to populate the display-only 'alias' column — self-consistent with its own inverted PUT, but that means a routable alias set via /api/models/alias's PUT never shows up as that model's display label, and a display label set via /api/models's PUT never resolves as a routable alias during a chat request
+- **Errors:** `INVALID_REQUEST` (model or alias missing from either route's request body)
+- **AIGate required behavior:** Both endpoints described as setting 'the alias for a model' should write the same KV shape so a value set through either surface is visible to the other, and to actual chat routing
 
 ### A user-defined model alias resolves to a real provider/model pair before any capability lookup or dispatch happens
 
@@ -935,6 +1109,17 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Rules:**
   - looksLikeVisionModel tests NOT_VISION FIRST and returns false immediately on a match, before VISION_NAME is even evaluated — any model id containing an image-generation, embedding, rerank, guard/moderation, or audio keyword can never be classified as vision-input-capable by this heuristic, even if it also contains a vision-sounding token
   - If the order were reversed (VISION_NAME checked first), a real registry entry — NVIDIA's 'nvidia/llama-nemotron-embed-vl-1b-v2:free', an EMBEDDING model (kind:"embedding" in openrouter.js's registry, not a vision-input chat model) — would match VISION_NAME on its 'vl' token and be misclassified as vision-capable, when NOT_VISION's 'embed' keyword correctly identifies it as a non-chat model first
+
+### GET /api/tags — fixed two-entry fixture list mimicking Ollama's model-discovery response, used by Ollama-compatible tools before they call the ollama chat lane (05's routing.ollama-lane-transform)
+
+- **id:** `catalog.ollama-tags-listing` · **module:** `catalog`
+- **Trigger:** An Ollama-compatible client's startup/model-discovery probe against GET /api/tags before it sends a chat request
+- **Input:** none
+- **Output:** { models: [{ name, modified_at, size, digest, details:{format,family,parameter_size,quantization_level} }, ...] } — always exactly the same two hardcoded entries (llama3.2, qwen2.5)
+- **Rules:**
+  - The entire response is a static, hand-authored object (open-sse/config/ollamaModels.js) — it does not read providerConnections, PROVIDER_MODELS, customModels, modelAliases, or disabledModels, so it is completely disconnected from the real, routable model catalog every other listing endpoint (v1/models, v1beta/models) derives from those sources
+  - A repo-wide grep for the two fixture names finds llama3.2 also hardcoded in src/app/api/v1/api/chat/route.js (the ollama chat lane, routing.ollama-lane-transform) as modelName's fallback default when the request body's own model field is missing or fails to parse — but that is a response-label default for the outgoing {model, message, done} shape, not a resolution/routing mechanism (handleChat still dispatches on the real, unmodified request body). Neither llama3.2 nor qwen2.5 maps to any real provider/model id, alias, or ollama-local static entry anywhere — the fixture list still names nothing a chat request can actually resolve to
+- **AIGate required behavior:** The model names an Ollama-compatible client discovers via GET /api/tags are names it can actually use in a subsequent chat request on the Ollama lane (POST /v1/api/chat, routing.ollama-lane-transform) — a discovery endpoint's contract is that its results are usable
 
 ### POST /v1beta/models/{model}:generateContent and :streamGenerateContent — per-model invocation route under the v1beta/models path, translating to/from the internal OpenAI-shaped pipeline
 
@@ -1077,6 +1262,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - The cache lives entirely in process memory (a module-scope Map in antigravityQuota.js, not global._-prefixed), separate from the persisted modelLock_* mechanism — a cache hit skips upstream calls without ever writing a DB lock, so this filtering is invisible to any code that only inspects the connection row
   - A strike-based circuit breaker layered on top of the same cache (STRIKE_THRESHOLD=3 429s within a 60s window) additionally blocks a connection+model pair for 15 minutes when the optimistic quota reading disagrees with repeated live 429s — this is a second, independent reason a connection can be filtered here beyond the plain remainingPercentage<=0 check
 - **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### Whether two concurrent requests against the same connection can both trigger a token refresh
+
+- **id:** `account.concurrent-refresh-race` · **module:** `connections`
+- **Trigger:** Two client requests routed to the same provider+model close enough together that both select the same connection (most likely under fill-first, the default strategy) while its token is expired or the upstream returns 401/403
+- **Input:** Two independent in-memory credentials snapshots for the same connectionId, each captured by a separate call to getProviderCredentials/checkAndRefreshToken
+- **Output:** Both requests independently call the provider's refresh endpoint with their own copy of refreshToken; for providers whose refresh token is single-use and rotates on every call, the second call's refresh fails
+- **Rules:**
+  - There is no per-connection refresh lock anywhere in this path: getProviderCredentials()'s selectionMutex only wraps the SELECTION step and releases before the caller even starts using the credentials (see account.select-mutex-global-scope) — nothing serializes the subsequent refresh-and-retry, at either the proactive layer (checkAndRefreshToken, called unconditionally after every selection in src/sse/handlers/chat.js line 253) or the reactive layer (chatCore.js's 401/403 handler, line 402)
+  - Fill-first (the default strategy) always returns the same top-priority connection to every concurrent caller as long as it's available — it does not mark a connection 'checked out', so two requests arriving within the same tens-of-milliseconds window before either has refreshed routinely receive identical credentials.refreshToken values
+  - Each caller mutates only its own local `credentials` object across refreshWithRetry's internal retry attempts (chatCore.js lines 404-413, explicitly commented as fixing rotation WITHIN one call's own retries) — this local mutation does nothing for a second, separate concurrent request, which still holds the pre-refresh refreshToken value it captured at selection time
+  - The DB write itself (updateProviderCredentials -> connectionsRepo.updateProviderConnection) is atomic per call (read-merge-write inside one db.transaction), so the stored row is never corrupted — the race is entirely about which in-memory refreshToken each concurrent request's refresh call sends upstream, not about a corrupted database write
+- **Errors:** `AUTH_ERROR` (a provider with single-use rotating refresh tokens (the code names xAI/grok-cli explicitly) receives a second concurrent refresh call using a refreshToken already consumed by the first — the provider returns invalid_grant and refreshWithRetry's 3 attempts all fail on the stale token)
+- **AIGate required behavior:** Two concurrent requests hitting an expired/rejected token on the same connection should converge on one valid refreshed token — either serialized so the second reuses the first's fresh token, or each refresh is independently idempotent regardless of which refreshToken value it started from
 
 ### Distinguishing 'no accounts configured' from 'all accounts temporarily locked', with retry-after computed from the earliest lock
 
@@ -1477,6 +1676,21 @@ Every item below is a capability AIGate must have. Derived from tracing
   - claude is the canonical example: apiKey credentials get x-api-key (raw) + anthropic-version, oauth (accessToken) credentials get Authorization Bearer + the same anthropic-version — same upstream API, two different header shapes depending on how the connection was created
   - If neither apiKey nor accessToken is present, this branch sets no auth header at all (unlike the combined branch's always-set-even-if-undefined behavior) — the code comment calls this out explicitly as matching legacy anthropic-compatible skip-when-both-absent behavior
 
+### POST /api/provider-nodes/validate — probe a user-supplied baseUrl+apiKey before a custom provider node is saved
+
+- **id:** `connection.provider-node-validate-partial-ssrf` · **module:** `connections`
+- **Trigger:** Dashboard custom-node creation/edit form, on the validate/test step before the node is persisted
+- **Input:** { baseUrl, apiKey, type: openai-compatible|anthropic-compatible|custom-embedding, modelId? }
+- **Output:** { valid, error?, method?, dimensions? } — 500 with a classified network-error message on a thrown fetch error
+- **Rules:**
+  - SSRF protection is applied ONLY when isLocalRequest(request) is false — a request from the loopback dashboard UI itself skips the check entirely (deliberate, so a self-hosted target like ollama-local's 127.0.0.1 base URL still validates); a remote caller is checked via ssrfGuard's assertPublicUrl before any fetch happens
+  - The SSRF check used here is assertPublicUrl — the synchronous, literal-hostname/IP-only layer described in ssrfGuard.js's own header comment as layer 1 of 3. It does NOT call assertPublicUrlResolved (layer 2: DNS-resolves the hostname and blocks a domain that merely resolves to a private/loopback/metadata address) and the subsequent fetchWithTimeout() is a plain fetch, not fetchPublic (layer 3: re-validates every redirect hop) — a non-local caller supplying a hostname that resolves to an internal address (e.g. a wildcard-DNS domain pointed at 127.0.0.1), or a public URL that 302s to an internal target, passes this route's check and is fetched anyway
+  - custom-embedding validates by POSTing a real /embeddings request (requires modelId); anthropic-compatible and the openai-compatible default both try GET /models first, then fall back to a minimal POST /chat/completions (max_tokens:1) if modelId is supplied and /models isn't conclusive (a non-401/403 non-OK status)
+  - 401/403 short-circuits straight to a hard fail (API key unauthorized) without attempting the chat fallback — only an ambiguous non-auth failure on /models triggers the secondary chat probe
+  - This is NOT an unauthenticated route: src/proxy.js runs dashboardGuard.js's proxy() as Next's middleware on every request, and /api/provider-nodes is one of PROTECTED_API_PATHS — a caller must present a valid dashboard session cookie (auth_token, JWT) or a valid machineId-derived x-9r-cli-token to reach this route at all, UNLESS settings.requireLogin is false. dashboardGuard's own isLocalRequest() (the same function this route calls to decide whether to run ssrfGuard) plays no role in THAT gate — being on the loopback socket does not bypass the session/CLI-token requirement for PROTECTED_API_PATHS, only LOCAL_ONLY_PATHS (a different, smaller list this route is not on)
+- **Errors:** `INVALID_REQUEST` (baseUrl or apiKey missing, baseUrl is not a parseable URL, or (non-local caller) the URL is blocked by assertPublicUrl), `AUTH_ERROR` (upstream returns 401/403), `PROVIDER_UNAVAILABLE` (network error (ECONNREFUSED/ENOTFOUND/ETIMEDOUT/timeout/cert errors), classified into a specific user-facing message)
+- **AIGate required behavior:** A remote (non-local) caller's user-supplied baseUrl is validated with the same DNS-resolution and redirect-safe protection ssrfGuard.js documents as necessary (assertPublicUrlResolved / fetchPublic) — the module comment explicitly says layer 1 alone leaves DNS-rebinding and redirect bypasses open
+
 ### POST /api/providers/test-batch — test-connection sweep across a group of connections selected by mode
 
 - **id:** `connection.test-batch-sequential` · **module:** `connections`
@@ -1597,6 +1811,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - The objects are plain mutable JS objects, not Object.freeze()'d — nothing technically prevents a future caller from mutating PROVIDERS.foo.baseUrl at runtime, but no current caller does; every other module only reads (PROVIDERS[provider], PROVIDER_OAUTH[provider], PROVIDER_MEDIA[provider])
   - Per-connection data (API keys, OAuth tokens, providerSpecificData) lives entirely in the providerConnections DB table, never on the PROVIDERS registry object — the registry describes the provider (shared across every connection to it), the DB row describes one credential
 
+### GET /api/providers/suggested-models — generic server-side fetch proxy that filters a caller-supplied URL's JSON through one of three named shapers
+
+- **id:** `catalog.suggested-models-open-proxy` · **module:** `catalog`
+- **Trigger:** The dashboard's fetchSuggestedModels (providerModelsFetcher.js) calling out during provider connection setup for openrouter-free/opencode-free/mimo-free suggestions
+- **Input:** ?url=<any URL>&type=openrouter-free|opencode-free|mimo-free query params
+- **Output:** { data:[...] } (shape depends on FILTERS[type]) — or { data: [] } on any upstream failure/non-JSON body
+- **Rules:**
+  - type must match a key in FILTERS (a fixed set of 3 response-shaping functions); url is NOT validated against any allowlist of known provider endpoints — the route fetches whatever URL string is supplied, server-side, and echoes the filtered result back
+  - In normal use, url is always one of a handful of hardcoded fetcher.url values baked into the AI_PROVIDERS registry (the client only ever calls this with those), but nothing in this route itself enforces that — the constraint lives entirely in the caller's discipline, not the server
+  - Fetch failures (network error, non-OK status, non-JSON body) are swallowed to { data: [] } rather than surfaced as an error status, so a caller cannot distinguish blocked/unreachable from legitimately empty
+  - This is NOT an unauthenticated route: src/proxy.js runs dashboardGuard.js's proxy() as Next's middleware on every request, and /api/providers is one of PROTECTED_API_PATHS — a caller must present a valid dashboard session cookie (auth_token, JWT) or a valid machineId-derived x-9r-cli-token, UNLESS settings.requireLogin is false, in which case dashboardGuard's isAuthenticated() short-circuits to true for anyone who reaches the deny-by-default /api/* branch
+- **Errors:** `INVALID_REQUEST` (url or type missing, or type not in FILTERS)
+- **AIGate required behavior:** A server-side fetch proxy that accepts an arbitrary URL from the query string validates that URL the same way provider-nodes/validate does (SSRF guard) before fetching it, regardless of which UI feature happens to be the only current caller
+
 ### features.usage / features.usageApikey — which providers get a quota/usage card and live usage fetch
 
 - **id:** `catalog.usage-feature-flag` · **module:** `catalog`
@@ -1672,6 +1900,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - The final deployUrl is only resolvable by a THIRD call (GET account subdomain info) — if that call fails or the account has no workers.dev subdomain configured at all, the route returns a 400 even though the Worker script IS already uploaded and live (partial-deployment: script exists on Cloudflare, but no proxyPools row is created and no cleanup/delete of the uploaded script is attempted)
 - **Errors:** `INVALID_REQUEST` (accountId or apiToken missing), `PROVIDER_UNAVAILABLE` (Worker script upload (PUT) fails), `INTERNAL_ERROR` (subdomain lookup fails or returns no subdomain — script already uploaded, no local record created, no rollback)
 
+### GET/PUT/DELETE /api/proxy-pools/[id]
+
+- **id:** `proxypool.crud-get-update-delete` · **module:** `transport`
+- **Trigger:** GET/PUT/DELETE /api/proxy-pools/{id}
+- **Input:** PUT body: partial { name, proxyUrl, noProxy, isActive, strictProxy, type } — only present keys are applied
+- **Output:** GET/PUT: { proxyPool }. DELETE: { success: true }, or 409 with boundConnectionCount if the pool is still bound to any connection
+- **Rules:**
+  - PUT only touches fields present in the body (hasOwnProperty checks per field) — omitted fields are left untouched, matching the partial-PATCH pattern used elsewhere in the codebase (cf. settings.patch-protected-keys)
+  - DELETE is guarded: it recomputes bound-connection count the same way as buildUsageMap (real connections only, via providerSpecificData.proxyPoolId) and refuses with 409 if any exist — but, same gap as proxypool.crud-list-and-create, this guard is blind to noAuth providers pinned/rotating onto the pool via settings.providerStrategies, so a pool actively serving a free-provider's traffic can be deleted out from under it with no warning
+  - SUSPECTED_BUG: the PUT handler's inline type allow-list (validTypes) is `["http", "vercel", "cloudflare"]` — it omits 'deno', even though VALID_PROXY_TYPES in the sibling create route (proxy-pools/route.js line 10) and the deno-deploy route both treat 'deno' as a first-class type. Any PUT that includes a `type` field on an existing deno-relay pool (even re-submitting its own current value 'deno' from an edit form) silently coerces it to 'http'. Since resolveConnectionProxyConfig() branches on `proxyPool.type === 'vercel' || 'cloudflare' || 'deno'` to decide between the header-relay path (vercelRelayUrl) and the ProxyAgent path (connectionProxyUrl), a pool downgraded to 'http' this way is misrouted: proxyAwareFetch would try to use the Deno relay's URL as a literal HTTP_PROXY endpoint via undici's ProxyAgent instead of sending it the x-relay-target/x-relay-path headers the deployed Deno relay function expects, breaking every request through that pool
+- **Errors:** `INVALID_REQUEST` (PUT sets name/proxyUrl to empty, or id not found (404 branch, not modeled as one of the eight enum codes — treated as INVALID_REQUEST here for the not-found case)), `INTERNAL_ERROR` (DB read/write throws)
+- **AIGate required behavior:** PUT /api/proxy-pools/[id] should accept the same four proxy types the create route and the deploy routes produce (http, vercel, cloudflare, deno), so editing/resaving an existing Deno-relay pool preserves its type
+
 ### GET/POST /api/proxy-pools — list (with optional usage enrichment) and create
 
 - **id:** `proxypool.crud-list-and-create` · **module:** `transport`
@@ -1683,6 +1924,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - name and proxyUrl are required (trimmed, non-empty) on create; isActive defaults to true when omitted; strictProxy defaults to false (only true if the body literal is `true`)
   - includeUsage=true triggers a second full table scan (getProviderConnections() with no filter) to build a Map of proxyPoolId -> count of connections whose providerSpecificData.proxyPoolId matches, then merges boundConnectionCount onto each pool in the response — this count only reflects real (non-noAuth) connections bound via proxypool.assign-to-connection, not noAuth providers using the pool through rotation/pin in settings.providerStrategies
 - **Errors:** `INVALID_REQUEST` (POST body missing name or proxyUrl), `INTERNAL_ERROR` (DB read/write throws)
+
+### POST /api/proxy-pools/deno-deploy — creates a Deno Deploy app, deploys the relay, polls status, and rolls back on 2 of its 3 failure paths
+
+- **id:** `proxypool.deno-relay-deploy` · **module:** `transport`
+- **Trigger:** POST /api/proxy-pools/deno-deploy with { denoToken, orgDomain, projectName? }
+- **Input:** Deno Deploy API token; org domain (used to build the final *.deno.net URL); optional project/app slug
+- **Output:** 201 { proxyPool, deployUrl }, or an error at any failed step
+- **Rules:**
+  - Same relay header contract as the other two (reads x-relay-target/x-relay-path, deletes those plus host, wraps the forward fetch in try/catch returning a 502 JSON on failure, matching the Cloudflare Worker's guard — unlike the Vercel Edge Function, which has no such try/catch around its forward)
+  - Deployment is two calls (create app, then deploy revision) followed by a bounded poll loop: up to 30 attempts at 2000ms apart (60s max) while status is 'queued'/'building'
+  - This route has three distinct failure paths, and only two of them roll back. (1) The deploy-revision call itself failing (non-ok) DOES roll back: it hits an explicit DELETE /apps/{id} before returning the error. (2) The poll loop ending with a non-'succeeded' status (reached either by observing a genuine terminal bad status, e.g. 'failed'/'canceled', or by the statusRes fetch itself failing mid-poll and breaking the loop early with whatever status was last seen) also DOES roll back, via the same `if (status !== "succeeded")` DELETE block. (3) The poll loop exhausting all 30 attempts (60s) throws `new Error("Deploy timed out after 60 seconds")` INSIDE the while loop — this throw unwinds immediately past the `if (status !== "succeeded")` rollback block entirely (it's never reached) and lands directly in the function's single outer catch, which only logs and returns a 500 with no DELETE call. So the 60s-timeout path does NOT roll back — see suspicion below
+  - The two rollback DELETE calls that do fire are fire-and-forget (.catch(() => {})) — if the DELETE itself also fails, that failure is swallowed silently and the app can still be left behind even on the two paths that do attempt cleanup
+- **Errors:** `INVALID_REQUEST` (orgDomain or denoToken missing), `INVALID_REQUEST` (app creation returns 409 (name already exists)), `PROVIDER_UNAVAILABLE` (app creation (non-409) or deploy-revision call fails), `TIMEOUT` (poll loop exhausts 30 attempts (60s) without reaching a terminal status — this path orphans the Deno app (no rollback)), `INTERNAL_ERROR` (revision status resolves to anything other than 'succeeded' via a genuine terminal status or an early loop break — this path DOES roll back)
+- **AIGate required behavior:** Given that this route already rolls back on 2 of its 3 failure paths (deploy-call failure, bad-final-status), the timeout path should follow the same pattern — either DELETE before throwing, or set a sentinel status and let it fall through to the existing `if (status !== "succeeded")` rollback block, instead of throwing straight past it
 
 ### pickProxyPoolId() rotation for free/noAuth providers, keyed by settings.providerStrategies
 
@@ -1720,6 +1975,21 @@ Every item below is a capability AIGate must have. Derived from tracing
   - The test result is NOT purely read-only: the pool row is unconditionally updated afterward with testStatus ('active'/'error'), lastTestedAt, lastError, and — notably — isActive is overwritten to exactly the test's ok boolean. A previously-active pool that fails one connectivity check is automatically deactivated (isActive: false), and a previously-inactive pool that passes is automatically reactivated, with no separate 'do not auto-toggle' option
   - testProxyUrl()'s one-off ProxyAgent is explicitly closed in a finally block after the test (dispatcher?.close?.()), unlike the long-lived cached ProxyAgents in transport.proxy-dispatcher-cache which are never explicitly closed on eviction
 - **Errors:** `TIMEOUT` (probe exceeds its timeout — AbortController fires, surfaced as 'Relay test timed out' or 'Proxy test timed out'), `PROVIDER_UNAVAILABLE` (probe request errors for any other reason (connection refused, invalid proxy URL, etc.))
+
+### POST /api/proxy-pools/vercel-deploy — deploys a header-relay Edge Function and polls it to readiness
+
+- **id:** `proxypool.vercel-relay-deploy` · **module:** `transport`
+- **Trigger:** POST /api/proxy-pools/vercel-deploy with { vercelToken, projectName? }
+- **Input:** Vercel API token; optional project name (defaults to relay-<timestamp36>)
+- **Output:** 201 { proxyPool, deployUrl } once the deployment is READY and a proxy pool row has been created for it; or an error response at any failed step
+- **Rules:**
+  - The deployed RELAY_FUNCTION_CODE is a Vercel Edge Function that reads x-relay-target (the scheme+host to forward to) and x-relay-path (path+query) off the incoming request, rejects with 400 if x-relay-target is missing, then deletes x-relay-target, x-relay-path, AND host from the forwarded headers before calling fetch(targetUrl, ...) — x-relay-target/x-relay-path are internal routing instructions never meant for the real upstream (leaving them would leak 9router's internal relay protocol to the provider and could collide with real headers); host must be deleted because it still holds the RELAY function's own domain (or whatever the original inbound Host was) and is invalid/misleading for a request now going to targetUrl's actual host — fetch() sets the correct Host itself once the stale one is removed
+  - After a successful deploy, the code issues a PATCH to disable Vercel's own deployment protection (ssoProtection: null) so the relay is reachable without a Vercel auth challenge — this PATCH's response is not checked (no error handling if it fails), so a deploy can succeed with SSO protection still silently enabled, in which case every subsequent relay request would get intercepted by Vercel's auth page instead of reaching the relay function
+  - pollDeployment(deploymentId, token, maxMs=120000) polls GET /v13/deployments/{id} every 3000ms; returns once readyState is READY; throws immediately (no further retry) on ERROR/CANCELED; throws 'Deployment timed out' after 120000ms of polling with no READY/ERROR/CANCELED resolution
+  - SUSPECTED_BUG / partial-deployment risk: createProxyPool() — the only step that records the deployment locally — runs AFTER pollDeployment() resolves. If pollDeployment throws (timeout, or Vercel reports ERROR/CANCELED), the outer catch returns a 500 with no cleanup at all: this file contains no DELETE/cleanup call anywhere, for any failure mode. The Vercel deployment (and, if it got that far, the disabled SSO protection) already exists on Vercel's account, consuming a real deployment slot/build minutes, but no proxyPools row is ever created — the operator has no record in 9router of the orphaned Vercel deployment and must find/delete it manually via the Vercel dashboard
+  - Newly-created pools from this route always get strictProxy: false and isActive: true hardcoded — strictProxy must be turned on manually afterward via PUT if desired
+- **Errors:** `INVALID_REQUEST` (vercelToken missing from the request body), `PROVIDER_UNAVAILABLE` (Vercel deployment creation call itself returns non-ok), `TIMEOUT` (pollDeployment exceeds 120000ms without reaching READY/ERROR/CANCELED), `INTERNAL_ERROR` (deployment reaches ERROR/CANCELED state, or any other unhandled exception)
+- **AIGate required behavior:** A failed or timed-out Vercel relay deployment should be cleaned up (deleted from Vercel) or otherwise reconciled so no orphaned billable resource is left with zero trace in 9router — the deno-deploy route (proxypool.deno-relay-deploy) shows this codebase already knows how to do that: it issues a DELETE rollback on 2 of its 3 failure paths
 
 ### resolveConnectionProxyConfig() — pool vs legacy vs none priority
 
@@ -1769,6 +2039,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - If that manual-bypass branch also fails (DNS resolve fails, or realIP is falsy, or createBypassRequest throws), execution falls out of the MITM block entirely and re-enters the generic `if (proxyUrl)` branch below — meaning a MITM host with a working proxyUrl and a failing bypass gets a SECOND proxy dispatch attempt through the same dispatcher before finally falling back to a plain direct fetch
   - For non-MITM hosts (the common case): if proxyUrl is set, dispatch through the cached undici ProxyAgent; if proxyUrl is unset, call the original (unpatched) global fetch directly — got-scraping/TLS-fingerprinting is present in the file but fully commented out (dead code), so no JA3 spoofing occurs at all despite the file header describing it
 - **Errors:** `PROVIDER_UNAVAILABLE` (proxy dispatch throws and strictProxy is not exactly true — caught, logged, silently falls back to a direct fetch (see transport.strict-proxy-fallback))
+
+### strictProxy — hard-fail vs silent direct fallback on proxy dispatch failure
+
+- **id:** `transport.strict-proxy-fallback` · **module:** `transport`
+- **Trigger:** proxyUrl is set and the undici ProxyAgent dispatch throws (proxy unreachable, auth failure, connection refused, etc.)
+- **Input:** proxyOptions.strictProxy (boolean, sourced from a proxy pool's strictProxy field)
+- **Output:** Either a thrown Error (request fails visibly) or a silent retry of the same URL with a plain direct fetch (no proxy, no error to the caller)
+- **Rules:**
+  - strictProxy only gates the two explicit `if (proxyOptions?.strictProxy === true) throw` sites in proxyFetch.js, both immediately after a caught proxy-dispatch error — it does not affect any other branch (vercel relay, MITM manual-bypass failure, or the 'no proxy configured at all' path)
+  - With strictProxy anything other than exactly true (false, undefined, missing), a dead/unreachable proxy is caught, a console.warn is emitted, and the SAME request is silently retried via the unpatched direct fetch — the caller receives a normal response with no indication the proxy was bypassed
+  - SUSPECTED_BUG: the primary chat-completion request path (open-sse/handlers/chatCore.js, the code every /v1 chat request goes through) builds its proxyOptions object WITHOUT a strictProxy field at all, so `proxyOptions?.strictProxy === true` is always false on that path regardless of what a proxy pool's strictProxy toggle is set to. Three sibling call sites that also build a proxyOptions object DO set the field explicitly: antigravityQuota.js propagates the resolved value faithfully (strictProxy: proxyCfg.strictProxy === true); usage/[connectionId]/route.js and codex-reset-credits/route.js force it to false with an explicit code comment explaining the choice ('force strictProxy=false so quota/refresh fall back to direct on failure'). chatCore.js has no such comment and no such field — it reads as an omission, not a deliberate choice, and it means the strictProxy toggle can never actually enforce anything for real model traffic, only for the three secondary (quota/refresh) paths that already deliberately ignore it
+- **Errors:** `PROVIDER_UNAVAILABLE` (strictProxy === true and proxy dispatch fails)
+- **AIGate required behavior:** A proxy pool with strictProxy enabled should cause real model-traffic requests through that pool to fail (not silently go direct) when the proxy is unreachable, matching what the dashboard toggle promises and what the other three call sites (antigravityQuota, usage, codex-reset-credits) already do with the same field
 
 ## Quota Tracker
 
@@ -1905,6 +2188,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - disableTunnel() sets svc.cancelToken.cancelled=true first, specifically so that an enable already in flight (e.g. a slow spawn racing a user's disable click) cannot resurrect tunnelEnabled/tunnelUrl in settings after disable has cleared them (throwIfCancelled checks are sprinkled through enableTunnel)
 - **Errors:** `INTERNAL_ERROR` (enableTunnel()/disableTunnel() throws (cloudflared spawn/exit error, health check failure) — caught and returned as {error: message} with status 500)
 
+### The dashboard's 'do not expose without an API key / with weak dashboard auth' rule is enforced only in the React UI, not inside the tunnel-enable routes themselves
+
+- **id:** `tunnel.enable-lacks-server-side-security-gate` · **module:** `tooling`
+- **Trigger:** A direct POST to /api/tunnel/enable or /api/tunnel/tailscale-enable (curl, a modified/compromised frontend build, or any script holding dashboard/CLI-token auth) instead of clicking the dashboard's Enable button
+- **Input:** none
+- **Output:** The tunnel or Tailscale Funnel is enabled and the gateway becomes reachable from the public internet, regardless of settings.requireApiKey, settings.requireLogin, or whether the dashboard still has the default password
+- **Rules:**
+  - EndpointPageClient.js's Cloudflare-row Enable handler refuses to open the enable modal when isLoginUnsafe (requireLogin off, or the dashboard still has the default password) or !requireApiKey is true, showing 'Security required: ...' instead — proving the product's own intended invariant is 'never let a user turn on public exposure while the endpoint has no key or the dashboard has weak auth'
+  - That client-side guard is itself inconsistently applied: the Cloudflare row's onClick checks both isLoginUnsafe and !requireApiKey, but the Tailscale row's primary onClick (the not-yet-enabled state) checks only isLoginUnsafe — it never checks requireApiKey at all, so even the UI does not stop a user from enabling Tailscale Funnel while 'Require API key' is off. The Tailscale row's error-retry state (tsStatus?.type === 'error') is guarded even less: its Enable button calls handleOpenTsModal() directly with no check at all, not even isLoginUnsafe — so once a Tailscale enable attempt has failed once, retrying from that state skips every client-side guard entirely
+  - None of this is enforced server-side: src/app/api/tunnel/enable/route.js and src/app/api/tunnel/tailscale-enable/route.js call enableTunnel()/enableTailscale() unconditionally on POST — neither route, nor src/lib/tunnel/**, nor src/mitm/manager.js (which both share code with) ever reads settings.requireApiKey, settings.requireLogin, or a 'dashboard has default password' flag
+  - dashboardGuard.js does gate who may call these routes at all (LOCAL_ONLY_PATHS requires a loopback+authenticated caller or a valid machineId-derived CLI token; PROTECTED_API_PATHS additionally requires isAuthenticated for the /api/tunnel prefix generally) — but that answers 'is the caller allowed to manage the tunnel', not 'is it safe to expose the endpoint publicly given its current API-key/login posture'; those are two independent questions and only the first is enforced server-side
+  - Once exposed, dashboardGuard.js's canAccessPublicLlmApi() (the /v1 gate) does not read settings.requireApiKey either — it grants access on isLocalRequest() OR a valid CLI token OR a real row in the apiKeys table (hasValidApiKey), independent of the 'Require API key' toggle. requireApiKey only gates the request inside each src/sse/handlers/*.js (e.g. chat.js, per endpoint.enforce-require-api-key) — reachable only for callers isLocalRequest() already let through
+- **AIGate required behavior:** Given the dashboard UI already encodes 'do not let a tunnel/Funnel go live while requireApiKey is off or dashboard auth is weak', that same rule should be enforced inside POST /api/tunnel/enable and POST /api/tunnel/tailscale-enable themselves (or in enableTunnel()/enableTailscale()), so server-side state can never diverge from a client-only UI guard — and the guard should apply identically to both the Cloudflare and Tailscale rows.
+
 ### Full state machine across the 7 /api/tunnel/* routes for both the Cloudflare quick-tunnel and Tailscale Funnel lanes
 
 - **id:** `tunnel.remote-access-state-machine` · **module:** `tooling`
@@ -1999,6 +2296,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - withCapacityAdapterStripping wraps the per-model executor so adapter-added models get the adapter-specific body treatment
 - **Streaming:** yes
 
+### Cancelling the upstream request when the client goes away
+
+- **id:** `routing.client-disconnect-propagation` · **module:** `routing`
+- **Trigger:** The client closes the connection at any point in the request
+- **Input:** Next's cancellation of the returned response body; request.signal (never read)
+- **Output:** Upstream fetch aborted — only in the streaming phase
+- **Rules:**
+  - The only link from client to upstream is streamController: its AbortController signal is merged into every fetch, and it is aborted by handleDisconnect, which is called from the ReadableStream cancel() of the returned SSE body
+  - handleDisconnect delays the abort by 500 ms to allow cleanup, then aborts; cancel() also cancels the reader chain, which cancels the upstream body
+  - request.signal is never read on the chat lane (the video lane is the only one that passes it), and handleChat never passes onDisconnect to handleChatCore
+  - Q4: before the streaming Response is returned (translation, image prefetch, headroom/pxpipe, up to 249 s of connect timeouts and retries per URL, token refresh, trying further accounts and combo members) a client disconnect is NOT propagated — work continues and further accounts may be tried and locked for nobody. Non-streaming requests are never cancelled
+- **Streaming:** yes
+- **AIGate required behavior:** A client disconnect cancels the upstream call and stops retry/fallback at any stage
+
 ### Combo detection and hand-off to the combo/fusion engine
 
 - **id:** `routing.combo-dispatch` · **module:** `routing`
@@ -2037,6 +2348,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - antigravity and gemini-cli need a real projectId: if missing it is fetched synchronously on the request path, then persisted in the background (fire-and-forget, errors swallowed)
   - onCredentialsRefreshed persists reactive refresh results with testStatus active; onRequestSuccess clears the account's error/lock for this model and the Antigravity strike counter
   - Per-request toggles read from settings here: providerThinking[provider], rtk/headroom/caveman/ponytail/pxpipe flags, ccFilterNaming
+
+### Unregistered provider id silently inherits the OpenAI transport config
+
+- **id:** `routing.default-executor-openai-fallback` · **module:** `routing`
+- **Trigger:** A chat request whose resolved provider id has no PROVIDERS entry and is not openai-compatible-* / anthropic-compatible-*, while an active connection exists for it — reachable today via a custom-embedding node prefix on /v1/chat/completions
+- **Input:** model "<embeddingNodePrefix>/<model>"
+- **Output:** A POST to https://api.openai.com/v1/chat/completions carrying that node's API key as Bearer
+- **Rules:**
+  - getModelInfo maps custom-embedding node prefixes to the node id (custom-embedding-...) on every lane, including chat
+  - getProviderCredentials finds the node's connection, so the account loop proceeds
+  - getExecutor has no entry -> DefaultExecutor(provider) with config PROVIDERS.openai because the id is not in the registry
+  - DefaultExecutor.buildUrl only reads providerSpecificData.baseUrl for openai-compatible-* and anthropic-compatible-* prefixes; for custom-embedding-* it falls through to this.config.baseUrl, i.e. OpenAI's chat URL
+- **Errors:** `AUTH_ERROR` (OpenAI rejects the foreign key with 401 — then the node's account is locked 2 minutes)
+- **AIGate required behavior:** A provider id with no transport config is rejected (or an embedding-only node is refused on the chat lane) before any upstream call
 
 ### getExecutor — specialized map, aliases, DefaultExecutor fallback
 
@@ -2111,6 +2436,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Post-fixes: finish_reason forced to tool_calls when tool_calls exist; object/created filled; Azure prompt_filter_results/content_filter_results removed; usage buffered and filtered to the client format; reasoning_content dropped when content is non-empty
 - **Errors:** `PROVIDER_UNAVAILABLE` (2xx body is not parseable JSON/SSE — 502, which then locks the account 30 s and tries the next (fallback.error-classification))
 
+### POST /v1/api/chat — Ollama-native clients
+
+- **id:** `routing.ollama-lane-transform` · **module:** `routing`
+- **Trigger:** POST /v1/api/chat (Ollama API path)
+- **Input:** Ollama chat body (model defaults to llama3.2 for the transform label)
+- **Output:** NDJSON lines {model, message, done} built from the OpenAI-format SSE that handleChat returns
+- **Rules:**
+  - The body is cloned to read the model name, then the request goes through handleChat unchanged; source format is body-sniffed (no endpoint override for this path)
+  - transformToOllama only understands `data:` SSE lines: content deltas become done:false lines, tool_call deltas are accumulated and emitted on finish_reason, and done:true is emitted on [DONE], on finish, and again in flush
+  - The outgoing Response defaults to status 200 and Content-Type application/x-ndjson whenever handleChat returned a body — the handleChat status is not copied in that case. Only when handleChat's response has NO body at all does the original status get copied through instead
+- **Streaming:** yes
+- **Errors:** `PROVIDER_UNAVAILABLE` (handleChat returns an error JSON (which has a body) — it has no data: lines, so the client receives only {done:true} with HTTP 200)
+- **AIGate required behavior:** Upstream errors surface to Ollama clients with an error status, and non-streaming requests return the answer
+
 ### Body parse, 1M-context marker strip, API-key gate, missing-model check
 
 - **id:** `routing.request-preflight` · **module:** `routing`
@@ -2151,6 +2490,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Pending-request counters (dashboard live view) are incremented before dispatch and decremented on each terminal path; the decrement clamps at 0 so double decrements are harmless
 - **Streaming:** yes
 
+### POST /v1/responses/compact — compaction via the same pipeline with body._compact
+
+- **id:** `routing.responses-compact-lane` · **module:** `routing`
+- **Trigger:** POST /v1/responses/compact
+- **Input:** Responses-API body
+- **Output:** handleChat result; for codex the upstream URL should gain /compact
+- **Rules:**
+  - The route parses the body, sets body._compact = true, rebuilds a Request with the original headers and hands it to handleChat — full routing/fallback applies
+  - Only CodexExecutor consumes the flag: transformRequest stores this._isCompact and deletes body._compact; buildUrl appends /compact when this._isCompact is true
+  - BaseExecutor.execute calls buildUrl BEFORE transformRequest, so the URL of a request is computed from the _isCompact value left by the PREVIOUS codex request on this singleton executor
+- **Streaming:** yes
+- **Errors:** `INVALID_REQUEST` (body is not JSON — request.json() throws in the route (unhandled, 500), unlike the 400 of the other lanes)
+- **AIGate required behavior:** A compact request goes to .../responses/compact and a normal request to .../responses
+
 ### Deciding the client's wire format
 
 - **id:** `routing.source-format-detection` · **module:** `routing`
@@ -2160,6 +2513,22 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Rules:**
   - Endpoint wins first: a path containing /v1/responses is openai-responses; /v1/messages is claude; /v1/chat/completions with an input[] array is openai (Cursor CLI sends a Responses body to the chat endpoint)
   - Otherwise body sniffing, in order: input (array or string) without messages -> openai-responses; request.contents + userAgent antigravity -> antigravity; contents[] -> gemini; any OpenAI-only field (stream_options, response_format, logprobs, n, penalties, logit_bias, user) -> openai; Claude-shaped content blocks or system/anthropic_version -> claude; default openai
+
+### Whether the upstream call streams, and whether the client gets SSE
+
+- **id:** `routing.stream-mode-decision` · **module:** `routing`
+- **Trigger:** handleChatCore, before translation
+- **Input:** body.stream, sourceFormat, PROVIDERS[provider].forceStream, model type, detected client tool, Accept header
+- **Output:** stream (upstream mode) and clientRequestedStreaming (drives the SSE->JSON collapse)
+- **Rules:**
+  - clientRequestedStreaming is true only when body.stream === true or the source format is antigravity/gemini/gemini-cli (always-streaming protocols)
+  - stream = true when the provider forces streaming; otherwise body.stream !== false — an OMITTED stream flag means streaming
+  - Image-generation models on antigravity/gemini-cli are forced non-streaming
+  - deepseek-tui without an explicit stream:true is forced non-streaming
+  - Accept: application/json without text/event-stream, and no explicit stream:true, and no forceStream -> non-streaming (AI SDK compatibility)
+  - forceStream provider + client did not request streaming -> upstream streams, response is collapsed to JSON (routing.response-mode-dispatch)
+- **Streaming:** yes
+- **AIGate required behavior:** An omitted stream flag means non-streaming, as in the OpenAI and Anthropic APIs this endpoint emulates
 
 ### Upstream SSE -> transform -> disconnect-aware stream -> client (first byte)
 
@@ -2211,6 +2580,22 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Fixed order: Claude-client tool dedupe, TTS tool stripping, default Claude tool type, RTK, headroom, caveman, ponytail, pxpipe (pxpipe is last so it sees the final body)
   - Header x-9router-token-saver: off disables RTK, headroom, caveman and ponytail for this request; pxpipe is gated only by its own setting
   - All savers are fail-open — headroom absence is logged as skipped, pxpipe event reporting errors are swallowed
+
+### When token usage is persisted relative to the response being flushed
+
+- **id:** `routing.usage-recording-timing` · **module:** `routing`
+- **Trigger:** Successful non-streaming, forced-JSON, or streaming completion
+- **Input:** Usage extracted from the upstream response or accumulated from the stream (estimated when absent)
+- **Output:** A usageHistory row via saveUsageStats -> saveRequestUsage (fire-and-forget), plus a requestDetails row
+- **Rules:**
+  - Q8 non-streaming: usage is extracted and saveUsageStats is called BEFORE the response is translated and returned — i.e. before the flush; the write itself is not awaited (it runs concurrently with the return)
+  - Q8 forced SSE->JSON: onRequestSuccess is awaited, then usage saved, then the JSON Response is returned — before the flush
+  - Q8 streaming: finalizeStream runs AFTER the terminal bytes are enqueued — in flush() for normal ends, or inside transform() on the Responses terminal event (because Responses clients close right after it and flush never runs). The save runs concurrently with the final flush to the client
+  - When the upstream sends no usage, it is estimated from the request body and emitted content length
+  - Rows with zero input and zero output tokens are not written at all
+- **Streaming:** yes
+- **Errors:** `PROVIDER_UNAVAILABLE` (stream errors or is cancelled before its terminal event — flush never runs, usage is never recorded)
+- **AIGate required behavior:** Tokens the provider billed are recorded even when the stream ends abnormally or the client leaves
 
 ### GET /v1 re-exports the model listing
 
@@ -2300,6 +2685,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - If settings.samlCert is unset, the metadata is generated against the DUMMY_FALLBACK_CERT rather than failing — an operator who fetches metadata before configuring the IdP cert gets a syntactically valid but non-functional document instead of an error
 - **Errors:** `INTERNAL_ERROR` (generateSamlMetadata throws (returns a 500 with an XML error body, not JSON))
 
+### SAML assertion replay protection is skippable whenever no saml_state cookie is presented
+
+- **id:** `identity.saml-replay-inresponseto-gap` · **module:** `identity`
+- **Trigger:** POST /api/auth/saml/acs with a SAMLResponse but no (or an already-expired/already-consumed) saml_state cookie
+- **Input:** A previously-valid, correctly-signed SAMLResponse, replayed without the original saml_state cookie
+- **Output:** The assertion is accepted and a session cookie is issued exactly as if it were a fresh, expected response — the InResponseTo value inside the assertion is never checked in this case
+- **Rules:**
+  - createSamlInstance configures node-saml with validateInResponseTo: 'never' — the library's own built-in InResponseTo/replay tracking is explicitly disabled for every request, by explicit choice, not omission
+  - validateSamlResponse's own manual replay check only runs when expectedRequestId is truthy; expectedRequestId is cookieStore.get('saml_state')?.value || '', so any ACS POST that arrives without a live saml_state cookie (cookie already expired past its 10-minute maxAge, already deleted by an earlier ACS attempt — the route deletes it unconditionally before validation even starts — or simply omitted by a replaying client) skips the InResponseTo comparison entirely
+  - With both the library-level and the fallback manual check bypassable, validatePostResponseAsync's signature/expiry checks are the only remaining defense — a correctly-signed assertion remains fully valid to replay for its entire IdP-set validity window (NotOnOrAfter), from any client, with no per-assertion one-time-use enforcement anywhere in this code path
+- **AIGate required behavior:** A signed SAML assertion should be usable to establish a session at most once: either node-saml's own validateInResponseTo tracking should be enabled ('always' or 'ifPresent'), or the code's manual InResponseTo/expectedRequestId comparison should be mandatory (reject when expectedRequestId is missing) rather than only applied when a saml_state cookie happens to still be present.
+
 ### POST /api/auth/saml/test — validate a SAML configuration's shape before saving it
 
 - **id:** `identity.saml-test-probe` · **module:** `identity`
@@ -2387,6 +2784,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - applyOutboundProxyEnv only runs when the PATCH body itself contained one of the three keys (checked via hasOwnProperty on the request body, not on whether the merged value differs from before)
   - It only ever writes env vars it validated (scheme allow-list http/https/socks4/socks4a/socks5/socks5h, rejects control chars/backticks/$ in the URL) and tracks a NINE_ROUTER_PROXY_MANAGED marker so it only clears vars it previously set, never externally-provided proxy env vars it didn't write
   - Disabling the proxy (outboundProxyEnabled: false) only clears the env vars if they were previously marked as managed by this code — an externally-set HTTP_PROXY survives untouched
+
+### Password change flow inside PATCH /api/settings
+
+- **id:** `settings.patch-password-change` · **module:** `settings`
+- **Trigger:** PATCH /api/settings with a newPassword field
+- **Input:** { newPassword, currentPassword? }
+- **Output:** password field replaced with a fresh bcrypt hash; 400/401 on validation failure
+- **Rules:**
+  - If a password hash already exists (settings.password is set), currentPassword is required and must bcrypt.compare true against it, else 401 'Invalid current password'
+  - If no password hash exists yet (first-time setup), currentPassword is optional; but if supplied, it must equal the literal string '123456' or the request is rejected with 401
+  - On success, newPassword is bcrypt-hashed (genSalt(10)) into body.password, and both newPassword and currentPassword are deleted from body before it reaches updateSettings
+- **Errors:** `INVALID_REQUEST` (a password hash already exists but currentPassword was not supplied), `AUTH_ERROR` (currentPassword does not match the stored hash (or, first-time, does not equal '123456'))
+- **AIGate required behavior:** The first-time password-change gate in PATCH /api/settings checks currentPassword against the operator's actual configured initial password, i.e. `process.env.INITIAL_PASSWORD || "123456"`, mirroring the check already implemented in src/app/api/auth/login/route.js line 58 for the same purpose
 
 ### PATCH /api/settings mass-assignment protection
 
@@ -2574,6 +2984,17 @@ Every item below is a capability AIGate must have. Derived from tracing
   - health: installed? -> module loads? -> a synthetic ping request transforms? three-step checklist, each step short-circuiting the next on failure
   - logs / stats: read-only; logs tails install.log plus the events.jsonl audit trail, stats aggregates it into all-time/today/7d/30d windows and a daily timeline
 - **Errors:** `INTERNAL_ERROR` (npm not found on PATH during install), `INTERNAL_ERROR` (npm install exits non-zero or times out after 5 minutes), `INVALID_REQUEST` (start called while not installed and pxpipeAutoInstall is off)
+
+### SB-1: the token-saver master opt-out header does not reach the PXPIPE gate
+
+- **id:** `tokensaver.pxpipe-master-optout-bug` · **module:** `routing`
+- **Trigger:** A client sends x-9router-token-saver: off intending to disable the whole token-saver pipeline, while settings.pxpipeEnabled is true
+- **Input:** x-9router-token-saver: off header + a Claude-format body large enough to clear pxpipeMinChars
+- **Output:** RTK/headroom/caveman/ponytail are all skipped (tokenSaverEnabled is false), but PXPIPE still runs and can replace the body with image-block content
+- **Rules:**
+  - Every other stage's enable check is `tokenSaverEnabled && <stage>Enabled` (chatCore.js:254,260,274,280); PXPIPE's check at line 287 is `if (pxpipeEnabled)` alone — tokenSaverEnabled is computed at line 251 but never referenced again after line 280
+  - This is confirmed directly from source (not inferred): grepping the whole file for tokenSaverEnabled shows exactly 5 uses — the definition plus 4 gate checks (RTK, headroom, caveman, ponytail) — and none at the PXPIPE gate
+- **AIGate required behavior:** x-9router-token-saver: off disables every token-saver stage, including PXPIPE, for that request
 
 ### RTK filter selection: autoDetectFilter dispatch order and the caps that bound it
 
@@ -2821,6 +3242,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - initState builds format-specific streaming state: a shared base (toolCalls Map, finishReason, usage, block indices) plus, only for openai-responses sources, a large additional set of per-item/per-reasoning/per-function-call tracking fields (msgTextBuf, reasoningBuf, funcArgsBuf, etc.) not needed by any other format
 - **Streaming:** yes
 
+### responsesTransformer.js — Chat Completions SSE to Codex Responses-API SSE, and its dead call path
+
+- **id:** `translator.responses-format-transformer` · **module:** `routing`
+- **Trigger:** Intended for POST /v1/responses when the client wants a streaming Responses-API reply
+- **Input:** OpenAI Chat Completions SSE stream
+- **Output:** Responses-API SSE events (response.output_item.added, response.output_text.delta, etc.) with sequence_number per event
+- **Rules:**
+  - createResponsesApiTransformStream is a TransformStream, not a request/response registry function — it reshapes one wire format into another at the SSE-event-shape level (both sides use the openai family), not between two client protocols, which is why it lives in transformer/ rather than translator/request or translator/response
+  - Its only caller in the codebase is handleResponsesCore in open-sse/handlers/responsesHandler.js, Case 2 (client wants streaming, provider forced SSE)
+  - handleResponsesCore itself has zero callers anywhere in the codebase: the live POST /v1/responses route (src/app/api/v1/responses/route.js) calls handleChat directly, whose own comment states the route is 'now handled by translator pattern (openai-responses format auto-detected)' via the registered openai:openai-responses / openai-responses:openai pair instead
+- **Streaming:** yes
+- **AIGate required behavior:** createResponsesApiTransformStream is exercised by the live /v1/responses streaming lane, since it exists specifically to shape Codex Responses-API SSE events
+
 ### Shared schema enums and config constants translators must use instead of literal strings
 
 - **id:** `translator.schema-config-constants` · **module:** `routing`
@@ -2869,6 +3303,21 @@ Every item below is a capability AIGate must have. Derived from tracing
   - canonicalizeUsage() folds cached_tokens and cache_creation_input_tokens INTO prompt_tokens ahead of time (the cache-inclusive convention) — calculateCostFromTokens then subtracts them back out (nonCachedInput = inputTokens - cachedTokens - cacheCreationTokens) so cached tokens are billed at pricing.cached (falling back to pricing.input) instead of double-counting them at full input rate
   - Any failure (missing provider, missing model, missing pricing, thrown error) resolves to cost = 0, not an error — calculateCost wraps the whole lookup in try/catch and logs to console.error
 
+### /api/pricing — GET merged pricing, PATCH validated overrides, DELETE reset-to-default
+
+- **id:** `pricing.crud-api` · **module:** `usage`
+- **Trigger:** Dashboard pricing editor
+- **Input:** PATCH body: {provider: {model: {input, output, cached, reasoning, cache_creation}}}; DELETE query: ?provider=&model=
+- **Output:** Merged pricing object (built-in PROVIDER_PRICING + user KV overrides)
+- **Rules:**
+  - GET merges: for every built-in provider/model, a matching user override (if any) is spread over it; for user-only providers/models with no built-in counterpart, the user entry is added as-is
+  - PATCH validates before writing: every field key must be one of input/output/cached/reasoning/cache_creation, and every value must be a non-negative finite number, or the whole request 400s before any write happens
+  - updatePricing() does a per-provider read-modify-write inside one db.transaction() so concurrent PATCHes to different providers cannot clobber each other's KV rows
+  - DELETE resets one model (provider+model given), one whole provider (provider only), or all pricing (neither) back to defaults by removing the corresponding KV override(s)
+  - Every write (PATCH or DELETE) calls invalidate() to clear the 5000ms (CACHE_TTL_MS) in-process pricing cache so the next getPricing()/getPricingForModel() call re-reads from the KV store
+- **Errors:** `INVALID_REQUEST` (PATCH body has an unknown pricing field or a negative/non-numeric value)
+- **AIGate required behavior:** GET /api/pricing/defaults returns the built-in default pricing table over HTTP, matching the route's own doc comment
+
 ### getActiveRequests — active counters plus a deduped recent-request ring buffer
 
 - **id:** `usage.active-requests-and-recent-ring` · **module:** `usage`
@@ -2914,6 +3363,31 @@ Every item below is a capability AIGate must have. Derived from tracing
   - The in-source comment states the reason directly: 'In-memory state shared across Next.js modules'
   - Next.js can evaluate a given source module more than once within the same server process (dev-mode HMR, and the route-handler module graph in general); module-scope state would silently re-initialize on each re-evaluation — a fresh EventEmitter with no subscribers, a reset pending-counter map — breaking the pending-request badge and dropping in-flight SSE listeners. Attaching to the single process-wide `global` object survives re-evaluation because it is not tied to any one module instance.
 - **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### /api/usage/history is not a history-rows endpoint — it returns the same aggregate shape as /api/usage/stats
+
+- **id:** `usage.history-route-returns-aggregate-not-rows` · **module:** `usage`
+- **Trigger:** GET /api/usage/history
+- **Input:** none
+- **Output:** The full getUsageStats() aggregate object (period defaults to 'all')
+- **Rules:**
+  - history/route.js calls `await getUsageStats()` with no period argument, which defaults to 'all' inside getUsageStats — an aggregate stats object identical in shape to what /api/usage/stats?period=all returns
+  - The function that actually returns per-request rows with provider/model/date-range filtering — getUsageHistory(filter) — is exported from usageRepo.js and re-exported through both src/lib/db/index.js and src/lib/usageDb.js, but has zero callers anywhere in the checkout (verified: the only matches for 'getUsageHistory' are its own definition and the two re-export barrel lines)
+- **AIGate required behavior:** A route named /api/usage/history returns per-request usage history rows — the sibling getUsageHistory(filter) function (provider/model/date-range filterable) appears purpose-built to back exactly this route
+
+### saveRequestUsage — dedup check, single-transaction 3-way write
+
+- **id:** `usage.history-write-dedup-transaction` · **module:** `usage`
+- **Trigger:** Any fire-and-forget saveRequestUsage(entry) call
+- **Input:** {provider, model, tokens, connectionId, apiKey, endpoint, timestamp?}
+- **Output:** One usageHistory row, one usageDaily upsert, one _meta lifetime counter increment — or a no-op endpoint patch if a matching row already exists
+- **Rules:**
+  - Before inserting, a SELECT looks for an existing usageHistory row with the same timestamp (ISO string, millisecond precision), provider, model, connectionId, apiKey, promptTokens and completionTokens
+  - If found, no new row is written — at most the existing row's endpoint is backfilled if it was previously null
+  - If not found, all three writes (history insert, usageDaily upsert via aggregateEntryToDay, _meta.totalRequestsLifetime increment) happen inside one db.transaction(), justified in-source by better-sqlite3 being synchronous so no other JS runs mid-transaction in the same process
+  - pushToRing() and the debounced stats-event only fire when a new row was actually inserted (inserted === true)
+- **Errors:** `INTERNAL_ERROR` (the transaction throws (e.g. adapter failure))
+- **AIGate required behavior:** Every completed request that calls saveRequestUsage produces its own usageHistory row
 
 ### trackPendingRequest and the PENDING_TIMEOUT_MS watchdog
 
@@ -2968,7 +3442,7 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Input:** The full buildRequestDetail() object, including request/providerRequest/providerResponse/response bodies
 - **Output:** requestDetails row (or nothing, if observability is disabled)
 - **Rules:**
-  - The write is a no-op unless config.enabled is true; enabled resolves from ENABLE_REQUEST_LOGS env var if set, else settings.enableObservability, which defaults to false
+  - The write is a no-op unless config.enabled resolves to true. getObservabilityConfig()'s resolution order: (1) if ENABLE_REQUEST_LOGS is set to anything (not undefined), enabled = that value.toLowerCase() === 'true' and settings/OBSERVABILITY_ENABLED are never consulted; (2) otherwise, uiFlag = typeof settings.enableObservability === 'boolean' — when true, enabled is settings.enableObservability itself (DEFAULT_SETTINGS.enableObservability is false, which is why the feature is off by default in practice); when settings.enableObservability is NOT strictly a boolean, enabled instead falls back to envFallback = process.env.OBSERVABILITY_ENABLED !== 'false' (true unless that env var is the exact string 'false', so an unset OBSERVABILITY_ENABLED in this fallback branch defaults enabled to true); (3) if getSettings() throws or any step in the try block throws, the outer catch hardcodes enabled: false regardless of any env var
   - Enabled writes are buffered in a module-scope array and flushed either when the buffer reaches batchSize (default 20) or on a flushIntervalMs timer (default 5000ms) — whichever comes first
   - flushToDatabase() drains the entire buffer in a while-loop so pushes that happen during the async flush are still captured, and writes all buffered items inside one db.transaction()
   - After each flush, rows beyond maxRecords (default 200 in this file's own fallback; 1000 in settingsRepo's DEFAULT_SETTINGS) are deleted, oldest-timestamp-first
@@ -3037,7 +3511,7 @@ Every item below is a capability AIGate must have. Derived from tracing
 |---|---|---|---|
 | `apikey.list-keys` | A key-management list endpoint masks or omits the secret value after initial issuance (standard practice, and consistent with GET /api/settings stripping password/oidcClientSecret) | rowToKey() copies row.key verbatim into every list/get response with no masking | Any surface that can read GET /api/keys (dashboard XSS, an over-permissioned session, a logging/proxy layer that captures response bodies) leaks every currently-active API key in plaintext, not just the one just-created key |
 | `apikey.legacy-format-unenforced` | Given generateCrc/parseApiKey/verifyApiKeyCrc exist specifically to bind a key to a machineId and detect tampering, the request-time auth path (validateApiKey / isValidApiKey) calls verifyApiKeyCrc (or parseApiKey) to reject a key whose embedded CRC doesn't match its machineId+keyId before or in addition to the DB lookup | validateApiKey performs only a raw string equality lookup against the stored apiKeys.key column; parseApiKey/verifyApiKeyCrc/isNewFormatKey are dead code outside of key generation and are never invoked on the read/auth path | The CRC provides no security property at request time — it cannot be used to detect a corrupted/tampered key independent of the DB, and the legacy sk-{random8} format is accepted with exactly the same trust as the new format purely because both are opaque strings to validateApiKey; anyone who can insert or copy a row into apiKeys (backup restore, DB access, export leak) gets a working key regardless of format |
-| `settings.patch-password-change` | The first-time password-change gate in PATCH /api/settings checks currentPassword against the operator's actual configured initial password, i.e. `process.env.INITIAL_PASSWORD || "123456"`, mirroring the check already implemented in src/app/api/auth/login/route.js line 58 for the same purpose | settings/route.js line 62 compares currentPassword only against the hardcoded literal "123456", never consulting process.env.INITIAL_PASSWORD | An operator who sets INITIAL_PASSWORD to a non-default value (as CLAUDE.md instructs: 'must override') cannot use that real initial password to complete their first password change through the dashboard/API — currentPassword !== '123456' is rejected with 401 even though it is the correct, configured initial password. Worse, the well-known literal '123456' still satisfies this specific check regardless of what INITIAL_PASSWORD was set to, so on an install that changed the env var specifically to move off the public default, a local caller who still knows the old default can pass this gate anyway. |
+| `settings.patch-password-change` | The first-time password-change gate in PATCH /api/settings checks currentPassword against the operator's actual configured initial password, i.e. `process.env.INITIAL_PASSWORD \|\| "123456"`, mirroring the check already implemented in src/app/api/auth/login/route.js line 58 for the same purpose | settings/route.js line 62 compares currentPassword only against the hardcoded literal "123456", never consulting process.env.INITIAL_PASSWORD | An operator who sets INITIAL_PASSWORD to a non-default value (as CLAUDE.md instructs: 'must override') cannot use that real initial password to complete their first password change through the dashboard/API — currentPassword !== '123456' is rejected with 401 even though it is the correct, configured initial password. Worse, the well-known literal '123456' still satisfies this specific check regardless of what INITIAL_PASSWORD was set to, so on an install that changed the env var specifically to move off the public default, a local caller who still knows the old default can pass this gate anyway. |
 | `identity.saml-replay-inresponseto-gap` | A signed SAML assertion should be usable to establish a session at most once: either node-saml's own validateInResponseTo tracking should be enabled ('always' or 'ifPresent'), or the code's manual InResponseTo/expectedRequestId comparison should be mandatory (reject when expectedRequestId is missing) rather than only applied when a saml_state cookie happens to still be present. | createSamlInstance sets validateInResponseTo: 'never', and validateSamlResponse's own fallback InResponseTo check is wrapped in `if (expectedRequestId)`, so a request with no saml_state cookie (already consumed, expired, or simply not sent) skips replay validation entirely and is judged solely on signature and time-window validity. | Any captured, correctly-signed SAMLResponse (via browser history/cache, a shared proxy log, a compromised extension, or a non-TLS hop) can be POSTed to /api/auth/saml/acs and re-establish a valid dashboard session for that identity at any point before the assertion's IdP-set NotOnOrAfter expiry, with no per-assertion one-time-use enforcement — a classic SAML replay attack that InResponseTo tracking exists specifically to prevent. |
 | `catalog.suggested-models-open-proxy` | A server-side fetch proxy that accepts an arbitrary URL from the query string validates that URL the same way provider-nodes/validate does (SSRF guard) before fetching it, regardless of which UI feature happens to be the only current caller | No SSRF check of any kind runs on url — the route trusts the browser-side caller to only ever pass one of a small fixed set of URLs, a constraint enforced nowhere on the server. dashboardGuard.js does require a valid dashboard session, a valid CLI token, or settings.requireLogin===false to reach the route at all — this is not an anonymous-internet-facing endpoint by default | Exploitability is scoped to: (1) an authenticated dashboard session itself performing the request (limited value — a logged-in admin SSRFing their own server), (2) a CSRF-style crafted link that rides an already-logged-in admin's sameSite:lax session cookie via a top-level GET navigation — a blind SSRF trigger the attacker cannot read the response of, but the internal request still fires, (3) a leaked/stolen CLI token, or (4) settings.requireLogin=false, which removes the auth requirement entirely and, combined with 13's tunnel.enable-lacks-server-side-security-gate (tunnel exposure has no server-side requireLogin/requireApiKey check), can leave this reachable by any internet caller with no auth at all |
 | `connection.provider-node-validate-partial-ssrf` | A remote (non-local) caller's user-supplied baseUrl is validated with the same DNS-resolution and redirect-safe protection ssrfGuard.js documents as necessary (assertPublicUrlResolved / fetchPublic) — the module comment explicitly says layer 1 alone leaves DNS-rebinding and redirect bypasses open | Only assertPublicUrl (layer 1, literal hostname/IP string check) runs, and the actual request uses a plain fetch with no manual redirect re-validation. dashboardGuard.js does require a valid dashboard session, a valid CLI token, or settings.requireLogin===false to reach the route at all — this is not an anonymous-internet-facing endpoint by default, and its POST+JSON-body shape is not CSRF-reachable the way a GET route would be under a sameSite:lax cookie | Exploitability is scoped to a caller that is BOTH non-local (reverse-proxied or tunnel-exposed, so isLocalRequest() is false and the route's own SSRF check actually runs) AND already past dashboardGuard's auth gate (a valid dashboard session, a valid CLI token, or settings.requireLogin===false) — e.g. an operator's own tunnel-exposed dashboard session, a compromised/leaked session or CLI token, or a requireLogin:false deployment combined with 13's tunnel.enable-lacks-server-side-security-gate (tunnel exposure enforces no requireLogin/requireApiKey check of its own). Within that scope, such a caller can supply a hostname that resolves to an internal/metadata address, or a URL that redirects to one, and this route will still fetch it and echo back a validity signal — a real but narrower-than-anonymous-internet SSRF gap, and one that (unlike catalog.suggested-models-open-proxy) is not reachable via a simple crafted-link CSRF because of its POST+JSON shape |

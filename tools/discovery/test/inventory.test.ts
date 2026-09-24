@@ -24,6 +24,11 @@ describe("buildInventory", () => {
     expect(inv.pages).toHaveLength(28);
   });
 
+  it("maps the root page (src/app/page.js) to the empty-string item, not the literal 'page.js'", () => {
+    expect(inv.pages).toContain("");
+    expect(inv.pages).not.toContain("page.js");
+  });
+
   it("finds every provider registry entry", () => {
     expect(inv.providers).toHaveLength(122);
   });

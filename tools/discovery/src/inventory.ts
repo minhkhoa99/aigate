@@ -68,7 +68,7 @@ export function buildInventory(): Inventory {
     ),
     pages: sorted(
       glob("src/app/**/page.js").map((p) =>
-        p.replace(/^src\/app\//, "").replace(/\/page\.js$/, ""),
+        p.replace(/^src\/app\//, "").replace(/(^|\/)page\.js$/, ""),
       ),
     ),
     providers: sorted(

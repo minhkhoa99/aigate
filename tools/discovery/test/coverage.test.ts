@@ -82,3 +82,23 @@ describe("computeCoverage", () => {
     expect(text).toContain("1/2");
   });
 });
+
+describe("computeCoverage — root page mapping", () => {
+  const rootInv: Inventory = { ...inv, pages: ["login", ""] };
+  const rootEntries: FeatureEntry[] = [
+    ...entries,
+    {
+      ...base,
+      id: "settings.landing-page",
+      newModule: "settings",
+      evidence: [{ file: "src/app/page.js", line: 1, note: "" }],
+    },
+  ];
+  const r = computeCoverage(rootEntries, rootInv);
+  const dim = (n: string) => r.dimensions.find((d) => d.name === n)!;
+
+  it("maps the root page item (empty string) to src/app/page.js, not src/app//page.js", () => {
+    expect(dim("pages").covered).toBe(1);
+    expect(dim("pages").missing).toEqual(["login"]);
+  });
+});

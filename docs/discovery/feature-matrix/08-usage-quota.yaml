@@ -417,7 +417,7 @@
   input: "The full buildRequestDetail() object, including request/providerRequest/providerResponse/response bodies"
   output: "requestDetails row (or nothing, if observability is disabled)"
   businessRules:
-    - "The write is a no-op unless config.enabled is true; enabled resolves from ENABLE_REQUEST_LOGS env var if set, else settings.enableObservability, which defaults to false"
+    - "The write is a no-op unless config.enabled resolves to true. getObservabilityConfig()'s resolution order: (1) if ENABLE_REQUEST_LOGS is set to anything (not undefined), enabled = that value.toLowerCase() === 'true' and settings/OBSERVABILITY_ENABLED are never consulted; (2) otherwise, uiFlag = typeof settings.enableObservability === 'boolean' — when true, enabled is settings.enableObservability itself (DEFAULT_SETTINGS.enableObservability is false, which is why the feature is off by default in practice); when settings.enableObservability is NOT strictly a boolean, enabled instead falls back to envFallback = process.env.OBSERVABILITY_ENABLED !== 'false' (true unless that env var is the exact string 'false', so an unset OBSERVABILITY_ENABLED in this fallback branch defaults enabled to true); (3) if getSettings() throws or any step in the try block throws, the outer catch hardcodes enabled: false regardless of any env var"
     - "Enabled writes are buffered in a module-scope array and flushed either when the buffer reaches batchSize (default 20) or on a flushIntervalMs timer (default 5000ms) — whichever comes first"
     - "flushToDatabase() drains the entire buffer in a while-loop so pushes that happen during the async flush are still captured, and writes all buffered items inside one db.transaction()"
     - "After each flush, rows beyond maxRecords (default 200 in this file's own fallback; 1000 in settingsRepo's DEFAULT_SETTINGS) are deleted, oldest-timestamp-first"
@@ -442,7 +442,13 @@
     - "The hardcoded DEFAULT_MAX_RECORDS in this file (200) differs from settingsRepo.js's DEFAULT_SETTINGS.observabilityMaxRecords (1000) — the file's own fallback only applies if getSettings() itself throws, so the 1000 default wins in practice, but two different defaults for the same knob exist in the codebase."
   evidence:
     - { file: src/lib/db/repos/requestDetailsRepo.js, line: 4, note: "DEFAULT_MAX_RECORDS = 200 (fallback default, differs from settingsRepo)" }
-    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 13, note: "getObservabilityConfig — enabled resolution" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 13, note: "getObservabilityConfig entry" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 18, note: "ENABLE_REQUEST_LOGS read — checked first, top priority" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 20, note: "ENABLE_REQUEST_LOGS branch: enabled = value.toLowerCase() === 'true', short-circuits the rest" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 31, note: "envFallback = OBSERVABILITY_ENABLED !== 'false' — true unless the env var is exactly 'false'" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 32, note: "uiFlag — settings.enableObservability must be strictly typeof boolean to take precedence over envFallback" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 33, note: "enabled = uiFlag ? settings.enableObservability : envFallback" }
+    - { file: src/lib/db/repos/requestDetailsRepo.js, line: 46, note: "catch-all: any failure in the try block (e.g. getSettings throws) hardcodes enabled: false" }
     - { file: src/lib/db/repos/requestDetailsRepo.js, line: 61, note: "sanitizeHeaders — strips auth/cookie/token headers" }
     - { file: src/lib/db/repos/requestDetailsRepo.js, line: 80, note: "truncateField — caps oversized JSON fields" }
     - { file: src/lib/db/repos/requestDetailsRepo.js, line: 88, note: "flushToDatabase — drain loop + transaction" }

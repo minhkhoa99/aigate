@@ -59,9 +59,40 @@ describe("renderCapabilities", () => {
     expect(md).toContain("pxpipe still runs");
   });
 
-  it("does not present a suspected bug as a capability to reproduce", () => {
-    const capSection = md.slice(0, md.indexOf("Suspected bugs"));
+  it("presents a suspected bug as a capability, stating AIGate's required behavior, never 9router's actual behavior", () => {
+    // Split on the actual section heading, not the word "Suspected bugs" that
+    // also appears in the generated-file prose header above it.
+    const capSection = md.slice(0, md.indexOf("## Suspected bugs"));
+    expect(capSection).toContain("Master opt-out header");
+    expect(capSection).toContain("**AIGate required behavior:** opt-out disables pxpipe");
     expect(capSection).not.toContain("pxpipe still runs");
-    expect(capSection).not.toContain("Master opt-out header");
+  });
+});
+
+describe("renderCapabilities — bug table pipe escaping", () => {
+  const pipeEntries: FeatureEntry[] = [
+    {
+      ...base,
+      id: "settings.patch-password-change",
+      subFeature: "Password change fallback",
+      labels: ["SUSPECTED_BUG"],
+      suspicion: {
+        expected: "reads a dedicated env var",
+        actual: 'process.env.INITIAL_PASSWORD || "123456"',
+        impact: "weak default | security risk",
+      },
+    },
+  ];
+  const md = renderCapabilities(pipeEntries);
+  const bugsSection = md.slice(md.indexOf("## Suspected bugs"));
+  const row = bugsSection.split("\n").find((l) => l.includes("settings.patch-password-change"));
+
+  it("escapes every `|` in interpolated cells so the row keeps its column count", () => {
+    expect(row).toBeDefined();
+    // split on pipes that are NOT already escaped with a backslash
+    const cells = row!.split(/(?<!\\)\|/);
+    expect(cells).toHaveLength(6); // leading empty, id, expected, actual, impact, trailing empty
+    expect(row).toContain('process.env.INITIAL_PASSWORD \\|\\| "123456"');
+    expect(row).toContain("weak default \\| security risk");
   });
 });

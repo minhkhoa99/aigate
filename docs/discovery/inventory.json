@@ -156,6 +156,7 @@
     "api/version/update"
   ],
   "pages": [
+    "",
     "(dashboard)/dashboard",
     "(dashboard)/dashboard/basic-chat",
     "(dashboard)/dashboard/cli-tools",
@@ -182,8 +183,7 @@
     "callback",
     "dashboard/settings/pricing",
     "landing",
-    "login",
-    "page.js"
+    "login"
   ],
   "providers": [
     "alicode",

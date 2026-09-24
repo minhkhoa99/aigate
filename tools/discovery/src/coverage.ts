@@ -21,7 +21,7 @@ export type CoverageReport = {
  */
 const EVIDENCE_PATH: Record<keyof Inventory, (item: string) => string | null> = {
   routes: (r: string) => `src/app/${r}/route.js`,
-  pages: (p: string) => `src/app/${p}/page.js`,
+  pages: (p: string) => (p === "" ? "src/app/page.js" : `src/app/${p}/page.js`),
   providers: (p: string) => `open-sse/providers/registry/${p}.js`,
   executors: (e: string) => `open-sse/executors/${e}.js`,
   translators: (t: string) => t,
