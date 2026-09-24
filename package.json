@@ -4,6 +4,8 @@
   "type": "module",
   "engines": { "node": ">=22" },
   "scripts": {
+    "web": "pnpm --filter @aigate/web dev",
+    "web:build": "pnpm --filter @aigate/web build",
     "discovery": "pnpm --filter @aigate/discovery exec tsx src/cli.ts",
     "test": "pnpm --filter @aigate/discovery test"
   }
