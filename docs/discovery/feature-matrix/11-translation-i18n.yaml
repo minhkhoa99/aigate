@@ -14,7 +14,7 @@
 # Q3 (what survives the OpenAI pivot) is answered in translator.pivot-loss.
 
 - id: translator.registered-format-pairs
-  group: Translation engine
+  group: Translation / language functionality
   feature: Translator registry
   subFeature: Every registered source:target request/response pair
   trigger: Module load — each translator file self-registers via register() as an import side effect
@@ -71,7 +71,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.direct-route-claude-kiro
-  group: Translation engine
+  group: Translation / language functionality
   feature: Translator registry
   subFeature: The one bidirectional direct route — claude:kiro / kiro:claude
   trigger: sourceFormat=claude, targetFormat=kiro (request) or upstream=kiro, client=claude (response)
@@ -103,7 +103,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.missing-import-failure-mode
-  group: Translation engine
+  group: Translation / language functionality
   feature: Translator registry
   subFeature: What breaks when a translator file is not imported by index.js
   trigger: A translator module exists under request/ or response/ but is not among the static imports at the bottom of index.js
@@ -135,7 +135,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.pivot-loss
-  group: Translation engine
+  group: Translation / language functionality
   feature: OpenAI pivot
   subFeature: What survives a round trip through the OpenAI intermediate format, and what does not
   trigger: Any request whose source and target format differ and have no direct route registered (the common case — see translator.direct-route-claude-kiro for the one exception)
@@ -202,7 +202,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.response-pivot-dispatch
-  group: Translation engine
+  group: Translation / language functionality
   feature: Translator registry
   subFeature: translateResponse — per-chunk direct route or two-hop pivot, and per-format stream state
   trigger: Each streamed chunk (or the single non-streaming body) coming back from the executor
@@ -242,7 +242,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.responses-format-transformer
-  group: Translation engine
+  group: Translation / language functionality
   feature: Transformer (outside the registry)
   subFeature: responsesTransformer.js — Chat Completions SSE to Codex Responses-API SSE, and its dead call path
   trigger: Intended for POST /v1/responses when the client wants a streaming Responses-API reply
@@ -278,7 +278,7 @@
     impact: "A maintainer could change or delete createResponsesApiTransformStream believing it affects the Responses-API streaming lane and see no effect on live traffic, or conversely trust its event-shaping logic (reasoning items, sequence numbers) as authoritative when the actually-live path (the registered translator pair) may have since diverged from it"
 
 - id: translator.stream-to-json-converter
-  group: Translation engine
+  group: Translation / language functionality
   feature: Transformer (outside the registry)
   subFeature: streamToJsonConverter.js — collapse a Responses-API SSE stream into one JSON object
   trigger: A forceStream provider (e.g. Codex) streams even though the client requested non-streaming JSON
@@ -311,7 +311,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.binary-protocol-bypass
-  group: Translation engine
+  group: Translation / language functionality
   feature: Executor-level decoding
   subFeature: How Kiro EventStream, Cursor protobuf, and CommandCode NDJSON avoid the translator's pivot dispatch
   trigger: A response arrives from kiro, cursor, or commandcode in its native binary/line-delimited wire format
@@ -350,7 +350,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.schema-config-constants
-  group: Translation engine
+  group: Translation / language functionality
   feature: Translator conventions
   subFeature: Shared schema enums and config constants translators must use instead of literal strings
   trigger: Any translator file, at import time and per-call
@@ -386,7 +386,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.tool-id-normalization
-  group: Translation engine
+  group: Translation / language functionality
   feature: Shared translator concerns
   subFeature: Tool-call id validation, regeneration, and missing-response repair
   trigger: Every translateRequest call, before format-specific conversion runs (and again inside claude-to-openai.js on the OpenAI leg)
@@ -422,7 +422,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.image-data-uri-concern
-  group: Translation engine
+  group: Translation / language functionality
   feature: Shared translator concerns
   subFeature: Base64 data-URI encode/parse shared by every image-capable translator
   trigger: Any translator converting an image content block between formats
@@ -453,7 +453,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.claude-oauth-cloaking
-  group: Translation engine
+  group: Translation / language functionality
   feature: Provider-specific request shaping
   subFeature: Claude OAuth anti-ban tool cloaking and fingerprint injection
   trigger: translateRequest's final step, only when PROVIDERS[provider].quirks.cloakToolsOnOAuth is set and the credential is a Claude Code OAuth token (apiKey/accessToken contains 'sk-ant-oat')
@@ -489,7 +489,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.playground-pipeline-debug
-  group: Translation engine
+  group: Translation / language functionality
   feature: Translator debug playground
   subFeature: "api/translator/translate, load, save, send — step through and manually fire the pivot"
   trigger: Dashboard developer tool for inspecting/replaying the translation pipeline outside a real client request
@@ -532,7 +532,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.playground-console-logs
-  group: Translation engine
+  group: Translation / language functionality
   feature: Translator debug playground
   subFeature: "api/translator/console-logs and console-logs/stream — buffered + live console output for the playground UI"
   trigger: Dashboard playground polling or SSE-subscribing to server console output while stepping through a translation
@@ -568,7 +568,7 @@
   labels: [IMPLEMENTATION_ACCIDENT]
 
 - id: i18n.locale-selection-persistence
-  group: Interface language
+  group: Translation / language functionality
   feature: Locale selection
   subFeature: "POST /api/locale — validate, normalize, persist the chosen locale as a 1-year cookie"
   trigger: User picks a language in LanguageSwitcher (dashboard UI)
@@ -610,7 +610,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: i18n.locale-normalization-fallback
-  group: Interface language
+  group: Translation / language functionality
   feature: Locale selection
   subFeature: Supported-locale catalog and the DEFAULT_LOCALE fallback
   trigger: Every read of LOCALES/normalizeLocale/isSupportedLocale — client cookie parsing, /api/locale validation, LanguageSwitcher menu rendering
@@ -642,7 +642,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: i18n.runtime-dom-translation
-  group: Interface language
+  group: Translation / language functionality
   feature: String translation mechanism
   subFeature: Literal-keyed runtime DOM text substitution (not a conventional key-based i18n library)
   trigger: initRuntimeI18n on client mount (RuntimeI18nProvider useEffect) and reloadTranslations on every route change / locale switch

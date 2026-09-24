@@ -2,7 +2,7 @@
 # Traced against E:\9router (read-only). newModule: tooling for all entries in this file.
 
 - id: clitools.all-statuses-batch
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Dashboard tool-status aggregation
   subFeature: all-statuses batches 13 per-tool GETs into one response
   trigger: Dashboard "Integrations" page load (or refresh) fetching combined tool status
@@ -35,7 +35,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.claude-settings-config
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Claude Code CLI settings integration
   subFeature: GET/POST/DELETE for ~/.claude/settings.json env vars plus the exa MCP toggle in ~/.claude.json
   trigger: Dashboard "Claude Code" card — GET on load, POST on Apply, DELETE on Reset
@@ -79,7 +79,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.write-not-atomic
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: User config file durability
   subFeature: Every cli-tools write is a single non-atomic fs.writeFile with no on-disk backup
   trigger: Any POST/DELETE/PATCH across all 13 write-capable cli-tools routes
@@ -116,7 +116,7 @@
     impact: "A crash, OOM kill, disk-full error, or power loss during any of these writes can truncate or corrupt the user's real tool config (e.g. ~/.claude/settings.json, ~/.codex/config.toml, ~/.openclaw/openclaw.json). Because every route's read path treats an unparseable file as simply 'no config', the damage is silent: the next status check reports the tool as unconfigured, and the next Apply starts from empty, permanently discarding whatever unrelated settings that file held before 9router wrote to it."
 
 - id: clitools.baseurl-v1-suffix-normalization
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Base URL normalisation for CLI tool configs
   subFeature: Each POST handler independently appends (or strips) a literal "/v1" suffix before writing baseUrl
   trigger: Every write-capable cli-tools POST handler, before the baseUrl value is written into that tool's own config format
@@ -150,7 +150,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.cline-settings-dual-file
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Cline VS Code extension settings integration
   subFeature: Split write across globalState.json (provider/model) and secrets.json (API key)
   trigger: Dashboard "Cline" card — GET/POST/DELETE
@@ -184,7 +184,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.codex-settings-toml-split-secret
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Codex CLI settings integration
   subFeature: TOML config.toml (model/provider) plus a static bearer header carrying the API key, separate auth.json cleanup
   trigger: Dashboard "Codex" card — GET/POST/DELETE
@@ -220,7 +220,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.copilot-settings-array-upsert
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: GitHub Copilot Chat (VS Code) settings integration
   subFeature: Array-based upsert into chatLanguageModels.json, and a missing install-detection step
   trigger: Dashboard "Copilot" card — GET/POST/DELETE
@@ -259,7 +259,7 @@
     impact: "The dashboard's Copilot integration card (and any 'all installed tools' summary the UI derives from installed flags) will show Copilot as installed on any machine, even one with no VS Code and no Copilot extension, inviting the user to Apply — which just writes a file nobody will ever read."
 
 - id: clitools.droid-settings-custommodels
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Factory Droid CLI settings integration
   subFeature: customModels array rebuild with reorder-to-front default selection
   trigger: Dashboard "Droid" card — GET/POST/DELETE
@@ -292,7 +292,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.kilo-settings-dual-file
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Kilo Code CLI settings integration
   subFeature: auth.json write plus a best-effort, error-swallowed VS Code settings.json write
   trigger: Dashboard "Kilo Code" card — GET/POST/DELETE
@@ -323,7 +323,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.opencode-settings-provider-map
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: OpenCode CLI settings integration
   subFeature: provider.models map merge, active-model selection, and an always-rewritten subagent entry
   trigger: Dashboard "OpenCode" card — GET/POST/PATCH/DELETE
@@ -357,7 +357,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.openclaw-settings-per-agent-fanout
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: OpenClaw CLI settings integration
   subFeature: Main openclaw.json plus one models.json per agent, written in a non-transactional fan-out
   trigger: Dashboard "OpenClaw" card — GET/POST/DELETE
@@ -392,7 +392,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.deepseek-tui-full-overwrite
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: DeepSeek TUI settings integration
   subFeature: Both POST and DELETE replace the entire config.toml with a fixed template, discarding unrelated content
   trigger: Dashboard "DeepSeek TUI" card — GET/POST/DELETE
@@ -430,7 +430,7 @@
     impact: "The first time a user clicks Apply or Reset for DeepSeek TUI in the 9router dashboard, any other settings they had configured directly in ~/.deepseek/config.toml (other providers, TUI preferences, anything not related to 9router) are silently and irrecoverably destroyed."
 
 - id: clitools.grok-build-settings-restore-on-reset
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Grok Build CLI settings integration
   subFeature: Surgical TOML section editing with a marker-comment mechanism to remember and restore the user's prior default/subagent config
   trigger: Dashboard "Grok Build" card — GET/POST/DELETE
@@ -465,7 +465,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.hermes-settings-regex-block
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Hermes Agent settings integration
   subFeature: Regex-based YAML model-block upsert plus a separate .env file for the API key
   trigger: Dashboard "Hermes Agent" card — GET/POST/DELETE
@@ -500,7 +500,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.jcode-settings-env-split
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: jcode CLI settings integration
   subFeature: confbox TOML provider entry plus a separate quoted-KEY=VALUE env file for the API key
   trigger: Dashboard "jcode" card — GET/POST/DELETE
@@ -535,7 +535,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.devin-settings-detect-only
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Devin CLI integration
   subFeature: The one tool in the set with GET only — no config file is ever written
   trigger: Dashboard "Devin" card — GET only (no POST/DELETE exported)
@@ -564,7 +564,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.cowork-settings-desktop-mcp
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Claude Desktop (Cowork/3p mode) settings integration
   subFeature: Per-instance configLibrary/<uuid>.json write, deploymentMode bootstrap in the real Claude Desktop config, and managed MCP server assembly
   trigger: Dashboard "Claude Desktop (Cowork)" card — GET/POST/DELETE
@@ -605,7 +605,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.antigravity-mitm-control
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: Antigravity/MITM local proxy control
   subFeature: Start/stop the local MITM server, toggle per-tool hosts-file DNS interception, and manage per-tool model-alias rewrite mappings
   trigger: Dashboard "MITM" card — GET/POST/DELETE/PATCH on the base route; GET/PUT on the alias sub-route
@@ -650,7 +650,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: clitools.cowork-mcp-marketplace-fetch
-  group: CLI Tool Integration
+  group: CLI Tools
   feature: MCP marketplace backing endpoints
   subFeature: Registry fetch (with in-memory cache) and per-server tool-list probe (with SSRF guard), consumed by McpMarketplaceModal
   trigger: McpMarketplaceModal opening (registry fetch) and expanding a server row (tools probe)
@@ -688,7 +688,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: skills.catalogue-raw-github-contract
-  group: Agent Skills
+  group: Skills
   feature: Agent Skills catalogue
   subFeature: Single source-of-truth array mapping each capability to a raw GitHub SKILL.md URL third parties fetch directly
   trigger: /dashboard/skills page render (reads SKILLS to list cards); any third-party AI agent fetching a copied raw URL at its own setup/tool-load time

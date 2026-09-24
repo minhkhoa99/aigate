@@ -20,7 +20,7 @@
 #     searchConfig 12, searchViaChat 9, fetchConfig 5, videoConfig 1, musicConfig 0.
 
 - id: media.kind-registry-and-endpoints
-  group: Media providers
+  group: Media Providers
   feature: Media provider catalog
   subFeature: MEDIA_PROVIDER_KINDS — the 9 kinds, their labels/icons, and each kind's declared REST endpoint
   trigger: Any dashboard media-providers page render, or GET /v1/models/info building a per-model endpoint field
@@ -56,7 +56,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: media.kind-endpoint-map-mismatch
-  group: Media providers
+  group: Media Providers
   feature: Media provider catalog
   subFeature: Two independently-maintained kind→endpoint maps disagree for imageToText and webFetch
   trigger: "GET /v1/models/info (builds a model's endpoint field from KIND_ENDPOINT); the media-providers connection detail page's GenericExampleCard (builds a curl example AND performs a live \"Try it\" fetch from MEDIA_PROVIDER_KINDS[kind].endpoint)"
@@ -97,7 +97,7 @@
     impact: "The dashboard's live \"Try it\" widget for any imageToText-kind provider/model 404s instead of exercising the real /v1/chat/completions vision path; any external client trusting GET /v1/models/info's endpoint field for a webFetch-kind model builds a request against a path 9router never routes."
 
 - id: media.embedding-lane
-  group: Media providers
+  group: Media Providers
   feature: Embedding
   subFeature: "POST /v1/embeddings — account-selection loop + embeddingsCore provider dispatch"
   trigger: POST /v1/embeddings
@@ -138,7 +138,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: media.image-lane
-  group: Media providers
+  group: Media Providers
   feature: Text to Image
   subFeature: "POST /v1/images/generations — account-selection loop + imageGenerationCore provider dispatch, including codex's SSE streaming path"
   trigger: POST /v1/images/generations
@@ -176,7 +176,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: media.image-to-text-routes-via-chat
-  group: Media providers
+  group: Media Providers
   feature: Image to Text
   subFeature: imageToText has no dedicated request lane — it is a catalog label for vision-capable chat models, served entirely through /v1/chat/completions
   trigger: A client calling /v1/chat/completions with a model whose registry entry declares "imageToText" in serviceKinds
@@ -210,7 +210,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: media.tts-lane
-  group: Media providers
+  group: Media Providers
   feature: Text To Speech
   subFeature: "POST /v1/audio/speech — combo expansion + account-selection loop + ttsCore provider dispatch"
   trigger: POST /v1/audio/speech
@@ -248,7 +248,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: media.tts-voice-listing
-  group: Media providers
+  group: Media Providers
   feature: Text To Speech
   subFeature: Voice listing — one generic credential-free route plus four dedicated per-provider routes that require a stored connection
   trigger: Dashboard TTS provider/model picker loading available voices
@@ -289,7 +289,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: media.stt-lane
-  group: Media providers
+  group: Media Providers
   feature: Speech To Text
   subFeature: "POST /v1/audio/transcriptions — noAuth bypass, then account-selection loop + sttCore provider dispatch"
   trigger: POST /v1/audio/transcriptions (multipart form)
@@ -325,7 +325,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: media.video-lane
-  group: Media providers
+  group: Media Providers
   feature: Video
   subFeature: "POST /v1/videos/{generations,edits,extensions} + GET /v1/videos/[id] — async job proxy, xAI-only in practice"
   trigger: POST /v1/videos/generations|edits|extensions, or GET /v1/videos/{request_id} to poll
@@ -373,7 +373,7 @@
     impact: "A client that trusts the catalog's per-model kind field to pick a video model can select runwayml's video models and get a hard 400 on every attempt; the same models are also invisible on the dashboard's video provider grid since that grid gates on serviceKinds, not the models[] kind field, so there is no UI path to notice the gap either."
 
 - id: media.music-kind-dead-config
-  group: Media providers
+  group: Media Providers
   feature: Music
   subFeature: The "music" kind is fully declared in shared config/UI scaffolding but has zero implementing code anywhere
   trigger: none — no request path reaches this kind
@@ -407,7 +407,7 @@
   labels: [IMPLEMENTATION_ACCIDENT]
 
 - id: media.websearch-lane
-  group: Media providers
+  group: Media Providers
   feature: Web Search
   subFeature: "POST /v1/search — combo expansion, credential-fallback-to-chat-provider, dedicated-API vs chat-wrapped search with cross-mode failover"
   trigger: POST /v1/search
@@ -447,7 +447,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: media.webfetch-lane
-  group: Media providers
+  group: Media Providers
   feature: Web Fetch
   subFeature: "POST /v1/web/fetch — URL extraction, account-selection loop scoped to a webfetch-specific lock key"
   trigger: POST /v1/web/fetch
@@ -485,7 +485,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: media.account-loop-shared-vs-duplicated
-  group: Media providers
+  group: Media Providers
   feature: Cross-lane account selection
   subFeature: "What every non-chat lane genuinely shares with the chat lane vs. what each lane independently re-implements"
   trigger: Any of the 7 non-chat entry handlers processing a request
@@ -523,7 +523,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: media.dashboard-effective-status-stale
-  group: Media providers
+  group: Media Providers
   feature: Dashboard connection status
   subFeature: getEffectiveStatus displays a stale "unavailable" testStatus as "active" once its lock has actually expired
   trigger: Any media-providers [kind] dashboard page render, computing each connection's displayed status badge
@@ -558,7 +558,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: media.dashboard-combo-kinds-disabled
-  group: Media providers
+  group: Media Providers
   feature: Dashboard combo creation
   subFeature: "COMBO_KINDS is a permanently-empty Set — combo creation/listing UI for image and tts kinds is unreachable, and the code that would render it is dead"
   trigger: "MediaProviderKindPage render for kind=image or kind=tts"

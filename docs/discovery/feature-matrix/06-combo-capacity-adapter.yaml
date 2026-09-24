@@ -31,7 +31,7 @@
 # Storage/CRUD: combo.storage-shape, combo.api-crud.
 
 - id: combo.mode-fallback
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: "\"Fallback\" strategy — sequential try-until-success across combo members"
   trigger: A combo dispatch (routing.combo-dispatch) resolves to comboStrategy "fallback" (the default) or any non-"round-robin"/"fusion" value
@@ -73,7 +73,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.mode-round-robin
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: "\"Round-robin\" strategy — sticky rotation of the starting member across requests"
   trigger: comboStrategy resolves to exactly "round-robin" (per-combo comboStrategies[name].fallbackStrategy, else global settings.comboStrategy) and models.length > 1
@@ -110,7 +110,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.mode-fusion-panel-completion
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: "\"Fusion\" strategy — panel completion rule (minPanel quorum, straggler grace, hard timeout)"
   trigger: comboStrategy resolves to "fusion" and models.length > 1 (single-model fusion short-circuits — see combo.mode-fusion-degrade)
@@ -148,7 +148,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.fusion-panel-concurrency-unbounded
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: Fusion fan-out has no explicit concurrency cap independent of panel size
   trigger: Every fusion request with more than one panel member
@@ -178,7 +178,7 @@
   labels: [IMPLEMENTATION_ACCIDENT]
 
 - id: combo.mode-fusion-degrade
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: Fusion panel body shaping and graceful degradation by number of surviving answers
   trigger: handleFusionChat invoked for a fusion-strategy combo
@@ -220,7 +220,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.judge-prompt-synthesis
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: Judge model synthesizes one final answer from anonymized panel responses
   trigger: Fusion panel produced 2 or more usable answers
@@ -257,7 +257,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.tool-history-flatten
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: flattenToolHistory converts tool_use/tool_result/tool_calls turns to prose before panel calls
   trigger: A fusion panel call (panel.length>1) whose panelBody has an array messages or input field
@@ -292,7 +292,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.detect-required-capabilities
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: detectRequiredCapabilities scans only the trailing user turn for modality requirements
   trigger: Every combo dispatch (handleComboChat's autoSwitch) and every capacity-adapter-solo check — called once per incoming request
@@ -329,7 +329,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.reorder-by-capabilities-tiers
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: reorderByCapabilities — 3-tier stable sort of combo/pool members by capability fit
   trigger: handleComboChat's autoSwitch (default true, always true from current chat.js call sites) with a non-empty required Set, run after rotation and before the fallback loop
@@ -366,7 +366,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.rotation-state-lifecycle
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: comboRotationState Map — ownership, every reset trigger, and non-durability across restart
   trigger: "Any of: a settings PATCH touching comboStrategy/comboStickyRoundRobinLimit/comboStrategies (settings.combo-rotation-reset); a combo PUT (any field, not just a rename); a combo DELETE"
@@ -402,7 +402,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.storage-shape
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: Combo persistence shape — id / unique name / kind / models(JSON) / timestamps
   trigger: Any combosRepo call (getCombos, getComboById, getComboByName, createCombo, updateCombo, deleteCombo)
@@ -436,7 +436,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.api-crud
-  group: Model combo
+  group: Combo / Vision Adapter
   feature: Model combo
   subFeature: "/api/combos CRUD routes — name validation, a duplicate pre-check race, and reuse outside the chat lane"
   trigger: "GET/POST /api/combos; GET/PUT/DELETE /api/combos/[id]"
@@ -475,7 +475,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: capacity.capability-pool-config
-  group: Capacity adapter
+  group: Combo / Vision Adapter
   feature: Capacity adapter
   subFeature: Per-capability adapter pool config (enabled/roundRobin/models) with legacy-array back-compat and empty-pool fallback
   trigger: Any augmentModelsWithCapacityAdapter or getActiveAdapterStrategy call — i.e. every combo dispatch and every capacity-adapter-solo check
@@ -509,7 +509,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: capacity.pool-models-and-strategy
-  group: Capacity adapter
+  group: Combo / Vision Adapter
   feature: Capacity adapter
   subFeature: Flattened deduped adapter pool across all 4 capabilities, and active-strategy resolution
   trigger: augmentModelsWithCapacityAdapter needs the pool; routing.combo-dispatch needs the active strategy for a solo-adapter combo
@@ -540,7 +540,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: capacity.augment-models-priority-prepend
-  group: Capacity adapter
+  group: Combo / Vision Adapter
   feature: Capacity adapter
   subFeature: augmentModelsWithCapacityAdapter prepends adapter models first — the file's own header comment says the opposite
   trigger: routing.capacity-adapter-solo (single model) or routing.combo-dispatch (combo members) when none of the original models satisfy a required hard capability
@@ -573,7 +573,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: capacity.strip-history-budget-formula
-  group: Capacity adapter
+  group: Combo / Vision Adapter
   feature: Capacity adapter
   subFeature: stripHistoryForContext — the exact token-budget formula, what is always kept, and what is dropped first
   trigger: withCapacityAdapterStripping wraps a call to a model that is a member of the adapter pool, immediately before invoking handleSingleModel for it
@@ -614,7 +614,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: capacity.wrap-stripping-per-model
-  group: Capacity adapter
+  group: Combo / Vision Adapter
   feature: Capacity adapter
   subFeature: withCapacityAdapterStripping — per-call wrapper that strips history only for models actually drawn from the adapter pool
   trigger: Every handleSingleModel invocation inside a capacity-adapter-augmented combo (produced by routing.capacity-adapter-solo, or a combo augmented via combo-dispatch)

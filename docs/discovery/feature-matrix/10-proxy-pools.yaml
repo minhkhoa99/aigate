@@ -23,7 +23,7 @@
 # against the original hostname) holds. Recorded as REFERENCE_BEHAVIOR, not a bug.
 
 - id: transport.proxy-priority-chain
-  group: Transport
+  group: Proxy Pools
   feature: Proxy-aware outbound fetch
   subFeature: proxyAwareFetch() dispatch priority chain
   trigger: Every outbound provider/executor HTTP call routed through proxyAwareFetch(url, options, proxyOptions) instead of raw fetch
@@ -65,7 +65,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: transport.strict-proxy-fallback
-  group: Transport
+  group: Proxy Pools
   feature: Proxy-aware outbound fetch
   subFeature: strictProxy — hard-fail vs silent direct fallback on proxy dispatch failure
   trigger: proxyUrl is set and the undici ProxyAgent dispatch throws (proxy unreachable, auth failure, connection refused, etc.)
@@ -108,7 +108,7 @@
     impact: "An operator who enables strictProxy specifically to guarantee traffic never leaves without the configured proxy (e.g. to hide the server's real egress IP from upstream providers) gets no such guarantee for actual chat requests — a dead proxy silently falls back to a direct connection from the box's own IP, with only a console.warn as a trace, defeating the stated purpose of the toggle on the one path that matters most"
 
 - id: transport.mitm-dns-bypass
-  group: Transport
+  group: Proxy Pools
   feature: Proxy-aware outbound fetch
   subFeature: MITM_BYPASS_HOSTS — manual DNS resolution + raw-socket TLS to dodge local DNS/hosts poisoning
   trigger: proxyAwareFetch() called with a target URL whose hostname matches (via substring `includes`) one of MITM_BYPASS_HOSTS
@@ -147,7 +147,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: transport.proxy-dispatcher-cache
-  group: Transport
+  group: Proxy Pools
   feature: Proxy-aware outbound fetch
   subFeature: Cached undici ProxyAgent dispatchers, keyed by normalized proxy URL
   trigger: getDispatcher(proxyUrl) called from either branch of proxyAwareFetch that needs to dispatch through a proxy
@@ -182,7 +182,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: transport.connection-proxy-config-priority
-  group: Transport
+  group: Proxy Pools
   feature: Connection proxy resolution
   subFeature: resolveConnectionProxyConfig() — pool vs legacy vs none priority
   trigger: Called with a connection's (or a synthetic noAuth connection's) providerSpecificData, once per credential resolution (getProviderCredentials in auth.js) or per background quota/usage/reset-credits call
@@ -220,7 +220,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.assign-to-connection
-  group: Transport
+  group: Proxy Pools
   feature: Proxy pool assignment
   subFeature: A real (non-noAuth) connection is bound to a proxy pool via its own create/update body
   trigger: POST /api/providers (create connection) or PUT /api/providers/[id] (update connection) with a proxyPoolId field in the request body
@@ -253,7 +253,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.rotate-for-noauth
-  group: Transport
+  group: Proxy Pools
   feature: Proxy pool assignment
   subFeature: pickProxyPoolId() rotation for free/noAuth providers, keyed by settings.providerStrategies
   trigger: getProviderCredentials() for a noAuth provider, per request
@@ -290,7 +290,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.crud-list-and-create
-  group: Transport
+  group: Proxy Pools
   feature: Proxy pool management
   subFeature: GET/POST /api/proxy-pools — list (with optional usage enrichment) and create
   trigger: "GET /api/proxy-pools[?isActive=true|false&includeUsage=true]; POST /api/proxy-pools"
@@ -328,7 +328,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.crud-get-update-delete
-  group: Transport
+  group: Proxy Pools
   feature: Proxy pool management
   subFeature: GET/PUT/DELETE /api/proxy-pools/[id]
   trigger: "GET/PUT/DELETE /api/proxy-pools/{id}"
@@ -370,7 +370,7 @@
     impact: "A Deno relay pool edited through the dashboard (e.g. renaming it, or toggling isActive, if the edit form resubmits the current type) gets silently reclassified as a plain HTTP proxy; resolveConnectionProxyConfig() then routes it through the undici ProxyAgent path instead of the vercelRelayUrl header-relay path, and every subsequent request through that pool breaks because the Deno relay function only understands x-relay-target/x-relay-path headers, not being dialed as an HTTP_PROXY"
 
 - id: proxypool.test-connectivity
-  group: Transport
+  group: Proxy Pools
   feature: Proxy pool management
   subFeature: POST /api/proxy-pools/[id]/test — live connectivity check, updates testStatus/isActive as a side effect
   trigger: POST /api/proxy-pools/{id}/test
@@ -407,7 +407,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.vercel-relay-deploy
-  group: Transport
+  group: Proxy Pools
   feature: Proxy pool relay deployment
   subFeature: POST /api/proxy-pools/vercel-deploy — deploys a header-relay Edge Function and polls it to readiness
   trigger: POST /api/proxy-pools/vercel-deploy with { vercelToken, projectName? }
@@ -455,7 +455,7 @@
     impact: "Repeated failed/slow deploy attempts accumulate orphaned Vercel deployments/projects that consume the operator's Vercel account quota and cost, discoverable only by manually auditing the Vercel dashboard, since 9router has no local record of them at all"
 
 - id: proxypool.cloudflare-relay-deploy
-  group: Transport
+  group: Proxy Pools
   feature: Proxy pool relay deployment
   subFeature: POST /api/proxy-pools/cloudflare-deploy — uploads a Worker relay script and resolves its workers.dev URL
   trigger: POST /api/proxy-pools/cloudflare-deploy with { accountId, apiToken, projectName? }
@@ -496,7 +496,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.deno-relay-deploy
-  group: Transport
+  group: Proxy Pools
   feature: Proxy pool relay deployment
   subFeature: POST /api/proxy-pools/deno-deploy — creates a Deno Deploy app, deploys the relay, polls status, and rolls back on 2 of its 3 failure paths
   trigger: POST /api/proxy-pools/deno-deploy with { denoToken, orgDomain, projectName? }
@@ -545,7 +545,7 @@
     impact: "A Deno deploy that hangs in 'queued'/'building' for the full 60s (slow build, transient Deno Deploy backend delay, etc.) leaves the app+revision live on the operator's Deno Deploy account with zero local record and zero cleanup attempt — the same class of orphaned-billable-resource risk flagged for proxypool.vercel-relay-deploy, just reachable only via this one specific failure mode here instead of all of them"
 
 - id: proxypool.storage-json-blob
-  group: Transport
+  group: Proxy Pools
   feature: Proxy pool persistence
   subFeature: proxyPoolsRepo.js — proxyPools table storage shape
   trigger: Any proxy-pool CRUD call (createProxyPool/updateProxyPool/deleteProxyPool/getProxyPools/getProxyPoolById)

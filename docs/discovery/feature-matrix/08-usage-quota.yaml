@@ -10,7 +10,7 @@
 # - 07-token-saver.yaml: tokensaver.savings-recording.
 
 - id: usage.request-field-trace-order
-  group: Usage tracking
+  group: Usage
   feature: Per-request usage capture
   subFeature: Every field recorded for one request, in the order it becomes known
   trigger: A chat request reaches a success or error return point inside handleChatCore (or the embeddings/other modality equivalents)
@@ -52,7 +52,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.write-not-synchronous
-  group: Usage tracking
+  group: Usage
   feature: Per-request usage capture
   subFeature: Whether the usage write blocks the HTTP response
   trigger: saveUsageStats()/saveRequestUsage() called from any chat/embeddings success or error path
@@ -85,7 +85,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.pending-request-orphan-timeout
-  group: Usage tracking
+  group: Usage
   feature: Live request tracking
   subFeature: trackPendingRequest and the PENDING_TIMEOUT_MS watchdog
   trigger: trackPendingRequest(model, provider, connectionId, started, error) called at request dispatch, completion, disconnect and error points
@@ -122,7 +122,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.active-requests-and-recent-ring
-  group: Usage tracking
+  group: Usage
   feature: Live request tracking
   subFeature: getActiveRequests — active counters plus a deduped recent-request ring buffer
   trigger: Called by getUsageStats(), by /api/usage/stream's pending-refresh push, and directly for lightweight polling
@@ -159,7 +159,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.history-write-dedup-transaction
-  group: Usage tracking
+  group: Usage
   feature: Usage persistence
   subFeature: saveRequestUsage — dedup check, single-transaction 3-way write
   trigger: Any fire-and-forget saveRequestUsage(entry) call
@@ -200,7 +200,7 @@
     impact: "Genuinely distinct requests that happen to land in the same millisecond with identical provider/model/account/token counts (e.g. rapid retries, fixed-size embeddings calls) are silently undercounted in usageHistory, usageDaily aggregates, byModel/byAccount stats and the lifetime request counter"
 
 - id: usage.daily-rollup-aggregation
-  group: Usage tracking
+  group: Usage
   feature: Usage persistence
   subFeature: aggregateEntryToDay — per-day rollup by provider/model/account/apiKey/endpoint
   trigger: Inside the saveRequestUsage transaction, once per new row
@@ -234,7 +234,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.stats-query-dual-path
-  group: Usage tracking
+  group: Usage
   feature: Usage querying
   subFeature: getUsageStats — live-history path vs pre-aggregated usageDaily path
   trigger: GET /api/usage/stats?period=... or /api/usage/history (no period)
@@ -269,7 +269,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.chart-data-buckets
-  group: Usage tracking
+  group: Usage
   feature: Usage querying
   subFeature: getChartData — time-bucketed tokens+cost series
   trigger: GET /api/usage/chart?period=...
@@ -304,7 +304,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.recent-logs-and-noop-append
-  group: Usage tracking
+  group: Usage
   feature: Usage querying
   subFeature: appendRequestLog is an empty no-op; the log view is derived read-side from usageHistory
   trigger: GET /api/usage/logs or /api/usage/request-logs
@@ -341,7 +341,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.global-state-next-reeval
-  group: Usage tracking
+  group: Usage
   feature: Live request tracking
   subFeature: Why live counters live on global.* instead of module-scope state
   trigger: usageRepo.js module load
@@ -374,7 +374,7 @@
   labels: [IMPLEMENTATION_ACCIDENT]
 
 - id: usage.sse-live-stream
-  group: Usage tracking
+  group: Usage
   feature: Live request tracking
   subFeature: GET /api/usage/stream — SSE push of usage stats
   trigger: Dashboard opens the usage/quota view
@@ -410,7 +410,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.request-details-buffered-persistence
-  group: Usage tracking
+  group: Usage
   feature: Per-request detail storage (observability)
   subFeature: requestDetailsRepo — disabled by default, buffered batch writes, capped and sanitized
   trigger: saveRequestDetail(detail) called from chatCore's success/error paths
@@ -456,7 +456,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.request-details-api-redaction
-  group: Usage tracking
+  group: Usage
   feature: Per-request detail storage (observability)
   subFeature: GET /api/usage/request-details — pagination plus mandatory content redaction
   trigger: Dashboard's request-details tab fetches a page of detail rows
@@ -490,7 +490,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.providers-distinct-api
-  group: Usage tracking
+  group: Usage
   feature: Per-request detail storage (observability)
   subFeature: GET /api/usage/providers — distinct-provider filter list for the request-details tab
   trigger: RequestDetailsTab.js loads its provider filter dropdown
@@ -522,7 +522,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: usage.history-route-returns-aggregate-not-rows
-  group: Usage tracking
+  group: Usage
   feature: Usage querying
   subFeature: "/api/usage/history is not a history-rows endpoint — it returns the same aggregate shape as /api/usage/stats"
   trigger: GET /api/usage/history
@@ -559,7 +559,7 @@
     impact: "AIGate would misdesign a 'usage history' endpoint contract by assuming per-row data if this were ported literally; the working, filter-capable raw-row query exists in source but is unreachable from the API surface"
 
 - id: pricing.cost-calculation-cache-inclusive
-  group: Usage tracking
+  group: Usage
   feature: Cost calculation
   subFeature: calculateCost — pricing lookup and cache-inclusive token math
   trigger: Inside saveRequestUsage(), before the usageHistory INSERT
@@ -594,7 +594,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: pricing.crud-api
-  group: Usage tracking
+  group: Usage
   feature: Cost calculation
   subFeature: /api/pricing — GET merged pricing, PATCH validated overrides, DELETE reset-to-default
   trigger: Dashboard pricing editor
@@ -639,7 +639,7 @@
     impact: "Any external client relying on the documented '/api/pricing/defaults' HTTP contract gets a 404, not the default pricing table; the feature works today only because the one consumer bypasses the API entirely"
 
 - id: quota.sources-taxonomy
-  group: Quota tracking
+  group: Quota Tracker
   feature: Quota sources
   subFeature: The four categories behavioral.md §21 asks about — which exist in 9router and how
   trigger: N/A — cross-cutting taxonomy over the quota subsystem
@@ -674,7 +674,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: quota.vendor-fetch-caching-claude-github-codex
-  group: Quota tracking
+  group: Quota Tracker
   feature: Quota sources
   subFeature: Vendor-reported quota fetch mechanics — per-provider windows, caching, cooldowns
   trigger: GET /api/usage/[connectionId] for an OAuth/apikey-eligible connection
@@ -714,7 +714,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: quota.codex-reset-credits
-  group: Quota tracking
+  group: Quota Tracker
   feature: Quota sources
   subFeature: Codex reset credits — a redeemable pool that manually ends the current 5h window early
   trigger: Dashboard 'use reset credit' button on a Codex connection
@@ -750,7 +750,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: quota.antigravity-local-cache-strike-breaker
-  group: Quota tracking
+  group: Quota Tracker
   feature: Quota sources
   subFeature: Antigravity's locally-counted/inferred quota — RAM cache plus a strike-based trust override
   trigger: auth.js's account pre-filter reading the cache, or a 409/429 from an Antigravity generation call
@@ -788,7 +788,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: quota.dashboard-refresh-and-visibility
-  group: Quota tracking
+  group: Quota Tracker
   feature: Quota UI
   subFeature: The /dashboard/quota page — auto-refresh cadence, per-provider throttling, client cache, visibility settings
   trigger: User opens /dashboard/quota
@@ -832,7 +832,7 @@
   labels: [REFERENCE_BEHAVIOR]
 
 - id: quota.auto-ping-window-warming
-  group: Quota tracking
+  group: Quota Tracker
   feature: Quota UI
   subFeature: quotaAutoPing scheduler — opt-in pings that start a new quota window right after reset
   trigger: A 60000ms (tickIntervalMs) scheduler interval, started/stopped based on whether any connection has auto-ping enabled
