@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Button, CopyField, Dot, Field, Input, Metric, PageHeading, Panel, Pill, Table, Tabs, Warning } from "../../shared/ui";
+import { Button, CopyField, Dot, Input, Metric, PageHeading, Panel, Pill, Table, Warning } from "../../shared/ui";
 
 const requestRows = [
   ["req_01J9A2", "14:02:41", "claude-3.5-sonnet", "Anthropic", "1,420", "$0.0042", "200"],
@@ -46,4 +46,3 @@ export function Console() {
       {["14:02:41.392  INFO   response completed req_01J9A2 · 200 · 1,420 tokens", "14:02:38.211  INFO   connection selected openai-primary · gpt-4o", "14:01:56.032  WARN   provider quota near limit deepseek-primary", "14:01:49.441  INFO   SSE stream started · gemini-2.5-pro", "14:00:57.120  INFO   usage snapshot persisted req_01J99Y"].filter((x) => level === "All levels" || (level === "Warnings" ? x.includes("WARN") : x.includes("ERROR"))).map((line) => <div key={line}>{line}</div>)}
     </div></Panel></>;
 }
-

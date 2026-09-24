@@ -1,0 +1,33 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: decolua/9router
+          ref: 39e36d3d0c849e0e01dfeacddf111edf892448fc
+          path: 9router
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm lint:check
+      - run: pnpm test
+        env:
+          NINEROUTER_PATH: ${{ github.workspace }}/9router
+      - run: pnpm discovery validate
+        env:
+          NINEROUTER_PATH: ${{ github.workspace }}/9router
+      - run: pnpm web:build

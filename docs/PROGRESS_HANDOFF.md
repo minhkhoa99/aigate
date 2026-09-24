@@ -10,9 +10,16 @@ Updated: 2026-09-25. Read this before continuing the project plan.
 - The UI provider catalog still matches the 111 active, visible imports in the current 9Router registry. `opencode-zen` uses the special import variable `p68z`, so a numeric-only parser incorrectly reports 110.
 - Checks passed: `pnpm test` (54/54), `pnpm discovery validate` (283 entries), `pnpm web:build`, and `node --test apps/web/src/features/providers/catalog.test.mjs`. Discovery commands need `NINEROUTER_PATH=D:\9router` on this machine. `pnpm install --frozen-lockfile` was run without changing the lockfile.
 
-## Next planned work: M0 SP0.1
+## M0 SP0.1 in progress
 
-The M-1 plan's unchecked boxes are historical instructions; the execution checkpoint at its top records completion. The next milestone is M0, starting with **SP0.1 mechanical lint and CI** in design spec §11.2/§11.7. No SP0 implementation exists yet. Define a small runnable violation fixture for each machine-checkable rule, then implement only the checks that can be applied to the current repo. Keep the two skills for SP0.2-SP0.5 after the red baseline; do not write them first. SP1 (NestJS/Fastify boot) follows SP0.
+- Replaced the copied 9Router `CLAUDE.md` with an AIGate-specific entry point to this handoff, the UI boundary, design spec, and local verification commands.
+- Added ESLint, TypeScript ESLint, `eslint-plugin-boundaries`, and dependency-cruiser. `pnpm lint` currently passes. It checks dynamic `Promise.all`, raw `fetch` without `AbortSignal.timeout`, secret-named values in console/logger calls, non-const type assertions, explicit `any`, empty catches, imports across web features, route files over 200 nonblank lines, repository `SELECT *`/missing `LIMIT`, and vendor imports from `apps/*/src/modules/*/domain/`. The `no-secret-logging` and SQL rules are syntax heuristics, not full data-flow or SQL parsing.
+- `pnpm lint:check` has seven passing tests that include deliberately invalid examples; the feature import and domain import fixtures were confirmed to fail their respective tools. A GitHub Actions workflow now installs dependencies, checks lint, runs the violation tests, M-1 tests and validation, and builds the web preview. The workflow itself has not run remotely yet.
+- Verification after these edits: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm lint:check` (7/7), `pnpm test` (54/54), `pnpm discovery validate` (283 entries), `pnpm web:build`, provider catalog test (1/1), and `git diff --check` all passed locally.
+
+## Next concrete work
+
+**SP0.1 is not complete.** The M-1 plan's unchecked boxes are historical instructions; its execution checkpoint records completion. Next, define the `AIProviderPort` execution context and bounded retry helper contract before enforcing `execute` timeout and unbounded retry. Check repository SQL enforcement against the actual Drizzle call shape once the API package exists. Then run the new GitHub Actions workflow and confirm a deliberately violating branch fails CI. Do not claim SP0.1 done from local lint alone. Keep the two skills for SP0.2-SP0.5 after the red baseline; do not write them first. SP1 (NestJS/Fastify boot) follows SP0.
 
 Before starting, inspect `docs/superpowers/specs/2026-09-22-aigate-design.md` §9 and §11, `docs/governance/rules.md`, and this handoff. Do not treat `UI_READY` as working API integration or copy the 9Router implementation accidents into AIGate.
 
