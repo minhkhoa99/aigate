@@ -578,3 +578,633 @@
   newModule: settings
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+
+# --- Task 19a: gate gap-fill — auth, settings sub-routes, system routes ---
+
+- id: identity.session-cookie-lifecycle
+  group: Settings
+  feature: Authentication
+  subFeature: Dashboard session cookie issuance, verification, and destruction (login/dashboardGuard/logout)
+  trigger: POST /api/auth/login with a valid password issues the cookie; every subsequent /api/* request through middleware verifies it; POST /api/auth/logout destroys it
+  input: "login: { password }; logout: none (relies on the existing auth_token cookie)"
+  output: "login: httpOnly auth_token JWT cookie (24h expiry) set on success; logout: auth_token and any pending oidc_state/oidc_nonce/oidc_code_verifier cookies deleted"
+  businessRules:
+    - "auth_token is a jose-signed HS256 JWT (createDashboardAuthToken) with a 24h expiration; its secret is loaded once from the JWT_SECRET env var or a persisted DATA_DIR/jwt-secret file (generated on first run, mode 0o600) — the same pattern as identity.machine-id-derivation's persisted secret"
+    - "The cookie is httpOnly and sameSite=lax always, but secure only when AUTH_COOKIE_SECURE=true or the request carries x-forwarded-proto: https (shouldUseSecureCookie) — a plain HTTP request behind a non-TLS-terminating proxy gets a non-secure cookie"
+    - "dashboardGuard.js's isAuthenticated() treats the caller as authenticated if EITHER the auth_token cookie verifies (hasValidToken → verifyDashboardAuthToken) OR settings.requireLogin === false — the JWT check and the requireLogin bypass are two independent ways to pass the same gate"
+    - "logout is unconditional and itself unauthenticated (no session check gates calling it) — it always clears auth_token plus the three OIDC PKCE/state cookies regardless of whether an OIDC flow was ever started, but does not clear saml_state"
+  state:
+    reads: ["settings.password (via login)", "auth_token cookie (via logout/guard)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["settings.patch-password-change"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["JWT_SECRET auto-generated and persisted to disk on first run if the env var is unset"]
+  persistence: ["DATA_DIR/jwt-secret (32-byte random hex, first run only)"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "logout clears the OIDC transient cookies but not saml_state — a half-completed SAML login attempt's state cookie survives a logout call (low impact: it only matters for a subsequent SAML ACS POST, and it expires after 10 minutes regardless)"
+  evidence:
+    - { file: src/app/api/auth/login/route.js, line: 91, note: "setDashboardAuthCookie(cookieStore, request) — issues the session cookie on successful login" }
+    - { file: src/lib/auth/dashboardSession.js, line: 62, note: "cookieStore.set('auth_token', token, { httpOnly, secure, sameSite: 'lax' })" }
+    - { file: src/dashboardGuard.js, line: 170, note: "hasValidToken — reads the auth_token cookie, delegates to verifyDashboardAuthToken" }
+    - { file: src/dashboardGuard.js, line: 183, note: "isAuthenticated — first branch: a valid auth_token cookie is sufficient" }
+    - { file: src/dashboardGuard.js, line: 185, note: "isAuthenticated — second branch: settings.requireLogin === false also passes, independent of any token" }
+    - { file: src/app/api/auth/logout/route.js, line: 7, note: "clearDashboardAuthCookie(cookieStore) plus manual delete of the three OIDC transient cookies" }
+  newModule: identity
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: identity.auth-status-disclosure
+  group: Settings
+  feature: Authentication
+  subFeature: GET /api/auth/status — unauthenticated auth-configuration probe
+  trigger: Login page loads (before any credential is submitted), or any caller of GET /api/auth/status
+  input: none
+  output: "200 JSON describing the current auth configuration and, if a valid session exists, that session's display identity — never the password hash or OIDC/SAML secret values"
+  businessRules:
+    - "The route is unauthenticated by design ('/api/auth/status' is in dashboardGuard.js's PUBLIC_API_PATHS) so the login page can render the right form (password vs SSO button, custom login labels) before the caller has any credential"
+    - "Fields returned to an unauthenticated caller include requireLogin, authMode, ssoType, oidcConfigured/samlConfigured (booleans only), the operator-customized login-button labels, and hasPassword (whether any password hash has ever been set) — none are secret values, but hasPassword does tell an unauthenticated network caller whether the install is still in its unset/first-run password state"
+    - "authenticated defaults to false and displayName/loginMethod fall back to generic strings ('Password user'/'Password') when getDashboardAuthSession(cookie) returns null, so an unauthenticated caller learns nothing about who (if anyone) is logged in via another session"
+    - "A thrown error (e.g. malformed settings JSON) is swallowed and answered with a hardcoded safe-default body (requireLogin: true, everything else false/null) instead of a 500 — the route never fails closed into an error response"
+  state:
+    reads: ["settings.requireLogin, authMode, ssoType, oidc*/saml* presence, password presence", "auth_token cookie (to resolve the current session, if any)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["identity.session-cookie-lifecycle"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The catch-block fallback hardcodes ssoType: 'oidc' and authMode: 'password' regardless of the real settings, so a transient settings-read failure can briefly make the login page show the wrong login method rather than an error"
+  evidence:
+    - { file: src/app/api/auth/status/route.js, line: 30, note: "GET — returns requireLogin/authMode/ssoType/oidcConfigured/samlConfigured/hasPassword/displayName/authenticated" }
+    - { file: src/app/api/auth/status/route.js, line: 41, note: "authenticated: !!session — false whenever the auth_token cookie is absent or invalid" }
+    - { file: src/dashboardGuard.js, line: 29, note: "'/api/auth/status' listed in PUBLIC_API_PATHS — no auth required to call this route" }
+  newModule: identity
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: identity.reset-password-local-only
+  group: Settings
+  feature: Authentication
+  subFeature: POST /api/auth/reset-password — reset the dashboard password to the install default
+  trigger: A local-machine caller (browser on loopback + already authenticated, or a valid machineId-derived CLI token) POSTs with no body
+  input: none
+  output: "200 { success: true }; settings.password is cleared (set to null)"
+  businessRules:
+    - "The route performs no current-password check at all — it unconditionally sets settings.password to null via updateSettings, so the next login falls back to the process.env.INITIAL_PASSWORD-or-'123456' comparison in the login route; this IS the 'forgot password' recovery path, not a self-service password rotation"
+    - "Who may call it is enforced entirely outside the route body, in dashboardGuard.js: '/api/auth/reset-password' is in LOCAL_ONLY_PATHS, so canAccessLocalOnlyRoute requires either a valid x-9r-cli-token header (machineId-derived) or (isLocalRequest(request) AND isAuthenticated(request)) — an already-logged-in browser session on loopback, or the CLI, not a bare unauthenticated caller"
+    - "Because the browser branch of canAccessLocalOnlyRoute requires isAuthenticated() (valid JWT OR requireLogin===false) in addition to isLocalRequest(), a fully logged-out local browser with requireLogin still true cannot call this route either — matching the route's own comment 'Local-only (enforced by dashboardGuard)'"
+  state:
+    reads: []
+    writes: ["settings.password (set to null)"]
+    runtimeOnly: []
+  dependencies: ["settings.patch-password-change", "identity.session-cookie-lifecycle"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "updateSettings throws", partial: false }
+  sideEffects: []
+  persistence: ["settings.password (cleared)"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Clearing the password does not itself open a remote path to the default: the documented recovery flow is '9Router CLI → Settings → Reset Password to Default' (the RESET_HINT string in the login route), i.e. the CLI already runs with local trust and can hit this route via its machineId CLI token without ever holding a dashboard session"
+  evidence:
+    - { file: src/app/api/auth/reset-password/route.js, line: 8, note: "updateSettings({ password: null }) — unconditional, no current-password check" }
+    - { file: src/dashboardGuard.js, line: 84, note: "'/api/auth/reset-password' listed in LOCAL_ONLY_PATHS" }
+    - { file: src/dashboardGuard.js, line: 162, note: "canAccessLocalOnlyRoute — CLI-token branch: hasValidCliToken(request) alone grants access" }
+    - { file: src/dashboardGuard.js, line: 164, note: "canAccessLocalOnlyRoute — browser branch: isLocalRequest(request) && isAuthenticated(request)" }
+  newModule: identity
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: identity.oidc-login-flow
+  group: Settings
+  feature: Authentication
+  subFeature: OIDC authorization-code + PKCE login (start → IdP → callback)
+  trigger: GET /api/auth/oidc/start (user clicks the OIDC login button), then the IdP redirects back to GET /api/auth/oidc/callback
+  input: "start: none; callback: ?code=...&state=... query params from the IdP redirect"
+  output: "start: 302 redirect to the IdP authorization endpoint; callback: 302 redirect to /dashboard on success (session cookie set) or to /login?error=... on any failure"
+  businessRules:
+    - "Settings keys that drive OIDC: settings.authMode must be 'oidc' or 'both' AND settings.oidcIssuerUrl + oidcClientId + oidcClientSecret must all be non-empty (getOidcRuntimeConfig / isOidcConfigured) — missing any one disables /start entirely (redirects straight to /login?error=oidc_not_configured)"
+    - "CSRF protection: a random 16-byte state value is generated per /start call, stored in an httpOnly oidc_state cookie (10 min maxAge), and the callback rejects the exchange outright ('oidc_invalid_state') if the returned ?state= does not exactly match the cookie, or if any of the three OIDC cookies is missing"
+    - "Replay protection: a random 16-byte nonce is generated per /start call, stored in oidc_nonce, and passed through to verifyOidcIdToken, which requires the id_token's nonce claim to match via jose's jwtVerify options (a library-enforced claim check, not a manual string compare after the fact) — a mismatched nonce fails verification and throws"
+    - "PKCE (S256) is used unconditionally: a code_verifier/code_challenge pair is generated at /start, the challenge sent in the authorize URL, and the verifier sent to the token endpoint at exchange time — on top of, not instead of, the state/nonce checks"
+    - "The returned identity maps to a session by embedding oidc: true, oidcSub, oidcEmail, oidcName as extra JWT claims on the same auth_token cookie used by password login — there is no separate OIDC session type"
+    - "The id_token is verified against the IdP's live JWKS (createRemoteJWKSet), with issuer and audience (=clientId) both enforced — a token signed by a different issuer or intended for a different client is rejected"
+  state:
+    reads: ["settings.authMode, oidcIssuerUrl, oidcClientId, oidcClientSecret, oidcScopes", "oidc_state/oidc_nonce/oidc_code_verifier cookies (callback)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["identity.session-cookie-lifecycle"]
+  providerInteraction: "IdP's /.well-known/openid-configuration discovery document, its token endpoint (code exchange), and its JWKS endpoint (id_token signature verification) — three outbound HTTP calls per login"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "state cookie missing or mismatched, or any of the three OIDC cookies absent", partial: false }
+    - { code: AUTH_ERROR, when: "id_token missing, signature invalid, or issuer/audience/nonce mismatch/expired", partial: false }
+    - { code: INVALID_REQUEST, when: "code or state query param missing from the callback URL", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "The discovery document is re-fetched on every /start and every /callback with no caching, adding two round trips to the IdP per login beyond the token/JWKS calls"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "getPublicOrigin prefers BASE_URL/NEXT_PUBLIC_BASE_URL over request headers, so the redirect_uri sent to the IdP silently points at a stale origin if that env var is set but doesn't match the real public URL — the callback then fails at the IdP with a redirect_uri mismatch, not inside this code"
+  evidence:
+    - { file: src/app/api/auth/oidc/start/route.js, line: 22, note: "state/nonce/PKCE pair generated fresh per /start call" }
+    - { file: src/app/api/auth/oidc/start/route.js, line: 44, note: "oidc_state cookie set as httpOnly, 10 min maxAge (oidc_nonce/oidc_code_verifier set identically on the next two lines)" }
+    - { file: src/app/api/auth/oidc/callback/route.js, line: 38, note: "storedState !== state (or any cookie missing) → oidc_invalid_state, exchange never attempted" }
+    - { file: src/app/api/auth/oidc/callback/route.js, line: 66, note: "verifyOidcIdToken called with the stored nonce" }
+    - { file: src/app/api/auth/oidc/callback/route.js, line: 75, note: "setDashboardAuthCookie with oidc/oidcSub/oidcEmail/oidcName claims" }
+    - { file: src/lib/auth/oidc.js, line: 220, note: "jwtVerify against the IdP's live JWKS with issuer/audience/nonce all enforced as verify options" }
+    - { file: src/lib/auth/oidc.js, line: 44, note: "isOidcConfigured — issuerUrl + clientId + clientSecret must all be present" }
+  newModule: identity
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: identity.oidc-test-probe
+  group: Settings
+  feature: Authentication
+  subFeature: POST /api/auth/oidc/test — validate an OIDC configuration before saving it
+  trigger: Dashboard admin clicks "Test connection" on the OIDC settings form, before or after saving
+  input: "{ issuerUrl?, clientId?, clientSecret?, scopes? } — any field omitted falls back to the currently-saved setting"
+  output: "200 { ok, discoveryOk, clientSecretTested, clientSecretValid, authorizationEndpoint, tokenEndpoint, jwksUri, ... } — never echoes the client secret back"
+  businessRules:
+    - "Access requires the same gate as a protected dashboard action: settings.requireLogin === false lets anyone through, otherwise the auth_token cookie must verify — implemented locally in the route (canAccessTestRoute) rather than via dashboardGuard's PROTECTED_API_PATHS, because '/api/auth/oidc' is otherwise entirely in PUBLIC_API_PATHS (needed for /start and /callback)"
+    - "The route accepts issuerUrl/clientId/clientSecret in the request body as overrides of the stored settings, so an admin can test a new IdP configuration before saving it — this means an authenticated caller can direct the server to fetch discovery from an arbitrary attacker-chosen issuerUrl"
+    - "Secret validation is a live probe, not a local check: probeOidcClientSecret POSTs a deliberately-invalid authorization code to the IdP's real token endpoint with the given client_secret; an invalid_client/unauthorized_client response means the secret is wrong, while invalid_grant/invalid_code means the secret was accepted and only the intentionally-bogus code failed"
+  state:
+    reads: ["settings.requireLogin", "auth_token cookie", "settings.oidcIssuerUrl/oidcClientId/oidcClientSecret/oidcScopes (fallback when body omits a field)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["identity.session-cookie-lifecycle", "identity.oidc-login-flow"]
+  providerInteraction: "IdP discovery document fetch, plus one token-endpoint POST with an invalid code purely to probe whether the client secret is accepted"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "requireLogin is true and the caller has no valid auth_token", partial: false }
+    - { code: INVALID_REQUEST, when: "issuerUrl or clientId missing after merging body and stored settings", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because an authenticated caller can supply an arbitrary issuerUrl, this route is a same-trust-level SSRF primitive (server-side fetch to an attacker-chosen URL) — consistent with the trust level already granted to anyone who can PATCH /api/settings, so not a privilege escalation on its own"
+  evidence:
+    - { file: src/app/api/auth/oidc/test/route.js, line: 9, note: "canAccessTestRoute — settings.requireLogin===false short-circuits to allowed" }
+    - { file: src/app/api/auth/oidc/test/route.js, line: 41, note: "fetchOidcDiscovery(issuerUrl) — issuerUrl may come straight from the request body" }
+    - { file: src/lib/auth/oidc.js, line: 167, note: "probeOidcClientSecret — live token-endpoint POST with an intentionally invalid code" }
+  newModule: identity
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: identity.saml-login-flow
+  group: Settings
+  feature: Authentication
+  subFeature: SAML 2.0 SP-initiated login (start → IdP → ACS)
+  trigger: GET /api/auth/saml/start (user clicks the SAML login button), then the IdP POSTs the assertion to /api/auth/saml/acs
+  input: "start: none; acs: multipart form body with a SAMLResponse field (base64-encoded XML)"
+  output: "start: 302 redirect to the IdP's SSO endpoint; acs: 302 redirect to /dashboard with the session cookie set, or to /login?error=... on any failure"
+  businessRules:
+    - "Settings keys that drive SAML: settings.samlEntryPoint (IdP SSO URL) and settings.samlCert (IdP X.509 cert) must both be present (isSamlConfigured) for /start to proceed; samlIssuer/samlAttributeEmail/samlAttributeName are optional overrides"
+    - "@node-saml/node-saml is configured with wantAssertionsSigned: true, so an unsigned or tampered assertion fails validatePostResponseAsync's signature check against the configured idpCert regardless of any other check"
+    - "Login attempts are rate-limited per source IP via the same checkLock/recordFail/recordSuccess mechanism as password login (loginLimiter), applied before the SAMLResponse is even parsed"
+    - "The returned identity maps to a session the same way as OIDC: setDashboardAuthCookie is called with { saml: true, samlEmail, samlName } as extra JWT claims on the one shared auth_token cookie"
+    - "Attribute extraction (pickSamlEmail/pickSamlDisplayName) tries a configured custom attribute name first, then a fixed list of common SAML/WS-Fed claim URIs, then falls back nameID → email → a hardcoded 'SAML user' string — an IdP that puts identity under an attribute not in that list needs the custom samlAttributeEmail/samlAttributeName setting"
+  state:
+    reads: ["settings.samlEntryPoint, samlCert, samlIssuer, samlAttributeEmail, samlAttributeName", "saml_state cookie (acs)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["identity.session-cookie-lifecycle"]
+  providerInteraction: "IdP's SSO endpoint (browser-redirected AuthnRequest); the assertion is POSTed back to the SP by the browser, not fetched by the server"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: RATE_LIMIT, when: "source IP has exceeded the login-attempt lockout threshold", partial: false }
+    - { code: AUTH_ERROR, when: "SAMLResponse missing, SAML not configured, or validatePostResponseAsync rejects the assertion (bad signature, expired, wrong audience/recipient)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "createSamlInstance falls back to a syntactically-shaped but non-functional DUMMY_FALLBACK_CERT when settings.samlCert is unset/unparseable, rather than throwing at construction time — /start's isSamlConfigured gate is the only thing actually preventing a redirect built against the dummy cert"
+  evidence:
+    - { file: src/app/api/auth/saml/start/route.js, line: 15, note: "buildSamlAuthorizeUrl — generates the AuthnRequest and requestId" }
+    - { file: src/app/api/auth/saml/start/route.js, line: 18, note: "saml_state cookie set to the AuthnRequest's ID, 10 min maxAge" }
+    - { file: src/app/api/auth/saml/acs/route.js, line: 49, note: "validateSamlResponse call — signature + replay checks" }
+    - { file: src/app/api/auth/saml/acs/route.js, line: 56, note: "setDashboardAuthCookie with saml/samlEmail/samlName claims" }
+    - { file: src/lib/auth/saml.js, line: 100, note: "wantAssertionsSigned: true in the node-saml instance config" }
+    - { file: src/lib/auth/saml.js, line: 159, note: "samlInstance.validatePostResponseAsync — the actual signature/condition verification" }
+  newModule: identity
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: identity.saml-replay-inresponseto-gap
+  group: Settings
+  feature: Authentication
+  subFeature: SAML assertion replay protection is skippable whenever no saml_state cookie is presented
+  trigger: POST /api/auth/saml/acs with a SAMLResponse but no (or an already-expired/already-consumed) saml_state cookie
+  input: "A previously-valid, correctly-signed SAMLResponse, replayed without the original saml_state cookie"
+  output: "The assertion is accepted and a session cookie is issued exactly as if it were a fresh, expected response — the InResponseTo value inside the assertion is never checked in this case"
+  businessRules:
+    - "createSamlInstance configures node-saml with validateInResponseTo: 'never' — the library's own built-in InResponseTo/replay tracking is explicitly disabled for every request, by explicit choice, not omission"
+    - "validateSamlResponse's own manual replay check only runs when expectedRequestId is truthy; expectedRequestId is cookieStore.get('saml_state')?.value || '', so any ACS POST that arrives without a live saml_state cookie (cookie already expired past its 10-minute maxAge, already deleted by an earlier ACS attempt — the route deletes it unconditionally before validation even starts — or simply omitted by a replaying client) skips the InResponseTo comparison entirely"
+    - "With both the library-level and the fallback manual check bypassable, validatePostResponseAsync's signature/expiry checks are the only remaining defense — a correctly-signed assertion remains fully valid to replay for its entire IdP-set validity window (NotOnOrAfter), from any client, with no per-assertion one-time-use enforcement anywhere in this code path"
+  state:
+    reads: ["saml_state cookie (optional — its absence is what triggers the gap)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["identity.saml-login-flow"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because acs/route.js deletes the saml_state cookie unconditionally on every attempt (success or failure, before validation runs), a second POST of the exact same SAMLResponse — by the same browser or a copy of the captured form body — always arrives with expectedRequestId === '' and is therefore never subject to any InResponseTo check, not even the disabled library-level one"
+  evidence:
+    - { file: src/lib/auth/saml.js, line: 101, note: "validateInResponseTo: 'never' — node-saml's own replay check is disabled" }
+    - { file: src/lib/auth/saml.js, line: 149, note: "manual InResponseTo check is inside `if (expectedRequestId)` — silently skipped when the cookie is absent" }
+    - { file: src/lib/auth/saml.js, line: 159, note: "validatePostResponseAsync — signature/condition checks only; no replay tracking of its own given validateInResponseTo: 'never'" }
+    - { file: src/app/api/auth/saml/acs/route.js, line: 30, note: "storedRequestId defaults to '' when the saml_state cookie is missing" }
+    - { file: src/app/api/auth/saml/acs/route.js, line: 33, note: "cookieStore.delete('saml_state') runs unconditionally before SAMLResponse is even read" }
+  newModule: identity
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A signed SAML assertion should be usable to establish a session at most once: either node-saml's own validateInResponseTo tracking should be enabled ('always' or 'ifPresent'), or the code's manual InResponseTo/expectedRequestId comparison should be mandatory (reject when expectedRequestId is missing) rather than only applied when a saml_state cookie happens to still be present."
+    actual: "createSamlInstance sets validateInResponseTo: 'never', and validateSamlResponse's own fallback InResponseTo check is wrapped in `if (expectedRequestId)`, so a request with no saml_state cookie (already consumed, expired, or simply not sent) skips replay validation entirely and is judged solely on signature and time-window validity."
+    impact: "Any captured, correctly-signed SAMLResponse (via browser history/cache, a shared proxy log, a compromised extension, or a non-TLS hop) can be POSTed to /api/auth/saml/acs and re-establish a valid dashboard session for that identity at any point before the assertion's IdP-set NotOnOrAfter expiry, with no per-assertion one-time-use enforcement — a classic SAML replay attack that InResponseTo tracking exists specifically to prevent."
+
+- id: identity.saml-metadata-public
+  group: Settings
+  feature: Authentication
+  subFeature: GET /api/auth/saml/metadata — public SP metadata document
+  trigger: An administrator (or the IdP's own configuration tooling) fetches the SP's metadata XML to configure the IdP side of the trust
+  input: none
+  output: "200 application/xml — SAML SP metadata (entity ID/issuer, ACS endpoint URL, NameID format) generated from current settings"
+  businessRules:
+    - "The route is deliberately unauthenticated (dashboardGuard's PUBLIC_API_PATHS matches the '/api/auth/saml' prefix) — SP metadata is not secret; it only describes where the IdP should send assertions, not any credential"
+    - "generateSamlMetadata builds the document from the same createSamlInstance config used at login/ACS time, so the ACS URL and issuer it advertises always match what /acs and /start actually enforce, with no separate hand-maintained metadata file"
+    - "If settings.samlCert is unset, the metadata is generated against the DUMMY_FALLBACK_CERT rather than failing — an operator who fetches metadata before configuring the IdP cert gets a syntactically valid but non-functional document instead of an error"
+  state:
+    reads: ["settings.samlIssuer, samlCert (for the instance config, not the response body itself)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["identity.saml-login-flow"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "generateSamlMetadata throws (returns a 500 with an XML error body, not JSON)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The error branch returns an XML-shaped error body even on unexpected failures, unlike every other route in this group which returns JSON — a caller must sniff Content-Type rather than assume a uniform error shape across the auth API surface"
+  evidence:
+    - { file: src/app/api/auth/saml/metadata/route.js, line: 8, note: "generateSamlMetadata(origin, settings) — no auth check inside the handler itself" }
+    - { file: src/dashboardGuard.js, line: 31, note: "'/api/auth/saml' prefix listed in PUBLIC_API_PATHS, covering /metadata alongside /start and /acs" }
+  newModule: identity
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: identity.saml-test-probe
+  group: Settings
+  feature: Authentication
+  subFeature: POST /api/auth/saml/test — validate a SAML configuration's shape before saving it
+  trigger: Dashboard admin clicks "Test connection" on the SAML settings form
+  input: "{ samlEntryPoint?, samlIssuer?, samlCert? } — any field omitted falls back to the currently-saved setting"
+  output: "200 { ok: true, samlEntryPoint, samlIssuer, certValid: true, acsUrl, metadataUrl } or 400 on a shape-validation failure"
+  businessRules:
+    - "Access requires the same local canAccessTestRoute gate as the OIDC test route (requireLogin===false OR a valid auth_token), duplicated here rather than shared, since '/api/auth/saml' is otherwise fully public"
+    - "Unlike the OIDC test route, this is a pure local validation: it checks that samlEntryPoint parses as a URL and that samlCert reformats successfully via formatX509Certificate — it never makes an outbound network call to the IdP, so a syntactically valid but wrong/unreachable entry point or an expired cert both report ok: true"
+  state:
+    reads: ["settings.requireLogin", "auth_token cookie", "settings.samlEntryPoint/samlIssuer/samlCert (fallback when body omits a field)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["identity.session-cookie-lifecycle", "identity.saml-login-flow"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "requireLogin is true and the caller has no valid auth_token", partial: false }
+    - { code: INVALID_REQUEST, when: "samlEntryPoint missing/not a URL, samlIssuer missing, samlCert missing, or samlCert fails to reformat as a certificate", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "'certValid: true' only means the string parsed into PEM shape (formatX509Certificate succeeded) — it is not a cryptographic validity/expiry/chain check, so an expired or malformed-but-parseable cert can still report certValid: true here and only fail later at actual ACS-time signature verification"
+  evidence:
+    - { file: src/app/api/auth/saml/test/route.js, line: 9, note: "canAccessTestRoute — settings.requireLogin===false short-circuits to allowed" }
+    - { file: src/app/api/auth/saml/test/route.js, line: 51, note: "formatX509Certificate(samlCert) — the only 'validation' performed on the certificate" }
+  newModule: identity
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: settings.database-export-import
+  group: Settings
+  feature: Settings
+  subFeature: GET/POST /api/settings/database — full database backup export and restore
+  trigger: Dashboard admin uses the "Export database" / "Import database" action
+  input: "GET: x-9r-password header (or x-9r-cli-token) for re-auth; POST: { password, ...fullDbPayload } body"
+  output: "GET: 200 with the full exported DB as JSON; POST: 200 { success: true } after wiping and replacing every table's contents"
+  businessRules:
+    - "Both GET and POST require a fresh password re-verification (verifyDashboardPassword — bcrypt.compare against the live settings.password, or INITIAL_PASSWORD/'123456' if unset) UNLESS the caller presents a valid x-9r-cli-token header, on top of dashboardGuard's own middleware gate: '/api/settings/database' is in ALWAYS_PROTECTED, so a valid dashboard JWT or CLI token is already required just to reach the route body"
+    - "exportDb() returns the settings table completely unstripped (exportSettings() is a bare readRaw(), unlike GET /api/settings which strips password/oidcClientSecret per settings.get-secret-stripping) plus every apiKeys row with its plaintext key column, plus each providerConnections/providerNodes/proxyPools row's full JSON data blob — which for OAuth-based connections includes access/refresh tokens. This is a deliberate full-fidelity backup (the point is restoring exact state), not an oversight, but the exported file is itself a complete credential bundle for the install"
+    - "importDb wipes settings, providerConnections, providerNodes, proxyPools, apiKeys, combos, and the modelAliases/customModels/mitmAlias/pricing kv scopes inside a single transaction before repopulating them from the payload — a partial payload still fully wipes tables it doesn't repopulate (e.g. omitting proxyPools from the payload empties proxyPools even if the caller never intended to touch it)"
+    - "After a successful import, applyOutboundProxyEnv is re-run against the freshly-imported settings so an imported outbound-proxy configuration takes effect immediately, matching settings.outbound-proxy-live-apply's normal PATCH-time behavior"
+  state:
+    reads: ["settings.password (re-auth)", "every table (export)"]
+    writes: ["every table (import — full wipe + repopulate)"]
+    runtimeOnly: []
+  dependencies: ["settings.get-secret-stripping", "settings.outbound-proxy-live-apply", "apikey.list-keys"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "GET/POST without a CLI token and with a wrong/missing password", partial: false }
+    - { code: INVALID_REQUEST, when: "POST payload is missing, not an object, or an array", partial: false }
+    - { code: INTERNAL_ERROR, when: "the export query or import transaction throws", partial: true }
+  sideEffects: ["A successful import replaces the entire application state (settings, connections, keys, combos, pricing) atomically, with no rollback path once committed other than importing a prior export"]
+  persistence: ["Every table — full export/replace"]
+  performanceConcerns:
+    - "No schema/shape validation of the payload beyond 'is a non-array object' — a payload with the right top-level keys but malformed row shapes fails partway through the transaction (which rolls back), but there is no pre-flight validation to give a clearer error before that point"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "GET's password check reads from a custom x-9r-password header rather than a JSON body field, so it cannot be tested via a simple browser fetch with credentials alone — the dashboard UI must explicitly attach the header"
+  evidence:
+    - { file: src/app/api/settings/database/route.js, line: 16, note: "GET — isCliRequest bypass, else verifyDashboardPassword(x-9r-password header)" }
+    - { file: src/app/api/settings/database/route.js, line: 19, note: "exportDb() — full unfiltered export" }
+    - { file: src/app/api/settings/database/route.js, line: 30, note: "POST — same re-auth pattern, password field pulled out of the JSON body" }
+    - { file: src/app/api/settings/database/route.js, line: 38, note: "applyOutboundProxyEnv(settings) re-applied after a successful import" }
+    - { file: src/lib/db/index.js, line: 76, note: "exportDb — settings: await exportSettings() (unstripped)" }
+    - { file: src/lib/db/index.js, line: 80, note: "exportDb — apiKeys exported with the plaintext key column" }
+    - { file: src/lib/db/repos/settingsRepo.js, line: 129, note: "exportSettings — bare readRaw(), no secret stripping" }
+    - { file: src/lib/db/index.js, line: 102, note: "importDb — DELETE FROM every table inside one transaction before repopulating" }
+    - { file: src/dashboardGuard.js, line: 43, note: "'/api/settings/database' listed in ALWAYS_PROTECTED" }
+  newModule: settings
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: settings.proxy-test-outbound-probe
+  group: Settings
+  feature: Settings
+  subFeature: POST /api/settings/proxy-test — verify an outbound proxy URL works before saving it
+  trigger: Dashboard admin clicks "Test" next to the outbound proxy URL field
+  input: "{ proxyUrl, testUrl?, timeoutMs? } — testUrl defaults to https://google.com/ if omitted"
+  output: "200 { ok, status, statusText, url, elapsedMs } on success, or { ok: false, error } with a 400/500/timeout status on failure"
+  businessRules:
+    - "The route has no auth check of its own — it relies entirely on dashboardGuard's generic /api/* fallback, where '/api/settings/proxy-test' matches PROTECTED_API_PATHS's '/api/settings' prefix: a valid dashboard session/CLI token is required unless settings.requireLogin is false"
+    - "The server issues a real outbound HEAD request to testUrl through a client-supplied proxyUrl (undici ProxyAgent) — both fields are attacker/client-controlled within the caller's existing trust level, so an authenticated caller can direct the server to probe arbitrary hosts (including internal network addresses) through an arbitrary proxy"
+    - "timeoutMs is clamped to a maximum of 30000ms regardless of what the caller requests, with an 8000ms default when omitted or invalid"
+    - "The setting itself is never persisted by this route — it is a stateless connectivity probe; saving the tested value into settings.outboundProxyUrl happens via the normal PATCH /api/settings path (settings.outbound-proxy-live-apply)"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["settings.outbound-proxy-live-apply"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "proxyUrl missing or fails ProxyAgent's own URL parsing", partial: false }
+    - { code: TIMEOUT, when: "the HEAD request does not complete within timeoutMs", partial: false }
+  sideEffects: ["Issues a real outbound network request to an arbitrary caller-supplied URL through an arbitrary caller-supplied proxy on every call"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "testUrl defaulting to a live external site (google.com) means a proxy test against a working outbound proxy always makes a real internet request as a side effect of validating connectivity, not a synthetic/local check"
+  evidence:
+    - { file: src/app/api/settings/proxy-test/route.js, line: 7, note: "testProxyUrl({ proxyUrl, testUrl, timeoutMs }) — both proxyUrl and testUrl taken verbatim from the request body" }
+    - { file: src/lib/network/proxyTest.js, line: 44, note: "dispatcher = new ProxyAgent({ uri: normalizedProxyUrl }) — constructed directly from the client-supplied proxyUrl" }
+    - { file: src/lib/network/proxyTest.js, line: 58, note: "undiciFetch(normalizedTestUrl, { method: 'HEAD', dispatcher, signal })" }
+    - { file: src/dashboardGuard.js, line: 52, note: "'/api/settings' prefix in PROTECTED_API_PATHS covers /api/settings/proxy-test (not in ALWAYS_PROTECTED or PUBLIC_API_PATHS)" }
+  newModule: settings
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: settings.require-login-public-status
+  group: Settings
+  feature: Settings
+  subFeature: GET /api/settings/require-login — public pre-auth login-page context
+  trigger: Login page loads, before any credential is available, to decide whether to show a login form at all and whether tunnel-based dashboard access is restricted
+  input: none
+  output: "200 { requireLogin, tunnelDashboardAccess, tunnelUrl, tailscaleUrl } — always 200, even on internal error (falls back to { requireLogin: true })"
+  businessRules:
+    - "The route is deliberately unauthenticated: dashboardGuard's PUBLIC_API_PATHS lists '/api/settings/require-login' explicitly (a carve-out from the otherwise-protected '/api/settings' prefix) specifically so the login page can read it before any session exists"
+    - "requireLogin is the exact toggle read by dashboardGuard.js's isAuthenticated() to decide whether ANY caller (not just this route) is treated as pre-authenticated across every PROTECTED_API_PATHS route — this GET only reports the current value; it cannot change it"
+    - "Turning requireLogin OFF is not reachable from this route (GET-only): it happens through the generic PATCH /api/settings, which is itself in PROTECTED_API_PATHS — so, unlike the tunnel-enable gap recorded in tunnel.enable-lacks-server-side-security-gate (13-console-remote.yaml), disabling requireLogin requires the caller to already hold a valid session or CLI token (or requireLogin to already be false); an unauthenticated remote caller cannot flip it themselves"
+    - "Once requireLogin is false, dashboardGuard.js's isAuthenticated() (the settings.requireLogin===false branch) is consulted by the generic /api/* fallback with no additional locality check — the bypass is not scoped to loopback callers the way LOCAL_ONLY_PATHS's equivalent bypass is, so a deliberately-disabled requireLogin removes the login requirement for every PROTECTED_API_PATHS route (settings, keys, providers, combos, models, usage, oauth, media-providers, pricing, tags, cli-tools, mcp, translator, tunnel) from any network location that can reach the server, not just the local machine — this matches the setting's literal name/intent but is a materially broader blast radius than a 'local-only testing convenience' if the server is ever reachable remotely while it is set"
+  state:
+    reads: ["settings.requireLogin, tunnelDashboardAccess, tunnelUrl, tailscaleUrl"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["settings.defaults-and-merge"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A getSettings() failure is swallowed into a 200 { requireLogin: true } fallback (fail-safe toward requiring login) rather than a 500 — the same fail-safe direction as GET /api/auth/status's equivalent fallback"
+  evidence:
+    - { file: src/app/api/settings/require-login/route.js, line: 7, note: "GET — requireLogin/tunnelDashboardAccess/tunnelUrl/tailscaleUrl computed straight from settings, no auth check in the handler itself" }
+    - { file: src/dashboardGuard.js, line: 33, note: "'/api/settings/require-login' explicitly carved out into PUBLIC_API_PATHS" }
+    - { file: src/dashboardGuard.js, line: 185, note: "isAuthenticated — settings.requireLogin === false bypasses auth with no isLocalRequest check at this call site" }
+    - { file: src/dashboardGuard.js, line: 227, note: "generic /api/* fallback calls isAuthenticated() alone (no locality check) for every PROTECTED_API_PATHS route" }
+  newModule: settings
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tooling.health-init-probes
+  group: Settings
+  feature: System lifecycle
+  subFeature: GET /api/health and GET /api/init — liveness/init-ping endpoints
+  trigger: An external process manager or the CLI launcher polls /api/health to confirm the server is up; something outside this file calls /api/init once at startup
+  input: none
+  output: "/api/health: 200 { ok: true } with wildcard CORS headers; /api/init: 200 plain-text 'Initialized'"
+  businessRules:
+    - "Both routes are unauthenticated (dashboardGuard's PUBLIC_API_PATHS lists both '/api/health' and '/api/init' explicitly) so a health-checker or launcher never needs credentials to confirm the server responds"
+    - "/api/health also answers CORS preflight (OPTIONS → 204 with the same wildcard headers), the only route in this task's scope that sets Access-Control-Allow-Origin: '*' — deliberate, since a liveness check may come from a browser on a different origin (e.g. a tunnel URL) or a monitoring tool"
+    - "/api/init performs no actual initialization logic in its own handler body — the file's comment ('called automatically to initialize app') describes why something calls it, not what it does; any real 'initialization' side effect is whatever module-level code already ran as a side effect of Next.js loading this route's module tree for the first request, not code inside this GET handler"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "/api/init's handler is indistinguishable in behavior from a static 200 — there is no way to observe from this file alone whether the 'initialize app' comment refers to a caller-side expectation (e.g. a launcher warming up the server) or a now-removed initialization step; AIGate should not assume any hidden side effect exists here beyond triggering Next's own first-request module evaluation"
+  evidence:
+    - { file: src/app/api/health/route.js, line: 10, note: "GET — { ok: true } with wildcard CORS headers" }
+    - { file: src/app/api/health/route.js, line: 14, note: "OPTIONS — 204 preflight response, same CORS headers" }
+    - { file: src/app/api/init/route.js, line: 1, note: "comment: 'called automatically to initialize app'" }
+    - { file: src/app/api/init/route.js, line: 3, note: "GET — returns the literal text 'Initialized', no other logic in the handler" }
+    - { file: src/dashboardGuard.js, line: 24, note: "'/api/health' listed in PUBLIC_API_PATHS" }
+    - { file: src/dashboardGuard.js, line: 25, note: "'/api/init' listed in PUBLIC_API_PATHS" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tooling.shutdown-dev-secret-gate
+  group: Settings
+  feature: System lifecycle
+  subFeature: POST /api/shutdown — development-only remote process termination
+  trigger: A caller with a valid dashboard session/CLI token (dashboardGuard) additionally presenting the correct SHUTDOWN_SECRET bearer token, on a non-production server
+  input: "Authorization: Bearer <SHUTDOWN_SECRET> header"
+  output: "403 in production regardless of any credential; 401 if SHUTDOWN_SECRET is unset or the header doesn't match; 200 { success: true } then process.exit(0) after a 500ms delay"
+  businessRules:
+    - "Three independent gates stack: (1) dashboardGuard.js's ALWAYS_PROTECTED lists '/api/shutdown', so the request never reaches the route handler at all without a valid dashboard JWT or CLI token; (2) inside the handler, NODE_ENV === 'production' short-circuits to 403 before the secret is even checked; (3) only in non-production does it compare Authorization against Bearer + SHUTDOWN_SECRET, and SHUTDOWN_SECRET is not set in .env.example — if the operator never sets it, every request 401s unconditionally"
+    - "process.exit(0) is scheduled 500ms after the response is built (not awaited before responding), so the caller reliably receives the 200 body before the process actually terminates"
+  state:
+    reads: ["SHUTDOWN_SECRET env var", "Authorization request header", "NODE_ENV"]
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "NODE_ENV is production (always 403), or SHUTDOWN_SECRET is unset/doesn't match the bearer token", partial: false }
+  sideEffects: ["Terminates the entire Node process (process.exit(0)) 500ms after responding"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because it is unreachable in production and undocumented/unset by default even in development (SHUTDOWN_SECRET absent from .env.example), this route is effectively dead in every shipped run mode unless a developer manually sets the env var for local debugging — distinct in purpose from /api/version/shutdown, the production-facing 'restart for update' route gated purely by dashboard auth"
+  evidence:
+    - { file: src/app/api/shutdown/route.js, line: 5, note: "NODE_ENV === 'production' → 403, checked before the secret" }
+    - { file: src/app/api/shutdown/route.js, line: 12, note: "!secret || authorization !== `Bearer ${secret}` → 401" }
+    - { file: src/app/api/shutdown/route.js, line: 19, note: "process.exit(0) — scheduled by the setTimeout on the previous line, after the response is built" }
+    - { file: src/dashboardGuard.js, line: 42, note: "'/api/shutdown' listed in ALWAYS_PROTECTED — valid JWT or CLI token required just to reach the handler" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tooling.version-check-public
+  group: Settings
+  feature: System lifecycle
+  subFeature: GET /api/version — current vs. latest npm version check
+  trigger: Dashboard loads the version/update-check widget, or any caller of GET /api/version
+  input: none
+  output: "200 { currentVersion, latestVersion, hasUpdate } — currentVersion from the bundled package.json, latestVersion from the npm registry (or null if unreachable)"
+  businessRules:
+    - "The route is unauthenticated (dashboardGuard's PUBLIC_API_PATHS lists '/api/version') — knowing the running version and whether an update exists is not treated as sensitive"
+    - "The npm registry lookup (GET https://registry.npmjs.org/9router/latest) is cached process-wide for 1 hour in a global (global.__npmVersionCache), surviving Next.js hot-reload/module re-evaluation the same way other global._* caches in this codebase do (per usage.global-state-next-reeval's pattern)"
+    - "A failed or timed-out (4s) registry fetch resolves to null rather than throwing, so hasUpdate is reported false and latestVersion null — the route never 500s due to registry unavailability"
+    - "compareVersions only compares the first three numeric dot-separated components — a pre-release/build-metadata suffix is not distinguished from the bare version by this comparison"
+  state:
+    reads: ["package.json version", "npm registry (cached 1h)"]
+    writes: []
+    runtimeOnly: ["global.__npmVersionCache"]
+  dependencies: []
+  providerInteraction: "registry.npmjs.org — one HTTPS GET, 4s timeout, cached 1h"
+  fallback: { hasFallback: true, retry: null, timeout: "4000ms on the registry fetch", quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Only the first caller after the 1h cache expires pays the registry round trip; all others read the cached value"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "compareVersions assumes exactly three numeric segments; a malformed version string from the registry (or an unusual package.json version) produces NaN comparisons that always evaluate false, silently reporting hasUpdate: false rather than erroring"
+  evidence:
+    - { file: src/app/api/version/route.js, line: 8, note: "global.__npmVersionCache — process-wide cache surviving hot reload" }
+    - { file: src/app/api/version/route.js, line: 44, note: "getLatestVersionCached — 1h TTL check against the cached fetchedAt" }
+    - { file: src/app/api/version/route.js, line: 58, note: "GET handler — compareVersions(latestVersion, currentVersion) drives hasUpdate" }
+    - { file: src/dashboardGuard.js, line: 32, note: "'/api/version' listed in PUBLIC_API_PATHS" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tooling.version-shutdown-for-update
+  group: Settings
+  feature: System lifecycle
+  subFeature: POST /api/version/shutdown — authenticated restart to release file locks before a manual update
+  trigger: Dashboard admin (or CLI) triggers a controlled restart, e.g. before manually replacing the install
+  input: none
+  output: "200 { success: true, message: 'Shutting down for manual update...' } then process.exit(0) after 500ms"
+  businessRules:
+    - "Gated purely by dashboardGuard.js's ALWAYS_PROTECTED ('/api/version/shutdown' is listed explicitly) — a valid dashboard JWT or CLI token is required, with no additional in-route secret unlike /api/shutdown, and no NODE_ENV restriction: this is the production-facing equivalent of the dev-only /api/shutdown route"
+    - "killAppProcesses() best-effort kills sibling processes that could hold file locks: the MITM proxy (via its PID file, escalating to sudo/PowerShell Stop-Process if needed), any other node.exe/next-server processes matching this install's path or cli.js, and cloudflared/tray binaries — via platform-specific shell commands (taskkill/PowerShell on Windows, kill/ps on POSIX)"
+    - "All kill attempts are wrapped in try/catch and proceed regardless of individual failures ('best effort') — the route always returns success and always schedules process.exit(0), even if killAppProcesses killed nothing or partially failed"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Force-kills sibling MITM/cloudflared/tray/node processes on the host, then terminates the current process"]
+  persistence: []
+  performanceConcerns:
+    - "Windows process enumeration shells out to PowerShell Get-WmiObject over all node.exe processes and greps command lines — O(number of node processes on the host) per call, acceptable for an infrequent manual-update action"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "killMitmByPidFile may need elevated privileges to kill a MITM process that itself runs as admin/sudo; the sudo/PowerShell Stop-Process fallback can still fail silently if the caller's own process lacks sufficient rights, leaving the MITM process running after this route reports success"
+  evidence:
+    - { file: src/app/api/version/shutdown/route.js, line: 7, note: "await killAppProcesses() — best-effort, errors swallowed" }
+    - { file: src/app/api/version/shutdown/route.js, line: 12, note: "setTimeout(() => process.exit(0), 500) — scheduled after the response is built" }
+    - { file: src/lib/appUpdater.js, line: 140, note: "killAppProcesses — kills MITM by PID file first, then every matched sibling process" }
+    - { file: src/dashboardGuard.js, line: 44, note: "'/api/version/shutdown' listed in ALWAYS_PROTECTED" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tooling.version-update-npm-relaunch
+  group: Settings
+  feature: System lifecycle
+  subFeature: POST /api/version/update — production-only self-update via a detached npm install
+  trigger: Dashboard admin (or CLI) triggers "Update now" from the version-check widget
+  input: none
+  output: "200 { success: true, message: 'Updater started. This app will exit shortly.' } (production only); 403 outside production"
+  businessRules:
+    - "Gated by dashboardGuard.js's ALWAYS_PROTECTED ('/api/version/update') plus an in-route NODE_ENV !== 'production' → 403 check — the inverse restriction of /api/shutdown (dev-only): this route only runs in production builds (the shipped CLI)"
+    - "killAppProcesses() runs first (same best-effort sibling-process kill as /api/version/shutdown) to release file locks Windows would otherwise hold during an npm overwrite"
+    - "spawnUpdaterAndExit() copies the bundled src/lib/updater/updater.js into DATA_DIR/runtime/updater (so a subsequent `npm install -g` overwriting the app's own installed files can't delete the script out from under the process running it), then spawns it as a fully detached (unref'd) Node child process before the parent exits"
+    - "The detached updater.js runs `npm i -g <packageName>@latest` (packageName defaults to '9router') via child_process.spawn, with retry logic (UPDATER_RETRIES, default 3) and a status file/log written to DATA_DIR/update — this IS the actual download-and-install step, performed entirely by npm's own registry client, not by any custom download code in this route"
+    - "After the npm install completes, the updater relaunches the app via `npx 9router` (npx.cmd on Windows) with --skip-update, preserving --tray mode if TRAY_MODE=1 was set — then the current server process exits via process.exit(0)"
+  state:
+    reads: ["NODE_ENV", "UPDATER_CONFIG (package name, ports, timeouts)"]
+    writes: ["DATA_DIR/runtime/updater/updater.js (copied once)", "DATA_DIR/update/status.json and install.log (written by the detached updater process, outside this route's own execution)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "npm registry, via a detached `npm install -g` process — not a direct HTTP call from this route itself"
+  fallback: { hasFallback: true, retry: "npm install retried up to UPDATER_RETRIES (default 3) times, inside the detached updater.js process, not this route", timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "NODE_ENV is not 'production'", partial: false }
+  sideEffects: ["Force-kills sibling processes, spawns a detached npm-install-and-relaunch process, then exits the current server process"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The route's own response ('Updater started...') is returned before npm install has even begun in the detached process — success here means 'the update process was launched', not 'the update succeeded'; a failed npm install downstream is only observable via the separate status.json the detached updater writes, which this route's response never surfaces"
+  evidence:
+    - { file: src/app/api/version/update/route.js, line: 5, note: "NODE_ENV !== 'production' → 403, checked before anything else" }
+    - { file: src/app/api/version/update/route.js, line: 14, note: "killAppProcesses() before spawning the updater" }
+    - { file: src/app/api/version/update/route.js, line: 18, note: "spawnUpdaterAndExit() — detach, then this route returns success" }
+    - { file: src/lib/appUpdater.js, line: 169, note: "ensureRuntimeUpdater(resolveBundledUpdaterPath()) — copies updater.js into DATA_DIR/runtime so npm -g can overwrite the install safely" }
+    - { file: src/lib/appUpdater.js, line: 177, note: "spawn(process.execPath, [updaterPath], { detached: true, ... }).unref() — the detached updater process" }
+    - { file: src/lib/appUpdater.js, line: 199, note: "setTimeout(() => process.exit(0), UPDATER_CONFIG.exitDelayMs) — the current server process exits after handing off" }
+    - { file: src/lib/updater/updater.js, line: 2, note: "comment: 'Spawns npm i -g <pkg>@latest' — the actual install command run by the detached process" }
+    - { file: src/dashboardGuard.js, line: 45, note: "'/api/version/update' listed in ALWAYS_PROTECTED" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

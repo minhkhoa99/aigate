@@ -1,50 +1,38 @@
 # Discovery coverage
 
-Entries: 244
+Entries: 261
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 122/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +24 |
+| routes | 141/154 | api/provider-nodes/[id], api/provider-nodes/validate, api/providers/[id]/models, api/providers/[id]/test, api/providers/[id]/test-models, api/providers/client, api/providers/kilo/free-models, api/providers/suggested-models … +5 |
 | pages | 5/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind]/[id] … +15 |
 | providers | 15/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +99 |
 | executors | 9/29 | azure, codebuddy-cn, codebuddy-intl, devin-cli, gemini-cli, github, grok-cli, grok-web … +12 |
 | translators | 37/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/concerns/thinking.js, open-sse/translator/formats/claude.js … +3 |
 | repos | 10/11 | nodesRepo |
-| settingsKeys | 37/52 | cloudEnabled, dnsToolEnabled, oidcClientId, oidcIssuerUrl, oidcLoginLabel, oidcScopes, samlAttributeEmail, samlAttributeName … +7 |
+| settingsKeys | 47/52 | cloudEnabled, dnsToolEnabled, oidcLoginLabel, samlLoginLabel, tunnelProvider |
 
 ## Entries per bounded context
 
 - apikeys: 9
 - catalog: 21
 - connections: 38
-- identity: 1
+- identity: 10
 - media: 15
 - routing: 79
-- settings: 7
-- tooling: 37
+- settings: 10
+- tooling: 42
 - transport: 14
 - usage: 23
 
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 12
-- REFERENCE_BEHAVIOR: 202
-- SUSPECTED_BUG: 30
+- REFERENCE_BEHAVIOR: 218
+- SUSPECTED_BUG: 31
 
 ## Missing — routes
 
-- api/auth/logout
-- api/auth/oidc/callback
-- api/auth/oidc/start
-- api/auth/oidc/test
-- api/auth/reset-password
-- api/auth/saml/acs
-- api/auth/saml/metadata
-- api/auth/saml/start
-- api/auth/saml/test
-- api/auth/status
-- api/health
-- api/init
 - api/provider-nodes/[id]
 - api/provider-nodes/validate
 - api/providers/[id]/models
@@ -54,17 +42,10 @@ Entries: 244
 - api/providers/kilo/free-models
 - api/providers/suggested-models
 - api/providers/test-batch
-- api/settings/database
-- api/settings/proxy-test
-- api/settings/require-login
-- api/shutdown
 - api/tags
 - api/v1/models/[...model]
 - api/v1beta/models
 - api/v1beta/models/[...path]
-- api/version
-- api/version/shutdown
-- api/version/update
 
 ## Missing — pages
 
@@ -247,16 +228,6 @@ Entries: 244
 
 - cloudEnabled
 - dnsToolEnabled
-- oidcClientId
-- oidcIssuerUrl
 - oidcLoginLabel
-- oidcScopes
-- samlAttributeEmail
-- samlAttributeName
-- samlCert
-- samlEntryPoint
-- samlIssuer
 - samlLoginLabel
-- ssoType
-- tunnelDashboardAccess
 - tunnelProvider
