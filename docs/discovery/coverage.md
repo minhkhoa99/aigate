@@ -1,16 +1,16 @@
 # Discovery coverage
 
-Entries: 231
+Entries: 244
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 115/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +31 |
+| routes | 122/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +24 |
 | pages | 5/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind]/[id] … +15 |
 | providers | 15/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +99 |
 | executors | 9/29 | azure, codebuddy-cn, codebuddy-intl, devin-cli, gemini-cli, github, grok-cli, grok-web … +12 |
 | translators | 37/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/concerns/thinking.js, open-sse/translator/formats/claude.js … +3 |
 | repos | 10/11 | nodesRepo |
-| settingsKeys | 33/52 | cloudEnabled, dnsToolEnabled, oidcClientId, oidcIssuerUrl, oidcLoginLabel, oidcScopes, samlAttributeEmail, samlAttributeName … +11 |
+| settingsKeys | 37/52 | cloudEnabled, dnsToolEnabled, oidcClientId, oidcIssuerUrl, oidcLoginLabel, oidcScopes, samlAttributeEmail, samlAttributeName … +7 |
 
 ## Entries per bounded context
 
@@ -21,15 +21,15 @@ Entries: 231
 - media: 15
 - routing: 79
 - settings: 7
-- tooling: 24
+- tooling: 37
 - transport: 14
 - usage: 23
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 9
-- REFERENCE_BEHAVIOR: 193
-- SUSPECTED_BUG: 29
+- IMPLEMENTATION_ACCIDENT: 12
+- REFERENCE_BEHAVIOR: 202
+- SUSPECTED_BUG: 30
 
 ## Missing — routes
 
@@ -59,13 +59,6 @@ Entries: 231
 - api/settings/require-login
 - api/shutdown
 - api/tags
-- api/tunnel/disable
-- api/tunnel/enable
-- api/tunnel/status
-- api/tunnel/tailscale-check
-- api/tunnel/tailscale-disable
-- api/tunnel/tailscale-enable
-- api/tunnel/tailscale-install
 - api/v1/models/[...model]
 - api/v1beta/models
 - api/v1beta/models/[...path]
@@ -265,9 +258,5 @@ Entries: 231
 - samlIssuer
 - samlLoginLabel
 - ssoType
-- tailscaleEnabled
-- tailscaleUrl
 - tunnelDashboardAccess
-- tunnelEnabled
 - tunnelProvider
-- tunnelUrl

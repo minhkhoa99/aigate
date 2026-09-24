@@ -1,0 +1,469 @@
+# Trace: Console Log, Remote functionality (Task 18)
+
+- id: console.ring-buffer-capacity
+  group: Console Log
+  feature: Console log capture
+  subFeature: Ring buffer capacity enforcement and overflow behavior
+  trigger: Any console.log/info/warn/error/debug call anywhere in the Next.js process once initConsoleLogCapture() has patched the console object (triggered by importing api/translator/console-logs or console-logs/stream — see translator.playground-console-logs)
+  input: "Arbitrary console.*(...args) call from anywhere in the process"
+  output: "Line appended to the in-memory logs array; oldest lines evicted once CONSOLE_LOG_CONFIG.maxLines (200) is exceeded"
+  businessRules:
+    - "The cap is enforced only in appendLine() on the server (src/lib/consoleLogBuffer.js): every push checks state.logs.length > maxLines and, if so, replaces the array with logs.slice(-maxLines) — a hard 200-line ring, not a rolling window with a separate write cursor"
+    - "Overflow is a silent drop: slice(-maxLines) simply discards the oldest lines with no counter, flag, or 'N lines truncated' marker surfaced to callers of getConsoleLogs() or to /api/translator/console-logs' GET response"
+    - "There is no client-side cap — the dashboard playground renders whatever the server hands it (buffered GET array or streamed SSE lines); nothing tells the client what was dropped, so a long-lived tab that has accumulated lines across multiple 'lines'/'line' SSE events could display more than 200 lines until it re-syncs via a fresh 'init' replay"
+  state:
+    reads: []
+    writes: ["in-memory logs array (global._consoleLogBufferState.logs)"]
+    runtimeOnly: ["the entire ring buffer — process-lifetime only, reset on restart"]
+  dependencies: ["translator.playground-console-logs"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "appendLine() runs synchronously inside every wrapped console.* call (initConsoleLogCapture), so a hot path that logs heavily pays the array-slice cost inline before the real console output is written"
+  behavior: { streaming: false, cancellation: null, concurrency: "logs array is process-global and shared by every concurrent request/emit; no locking, but single-threaded Node means no torn writes" }
+  edgeCases:
+    - "CONSOLE_LOG_CONFIG.maxLines is a shared constant object (src/shared/constants/config.js) that also holds pollIntervalMs, so raising the cap for debugging means editing a config object whose other key is an unrelated dashboard poll interval, not a dedicated console-log config"
+  evidence:
+    - { file: src/lib/consoleLogBuffer.js, line: 68, note: "cap check: state.logs.length > maxLines" }
+    - { file: src/lib/consoleLogBuffer.js, line: 69, note: "silent drop via state.logs.slice(-maxLines), no counter or flag" }
+    - { file: src/shared/constants/config.js, line: 58, note: "CONSOLE_LOG_CONFIG.maxLines = 200" }
+    - { file: src/lib/consoleLogBuffer.js, line: 89, note: "appendLine invoked synchronously inside the monkeypatched console[level]" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: console.batched-flush-and-formatting
+  group: Console Log
+  feature: Console log capture
+  subFeature: Batched SSE flush timer and log line formatting (ANSI strip, arg serialization)
+  trigger: Each console.* call while capture is patched; a debounced flush fires at most every 100ms or immediately once 50 pending lines accumulate
+  input: "console.*(...args) call arguments (strings, Errors, objects)"
+  output: "A formatted, ANSI-stripped string line pushed to state.logs and state.pendingLines, eventually emitted as a 'lines' event on the shared EventEmitter for /console-logs/stream subscribers"
+  businessRules:
+    - "formatArg() strips ANSI escape codes (terminal color codes) from strings, Error stacks/messages, and JSON-stringified objects alike (src/lib/consoleLogBuffer.js) so the dashboard playground never renders raw \\x1b[...m sequences"
+    - "scheduleFlush() debounces at FLUSH_INTERVAL_MS=100ms via setTimeout, but appendLine() bypasses the debounce and flushes immediately once pendingLines reaches MAX_BATCH_LINES=50 in the same call, clearing any pending timer first — a burst of 50+ log lines in one microtask flushes as one large 'lines' batch instead of waiting out the 100ms window"
+    - "The flush timer is unref()'d (scheduleFlush) so a pending flush never keeps the Node process alive on its own — an intentional 'this is debug tooling, not a durability guarantee' choice"
+  state: { reads: [], writes: ["state.pendingLines (drained on each flush)"], runtimeOnly: ["flushTimer — a live setTimeout handle stored on the global state object"] }
+  dependencies: ["translator.playground-console-logs"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "formatArg() runs JSON.stringify on every non-string, non-Error argument on every console call while patched — an app that logs large objects heavily pays this serialization cost even when no playground session is open, because the patch stays installed for the process lifetime once initConsoleLogCapture() has run once"
+  behavior: { streaming: true, cancellation: null, concurrency: "pendingLines is a single shared array drained by whichever flush fires first (timer or batch threshold); no per-subscriber queue" }
+  edgeCases:
+    - "If a caller passes a circular object to console.log, JSON.stringify throws inside formatArg's try, and the catch falls back to String(arg) — ANSI stripping still applies to that fallback string"
+  evidence:
+    - { file: src/lib/consoleLogBuffer.js, line: 27, note: "FLUSH_INTERVAL_MS = 100" }
+    - { file: src/lib/consoleLogBuffer.js, line: 28, note: "MAX_BATCH_LINES = 50" }
+    - { file: src/lib/consoleLogBuffer.js, line: 41, note: "state.flushTimer?.unref?.() — debug buffer never holds the process open" }
+    - { file: src/lib/consoleLogBuffer.js, line: 56, note: "stripAnsi applied to plain strings" }
+    - { file: src/lib/consoleLogBuffer.js, line: 59, note: "JSON.stringify(arg) wrapped in stripAnsi; catch falls back to String(arg)" }
+    - { file: src/lib/consoleLogBuffer.js, line: 72, note: "MAX_BATCH_LINES reached -> immediate flush bypassing the 100ms debounce" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: console.global-state-hot-reload-guard
+  group: Console Log
+  feature: Console log capture
+  subFeature: Why the ring buffer lives on global._* and the hot-reload guard that protects it
+  trigger: Module (re-)evaluation of src/lib/consoleLogBuffer.js — normally once per process, but can happen more than once under Next.js dev-mode hot module reload / Turbopack fast refresh
+  input: none
+  output: "A single shared state object (logs, emitter, patched flag) surviving across module re-evaluations"
+  businessRules:
+    - "state is stored on global._consoleLogBufferState specifically because Next.js (especially dev-mode HMR/Turbopack) can re-evaluate a module's top-level code more than once per OS process — a plain module-scope `const state = {...}` would silently reset to a fresh empty buffer/emitter on every reload, dropping all buffered logs and detaching every already-open SSE subscriber from the old emitter instance"
+    - "The guard is two-layered: the whole state object is created only `if (!global._consoleLogBufferState)`, and a second, narrower guard re-creates just `state.emitter` if a stale global survived a reload but somehow lost its EventEmitter — the inline comment 'handles hot reload with stale global' makes the intent explicit"
+    - "This is a framework artifact (Next.js module re-evaluation semantics), not a business requirement — AIGate does not need to reproduce the global._* mechanism itself, only the underlying requirement it protects: exactly one console-log ring buffer + emitter for the process lifetime"
+  state: { reads: ["global._consoleLogBufferState"], writes: ["global._consoleLogBufferState (created once, patched idempotently)"], runtimeOnly: ["global._consoleLogBufferState.emitter, .logs, .patched, .originals"] }
+  dependencies: ["translator.playground-console-logs"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "state.patched (set once by initConsoleLogCapture) is itself part of the same global object, so a hot-reloaded module correctly sees console already patched and skips re-wrapping console[level] a second time — without the shared global, a reload would double-patch and each log line would print/append twice"
+  evidence:
+    - { file: src/lib/consoleLogBuffer.js, line: 6, note: "global._consoleLogBufferState created only if absent" }
+    - { file: src/lib/consoleLogBuffer.js, line: 19, note: "hot-reload guard: re-create emitter if a stale global lost it" }
+    - { file: src/lib/consoleLogBuffer.js, line: 84, note: "state.patched guard prevents double-patching console on module re-evaluation" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: console.route-path-naming-accident
+  group: Console Log
+  feature: Console log capture
+  subFeature: Console-log routes live under /api/translator/ instead of a dedicated /api/console-log path
+  trigger: Any client (dashboard translator playground) calling GET/DELETE /api/translator/console-logs or GET /api/translator/console-logs/stream
+  input: none
+  output: "Same buffered-log / SSE-stream responses already documented under translator.playground-console-logs — this entry records the path/placement choice, not new request/response behavior"
+  businessRules:
+    - "translator.playground-console-logs (docs/discovery/feature-matrix/11-translation-i18n.yaml) already traces the full request/response/SSE behavior of these two routes end to end — this entry does not re-derive it, only records why the path is /api/translator/console-logs and not something like /api/console-log or /api/system/logs"
+    - "Nothing in the route handlers or in consoleLogBuffer.js is translator-specific: initConsoleLogCapture() patches the process-wide console object and captures every console.* call in the entire Next.js process, not just calls made during a translation request — the capability is a general-purpose debug console viewer that happens to have been built for, and nested under, the translator playground UI"
+    - "The naming/placement is a historical/organizational accident (the feature shipped as a debugging aid for the translator playground page and inherited that page's route prefix), not a deliberate API design choice — record this so AIGate does not copy the /api/translator/console-logs path for what is really a general process-console-log capability; if the capability is kept at all, a fresh AIGate design should place it under its own diagnostics/tooling path"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["translator.playground-console-logs"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because capture is process-wide, opening the translator playground's console-log viewer surfaces log lines generated by completely unrelated features (tunnel enable, MITM start, provider requests, etc.) that happen to log during the same process lifetime — a discoverability side effect of the naming/placement, not of the capture mechanism itself (see console.ring-buffer-capacity)"
+  evidence:
+    - { file: src/app/api/translator/console-logs/route.js, line: 2, note: "imports from @/lib/consoleLogBuffer — a general-purpose capture module nested under the translator route tree" }
+    - { file: src/app/api/translator/console-logs/route.js, line: 4, note: "initConsoleLogCapture() called here patches the process-wide console, not scoped to translator activity" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: tunnel.remote-access-state-machine
+  group: Remote functionality
+  feature: Tunnel exposure
+  subFeature: Full state machine across the 7 /api/tunnel/* routes for both the Cloudflare quick-tunnel and Tailscale Funnel lanes
+  trigger: Dashboard Endpoint page tunnel/Tailscale controls
+  input: "POST with no body (enable/disable/tailscale-enable/tailscale-disable), POST { sudoPassword? } (tailscale-install), GET (status, tailscale-check)"
+  output: "Transitions through not-installed -> installed -> logged-in -> funnel-enabled -> running for Tailscale, or an implicit not-running -> running for Cloudflare (binary auto-downloaded on first enable, no separate install step)"
+  businessRules:
+    - "Cloudflare lane collapses 'not installed' and 'installed' into one step: GET /api/tunnel/status never reports whether the cloudflared binary is present — enableTunnel() calls spawnQuickTunnel(), which calls ensureCloudflared() internally, auto-downloading the ~30MB binary from GitHub releases on the very first POST /api/tunnel/enable if missing. There is no separate 'install cloudflared' route or button."
+    - "Tailscale lane exposes every step as dashboard-visible state: GET /api/tunnel/tailscale-check reports {installed, loggedIn, daemonRunning}; POST /api/tunnel/tailscale-install (SSE) installs the binary and starts the daemon; POST /api/tunnel/tailscale-enable then must (a) start the daemon with a cached/supplied sudo password, (b) check login via isTailscaleLoggedInStrict — if not logged in, returns {needsLogin:true, authUrl} instead of erroring, expecting the caller to open authUrl and retry, (c) call startFunnel — if Tailscale's own Funnel feature isn't turned on for the tailnet, returns {funnelNotEnabled:true, enableUrl} rather than an error, again expecting a manual out-of-band step, then (d) re-verifies via the *Strict probes before persisting tailscaleEnabled=true"
+    - "Both lanes persist their 'enabled' bit and public URL into 9router's own settings row (tunnelEnabled/tunnelUrl or tailscaleEnabled/tailscaleUrl), separate from the Cloudflare-lane-only shortId/tunnelUrl file at DATA_DIR/tunnel/state.json which only the Cloudflare code path reads/writes"
+    - "'Running' is re-derived on every status poll rather than trusted from the persisted flag: getTunnelStatus() only probes isCloudflaredRunning() (a PID-liveness check) when settings.tunnelEnabled is true (lazy skip), and getTailscaleStatus() only checks isTailscaleRunning() when isTailscaleLoggedIn() is true — so a persisted 'enabled=true' with a dead process reports enabled:false in status without ever clearing the stored settings flag itself"
+  state:
+    reads: ["settings.tunnelEnabled/tunnelUrl", "settings.tailscaleEnabled/tailscaleUrl", "DATA_DIR/tunnel/state.json (shortId, tunnelUrl)", "cloudflared/tailscale binary presence + daemon/login state (external processes, not DB)"]
+    writes: ["settings.tunnelEnabled/tunnelUrl", "settings.tailscaleEnabled/tailscaleUrl", "DATA_DIR/tunnel/state.json"]
+    runtimeOnly: ["svc.cancelToken / svc.spawnInProgress per lane (module-scope, not global._*)", "in-memory statusCache in status/route.js (3s TTL)"]
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "Cloudflare: cloudflared itself retries connection with --retries 99; on an unexpected exit, a watchdog callback (setTunnelUnexpectedExitCallback) triggers a respawn outside this route set", timeout: "spawnQuickTunnel/spawnCloudflared time out after 90s waiting for a URL/connection log line; POST /api/tunnel/enable additionally waits a fixed 8s (DNS_WARMUP_DELAY_MS) after registration before responding", quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "any of the 7 routes' try/catch bodies catch a thrown error and return {error: error.message} with status 500", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because 'installed' is invisible for Cloudflare, a user with no network access to GitHub releases only discovers the download failure at Enable-click time, inside the same request that also tries to spawn and health-check the tunnel — status/route.js's separate download-progress field (getDownloadStatus()) exists specifically so the UI can show 'downloading cloudflared...' during that same first-enable call"
+  evidence:
+    - { file: src/app/api/tunnel/status/route.js, line: 14, note: "status polls both tunnel and tailscale probes in parallel, cached 3s" }
+    - { file: src/lib/tunnel/cloudflare/cloudflared.js, line: 139, note: "ensureCloudflared — binary auto-downloaded inside the enable path, no separate install step" }
+    - { file: src/app/api/tunnel/tailscale-check/route.js, line: 50, note: "installed/loggedIn/daemonRunning reported as distinct booleans for the Tailscale lane" }
+    - { file: src/lib/tunnel/tailscale/manager.js, line: 46, note: "needsLogin+authUrl returned instead of throwing when not logged in" }
+    - { file: src/lib/tunnel/tailscale/manager.js, line: 71, note: "funnelNotEnabled+enableUrl returned when Tailscale Funnel itself isn't turned on" }
+    - { file: src/lib/tunnel/cloudflare/manager.js, line: 141, note: "getTunnelStatus lazily skips the PID probe when settingsEnabled is false" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tunnel.cloudflare-quick-tunnel-enable-disable
+  group: Remote functionality
+  feature: Tunnel exposure
+  subFeature: POST /api/tunnel/enable and /api/tunnel/disable — Cloudflare quick-tunnel lifecycle
+  trigger: Dashboard Endpoint page Enable/disable action for the Cloudflare tunnel row (client-side gated, see tunnel.enable-lacks-server-side-security-gate)
+  input: none (both POST with empty body)
+  output: "enable: {success, tunnelUrl, shortId, publicUrl, alreadyRunning?}; disable: {success:true}"
+  businessRules:
+    - "enableTunnel() first checks if cloudflared is already running AND both the direct trycloudflare.com URL and the public https://r{shortId}.abc-tunnel.us URL probe alive — only then does it reuse the existing tunnel instead of respawning, to avoid a stale socket surviving a network change"
+    - "On a fresh spawn, the tunnel is registered with 9router's own worker (POST {WORKER_URL}/api/tunnel/register) to bind shortId -> tunnelUrl, before the public *.abc-tunnel.us URL is health-checked — the public URL depends on this external worker being reachable"
+    - "POST /api/tunnel/enable waits a hardcoded DNS_WARMUP_DELAY_MS=8000ms after the tunnel registers, purely to let Cloudflare edge DNS propagate, before returning to the caller — a fixed sleep, not a poll-until-ready"
+    - "disableTunnel() sets svc.cancelToken.cancelled=true first, specifically so that an enable already in flight (e.g. a slow spawn racing a user's disable click) cannot resurrect tunnelEnabled/tunnelUrl in settings after disable has cleared them (throwIfCancelled checks are sprinkled through enableTunnel)"
+  state:
+    reads: ["DATA_DIR/tunnel/state.json (existing shortId/tunnelUrl on the reuse path)"]
+    writes: ["settings.tunnelEnabled/tunnelUrl", "DATA_DIR/tunnel/state.json"]
+    runtimeOnly: ["svc.cancelToken, svc.spawnInProgress, svc.activeLocalPort (module-scope in cloudflare/manager.js)"]
+  dependencies: ["tunnel.remote-access-state-machine"]
+  providerInteraction: "Cloudflare's trycloudflare.com quick-tunnel edge + 9router's own tunnel-registration worker (WORKER_URL)"
+  fallback: { hasFallback: true, retry: null, timeout: "waitForHealth polls the public URL with its own internal timeout; DNS_WARMUP_DELAY_MS is a fixed 8s post-registration wait", quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "enableTunnel()/disableTunnel() throws (cloudflared spawn/exit error, health check failure) — caught and returned as {error: message} with status 500", partial: false }
+  sideEffects:
+    - "killCloudflared(localPort) unconditionally kills any existing cloudflared process (by tracked PID and by matching the port in its command line) before every fresh spawn"
+  persistence: ["settings.tunnelEnabled / settings.tunnelUrl (SQLite settings row)", "DATA_DIR/tunnel/state.json {shortId, tunnelUrl}"]
+  performanceConcerns:
+    - "The 8s DNS_WARMUP_DELAY_MS in enable/route.js blocks the HTTP response for the full duration on every enable call, even the reuse (alreadyRunning) path — enableTunnel() itself returns quickly on reuse, but the route still waits out the full 8s before responding"
+  behavior: { streaming: false, cancellation: "cancelToken checked at multiple points inside enableTunnel; a disable mid-enable causes the in-flight enable to throw 'tunnel cancelled', which is swallowed (not logged as an error) rather than surfaced to the original caller", concurrency: "svc is a module-scope singleton per process — concurrent enable calls race on the same svc.cancelToken/spawnInProgress" }
+  edgeCases:
+    - "killCloudflared's platform-specific pkill/PowerShell filter matches ':${port}' with a boundary guard specifically to avoid a stale process surviving a respawn because a port-number substring (e.g. 20128 vs 201280) collided"
+  evidence:
+    - { file: src/app/api/tunnel/enable/route.js, line: 6, note: "DNS_WARMUP_DELAY_MS = 8000" }
+    - { file: src/app/api/tunnel/enable/route.js, line: 15, note: "fixed 8s sleep after enableTunnel() resolves, before responding" }
+    - { file: src/lib/tunnel/cloudflare/manager.js, line: 47, note: "reuse path double-probes direct+public URL before trusting an existing tunnel" }
+    - { file: src/lib/tunnel/cloudflare/manager.js, line: 85, note: "registerTunnelUrl call to 9router's own worker before the public health check" }
+    - { file: src/lib/tunnel/cloudflare/manager.js, line: 116, note: "disableTunnel sets cancelToken.cancelled=true before killing the process" }
+    - { file: src/lib/tunnel/cloudflare/cloudflared.js, line: 420, note: "killCloudflared kills the tracked PID plus port-matched processes before every respawn" }
+    - { file: src/app/api/tunnel/disable/route.js, line: 8, note: "POST handler calls disableTunnel() then re-runs configureTunnelMonitoring off the fresh settings" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tunnel.status-polling-and-caching
+  group: Remote functionality
+  feature: Tunnel exposure
+  subFeature: GET /api/tunnel/status — coalesced polling across both lanes plus download progress
+  trigger: Dashboard Endpoint page polling both tunnel lanes' live state
+  input: none
+  output: "{ tunnel: {enabled, settingsEnabled, tunnelUrl, shortId, publicUrl, running}, tailscale: {enabled, settingsEnabled, tunnelUrl, running, loggedIn}, download: {downloading, progress} }"
+  businessRules:
+    - "A process-global 3s cache (global.__tunnelStatusCache — the same 'survive Next.js hot reload' pattern as consoleLogBuffer's global._*) coalesces rapid dashboard polls into one pair of underlying probes; the inline comment notes the underlying probes already self-cache for 10s, so this is a second, shorter coalescing layer on top"
+    - "Download progress (cloudflared binary fetch) is deliberately excluded from the 3s cache and read live on every call via getDownloadStatus(), so the UI's download progress bar updates smoothly even while the rest of the payload is served from cache"
+    - "enabled is derived as settingsEnabled && running for both lanes — a persisted 'enabled' setting alone never reports as enabled if the live process probe disagrees, but nothing here clears the stale settings flag (see tunnel.remote-access-state-machine)"
+  state: { reads: ["settings.tunnelEnabled/tunnelUrl", "settings.tailscaleEnabled/tailscaleUrl", "cloudflared PID liveness", "tailscale daemon/login/running probes", "global.__tunnelStatusCache"], writes: ["global.__tunnelStatusCache (value, fetchedAt)"], runtimeOnly: ["global.__tunnelStatusCache"] }
+  dependencies: ["tunnel.remote-access-state-machine"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "either probe throws — caught and returned as {error: message} with status 500", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "STATUS_CACHE_TTL_MS=3000 is a magic number with no override — a dashboard polling faster than 3s (e.g. two open tabs polling independently) gets no fresher data than the cache, by design"
+  behavior: { streaming: false, cancellation: null, concurrency: "cache is process-global; concurrent GETs during a cache miss can both trigger a fresh Promise.all probe (no in-flight de-dup lock), briefly doubling probe cost under concurrent first-load" }
+  edgeCases:
+    - "isCloudflaredRunning() is a PID-liveness check only (process.kill(pid,0)) — a hung-but-alive cloudflared process (e.g. stuck on a DNS lookup) still reports running:true even though it may not actually be forwarding traffic"
+  evidence:
+    - { file: src/app/api/tunnel/status/route.js, line: 4, note: "STATUS_CACHE_TTL_MS = 3000" }
+    - { file: src/app/api/tunnel/status/route.js, line: 13, note: "cache-miss check + Promise.all([getTunnelStatus(), getTailscaleStatus()])" }
+    - { file: src/app/api/tunnel/status/route.js, line: 19, note: "download status read live, outside the cache" }
+    - { file: src/lib/tunnel/cloudflare/manager.js, line: 144, note: "enabled = settingsEnabled && running" }
+    - { file: src/lib/tunnel/cloudflare/cloudflared.js, line: 440, note: "isCloudflaredRunning — PID-liveness only, not a traffic health check" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tunnel.tailscale-install-sse-flow
+  group: Remote functionality
+  feature: Tunnel exposure
+  subFeature: POST /api/tunnel/tailscale-install (SSE) and GET /api/tunnel/tailscale-check
+  trigger: User clicks Enable on the Tailscale row when tailscale-check reports installed:false, or explicitly retries install
+  input: "POST { sudoPassword? } (falls back to cached/encrypted password shared with the MITM subsystem); GET (check) takes nothing"
+  output: "check: {installed, loggedIn, platform, brewAvailable, daemonRunning, customDaemonRunning, systemDaemonRunning, hasCachedPassword}; install: SSE stream of {event: progress|done|error}"
+  businessRules:
+    - "tailscale-install reuses the exact same cached/encrypted sudo password store as the MITM subsystem (getCachedPassword/loadEncryptedPassword imported from @/mitm/manager) — entering a sudo password once for MITM makes it available to Tailscale install and vice versa, an intentional cross-feature convenience, not a coincidence of shared code"
+    - "A password is only required (needsPassword) on non-Windows, non-Homebrew-macOS platforms; Windows and Homebrew-installed-macOS paths install without any sudo password prompt at all"
+    - "tailscale-check runs three daemon probes in parallel (a custom daemon via its own socket, the system daemon, and Homebrew availability) rather than a single check, because Tailscale can be running via 9router's own bundled daemon binary, the OS's system-installed tailscaled, or not at all — the UI needs to distinguish all three to decide what Enable should even do next"
+    - "installTailscale's progress callback streams free-text messages as SSE 'progress' events with no structured stage/step field — the dashboard can only display them as a scrolling log, not drive a stepper UI off them"
+  state: { reads: ["cached/encrypted sudo password (shared with MITM)", "DATA_DIR/tunnel/state.json shortId"], writes: [], runtimeOnly: ["cachedSudoPassword (globalThis, shared with MITM manager.js)"] }
+  dependencies: ["tunnel.remote-access-state-machine"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "a sudo password is required (non-Windows, non-brew) but none was supplied or cached — returns 400 'Sudo password is required'", partial: false }
+    - { code: AUTH_ERROR, when: "installTailscale rejects with a message containing 'incorrect password' or 'Sorry' — surfaced over SSE as {event:'error', error:'Wrong sudo password'}", partial: true }
+  sideEffects: ["initDbHooks(getSettings, updateSettings) is called at module load (the \"use server\" file), wiring the MITM manager's settings persistence hooks as a side effect of merely importing this route"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: "no explicit AbortSignal wiring — the stream's controller.close() only runs in the finally block after installTailscale's promise settles; a client disconnect mid-install does not cancel the underlying install", concurrency: null }
+  edgeCases:
+    - "The three daemon probes in tailscale-check (custom, system, brew) each carry their own 1.5s PROBE_TIMEOUT_MS and run via Promise.all, but a probe that hangs past its own exec timeout still blocks the overall GET response until that individual timeout fires — there is no outer request-level timeout"
+  evidence:
+    - { file: src/app/api/tunnel/tailscale-install/route.js, line: 9, note: "initDbHooks wired as a module-load side effect" }
+    - { file: src/app/api/tunnel/tailscale-install/route.js, line: 24, note: "sudoPassword sourced from body, then cached, then the encrypted-on-disk store" }
+    - { file: src/app/api/tunnel/tailscale-install/route.js, line: 26, note: "needsPassword gate — 400 when required and missing" }
+    - { file: src/app/api/tunnel/tailscale-check/route.js, line: 6, note: "getCachedPassword/loadEncryptedPassword imported from @/mitm/manager — shared store with MITM" }
+    - { file: src/app/api/tunnel/tailscale-check/route.js, line: 42, note: "three daemon probes run in parallel, each with its own 1.5s timeout" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tunnel.tailscale-funnel-enable-disable
+  group: Remote functionality
+  feature: Tunnel exposure
+  subFeature: POST /api/tunnel/tailscale-enable and /api/tunnel/tailscale-disable — daemon start, login, Funnel activation
+  trigger: User clicks Enable on the Tailscale row once tailscale-check reports installed:true
+  input: none (POST, empty body)
+  output: "enable: {success:true, tunnelUrl} on full success, or {success:false, needsLogin:true, authUrl} / {success:false, funnelNotEnabled:true, enableUrl} / {success:false, error} on partial outcomes; disable: {success:true}"
+  businessRules:
+    - "enableTailscale() is a 4-stage sequential flow, each stage able to short-circuit the response before the next: (1) startDaemonWithPassword, (2) isTailscaleLoggedInStrict -> startLogin if false, (3) stopFunnel() then startFunnel() -> retries via startLogin if the funnel error looks like a not-logged-in condition, (4) a final isTailscaleLoggedInStrict + isTailscaleRunningStrict double-check after funnel start succeeds, tearing the funnel back down (stopFunnel) if that strict check fails (e.g. the device was removed from the tailnet mid-flow)"
+    - "stopFunnel() is called unconditionally at the start of stage 3, before startFunnel() — every enable call tears down and rebuilds the funnel rather than checking if one is already correctly running, unlike the Cloudflare lane's explicit alive-probe-then-reuse path"
+    - "TLS cert provisioning (provisionCert(hostname)) after a successful funnel start is explicitly non-fatal: provisionCert itself wraps its own tailscale-CLI call in a try/catch and only warns on failure, so enableTailscale can report success:true with a tunnelUrl that may not yet serve valid HTTPS"
+    - "The post-funnel health check (waitForHealth) treats its own timeout as non-fatal (only re-throws non-timeout errors), returning success:true with reachableNow:false logged, relying on a background watchdog for eventual reachability rather than failing the enable call"
+    - "disableTailscale() never stops the tailscaled daemon itself — only stopFunnel() — so the daemon (and any sudo password cached to start it in stage 1) keeps running after disable; only the public Funnel exposure is torn down"
+  state: { reads: ["tailscale daemon/login/running state (external process, not DB)"], writes: ["settings.tailscaleEnabled/tailscaleUrl"], runtimeOnly: ["svc.cancelToken/spawnInProgress (tailscale/manager.js — a separate module-scope singleton from the Cloudflare lane's svc)"] }
+  dependencies: ["tunnel.remote-access-state-machine", "tunnel.tailscale-install-sse-flow"]
+  providerInteraction: "Tailscale's own control plane (login, Funnel feature flag) and the local tailscaled daemon"
+  fallback: { hasFallback: true, retry: "on a funnel-start error matching a not-logged-in pattern, automatically falls back to startLogin instead of failing outright", timeout: "waitForHealth has its own internal timeout, treated as non-fatal", quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "any stage throws an error that isn't the recognized not-logged-in/funnel-not-enabled shape — caught by the route and returned as {error: message} with status 500", partial: false }
+  sideEffects: []
+  persistence: ["settings.tailscaleEnabled / settings.tailscaleUrl"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: "cancelToken checked at multiple points; disableTailscale sets cancelled=true before calling stopFunnel()", concurrency: "separate svc singleton from the Cloudflare lane, so concurrent Cloudflare and Tailscale enables don't race each other, only same-lane concurrent calls do" }
+  edgeCases:
+    - "disableTailscale() leaving the daemon running means a cached sudo password from stage 1 can remain in memory (globalThis, shared with MITM) well after the user believes remote access is fully disabled"
+  evidence:
+    - { file: src/lib/tunnel/tailscale/manager.js, line: 32, note: "stage 1: startDaemonWithPassword" }
+    - { file: src/lib/tunnel/tailscale/manager.js, line: 46, note: "stage 2: needsLogin short-circuit with authUrl" }
+    - { file: src/lib/tunnel/tailscale/manager.js, line: 52, note: "stopFunnel() called unconditionally before every startFunnel()" }
+    - { file: src/lib/tunnel/tailscale/manager.js, line: 71, note: "stage 3: funnelNotEnabled short-circuit with enableUrl" }
+    - { file: src/lib/tunnel/tailscale/manager.js, line: 77, note: "stage 4: final strict re-check tears the funnel back down on failure" }
+    - { file: src/lib/tunnel/tailscale/manager.js, line: 86, note: "provisionCert call site — non-fatal by virtue of its own internal try/catch" }
+    - { file: src/lib/tunnel/tailscale/tailscale.js, line: 832, note: "provisionCert's own catch — cert-provision failure only warns, never throws" }
+    - { file: src/lib/tunnel/tailscale/manager.js, line: 110, note: "disableTailscale only calls stopFunnel, never stops the daemon" }
+    - { file: src/app/api/tunnel/tailscale-disable/route.js, line: 8, note: "POST handler calls disableTailscale() then re-runs configureTunnelMonitoring off the fresh settings" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: tunnel.enable-lacks-server-side-security-gate
+  group: Remote functionality
+  feature: Tunnel exposure
+  subFeature: The dashboard's 'do not expose without an API key / with weak dashboard auth' rule is enforced only in the React UI, not inside the tunnel-enable routes themselves
+  trigger: A direct POST to /api/tunnel/enable or /api/tunnel/tailscale-enable (curl, a modified/compromised frontend build, or any script holding dashboard/CLI-token auth) instead of clicking the dashboard's Enable button
+  input: none
+  output: "The tunnel or Tailscale Funnel is enabled and the gateway becomes reachable from the public internet, regardless of settings.requireApiKey, settings.requireLogin, or whether the dashboard still has the default password"
+  businessRules:
+    - "EndpointPageClient.js's Cloudflare-row Enable handler refuses to open the enable modal when isLoginUnsafe (requireLogin off, or the dashboard still has the default password) or !requireApiKey is true, showing 'Security required: ...' instead — proving the product's own intended invariant is 'never let a user turn on public exposure while the endpoint has no key or the dashboard has weak auth'"
+    - "That client-side guard is itself inconsistently applied: the Cloudflare row's onClick checks both isLoginUnsafe and !requireApiKey, but the Tailscale row's onClick checks only isLoginUnsafe — it never checks requireApiKey at all, so even the UI does not stop a user from enabling Tailscale Funnel while 'Require API key' is off"
+    - "None of this is enforced server-side: src/app/api/tunnel/enable/route.js and src/app/api/tunnel/tailscale-enable/route.js call enableTunnel()/enableTailscale() unconditionally on POST — neither route, nor src/lib/tunnel/**, nor src/mitm/manager.js (which both share code with) ever reads settings.requireApiKey, settings.requireLogin, or a 'dashboard has default password' flag"
+    - "dashboardGuard.js does gate who may call these routes at all (LOCAL_ONLY_PATHS requires a loopback+authenticated caller or a valid machineId-derived CLI token; PROTECTED_API_PATHS additionally requires isAuthenticated for the /api/tunnel prefix generally) — but that answers 'is the caller allowed to manage the tunnel', not 'is it safe to expose the endpoint publicly given its current API-key/login posture'; those are two independent questions and only the first is enforced server-side"
+    - "Once exposed, dashboardGuard.js's canAccessPublicLlmApi() (the /v1 gate) does not read settings.requireApiKey either — it grants access on isLocalRequest() OR a valid CLI token OR a real row in the apiKeys table (hasValidApiKey), independent of the 'Require API key' toggle. requireApiKey only gates the request inside each src/sse/handlers/*.js (e.g. chat.js, per endpoint.enforce-require-api-key) — reachable only for callers isLocalRequest() already let through"
+  suspicion:
+    expected: "Given the dashboard UI already encodes 'do not let a tunnel/Funnel go live while requireApiKey is off or dashboard auth is weak', that same rule should be enforced inside POST /api/tunnel/enable and POST /api/tunnel/tailscale-enable themselves (or in enableTunnel()/enableTailscale()), so server-side state can never diverge from a client-only UI guard — and the guard should apply identically to both the Cloudflare and Tailscale rows."
+    actual: "src/app/api/tunnel/enable/route.js and src/app/api/tunnel/tailscale-enable/route.js contain no read of settings.requireApiKey, settings.requireLogin, or the dashboard password state anywhere in their own code or in the functions they call — the guard is implemented exclusively as an onClick condition in the React component, and even there the Tailscale row omits the requireApiKey check that the Cloudflare row has."
+    impact: "Any actor who can already reach these local-only routes with a valid dashboard session cookie or a machineId-derived CLI token (a compromised/rogue local script, a stale/leaked auth_token, a modified frontend bundle, or simply calling the endpoint by hand) can turn on public exposure while requireApiKey is still false and/or the dashboard still has the default password — silently defeating the product's own stated security invariant with no server-side backstop, and the Tailscale lane has no client-side backstop either."
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["endpoint.enforce-require-api-key", "settings.defaults-and-merge"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "requireApiKey defaults to true (src/lib/db/repos/settingsRepo.js), so a fresh install is not exposed by default — the gap only matters once an admin has deliberately turned requireApiKey off (e.g. for local-only testing) and later enables the tunnel without realizing the UI guard (where it exists at all) is the only thing stopping that combination"
+    - "Even without a server-side gate, a request dashboardGuard.js's isLocalRequest() correctly classifies as non-local (e.g. the tunnel daemon forwards an X-Forwarded-For header identifying the real remote client) still needs a real apiKeys-table key via hasValidApiKey — so the practical severity depends on how reliably tunnel/Funnel-forwarded traffic is classified as non-local by the loopback-socket-based check in src/dashboardGuard.js, which this task did not independently verify against cloudflared/tailscale's actual header-forwarding behavior and is worth a follow-up check"
+  evidence:
+    - { file: src/app/api/tunnel/enable/route.js, line: 10, note: "enableTunnel() called with no requireApiKey/requireLogin check anywhere in the route" }
+    - { file: src/app/api/tunnel/tailscale-enable/route.js, line: 8, note: "enableTailscale() called with no requireApiKey/requireLogin check anywhere in the route" }
+    - { file: "src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js", line: 819, note: "Cloudflare row's client-only guard: onClick refuses to open the enable modal when !requireApiKey" }
+    - { file: "src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js", line: 901, note: "Tailscale row's onClick checks isLoginUnsafe only — no !requireApiKey check at all" }
+    - { file: "src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js", line: 991, note: "UI-only warning banner (not a blocking check) shown when isRemoteHost && !requireApiKey" }
+    - { file: src/dashboardGuard.js, line: 68, note: "/api/tunnel is only in PROTECTED_API_PATHS (who may call it), never checked against requireApiKey" }
+    - { file: src/dashboardGuard.js, line: 155, note: "canAccessPublicLlmApi does not read settings.requireApiKey at all" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+
+- id: remote.nineremote-promo-no-backend
+  group: Remote functionality
+  feature: 9Remote promo
+  subFeature: 9Remote button + promo modal — zero backend, zero routes, zero persistence
+  trigger: User clicks the Remote button in the dashboard's top toolbar (NineRemoteButton)
+  input: none
+  output: "A promo modal opens client-side; its only action button does window.open('https://9remote.cc', '_blank') — an external, separate SaaS product's marketing site"
+  businessRules:
+    - "NineRemoteButton.js and NineRemotePromoModal.js are pure client components ('use client') with no fetch/API call anywhere in either file — confirmed by reading both files in full: no import of any /api/* path, no server action, no use of localDb/settings"
+    - "There is no backend route under /api/remote, /api/nine-remote, or any similar path anywhere in src/app/api/ — the only 'remote'-adjacent routes in the app are the unrelated /api/tunnel/* (Cloudflare/Tailscale) routes traced elsewhere in this file"
+    - "Nothing about this feature is persisted anywhere (no settings key, no DB row, no localStorage/cookie) — every render starts from the same static FEATURES/BULLETS arrays and the hardcoded NINE_REMOTE_URL constant"
+    - "This is a pure marketing/promo surface for a separate paid product (9remote.cc), not a capability 9router itself implements. The spec excludes 9Remote from AIGate entirely — a later worker auditing 'missing routes for the Remote button' should treat that as expected, not as a gap to fill in"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["window.open(NINE_REMOTE_URL, '_blank') — navigates the user to an external, third-party site outside 9router's own domain"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Escape-key handling and body-scroll-lock (document.body.style.overflow) are the modal's only interactive logic beyond the CTA button — there is no telemetry/analytics call recording that the promo was shown or clicked"
+  evidence:
+    - { file: src/shared/components/NineRemoteButton.js, line: 6, note: "button component — only local useState toggling the modal, no fetch" }
+    - { file: src/shared/components/NineRemotePromoModal.js, line: 18, note: "NINE_REMOTE_URL = https://9remote.cc — the only external reference in the whole feature" }
+    - { file: src/shared/components/NineRemotePromoModal.js, line: 88, note: "CTA button does window.open only — no API call, no persisted state" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: mitm.root-ca-generation-and-trust-install
+  group: Remote functionality
+  feature: MITM proxy control
+  subFeature: Root CA generation + OS trust-store installation during MITM server start, and the missing rollback when startup fails after install
+  trigger: startServer() (invoked from POST /api/cli-tools/antigravity-mitm, per clitools.antigravity-mitm-control) when no valid, unexpired Root CA + trust-store entry exists yet
+  input: "sudoPassword (mac/linux), apiKey, forceKillPort443"
+  output: "A self-signed 10-year Root CA (src/mitm/cert/rootCA.js) generated to disk and installed into the OS trust store (Windows Root store via certutil, macOS System keychain via security, Linux distro trust dir + NSS DBs) before the MITM server process is even spawned"
+  businessRules:
+    - "startServer()'s Step 1 (generateRootCA) only regenerates the CA if it's missing or isCertExpired (within 30 days of the 10-year expiry) — the old cert is best-effort uninstalled from the trust store first, wrapped in try/catch so a failed uninstall doesn't block regeneration"
+    - "Step 1.5 auto-installs the (possibly freshly generated) Root CA into the OS trust store if checkCertInstalled() reports it isn't already trusted — the Windows/macOS checks compare the exact certificate fingerprint (not just the CommonName), so a stale cert with the same CN but a different key correctly reports 'not installed' and triggers a real re-install rather than a false-positive skip"
+    - "On Linux specifically, if no sudo is available at all, the system trust-store install is skipped entirely (only user-level NSS databases for Firefox/Chromium profiles are updated) and the log tells the user to manually trust the cert file on client machines — a degraded but non-fatal path"
+    - "Windows processes that already have admin rights install with zero password prompt (runElevatedPowerShell runs directly with no UAC popup when isAdmin() is already true); non-admin Windows processes get exactly one UAC popup per elevated call (winElevated.js's own comment documents batching multiple admin tasks into one script to avoid popup spam)"
+    - "There is no rollback of the trust-store install if a later startup step fails: if Step 1.5 successfully installs the Root CA but the subsequent server spawn or its 8s health poll (pollMitmHealth) then fails, startServer only kills the spawned process and cleans up its lock/PID files — it never calls uninstallCert to undo the trust-store change it just made. uninstallCert is only ever invoked from the expiry-regeneration branch of Step 1, never on a failed startup and never from stopServer() (see mitm.hosts-file-atomic-write-and-rollback)"
+  state:
+    reads: ["rootCA.crt/rootCA.key on disk (MITM_DIR)", "OS trust store (fingerprint check)"]
+    writes: ["rootCA.crt/rootCA.key on disk", "OS trust store (Windows Root store / macOS System keychain / Linux CA dir + NSS DBs)"]
+    runtimeOnly: []
+  dependencies: ["clitools.antigravity-mitm-control"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "a sudo password is required (mac/linux, isSudoPasswordRequired) to install the cert but none was supplied or cached — startServer throws 'Sudo password required to install Root CA certificate'", partial: false }
+    - { code: INTERNAL_ERROR, when: "installCert itself throws (e.g. wrong sudo password, certutil failure) — wrapped and re-thrown as 'Failed to trust certificate: ...'", partial: true }
+  sideEffects: []
+  persistence: ["rootCA.crt / rootCA.key on disk under MITM_DIR", "OS trust store entry (survives across 9router restarts and across stopServer/startServer cycles)"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "startServer() takes an O_EXCL lock file (flag 'wx') before Step 1, specifically to prevent two concurrent startServer calls from racing the CA-generate-then-install sequence across processes" }
+  edgeCases:
+    - "If startup fails after the trust-store install but the process is later relaunched and startServer succeeds, the already-installed (and still valid, non-expired) cert is simply detected as trusted and skipped — so the leftover trust-store entry from the earlier failed attempt is harmless in the common case; the gap only matters if a user uninstalls 9router entirely without ever having a fully successful start, leaving an orphaned Root CA in their OS trust store with no in-app way to remove it short of another successful start+stop cycle"
+  evidence:
+    - { file: src/mitm/manager.js, line: 539, note: "Step 1: regenerate Root CA only if missing or expired" }
+    - { file: src/mitm/manager.js, line: 552, note: "Step 1.5: checkCertInstalled fingerprint check before auto-install" }
+    - { file: src/mitm/cert/install.js, line: 77, note: "checkCertInstalledWindows compares the exact certificate fingerprint via certutil, not just the CN" }
+    - { file: src/mitm/manager.js, line: 557, note: "Linux no-sudo path: system trust skipped, NSS DBs still updated separately" }
+    - { file: src/mitm/winElevated.js, line: 41, note: "zero-popup path when already admin; one UAC popup otherwise" }
+    - { file: src/mitm/manager.js, line: 711, note: "failed health poll only kills the process/cleans lock files — no uninstallCert call" }
+    - { file: src/mitm/cert/install.js, line: 138, note: "uninstallCert exists but is only ever called from manager.js's expiry-regeneration branch, never on startup failure or from stopServer" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: mitm.hosts-file-atomic-write-and-rollback
+  group: Remote functionality
+  feature: MITM proxy control
+  subFeature: Hosts-file DNS entries — atomic write+rollback on Windows vs direct overwrite on macOS/Linux, and unconditional cleanup on stop
+  trigger: enableToolDNS/addDNSEntry (per-tool) during MITM setup, and stopServer's unconditional full-hosts cleanup on every stop
+  input: "tool name (key into TOOL_HOSTS), sudoPassword"
+  output: "127.0.0.1 <host> lines added to or removed from the OS hosts file for the given tool's hostnames"
+  businessRules:
+    - "Windows hosts-file writes use a genuine atomic-write-with-rollback pattern (atomicWriteHostsWin): write the new content to a '.9router.new' sibling file, rename the current hosts file to '.9router.bak', then rename '.new' onto the real path — same-volume renames are atomic on NTFS. If the second rename fails, it explicitly rolls back by renaming '.bak' back onto the target, falling back to a raw fs.writeFileSync(target, originalContent) as a last resort if even that rename fails"
+    - "macOS/Linux hosts-file writes have no equivalent rollback: addDNSEntry/removeDNSEntry pipe the full new content through `printf ... | tee ${HOSTS_FILE}` under sudo — a direct overwrite of the live file with no temp-file-then-rename step and no backup copy. The code's own comment calls this 'atomic', which is true only in the narrow sense that a single small write() to a regular file is unlikely to produce a torn/partial line — it provides no rollback if the operation fails outright (wrong password, process killed before the write), unlike the Windows path. This is the same non-atomic-write class already flagged for CLI-tool config writes in clitools.write-not-atomic, here applied to a shared OS system file instead of one app's own config"
+    - "stopServer() removes ALL tool DNS entries unconditionally on every stop, regardless of which tools were actually enabled, matching clitools.antigravity-mitm-control's already-documented DELETE-handler behavior; on Windows, stopServer bypasses PowerShell entirely and writes the hosts file directly when the process is already admin, falling back to a separate PowerShell regex-filter script when not admin — a second, independent hosts-file-write code path from atomicWriteHostsWin, with no atomic rename step in either stopServer branch"
+    - "checkDNSEntry/checkAllDNSStatus are pure substring checks against the raw hosts-file text, read directly on every call rather than cached — a hosts file that is mid-write (or corrupted) simply causes a false 'not active' rather than an error, since the read is wrapped in a try/catch that returns false"
+  state:
+    reads: ["OS hosts file"]
+    writes: ["OS hosts file", "DNS cache (via ipconfig /flushdns or dscacheutil/resolvectl)"]
+    runtimeOnly: []
+  dependencies: ["clitools.antigravity-mitm-control", "clitools.write-not-atomic"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "execWithPassword's sudo call rejects with an incorrect-password-shaped stderr — surfaced as 'Wrong sudo password'", partial: false }
+    - { code: INTERNAL_ERROR, when: "any other addDNSEntry/removeDNSEntry failure — surfaced as 'Failed to add/remove DNS entry: <message>'", partial: false }
+  sideEffects: ["DNS cache flush (ipconfig/dscacheutil+killall mDNSResponder/resolvectl) after every hosts-file mutation, best-effort — errors are ignored on the Windows sync shutdown-cleanup path"]
+  persistence: ["OS hosts file entries (127.0.0.1 <tool-host> lines) — survive process restarts; only removed by an explicit removeDNSEntry/removeAllDNSEntries/stopServer call, or manually by the user"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "removeAllDNSEntriesSync (used during process-shutdown signal handlers, where async ops aren't safe) does a single synchronous fs.writeFileSync with no atomic rename and no rollback on any platform including Windows — the atomic path (atomicWriteHostsWin) is only used by the async addDNSEntry/removeDNSEntry functions, not by this shutdown-time sync variant"
+  evidence:
+    - { file: src/mitm/dns/dnsConfig.js, line: 14, note: "atomicWriteHostsWin — temp file + rename + rollback-on-failure, Windows only" }
+    - { file: src/mitm/dns/dnsConfig.js, line: 25, note: "rollback: rename .bak back onto target, or raw writeFileSync as a last resort" }
+    - { file: src/mitm/dns/dnsConfig.js, line: 172, note: "POSIX addDNSEntry: direct sudo tee overwrite, no temp file, no backup" }
+    - { file: src/mitm/dns/dnsConfig.js, line: 234, note: "removeAllDNSEntriesSync: plain writeFileSync, no atomic rename on any platform" }
+    - { file: src/mitm/manager.js, line: 777, note: "stopServer Windows admin path: direct fs write, unconditional full-hosts cleanup" }
+    - { file: src/mitm/manager.js, line: 782, note: "stopServer Windows non-admin path: separate PowerShell regex-filter script, independent write path from atomicWriteHostsWin" }
+    - { file: src/mitm/dns/dnsConfig.js, line: 118, note: "checkDNSEntry: try/catch around a raw file read, false on any read error" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
