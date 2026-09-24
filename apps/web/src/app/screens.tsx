@@ -1,5 +1,6 @@
 import { Overview } from "../features/overview/screens";
 import { EndpointKeys, Routing, TokenSaver } from "../features/gateway/screens";
+import { ComboCreate } from "../features/gateway/combo-create";
 import { Connections, LlmProviders, MediaProviders, ProviderDetail, Quota } from "../features/providers/screens";
 import { Console, RequestDetail, Requests, Usage } from "../features/traffic/screens";
 import { DeployWizard, Mitm, ProxyPools, Tunnel } from "../features/network/screens";
@@ -23,15 +24,18 @@ export function ScreenView({ path, developerMode, onDeveloperMode, state = "read
     case "/": return <Overview />;
     case "/gateway/endpoint": return <EndpointKeys />;
     case "/gateway/routing": return <Routing />;
+    case "/gateway/routing/new": return <ComboCreate />;
     case "/gateway/token-saver": return <TokenSaver />;
     case "/providers": return <LlmProviders />;
     case "/providers/new": return <ProviderDetail isNew />;
-    case "/providers/anthropic": return <ProviderDetail />;
+    case "/providers/detail": return <ProviderDetail providerId={new URLSearchParams(window.location.search).get("provider") ?? undefined} />;
     case "/providers/connections": return <Connections />;
     case "/providers/quota": return <Quota />;
     case "/providers/media": return <MediaProviders />;
-    case "/providers/media/video": return <MediaProviders detail />;
-    case "/providers/media/video/xai": return <MediaProviders detail />;
+    case "/providers/media/catalog": return <MediaProviders kind={new URLSearchParams(window.location.search).get("kind") ?? undefined} />;
+    case "/providers/media/provider": return <MediaProviders kind={new URLSearchParams(window.location.search).get("kind") ?? undefined} providerId={new URLSearchParams(window.location.search).get("provider") ?? undefined} />;
+    case "/providers/media/video": return <MediaProviders kind="video" />;
+    case "/providers/media/video/xai": return <MediaProviders kind="video" providerId="xai" />;
     case "/traffic/usage": return <Usage />;
     case "/traffic/requests": return <Requests />;
     case "/traffic/requests/request-123": return <RequestDetail />;
@@ -50,6 +54,6 @@ export function ScreenView({ path, developerMode, onDeveloperMode, state = "read
     case "/login": return <Login />;
     case "/callback": return <Callback />;
     case "/welcome": return <Onboarding />;
-    default: return <><PageHeading eyebrow="Navigation" title="Page not found" description="This route is not part of the UI preview." /><StateBlock state="error" code="ERR_ROUTE_NOT_FOUND" action={<Link to="/" className="button button-primary">Back to overview</Link>} /></>;
+    default: return path.startsWith("/providers/") ? <ProviderDetail providerId={path.split("/")[2]} /> : <><PageHeading eyebrow="Navigation" title="Page not found" description="This route is not part of the UI preview." /><StateBlock state="error" code="ERR_ROUTE_NOT_FOUND" action={<Link to="/" className="button button-primary">Back to overview</Link>} /></>;
   }
 }

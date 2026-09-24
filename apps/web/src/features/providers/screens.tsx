@@ -1,52 +1,54 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Button, CopyField, Dot, Field, Input, Metric, Modal, PageHeading, Panel, Pill, Table, Tabs, Warning } from "../../shared/ui";
-
-const providerRows = [
-  ["Anthropic", "Claude 3.5 Sonnet, Claude 3.7", "2 connections", "99.98%", "Healthy"],
-  ["OpenAI", "GPT-4o, o3, GPT-4o mini", "3 connections", "99.94%", "Healthy"],
-  ["Google Vertex", "Gemini 2.5 Pro, Flash", "1 connection", "99.81%", "Healthy"],
-  ["DeepSeek", "DeepSeek R1, V3", "2 connections", "98.42%", "Degraded"],
-  ["Mistral", "Large, Codestral", "1 connection", "99.92%", "Healthy"],
-  ["xAI", "Grok 3, Grok Imagine", "1 connection", "99.76%", "Healthy"],
-];
+import { Button, Field, Input, Metric, Modal, PageHeading, Panel, Pill, Table, Tabs, Warning } from "../../shared/ui";
+import { allProviders, mediaGroups, mediaOnlyProviders, providerGroups, providers } from "./catalog";
 
 export function LlmProviders() {
   const [filter, setFilter] = useState("");
-  const rows = providerRows.filter((r) => r[0].toLowerCase().includes(filter.toLowerCase()));
-  return <><PageHeading eyebrow="Providers / Catalog" title="LLM providers" description="Browse models, availability, and connected accounts." action={<Link className="button button-primary" to="/providers/new">+ Add provider</Link>} />
-    <div className="grid grid-3"><Metric label="Connected providers" value="12" delta="10 healthy" /><Metric label="Available models" value="186" delta="Across all lanes" /><Metric label="Active connections" value="41" delta="2 need attention" tone="warning" /></div>
-    <Panel title="Provider catalog" detail="Configured providers and current availability" className="section-gap panel-flush" action={<Input placeholder="Filter providers…" defaultValue={filter} />}>
-      <div className="table-toolbar"><input className="input" aria-label="Filter providers" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search by provider name" /><Button>All kinds ⌄</Button><Button>Health ⌄</Button></div>
-      <Table columns={["Provider", "Models", "Connections", "Success", "Health", ""]} rows={rows.map((r) => [<Link className="table-link" to="/providers/anthropic">{r[0]}</Link>, r[1], r[2], <span className="mono">{r[3]}</span>, <Pill tone={r[4] === "Healthy" ? "healthy" : "warning"}>{r[4]}</Pill>, <Link className="table-link" to="/providers/anthropic">View →</Link>])} />
-    </Panel></>;
+  const [showAllKeys, setShowAllKeys] = useState(false);
+  const query = filter.trim().toLocaleLowerCase();
+  return <><PageHeading eyebrow="Providers / Catalog" title="LLM providers" description="Browse built-in providers by connection method. Connection state appears after backend integration." />
+    <div className="provider-catalog-toolbar"><input className="input" aria-label="Search providers" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={`Search ${providers.length} providers…`} /><span className="muted mono">{providers.filter((p) => p.name.toLocaleLowerCase().includes(query)).length} / {providers.length} built-in</span></div>
+    {!query && <section className="catalog-section"><div className="catalog-section-head"><div><h2>Custom providers</h2><p>OpenAI or Anthropic compatible endpoints you define.</p></div><div className="row"><a className="button" href="/providers/new?protocol=anthropic">+ Anthropic compatible</a><a className="button button-primary" href="/providers/new?protocol=openai">+ OpenAI compatible</a></div></div><div className="catalog-empty">No custom providers in this UI preview.</div></section>}
+    {providerGroups.map((group) => {
+      const matches = group.providers.filter(([, name]) => name.toLocaleLowerCase().includes(query));
+      if (!matches.length) return null;
+      const visible = group.id === "apikey" && !query && !showAllKeys ? matches.slice(0, 20) : matches;
+      return <section className="catalog-section" key={group.id} aria-labelledby={`${group.id}-heading`}><div className="catalog-section-head"><div><h2 id={`${group.id}-heading`}>{group.title} <span className="muted mono">{matches.length}</span></h2><p>{group.id === "oauth" ? "Account sign-in and token based connections." : group.id === "free" ? "Providers listed under Free Tier in the 9Router reference; access terms vary." : group.id === "webCookie" ? "Subscription account connections; provider-specific setup is pending." : "Connect with a provider-issued API key."}</p></div></div>
+        <div className="catalog-grid">{visible.map(([id, name]) => <a className="catalog-card" href={`/providers/detail?provider=${id}`} key={id}><span className="catalog-glyph" aria-hidden="true">{name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{name}</strong><small>View provider →</small></span></a>)}</div>
+        {group.id === "apikey" && !query && <button className="catalog-more" type="button" onClick={() => setShowAllKeys(!showAllKeys)}>{showAllKeys ? "Show fewer" : `Show all ${matches.length} providers`}</button>}
+      </section>;
+    })}
+    {query && !providers.some((p) => p.name.toLocaleLowerCase().includes(query)) && <div className="catalog-empty">No providers match “{filter}”.</div>}
+  </>;
 }
 
-export function ProviderDetail({ isNew = false }: { isNew?: boolean }) {
-  const [tab, setTab] = useState("Models");
-  return <><PageHeading eyebrow="Providers / Catalog" title={isNew ? "Add provider" : "Anthropic"} description={isNew ? "Connect a provider and select the models it can serve." : "Provider health, models, connection strategy, and credentials."} action={!isNew && <Pill tone="healthy">Healthy</Pill>} />
-    {isNew ? <div className="split"><Panel title="Provider details"><div className="stack"><Field label="Provider name"><Input placeholder="Provider name" /></Field><Field label="Protocol"><select className="input"><option>OpenAI compatible</option><option>Anthropic compatible</option></select></Field><Field label="Base URL"><Input placeholder="https://api.example.com/v1" /></Field><Button variant="primary">Continue</Button></div></Panel><Panel title="Connection checklist"><div className="flow-steps">{["Enter provider details", "Validate endpoint", "Add credentials", "Select models"].map((x, i) => <div key={x}><span>{String(i + 1).padStart(2, "0")}</span><strong>{x}</strong></div>)}</div></Panel></div> : <>
-      <div className="grid grid-4"><Metric label="Requests 24h" value="245,821" delta="↗ +12.3%" /><Metric label="Success rate" value="99.98%" delta="Healthy" /><Metric label="p95 latency" value="940ms" delta="Within target" /><Metric label="Connections" value="2" delta="Both active" /></div>
-      <div className="section-gap"><Tabs items={["Models", "Connections", "Mapping", "Usage"]} active={tab} onChange={setTab} /></div>
-      {tab === "Models" && <Panel title="Available models" className="section-gap panel-flush" action={<Button>Manage models</Button>}><Table columns={["Model ID", "Kind", "Context", "Status"]} rows={[["claude-3.5-sonnet", "Chat", "200K", "Enabled"],["claude-3.7-sonnet", "Chat", "200K", "Enabled"],["claude-3-opus", "Chat", "200K", "Disabled"]].map((r) => [<code>{r[0]}</code>, r[1], <span className="mono">{r[2]}</span>, <Pill tone={r[3] === "Enabled" ? "healthy" : "muted"}>{r[3]}</Pill>])} /></Panel>}
-      {tab === "Connections" && <Panel title="Connected accounts" className="section-gap"><div className="list-row"><Dot /><div><strong>Anthropic primary</strong><small>OAuth · token healthy · last used 2 minutes ago</small></div><Pill tone="healthy">Active</Pill></div><div className="list-row"><Dot /><div><strong>Anthropic secondary</strong><small>API key · standby</small></div><Pill tone="healthy">Active</Pill></div></Panel>}
-      {tab === "Mapping" && <Panel title="Model aliases" className="section-gap"><CopyField label="Public alias" value="claude-default → anthropic/claude-3.5-sonnet" /></Panel>}
-      {tab === "Usage" && <Panel title="Usage by model" className="section-gap"><Metric label="Tokens 24h" value="41.2M" delta="Across 2 models" /></Panel>}
-    </>}
+export function ProviderDetail({ isNew = false, providerId }: { isNew?: boolean; providerId?: string }) {
+  const provider = providers.find((item) => item.id === providerId);
+  const protocol = new URLSearchParams(window.location.search).get("protocol");
+  if (isNew) return <><PageHeading eyebrow="Providers / Custom" title="Add custom provider" description="Define an OpenAI or Anthropic compatible endpoint." />
+    <div className="split"><Panel title="Provider details"><div className="stack"><Field label="Provider name"><Input placeholder="Provider name" /></Field><Field label="Protocol"><select className="input" defaultValue={protocol === "anthropic" ? "anthropic" : "openai"}><option value="openai">OpenAI compatible</option><option value="anthropic">Anthropic compatible</option></select></Field><Field label="Base URL"><Input placeholder="https://api.example.com/v1" /></Field><Button variant="primary" disabled>Continue after backend integration</Button></div></Panel><Panel title="Connection checklist"><div className="flow-steps">{["Enter provider details", "Validate endpoint", "Add credentials", "Select models"].map((x, i) => <div key={x}><span>{String(i + 1).padStart(2, "0")}</span><strong>{x}</strong></div>)}</div></Panel></div></>;
+  if (!provider) return <><PageHeading eyebrow="Providers / Catalog" title="Provider not found" description="This provider is not in the current catalog." /><Link className="button" to="/providers">Back to providers</Link></>;
+  const group = providerGroups.find((item) => item.id === provider.group)!;
+  return <><PageHeading eyebrow={`Providers / ${group.title}`} title={provider.name} description="Connection setup, models, and health will appear here when provider integration is available." action={<a className="button button-primary" href={`/providers/connections?provider=${provider.id}`}>+ Add connection</a>} />
+    <div className="grid grid-2"><Panel title="Provider type"><Pill tone="info">{group.title}</Pill><p className="muted">Built-in catalog entry · ID <code>{provider.id}</code></p></Panel><Panel title="Connections"><div className="state-block"><strong>No AIGate connection data yet</strong><p>Use Add connection to preview the setup form. Saving credentials requires backend integration.</p></div></Panel></div>
   </>;
 }
 
 export function Connections() {
   const [tab, setTab] = useState("All accounts");
-  const [flowOpen, setFlowOpen] = useState(false);
+  const requestedProvider = new URLSearchParams(window.location.search).get("provider");
+  const [flowOpen, setFlowOpen] = useState(Boolean(requestedProvider));
+  const [providerId, setProviderId] = useState(allProviders.some((p) => p.id === requestedProvider) ? requestedProvider! : providers[0].id);
+  const selectedProvider = allProviders.find((p) => p.id === providerId)!;
   return <><PageHeading eyebrow="Providers / Connections" title="Connections" description="Accounts, credentials, refresh status, and selection order." action={<Button variant="primary" onClick={() => setFlowOpen(true)}>+ Add connection</Button>} />
-    <Warning>Secrets are never shown after they are saved. Replace a credential to rotate it.</Warning>
+    <Warning>Account rows below are sample data. No provider credential is saved by this UI preview.</Warning>
     <div className="section-gap"><Tabs items={["All accounts", "Needs attention", "Strategies"]} active={tab} onChange={setTab} /></div>
     {tab === "Strategies" ? <div className="grid grid-2 section-gap"><Panel title="Account selection"><Field label="Default strategy"><select className="input"><option>Fill first</option><option>Round robin</option><option>Sticky</option></select></Field></Panel><Panel title="Health checks"><div className="list-row"><div><strong>Proactive refresh</strong><small>Refresh credentials before expiry.</small></div><input type="checkbox" defaultChecked aria-label="Proactive refresh" /></div></Panel></div> :
       <Panel title={tab === "Needs attention" ? "Connections requiring action" : "Connected accounts"} className="section-gap panel-flush">
-        <Table columns={["Provider / Account", "Auth", "Quota", "Last used", "Status", ""]} rows={(tab === "Needs attention" ? ["DeepSeek"] : ["Anthropic", "OpenAI", "Google Vertex", "DeepSeek"]).map((name, i) => [<strong>{name} primary</strong>, i === 0 ? "OAuth" : "API key", <span className="mono">{i === 3 ? "82%" : "42%"}</span>, `${i + 2}m ago`, <Pill tone={name === "DeepSeek" ? "warning" : "healthy"}>{name === "DeepSeek" ? "Refresh" : "Active"}</Pill>, <Button variant="ghost" onClick={() => setFlowOpen(true)}>Manage</Button>])} />
+        <Table columns={["Provider / Account", "Auth", "Quota", "Last used", "Status", ""]} rows={(tab === "Needs attention" ? ["DeepSeek"] : ["Anthropic", "OpenAI", "Google Vertex", "DeepSeek"]).map((name, i) => [<strong>{name} primary</strong>, i === 0 ? "OAuth" : "API key", <span className="mono">{i === 3 ? "82%" : "42%"}</span>, `${i + 2}m ago`, <Pill tone={name === "DeepSeek" ? "warning" : "healthy"}>{name === "DeepSeek" ? "Refresh" : "Active"}</Pill>, <span className="muted">Demo</span>])} />
       </Panel>}
-    {flowOpen && <Modal title="Add connection" onClose={() => setFlowOpen(false)}><p>Choose a provider and authentication method. The form changes with the provider contract.</p><div className="stack"><Field label="Provider"><select className="input"><option>Anthropic</option><option>OpenAI</option><option>Google Vertex</option></select></Field><Field label="Method"><select className="input"><option>API key</option><option>OAuth</option></select></Field><Field label="Credential"><Input type="password" placeholder="Enter a new key" /></Field></div><div className="modal-actions"><Button onClick={() => setFlowOpen(false)}>Cancel</Button><Button variant="primary" onClick={() => setFlowOpen(false)}>Continue</Button></div></Modal>}
+    {flowOpen && <Modal title="Add connection" onClose={() => setFlowOpen(false)}><p>Preview the setup for a built-in provider. Credentials cannot be saved yet.</p><div className="stack"><Field label="Provider"><select className="input" value={providerId} onChange={(e) => setProviderId(e.target.value)}>{providerGroups.map((group) => <optgroup key={group.id} label={group.title}>{group.providers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</optgroup>)}<optgroup label="Media-only providers">{mediaOnlyProviders.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}</optgroup></select></Field><div className="list-row"><div><strong>Connection method</strong><small>{selectedProvider.group === "oauth" ? "OAuth sign-in" : selectedProvider.group === "apikey" ? "Provider-issued API key" : selectedProvider.group === "webCookie" ? "Subscription account session" : "Provider-specific setup; details pending integration"}</small></div></div>{selectedProvider.group === "apikey" ? <Field label="Credential"><Input type="password" placeholder="Available after backend integration" disabled /></Field> : <div className="warning">{selectedProvider.group === "oauth" ? "OAuth authorization" : "Provider-specific authentication"} will open here after backend integration.</div>}</div><div className="modal-actions"><Button onClick={() => setFlowOpen(false)}>Close</Button><Button variant="primary" disabled>Continue</Button></div></Modal>}
   </>;
 }
 
@@ -58,11 +60,14 @@ export function Quota() {
   </>;
 }
 
-export function MediaProviders({ detail = false }: { detail?: boolean }) {
-  const kinds = ["Image generation", "Image understanding", "Text to speech", "Speech to text", "Video", "Web search", "Web fetch", "Embeddings", "Music"];
-  return <><PageHeading eyebrow="Providers / Media" title={detail ? "Video providers" : "Media providers"} description="Configure providers for non-chat capabilities and inspect supported lanes." action={<Button variant="primary">+ Connect provider</Button>} />
-    <div className="grid grid-3">{(detail ? ["xAI", "RunwayML", "Vertex AI"] : kinds).map((kind, i) => <Link to={detail ? "/providers/media/video/xai" : "/providers/media/video"} className="media-card" key={kind}><div className="row between"><span className="media-icon">{["▧", "◈", "◖", "◎", "▸", "⌕", "↗", "▥", "♫"][i]}</span><Pill tone={i === 8 || (detail && i === 1) ? "muted" : "healthy"}>{i === 8 ? "No provider" : "Available"}</Pill></div><strong>{kind}</strong><small>{detail ? "Inspect models and connection status" : `${i + 1} configured models`}</small></Link>)}</div>
-    {detail && <Panel title="Video lane" className="section-gap"><Warning>Models shown as video capable must be routable through this lane.</Warning><div className="list-row"><Dot /><div><strong>xAI · grok-imagine-video</strong><small>Creation and polling supported</small></div><Pill tone="healthy">Ready</Pill></div></Panel>}
+export function MediaProviders({ kind, providerId }: { kind?: string; providerId?: string }) {
+  const group = mediaGroups.find((item) => item.id === kind);
+  const provider = group?.providers.find(([id]) => id === providerId);
+  if (provider) return <><PageHeading eyebrow={`Providers / Media / ${group!.title}`} title={provider[1]} description={`Built-in ${group!.title.toLowerCase()} provider · ID ${provider[0]}.`} action={<a className="button button-primary" href={`/providers/connections?provider=${provider[0]}`}>+ Add connection</a>} /><Panel title="Connection setup"><div className="state-block"><strong>No AIGate connection data yet</strong><p>Provider-specific authentication and model setup will appear after backend integration.</p></div></Panel></>;
+  if (kind && !group) return <><PageHeading eyebrow="Providers / Media" title="Media kind not found" description="This capability is not in the current catalog." /><Link to="/providers/media" className="button">Back to media providers</Link></>;
+  if (group) return <><PageHeading eyebrow="Providers / Media" title={`${group.title} providers`} description={`${group.providers.length} built-in provider${group.providers.length === 1 ? "" : "s"} in the 9Router reference catalog. Connection data is pending.`} />
+    <div className="catalog-grid">{group.providers.map(([id, name]) => <a className="catalog-card" href={`/providers/media/provider?kind=${group.id}&provider=${id}`} key={id}><span className="catalog-glyph" aria-hidden="true">{name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{name}</strong><small>View provider →</small></span></a>)}</div></>;
+  return <><PageHeading eyebrow="Providers / Media" title="Media providers" description="Browse the providers available for each media capability." />
+    <div className="grid grid-3">{mediaGroups.map((item) => <a href={`/providers/media/catalog?kind=${item.id}`} className="media-card" key={item.id}><div className="row between"><span className="media-icon">{item.title.slice(0, 1)}</span><Pill tone="info">{item.providers.length} providers</Pill></div><strong>{item.title}</strong><small>Browse built-in providers →</small></a>)}{["Image understanding", "Music"].map((title) => <div className="media-card" key={title}><div className="row between"><span className="media-icon">{title.slice(0, 1)}</span><Pill>Pending</Pill></div><strong>{title}</strong><small>No provider list on the 9Router reference page.</small></div>)}</div>
   </>;
 }
-

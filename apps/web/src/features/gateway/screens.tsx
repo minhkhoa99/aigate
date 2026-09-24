@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Button, ConfirmDialog, CopyField, Dot, Field, Input, Metric, Modal, PageHeading, Panel, Pill, Table, Tabs, Warning } from "../../shared/ui";
 
 const keyRows = [
@@ -32,10 +33,11 @@ export function EndpointKeys() {
 }
 
 export function Routing() {
-  const [tab, setTab] = useState("Overview");
+  const [tab, setTab] = useState("Combo");
   return <>
-    <PageHeading eyebrow="Gateway / Routing" title="Routing & fallback" description="Decide where traffic goes, when to retry, and how to recover from failure." action={<Button variant="primary">+ Create combo</Button>} />
-    <Tabs items={["Overview", "Fallback", "Capacity adapter", "Simulator"]} active={tab} onChange={setTab} />
+    <PageHeading eyebrow="Gateway / Routing" title="Routing & fallback" description="Decide where traffic goes, when to retry, and how to recover from failure." action={<Link to="/gateway/routing/new" className="button button-primary">+ Create combo</Link>} />
+    <Tabs items={["Combo", "Overview", "Fallback", "Capacity adapter", "Simulator"]} active={tab} onChange={setTab} />
+    {tab === "Combo" && <Panel title="Combos" detail="Saved model combinations will appear here after gateway integration." className="section-gap"><div className="state-block"><strong>No combos yet</strong><p>Start with a model order and routing strategy.</p><Link to="/gateway/routing/new" className="button button-primary">Create combo</Link></div></Panel>}
     {tab === "Overview" && <div className="grid grid-2 section-gap"><Panel title="Active routes" detail="Current model resolution order">
       {["claude-3.5-sonnet → Anthropic primary", "gpt-4o → OpenAI primary", "gemini-2.5-pro → Google Vertex", "deepseek-r1 → DeepSeek pooled"].map((r, i) => <div className="list-row" key={r}><Dot tone={i === 3 ? "warning" : "healthy"} /><div><strong className="mono">{r}</strong><small>{i === 3 ? "Fallback available" : "Direct · healthy"}</small></div><Pill tone={i === 3 ? "warning" : "healthy"}>{i === 3 ? "Guarded" : "Active"}</Pill></div>)}
     </Panel><Panel title="Decision path" detail="Single request, from client to provider"><div className="flow-steps">{["Validate API key", "Resolve alias & capability", "Choose connection", "Translate request", "Dispatch with timeout", "Stream response"].map((s, i) => <div key={s}><span>{String(i + 1).padStart(2, "0")}</span><strong>{s}</strong><Dot /></div>)}</div></Panel></div>}
@@ -59,4 +61,3 @@ export function TokenSaver() {
     <Panel title="Stage controls" className="section-gap">{["RTK · tool response compression", "Headroom · context reduction", "Caveman · concise transforms", "Ponytail · low-cost rewrites", "PXPIPE · image block extraction"].map((name) => <div className="list-row" key={name}><div><strong>{name}</strong><small>Runs only when the master Token Saver switch allows it.</small></div><input type="checkbox" defaultChecked aria-label={`Enable ${name}`} /></div>)}</Panel>
   </>;
 }
-

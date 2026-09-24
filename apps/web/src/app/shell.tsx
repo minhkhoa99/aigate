@@ -6,6 +6,7 @@ import { Dot } from "../shared/ui";
 
 function currentLabel(path: string): string {
   for (const group of navigation) for (const item of group.items) if (item.href === path) return item.label;
+  if (path === "/gateway/routing/new") return "Create combo";
   if (path.startsWith("/providers/media/")) return "Media Provider";
   if (path.startsWith("/providers/")) return "Provider Detail";
   if (path.startsWith("/traffic/requests/")) return "Request Detail";
