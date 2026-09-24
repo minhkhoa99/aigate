@@ -33,9 +33,9 @@ keep the existing screen layout/components instead of recreating Stitch HTML.**
 | U0/U1 design system and shell | UI_READY | theme, sidebar, topbar, responsive layout, shared states/dialogs/toast |
 | U2 auth, onboarding, settings | UI_READY | `/welcome`, `/login`, `/callback`, `/settings/{general,auth,developer}` |
 | U3 endpoint and keys | UI_READY | `/gateway/endpoint` |
-| U4 providers and AuthFlow | UI_READY | `/providers`, `/providers/{new,anthropic,connections}` and add-connection modal |
-| U5 media providers | UI_READY | `/providers/media`, `/providers/media/video`, `/providers/media/video/xai` |
-| U6 routing and Token Saver | UI_READY | `/gateway/{routing,token-saver}` |
+| U4 providers and AuthFlow | UI_READY | `/providers`, `/providers/{new,detail,connections}` and add-connection modal; [provider parity baseline](provider-parity.md) |
+| U5 media providers | UI_READY | `/providers/media`, `/providers/media/catalog`, `/providers/media/provider`, legacy video preview routes |
+| U6 routing and Token Saver | UI_READY | `/gateway/{routing,routing/new,token-saver}`; create-combo form previews a local draft |
 | U7 usage, quota, requests | UI_READY | `/traffic/{usage,requests}`, request detail, `/providers/quota` |
 | U8 overview | UI_READY | `/` |
 | U9 network | UI_READY | `/network/{proxy-pools,tunnel,mitm}`, deploy wizard |
@@ -66,3 +66,14 @@ a completed mutation. No stored credential value is rendered.
 4. Run `pnpm install`, `pnpm web`, and `pnpm web:build` from the repo root.
 
 This branch is **visual UI complete for U0–U11, not M3 functionally complete**.
+
+## Work completed on 2026-09-24 for Claude
+
+| Area | Implemented UI | Still required for functional completion |
+|---|---|---|
+| Providers | `/providers` and media catalog now list all 111 visible IDs from the local 9Router source registry, grouped by OAuth, Free Tier, API Key, and media capability. Provider detail and `/providers/connections` show connection methods and credential fields. See [provider parity baseline](provider-parity.md) and `apps/web/src/features/providers/catalog.ts`. | Save/test credentials, OAuth callbacks and refresh, model discovery, request adapters, quota/health, and live connection state. The catalog is metadata, not 111 working integrations. |
+| Routing combo | `/gateway/routing` now starts on a Combo tab with an empty list state. Its `+ Create combo` action opens `/gateway/routing/new`. The form supports name, fallback/round-robin/fusion modes, ordered model selection with add/remove/reorder, Fusion quorum/judge/grace/timeout/concurrency fields, native input checks, cross-field checks, and an unsaved draft preview. Member and judge dropdowns currently use the four sample models shown on Routing; arbitrary model IDs cannot be typed. Source: `apps/web/src/features/gateway/combo-create.tsx`. | Replace the sample dropdown options with the full live model list from active provider connections, including availability/capability; define the API payload, save/list/edit/delete combos, enforce server validation, run real routing, and implement dry-run simulation. The preview does not persist or dispatch requests. |
+
+The combo preview uses a UI-only shape (`name`, `strategy`, `models`, optional `fusion`). Treat it as a draft for discussion, not an agreed API contract. The 9Router create dialog was used as a reference for name, models, and three strategies; AIGate's extra Fusion controls follow the project spec in §10.3.
+
+Verification: run `pnpm web:build` from the repo root. The provider catalog count check is `node --test apps/web/src/features/providers/catalog.test.mjs`.

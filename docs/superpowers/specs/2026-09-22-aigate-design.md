@@ -29,7 +29,7 @@ AIGate là một AI Gateway/Router **mới, độc lập**. Nó có toàn bộ n
 | File JS | 881 |
 | API route | 154 |
 | Dashboard page | 28 (23 dashboard) |
-| Provider registry | 123 |
+| Provider registry | Current source snapshot: 111 visible, 10 hidden, 3 disabled imports; recheck upstream at sync time |
 | Executor | 29 |
 | Translator file | 48 |
 | Repo (DB) | 11 |
@@ -642,6 +642,8 @@ Nơi **duy nhất** định đoạt request đi đâu. Gộp combo + fallback + 
 - Ngách: PXPIPE "chạy" nghĩa là *module đã nạp*, không phải *port đang lắng nghe*
 
 #### 5 · LLM Providers — `/providers`, `/:id`, `/new`
+
+Provider coverage follows [the active 9Router registry and the 2026-09-24 UI baseline](../../design/provider-parity.md). The first UI pass shows all 111 visible source IDs across LLM and media catalogs. Functional parity requires working auth and routing for every visible ID. Custom providers remain user-created records.
 
 ```
 danh sách:
