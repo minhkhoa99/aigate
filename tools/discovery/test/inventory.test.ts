@@ -15,7 +15,7 @@ const KEYS = [
 
 describe("buildInventory", () => {
   it("finds every API route", () => {
-    expect(inv.routes).toHaveLength(154);
+    expect(inv.routes).toHaveLength(166);
     expect(inv.routes).toContain("api/settings");
     expect(inv.routes).toContain("api/oauth/[provider]/[action]");
   });
@@ -30,11 +30,11 @@ describe("buildInventory", () => {
   });
 
   it("finds every provider registry entry", () => {
-    expect(inv.providers).toHaveLength(122);
+    expect(inv.providers).toHaveLength(124);
   });
 
   it("finds every executor and translator file", () => {
-    expect(inv.executors).toHaveLength(29);
+    expect(inv.executors).toHaveLength(31);
     expect(inv.translators).toHaveLength(48);
   });
 

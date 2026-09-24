@@ -1448,3 +1448,99 @@
   newModule: connections
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+# 2026-09-24 delta against 9Router v0.5.86: Xiaomi MiMo import and login routes.
+- id: connection.xiaomi-mimo-key-import
+  group: Provider authentication
+  feature: Xiaomi MiMo connection
+  subFeature: Import an API key or session credential
+  trigger: POST /api/oauth/xiaomi-mimo/api-key
+  input: "{ apiKey?, uid?, baseUrl?, mimoPassToken?, mimoUserId?, mimoCUserId?, region? }"
+  output: "{ success, validated, modelCount, updated?, connection } or 400/500 error"
+  businessRules:
+    - "An API key must start with sk-. A session-only import is allowed when mimoPassToken exists without an API key."
+    - "API keys are probed against the chosen base URL's /models endpoint with a 10-second deadline; network/validation failure is soft and the key is stored as untested. Session-only imports skip that probe."
+    - "Existing Xiaomi connections are matched by uid, exact key, or session user plus optional region and updated; otherwise a new connection is created with per-account session fields."
+  state: { reads: ["Xiaomi provider connections"], writes: ["Xiaomi provider connections"], runtimeOnly: [] }
+  dependencies: ["connection.storage-shape-json-blob"]
+  providerInteraction: "GET {baseUrl}/models with bearer API key when supplied"
+  fallback: { hasFallback: true, retry: null, timeout: "10 seconds on models probe", quota: "Network failure does not block import" }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "neither API key nor session token is present, or API key lacks sk- prefix", partial: false }
+    - { code: INTERNAL_ERROR, when: "connection persistence or unexpected parsing fails", partial: false }
+  sideEffects: ["May call upstream /models", "Creates or updates a local provider connection"]
+  persistence: ["Connection credential and providerSpecificData in SQLite-backed storage"]
+  performanceConcerns: ["API key validation can add up to 10 seconds before import"]
+  behavior: { streaming: false, cancellation: "AbortSignal.timeout(10000) on upstream probe", concurrency: null }
+  edgeCases: ["A failed upstream probe does not distinguish invalid credentials from network failure; the key still persists as untested."]
+  evidence:
+    - { file: src/app/api/oauth/xiaomi-mimo/api-key/route.js, line: 39, note: "API key validation fetch with deadline" }
+    - { file: src/app/api/oauth/xiaomi-mimo/api-key/route.js, line: 75, note: "Matching connection is updated" }
+    - { file: src/app/api/oauth/xiaomi-mimo/api-key/route.js, line: 105, note: "Otherwise create a connection" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: connection.xiaomi-mimo-desktop-auto-import
+  group: Provider authentication
+  feature: Xiaomi MiMo connection
+  subFeature: Find local desktop API key and optional session identity
+  trigger: GET /api/oauth/xiaomi-mimo/auto-import
+  input: none
+  output: "{ found, apiKey?, uid?, baseUrl?, source?, mimoPassToken?, mimoUserId?, mimoCUserId?, error? }"
+  businessRules:
+    - "Searches the first readable MiMoCode auth.json candidate under the user's home directory, with OS-specific paths."
+    - "Requires xiaomi.key with sk- prefix; extracts metadata UID/base URL and best-effort reads MiMo Desktop's passToken identity from its cookie store."
+    - "Returns credentials to the caller but does not save a provider connection; the import route performs that write separately."
+  state: { reads: ["MiMoCode auth.json", "MiMo Desktop cookie store"], writes: [], runtimeOnly: [] }
+  dependencies: ["connection.xiaomi-mimo-key-import"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: "Desktop passToken read failure is non-fatal" }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "no readable auth file or no valid key; found:false", partial: false }
+    - { code: INTERNAL_ERROR, when: "unexpected local-file failure; returns 500", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["Desktop cookie store read may copy or query a local SQLite profile"]
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: ["Desktop cookie database can be locked while the app runs; passToken then remains null while the API key may still import."]
+  evidence:
+    - { file: src/app/api/oauth/xiaomi-mimo/auto-import/route.js, line: 25, note: "Platform-specific auth.json candidate paths" }
+    - { file: src/app/api/oauth/xiaomi-mimo/auto-import/route.js, line: 52, note: "GET selects first readable candidate" }
+    - { file: src/app/api/oauth/xiaomi-mimo/auto-import/route.js, line: 113, note: "Best-effort readDesktopPassToken" }
+    - { file: open-sse/shared/mimoAccount.js, line: 108, note: "Read Desktop passToken and identity cookies" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: connection.xiaomi-mimo-login-session
+  group: OAuth providers
+  feature: Xiaomi MiMo connection
+  subFeature: Browser-assisted desktop login start and status polling
+  trigger: POST /api/oauth/xiaomi-mimo/login/start, then GET /api/oauth/xiaomi-mimo/login/status
+  input: "Start { region? }; status query state plus httpOnly 9r_mimo_login cookie"
+  output: "Start { success, state, pageUrl, region }; status pending/done/expired/error with identity only on done"
+  businessRules:
+    - "Start restricts region to cn/sgp/ams/ru/in, probes a local HTTP proxy for non-CN egress, follows two upstream redirects, then returns a same-origin login page path."
+    - "Session state and upstream cookie jar ride an httpOnly 15-minute cookie, not the URL. Status checks the state, refreshes the cookie while pending, returns passToken identity once done, then clears the cookie."
+    - "A completed browser login only yields identity; saving a provider connection is a separate import step."
+  state: { reads: ["httpOnly login session cookie", "upstream Xiaomi login responses"], writes: ["httpOnly login session cookie"], runtimeOnly: [] }
+  dependencies: ["connection.xiaomi-mimo-key-import"]
+  providerInteraction: "GET upstream MiMo account endpoints through the resolved egress"
+  fallback: { hasFallback: true, retry: null, timeout: "15 seconds per login hop", quota: "Local proxy probe failure falls back to direct egress" }
+  errorCases:
+    - { code: AUTH_ERROR, when: "session cookie absent or state mismatch; status returns expired/404", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "upstream redirect chain lacks expected locations; start returns 502", partial: false }
+  sideEffects: ["Creates and later clears a browser login session cookie", "Calls Xiaomi login endpoints"]
+  persistence: ["Short-lived browser cookie only; no connection row until import"]
+  performanceConcerns: ["Non-CN login probes eight local proxy ports concurrently before two upstream hops"]
+  behavior: { streaming: false, cancellation: "15-second AbortSignal timeout on upstream hops", concurrency: "Promise.any across local proxy ports" }
+  edgeCases: ["Status returns identity once and clears the session cookie; a later poll reports expired."]
+  evidence:
+    - { file: src/app/api/oauth/xiaomi-mimo/login/start/route.js, line: 81, note: "Start region-bound login session" }
+    - { file: src/app/api/oauth/xiaomi-mimo/login/start/route.js, line: 129, note: "httpOnly session cookie holds login state" }
+    - { file: src/app/api/oauth/xiaomi-mimo/login/status/route.js, line: 14, note: "Status decodes session and rejects state mismatch" }
+    - { file: src/app/api/oauth/xiaomi-mimo/login/status/route.js, line: 43, note: "Done clears one-shot login cookie" }
+    - { file: src/lib/mimoLoginSession.js, line: 520, note: "loginUpstreamFetch uses the session proxy when present" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

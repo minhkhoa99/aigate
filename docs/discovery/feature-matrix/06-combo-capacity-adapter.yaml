@@ -644,3 +644,36 @@
   newModule: routing
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+# 2026-09-24 delta against 9Router v0.5.86: source-specific combo presets.
+- id: combo.source-presets
+  group: Combo / Vision Adapter
+  feature: Combo presets
+  subFeature: Preview and create missing Cursor or Claude combo aliases
+  trigger: GET or POST /api/combos/presets with source cursor or claude
+  input: "GET query source; POST JSON { source }"
+  output: "GET { source, items, toCreate, toSkip }; POST { source, created, skipped, createdCount, skippedCount }"
+  businessRules:
+    - "Only cursor and claude are accepted sources. GET previews and does not write; POST creates each missing combo sequentially and skips names already present."
+    - "Cursor presets prefer live models resolved from the first active cursor connection; if that lookup fails or has no models, static cu registry models are used. Claude presets use static cc registry models plus configured Claude Code aliases."
+    - "Each preset name is the client-native model ID, while its member is the prefixed provider model; only names matching letters, numbers, underscore, period, or hyphen are included."
+  state: { reads: ["existing combos", "active cursor connections", "static provider models", "Claude CLI model aliases"], writes: ["combos on POST"], runtimeOnly: [] }
+  dependencies: ["combo.api-crud", "catalog.model-registry-global"]
+  providerInteraction: "Cursor live model resolver may contact the first active cursor account"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: "Cursor live model failure falls back to static catalog" }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "source is missing or not cursor/claude; returns 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "preset resolution or createCombo throws; returns 500", partial: true }
+  sideEffects: ["POST persists one combo per missing preset name"]
+  persistence: ["Combo rows in SQLite-backed local storage"]
+  performanceConcerns: ["POST creates combos one at a time; Cursor preview may fetch a live catalog"]
+  behavior: { streaming: false, cancellation: null, concurrency: "Sequential createCombo loop on POST" }
+  edgeCases: ["A POST failure after earlier successful creates can leave a partially created set; the route has no transaction or rollback."]
+  evidence:
+    - { file: src/app/api/combos/presets/route.js, line: 19, note: "Cursor live models from the first active cursor connection" }
+    - { file: src/app/api/combos/presets/route.js, line: 50, note: "GET previews source presets and counts create/skip" }
+    - { file: src/app/api/combos/presets/route.js, line: 95, note: "POST persists each missing combo with createCombo" }
+    - { file: src/lib/comboPresets.js, line: 10, note: "Combo name pattern; source allow-list follows on line 11" }
+    - { file: src/lib/comboPresets.js, line: 119, note: "buildPresetItems marks existing combo names" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

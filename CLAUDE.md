@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## Current AIGate checkpoint
+
+Read `docs/PROGRESS_HANDOFF.md` for the verified milestone state, active work, and next commands. This repository is AIGate; the 9Router architecture notes below describe the read-only reference application and are not AIGate's implemented backend.
+
 ## UI ownership handoff
 
 Read `docs/design/UI_HANDOFF.md` before changing frontend files. The visual UI

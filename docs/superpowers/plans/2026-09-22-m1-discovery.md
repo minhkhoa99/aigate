@@ -1,5 +1,7 @@
 # M-1 Discovery Implementation Plan
 
+> **Execution checkpoint (2026-09-25): M-1 complete against 9Router `39e36d3d` (`v0.5.86`).** Tasks 1-19 have artifacts and the exit gate passes: 283 matrix entries, 166/166 API routes, 11/11 DB repos, 54/54 discovery tests. The unchecked step boxes below are the original procedure, not the current task list. See `docs/PROGRESS_HANDOFF.md` for completed work and the next M0 step. The fixed counts and `E:\` paths below describe the original 2026-09-22 snapshot; set `NINEROUTER_PATH=D:\9router` for the currently verified checkout.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Produce a machine-validated Feature Matrix covering all 23 feature groups of 9router, plus a generated `capabilities.md`, so that every later AIGate sub-project starts from verified behavior instead of guesswork.

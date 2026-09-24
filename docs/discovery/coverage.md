@@ -1,13 +1,13 @@
 # Discovery coverage
 
-Entries: 275
+Entries: 283
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 154/154 |  |
+| routes | 166/166 |  |
 | pages | 5/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +15 |
-| providers | 15/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +99 |
-| executors | 9/29 | azure, codebuddy-cn, codebuddy-intl, devin-cli, gemini-cli, github, grok-cli, grok-web … +12 |
+| providers | 15/124 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +101 |
+| executors | 9/31 | azure, codebuddy-cn, codebuddy-intl, devin-cli, gemini-cli, github, grok-cli, grok-web … +14 |
 | translators | 37/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/concerns/thinking.js, open-sse/translator/formats/claude.js … +3 |
 | repos | 11/11 |  |
 | settingsKeys | 47/52 | cloudEnabled, dnsToolEnabled, oidcLoginLabel, samlLoginLabel, tunnelProvider |
@@ -16,19 +16,19 @@ Entries: 275
 
 - apikeys: 9
 - catalog: 29
-- connections: 44
+- connections: 47
 - identity: 10
 - media: 15
-- routing: 79
+- routing: 81
 - settings: 10
-- tooling: 42
+- tooling: 45
 - transport: 14
 - usage: 23
 
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 12
-- REFERENCE_BEHAVIOR: 229
+- REFERENCE_BEHAVIOR: 237
 - SUSPECTED_BUG: 34
 
 ## Missing — pages
@@ -132,12 +132,14 @@ Entries: 275
 - ollama-search
 - opencode
 - opencode-go
+- opencode-zen
 - perplexity
 - perplexity-agent
 - perplexity-web
 - playht
 - poolside
 - qoder
+- qoder-cn
 - recraft
 - sambanova
 - sdwebui
@@ -183,10 +185,12 @@ Entries: 275
 - ollama-local
 - opencode
 - opencode-go
+- opencode-zen
 - perplexity-web
 - qoder
 - vertex
 - windsurf
+- xiaomi-mimo
 - xiaomi-tokenplan
 - zed
 

@@ -1456,3 +1456,37 @@
   newModule: routing
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+# 2026-09-24 delta against 9Router v0.5.86: System One decision lane.
+- id: routing.systemone-decision-lane
+  group: Request routing
+  feature: System One decision endpoint
+  subFeature: POST /v1/systemone forwards a decision payload through account fallback
+  trigger: POST /v1/systemone (OPTIONS handles CORS preflight)
+  input: "JSON with model, state, and questions object"
+  output: "Upstream JSON decision body or classified error response"
+  businessRules:
+    - "The route delegates to handleSystemone, which validates JSON, API key when requireApiKey is enabled, required state/questions, and model alias resolution."
+    - "It selects one provider account, refreshes credentials, dispatches a native decision payload through systemoneCore, and tries the next account only when markAccountUnavailable allows fallback."
+    - "Core uses the provider's systemoneConfig URL/headers and forwards the body with resolved model, without chat translation; successful upstream usage is recorded when supplied."
+  state: { reads: ["settings.requireApiKey", "API keys", "model registry", "provider connections", "systemoneConfig"], writes: ["account error/lock state", "usage record on success"], runtimeOnly: [] }
+  dependencies: ["account.select-locked-and-excluded-filter", "catalog.model-registry-global"]
+  providerInteraction: "POST to systemoneConfig.baseUrl for the selected provider"
+  fallback: { hasFallback: true, retry: "Next account on recoverable failure", timeout: "FETCH_CONNECT_TIMEOUT_MS upstream", quota: "Account locks can skip exhausted connections" }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "JSON, model, state, or questions is missing/invalid", partial: false }
+    - { code: AUTH_ERROR, when: "requireApiKey is enabled and key is absent/invalid", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "provider lacks systemoneConfig or all accounts fail", partial: false }
+  sideEffects: ["Upstream decision request", "Account error state update", "Usage record on success"]
+  persistence: ["Usage and account state in SQLite-backed storage"]
+  performanceConcerns: ["Recoverable failures can repeat the upstream call across accounts"]
+  behavior: { streaming: false, cancellation: "Core fetch has a connection timeout", concurrency: "One account at a time" }
+  edgeCases: ["Core accepts question-level shapes without validating them locally; the upstream decides their validity."]
+  evidence:
+    - { file: src/app/api/v1/systemone/route.js, line: 19, note: "POST delegates to handleSystemone" }
+    - { file: src/sse/handlers/systemone.js, line: 63, note: "Validates required state and questions after model check" }
+    - { file: src/sse/handlers/systemone.js, line: 90, note: "Account selection loop" }
+    - { file: src/sse/handlers/systemone.js, line: 112, note: "Dispatches handleSystemoneCore" }
+    - { file: open-sse/handlers/systemoneCore.js, line: 52, note: "Fetches provider-native decision endpoint" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

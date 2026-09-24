@@ -762,3 +762,100 @@
   newModule: tooling
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+# 2026-09-24 delta against 9Router v0.5.86: six new CLI settings routes.
+- id: clitools.codewhale-forge-toml
+  group: CLI Tools
+  feature: CLI settings integration
+  subFeature: CodeWhale and ForgeCode TOML configuration
+  trigger: GET, POST, or DELETE on either tool's settings route
+  input: "POST { baseUrl, apiKey?, model? }; DELETE has no body"
+  output: "GET installation/config status; POST/DELETE success or 400/500 error"
+  businessRules:
+    - "Both detect an installed binary with where/which, then fall back to config-file existence. GET parses TOML and reports whether 9Router is configured."
+    - "POST requires baseUrl, appends /v1 if absent, merges an openai section into existing TOML, and writes the final file directly."
+    - "DELETE removes only the openai section; if no sections remain, it removes the config file."
+  state: { reads: ["~/.codewhale/config.toml", "~/.forge/config.toml"], writes: ["~/.codewhale/config.toml", "~/.forge/config.toml"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "POST JSON is invalid or baseUrl is missing", partial: false }
+    - { code: INTERNAL_ERROR, when: "file or TOML operation fails outside tolerated read errors", partial: false }
+  sideEffects: ["Writes or removes user-owned TOML config files"]
+  persistence: ["User CLI config files outside 9Router storage"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: ["Both tolerate a parse failure by starting from an empty object, so a malformed existing file may be overwritten on Apply."]
+  evidence:
+    - { file: src/app/api/cli-tools/codewhale-settings/route.js, line: 73, note: "POST merges the openai TOML section" }
+    - { file: src/app/api/cli-tools/codewhale-settings/route.js, line: 133, note: "DELETE removes an otherwise-empty config file" }
+    - { file: src/app/api/cli-tools/forge-settings/route.js, line: 73, note: "POST merges the openai TOML section" }
+    - { file: src/app/api/cli-tools/forge-settings/route.js, line: 135, note: "DELETE writes remaining TOML sections" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.crush-pi-smelt-json
+  group: CLI Tools
+  feature: CLI settings integration
+  subFeature: Crush, Pi, and Smelt JSON configuration
+  trigger: GET, POST, or DELETE on the respective settings route
+  input: "POST { baseUrl, apiKey?, model?, models? }; DELETE has no body"
+  output: "GET installation/config status; POST/DELETE success or 400/500 error"
+  businessRules:
+    - "Crush and Pi merge a providers.9router entry into JSON; Smelt merges top-level baseUrl/apiKey/model and marks _managedBy=9router."
+    - "Pi resolves ~/.pi/agent/models.json before ~/.pi/models.json and accepts a model descriptor list or a single default model."
+    - "POST requires baseUrl and appends /v1 if absent; DELETE removes only the 9Router-owned fields or provider entry."
+  state: { reads: ["Crush, Pi, and Smelt user JSON config files"], writes: ["Crush, Pi, and Smelt user JSON config files"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "POST JSON is invalid or baseUrl is missing", partial: false }
+    - { code: INTERNAL_ERROR, when: "config write fails", partial: false }
+  sideEffects: ["Writes or removes settings in user-owned JSON config files"]
+  persistence: ["User CLI config files outside 9Router storage"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: ["Crush and Pi tolerate malformed existing JSON by starting from an empty object; Smelt does the same on Apply."]
+  evidence:
+    - { file: src/app/api/cli-tools/crush-settings/route.js, line: 121, note: "POST writes providers.9router with model metadata" }
+    - { file: src/app/api/cli-tools/pi-settings/route.js, line: 129, note: "POST accepts a models list or single fallback model" }
+    - { file: src/app/api/cli-tools/pi-settings/route.js, line: 180, note: "DELETE writes JSON after removing providers.9router" }
+    - { file: src/app/api/cli-tools/smelt-settings/route.js, line: 104, note: "POST writes merged top-level 9Router fields" }
+    - { file: src/app/api/cli-tools/smelt-settings/route.js, line: 133, note: "DELETE removes an otherwise-empty Smelt file" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.omp-yaml-and-auth-db
+  group: CLI Tools
+  feature: CLI settings integration
+  subFeature: Oh My Pi YAML model discovery and optional auth database update
+  trigger: GET, POST, or DELETE /api/cli-tools/omp-settings
+  input: "POST { baseUrl, apiKey? }; DELETE has no body"
+  output: "GET installation/has9Router status; POST/DELETE success or 400/500 error"
+  businessRules:
+    - "GET checks the omp binary, agent.db, or models.yml, then looks for a 9router provider in YAML."
+    - "POST requires baseUrl, writes a 9router provider block under providers in models.yml with proxy discovery, then best-effort replaces the auth_credentials row if better-sqlite3 is available."
+    - "DELETE removes the 9router provider block from models.yml, deleting the file if only providers: remains; it does not remove auth_credentials from agent.db."
+  state: { reads: ["~/.omp/agent/models.yml", "~/.omp/agent/agent.db"], writes: ["~/.omp/agent/models.yml", "~/.omp/agent/agent.db on POST when better-sqlite3 is available"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "POST JSON is invalid or baseUrl is missing", partial: false }
+    - { code: INTERNAL_ERROR, when: "models.yml write fails; optional database failure is ignored", partial: false }
+  sideEffects: ["Writes user-owned models.yml; may update Oh My Pi auth database"]
+  persistence: ["~/.omp/agent/models.yml and optionally agent.db"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: ["DELETE leaves the optional auth_credentials database row behind after removing YAML."]
+  evidence:
+    - { file: src/app/api/cli-tools/omp-settings/route.js, line: 65, note: "GET checks installation and YAML status" }
+    - { file: src/app/api/cli-tools/omp-settings/route.js, line: 120, note: "POST writes models.yml" }
+    - { file: src/app/api/cli-tools/omp-settings/route.js, line: 134, note: "POST updates auth_credentials when better-sqlite3 is available" }
+    - { file: src/app/api/cli-tools/omp-settings/route.js, line: 160, note: "DELETE removes YAML provider block" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

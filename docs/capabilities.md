@@ -258,6 +258,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - DELETE only clears the 9Router-related fields (and flips the provider back to 'cline') when actModeApiProvider was 'openai' — if the user had switched Cline to a different provider in between, Reset leaves that provider untouched but still deletes secrets.openAiApiKey unconditionally
 - **Errors:** `INVALID_REQUEST` (baseUrl, apiKey or model missing from POST body — 400), `INTERNAL_ERROR` (unexpected fs error on either file)
 
+### CodeWhale and ForgeCode TOML configuration
+
+- **id:** `clitools.codewhale-forge-toml` · **module:** `tooling`
+- **Trigger:** GET, POST, or DELETE on either tool's settings route
+- **Input:** POST { baseUrl, apiKey?, model? }; DELETE has no body
+- **Output:** GET installation/config status; POST/DELETE success or 400/500 error
+- **Rules:**
+  - Both detect an installed binary with where/which, then fall back to config-file existence. GET parses TOML and reports whether 9Router is configured.
+  - POST requires baseUrl, appends /v1 if absent, merges an openai section into existing TOML, and writes the final file directly.
+  - DELETE removes only the openai section; if no sections remain, it removes the config file.
+- **Errors:** `INVALID_REQUEST` (POST JSON is invalid or baseUrl is missing), `INTERNAL_ERROR` (file or TOML operation fails outside tolerated read errors)
+
 ### TOML config.toml (model/provider) plus a static bearer header carrying the API key, separate auth.json cleanup
 
 - **id:** `clitools.codex-settings-toml-split-secret` · **module:** `tooling`
@@ -315,6 +327,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - cleanup1pLegacy best-effort removes any of LOCAL_STDIO_PLUGINS' names from the FIRST-PARTY (1p) claude_desktop_config.json's mcpServers, in case an older 9router version wrote stdio entries there directly
   - DELETE does not remove the instance file or _meta.json; it overwrites the active configLibrary/<uuid>.json with an empty object {} — Cowork keeps pointing at the same (now-empty) instance
 - **Errors:** `INVALID_REQUEST` (baseUrl/apiKey missing, or models[] resolves empty — 400), `INTERNAL_ERROR` (unexpected fs error on any of the four files touched)
+
+### Crush, Pi, and Smelt JSON configuration
+
+- **id:** `clitools.crush-pi-smelt-json` · **module:** `tooling`
+- **Trigger:** GET, POST, or DELETE on the respective settings route
+- **Input:** POST { baseUrl, apiKey?, model?, models? }; DELETE has no body
+- **Output:** GET installation/config status; POST/DELETE success or 400/500 error
+- **Rules:**
+  - Crush and Pi merge a providers.9router entry into JSON; Smelt merges top-level baseUrl/apiKey/model and marks _managedBy=9router.
+  - Pi resolves ~/.pi/agent/models.json before ~/.pi/models.json and accepts a model descriptor list or a single default model.
+  - POST requires baseUrl and appends /v1 if absent; DELETE removes only the 9Router-owned fields or provider entry.
+- **Errors:** `INVALID_REQUEST` (POST JSON is invalid or baseUrl is missing), `INTERNAL_ERROR` (config write fails)
 
 ### Both POST and DELETE replace the entire config.toml with a fixed template, discarding unrelated content
 
@@ -400,6 +424,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Primary write is auth.json's 'openai-compatible' entry (type, apiKey, baseUrl, model)
   - A second, best-effort write mirrors the same values into the VS Code extension's own settings.json (kilocode.customProvider / kilocode.defaultModel) wrapped in its own try/catch — a failure there (e.g. VS Code not installed, path not writable) is silently swallowed and does not affect the reported success of the Apply
 - **Errors:** `INVALID_REQUEST` (baseUrl, apiKey or model missing — 400), `INTERNAL_ERROR` (auth.json write itself fails (the VS Code write failing does NOT produce an error))
+
+### Oh My Pi YAML model discovery and optional auth database update
+
+- **id:** `clitools.omp-yaml-and-auth-db` · **module:** `tooling`
+- **Trigger:** GET, POST, or DELETE /api/cli-tools/omp-settings
+- **Input:** POST { baseUrl, apiKey? }; DELETE has no body
+- **Output:** GET installation/has9Router status; POST/DELETE success or 400/500 error
+- **Rules:**
+  - GET checks the omp binary, agent.db, or models.yml, then looks for a 9router provider in YAML.
+  - POST requires baseUrl, writes a 9router provider block under providers in models.yml with proxy discovery, then best-effort replaces the auth_credentials row if better-sqlite3 is available.
+  - DELETE removes the 9router provider block from models.yml, deleting the file if only providers: remains; it does not remove auth_credentials from agent.db.
+- **Errors:** `INVALID_REQUEST` (POST JSON is invalid or baseUrl is missing), `INTERNAL_ERROR` (models.yml write fails; optional database failure is ignored)
 
 ### Main openclaw.json plus one models.json per agent, written in a non-transactional fan-out
 
@@ -631,6 +667,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - PUT /api/combos/[id] calls resetComboRotation(prev.name) unconditionally after ANY successful update — even one that only changes the models array, not the name — and additionally calls resetComboRotation(combo.name) when the name actually changed, so a rename resets both the old and new name's state
   - DELETE /api/combos/[id] calls resetComboRotation(prev.name) after the row is removed, so a later combo re-created with the same name always starts rotation fresh
   - Not durable: a process restart (deploy, crash, Next.js module re-evaluation) wipes the Map entirely with no reload-from-DB step — every combo's round-robin sequence silently restarts at index 0 on the next boot
+
+### Preview and create missing Cursor or Claude combo aliases
+
+- **id:** `combo.source-presets` · **module:** `routing`
+- **Trigger:** GET or POST /api/combos/presets with source cursor or claude
+- **Input:** GET query source; POST JSON { source }
+- **Output:** GET { source, items, toCreate, toSkip }; POST { source, created, skipped, createdCount, skippedCount }
+- **Rules:**
+  - Only cursor and claude are accepted sources. GET previews and does not write; POST creates each missing combo sequentially and skips names already present.
+  - Cursor presets prefer live models resolved from the first active cursor connection; if that lookup fails or has no models, static cu registry models are used. Claude presets use static cc registry models plus configured Claude Code aliases.
+  - Each preset name is the client-native model ID, while its member is the prefixed provider model; only names matching letters, numbers, underscore, period, or hyphen are included.
+- **Errors:** `INVALID_REQUEST` (source is missing or not cursor/claude; returns 400), `INTERNAL_ERROR` (preset resolution or createCombo throws; returns 500)
 
 ### Combo persistence shape — id / unique name / kind / models(JSON) / timestamps
 
@@ -1358,6 +1406,18 @@ Every item below is a capability AIGate must have. Derived from tracing
 
 ## OAuth providers
 
+### Browser-assisted desktop login start and status polling
+
+- **id:** `connection.xiaomi-mimo-login-session` · **module:** `connections`
+- **Trigger:** POST /api/oauth/xiaomi-mimo/login/start, then GET /api/oauth/xiaomi-mimo/login/status
+- **Input:** Start { region? }; status query state plus httpOnly 9r_mimo_login cookie
+- **Output:** Start { success, state, pageUrl, region }; status pending/done/expired/error with identity only on done
+- **Rules:**
+  - Start restricts region to cn/sgp/ams/ru/in, probes a local HTTP proxy for non-CN egress, follows two upstream redirects, then returns a same-origin login page path.
+  - Session state and upstream cookie jar ride an httpOnly 15-minute cookie, not the URL. Status checks the state, refreshes the cookie while pending, returns passToken identity once done, then clears the cookie.
+  - A completed browser login only yields identity; saving a provider connection is a separate import step.
+- **Errors:** `AUTH_ERROR` (session cookie absent or state mismatch; status returns expired/404), `PROVIDER_UNAVAILABLE` (upstream redirect chain lacks expected locations; start returns 502)
+
 ### POST /api/oauth/codex/bulk-import — import many pre-obtained codex OAuth token JSON blobs in one call
 
 - **id:** `oauth.codex-bulk-import` · **module:** `connections`
@@ -1716,6 +1776,30 @@ Every item below is a capability AIGate must have. Derived from tracing
   - A soft-success status (e.g. Grok CLI's 402 spending-limit) keeps testStatus:active but writes the soft message into lastError as a warning — this is the same soft-success convention markAccountUnavailable/clearAccountError use for runtime routing (03's account.clear-error-on-success), reused here for a manual test
   - Every call — success or failure — writes testStatus/lastError/lastErrorAt back to the connection row; a passing test also clears a prior error, and an OAuth refresh mid-test persists the new tokens even though the caller only asked to validate
 - **Errors:** `INVALID_REQUEST` (connection not found), `AUTH_ERROR` (probe returns 401/403, or refresh fails/is absent for an expired token), `PROVIDER_UNAVAILABLE` (provider has no OAUTH_TEST_CONFIG entry and is not apikey/cookie-testable (Provider-test-not-supported))
+
+### Find local desktop API key and optional session identity
+
+- **id:** `connection.xiaomi-mimo-desktop-auto-import` · **module:** `connections`
+- **Trigger:** GET /api/oauth/xiaomi-mimo/auto-import
+- **Input:** none
+- **Output:** { found, apiKey?, uid?, baseUrl?, source?, mimoPassToken?, mimoUserId?, mimoCUserId?, error? }
+- **Rules:**
+  - Searches the first readable MiMoCode auth.json candidate under the user's home directory, with OS-specific paths.
+  - Requires xiaomi.key with sk- prefix; extracts metadata UID/base URL and best-effort reads MiMo Desktop's passToken identity from its cookie store.
+  - Returns credentials to the caller but does not save a provider connection; the import route performs that write separately.
+- **Errors:** `PROVIDER_UNAVAILABLE` (no readable auth file or no valid key; found:false), `INTERNAL_ERROR` (unexpected local-file failure; returns 500)
+
+### Import an API key or session credential
+
+- **id:** `connection.xiaomi-mimo-key-import` · **module:** `connections`
+- **Trigger:** POST /api/oauth/xiaomi-mimo/api-key
+- **Input:** { apiKey?, uid?, baseUrl?, mimoPassToken?, mimoUserId?, mimoCUserId?, region? }
+- **Output:** { success, validated, modelCount, updated?, connection } or 400/500 error
+- **Rules:**
+  - An API key must start with sk-. A session-only import is allowed when mimoPassToken exists without an API key.
+  - API keys are probed against the chosen base URL's /models endpoint with a 10-second deadline; network/validation failure is soft and the key is stored as untested. Session-only imports skip that probe.
+  - Existing Xiaomi connections are matched by uid, exact key, or session user plus optional region and updated; otherwise a new connection is created with per-account session fields.
+- **Errors:** `INVALID_REQUEST` (neither API key nor session token is present, or API key lacks sk- prefix), `INTERNAL_ERROR` (connection persistence or unexpected parsing fails)
 
 ## Providers
 
@@ -2556,6 +2640,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Non-streaming: fired (not awaited) after the body has been parsed successfully
   - Forced SSE->JSON: awaited after the SSE has been collapsed
 - **Streaming:** yes
+
+### POST /v1/systemone forwards a decision payload through account fallback
+
+- **id:** `routing.systemone-decision-lane` · **module:** `routing`
+- **Trigger:** POST /v1/systemone (OPTIONS handles CORS preflight)
+- **Input:** JSON with model, state, and questions object
+- **Output:** Upstream JSON decision body or classified error response
+- **Rules:**
+  - The route delegates to handleSystemone, which validates JSON, API key when requireApiKey is enabled, required state/questions, and model alias resolution.
+  - It selects one provider account, refreshes credentials, dispatches a native decision payload through systemoneCore, and tries the next account only when markAccountUnavailable allows fallback.
+  - Core uses the provider's systemoneConfig URL/headers and forwards the body with resolved model, without chat translation; successful upstream usage is recorded when supplied.
+- **Errors:** `INVALID_REQUEST` (JSON, model, state, or questions is missing/invalid), `AUTH_ERROR` (requireApiKey is enabled and key is absent/invalid), `PROVIDER_UNAVAILABLE` (provider lacks systemoneConfig or all accounts fail)
 
 ### Choosing the upstream format and endpoint (runtime transport)
 

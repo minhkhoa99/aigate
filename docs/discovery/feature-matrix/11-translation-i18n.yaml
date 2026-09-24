@@ -48,14 +48,14 @@
     - { file: open-sse/translator/request/openai-to-claude.js, line: 382, note: "register(OPENAI, CLAUDE, ...)" }
     - { file: open-sse/translator/request/openai-to-commandcode.js, line: 172, note: "register(OPENAI, COMMANDCODE, ...)" }
     - { file: open-sse/translator/request/openai-to-cursor.js, line: 185, note: "register(OPENAI, CURSOR, ...)" }
-    - { file: open-sse/translator/request/openai-to-gemini.js, line: 458, note: "register(OPENAI, GEMINI, ...)" }
-    - { file: open-sse/translator/request/openai-to-gemini.js, line: 459, note: "register(OPENAI, GEMINI_CLI, ...) wrapped in wrapInCloudCodeEnvelope" }
-    - { file: open-sse/translator/request/openai-to-gemini.js, line: 460, note: "register(OPENAI, ANTIGRAVITY, ...)" }
+    - { file: open-sse/translator/request/openai-to-gemini.js, line: 451, note: "register(OPENAI, GEMINI, ...)" }
+    - { file: open-sse/translator/request/openai-to-gemini.js, line: 452, note: "register(OPENAI, GEMINI_CLI, ...) wrapped in wrapInCloudCodeEnvelope" }
+    - { file: open-sse/translator/request/openai-to-gemini.js, line: 453, note: "register(OPENAI, ANTIGRAVITY, ...)" }
     - { file: open-sse/translator/request/openai-to-kiro.js, line: 443, note: "register(OPENAI, KIRO, ...)" }
     - { file: open-sse/translator/request/openai-to-ollama.js, line: 195, note: "register(OPENAI, OLLAMA, ...)" }
     - { file: open-sse/translator/request/openai-to-vertex.js, line: 42, note: "register(OPENAI, VERTEX, ...)" }
     - { file: open-sse/translator/response/claude-to-openai.js, line: 194, note: "register(CLAUDE, OPENAI, null, ...)" }
-    - { file: open-sse/translator/response/commandcode-to-openai.js, line: 184, note: "register(COMMANDCODE, OPENAI, null, ...)" }
+    - { file: open-sse/translator/response/commandcode-to-openai.js, line: 183, note: "register(COMMANDCODE, OPENAI, null, ...)" }
     - { file: open-sse/translator/response/cursor-to-openai.js, line: 30, note: "register(CURSOR, OPENAI, null, ...)" }
     - { file: open-sse/translator/response/gemini-to-openai.js, line: 159, note: "register(GEMINI, OPENAI, null, ...)" }
     - { file: open-sse/translator/response/gemini-to-openai.js, line: 162, note: "register(VERTEX, OPENAI, null, ...) — same response fn as gemini/gemini-cli/antigravity" }
