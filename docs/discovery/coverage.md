@@ -1,22 +1,22 @@
 # Discovery coverage
 
-Entries: 261
+Entries: 275
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 141/154 | api/provider-nodes/[id], api/provider-nodes/validate, api/providers/[id]/models, api/providers/[id]/test, api/providers/[id]/test-models, api/providers/client, api/providers/kilo/free-models, api/providers/suggested-models … +5 |
+| routes | 154/154 |  |
 | pages | 5/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind]/[id] … +15 |
 | providers | 15/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +99 |
 | executors | 9/29 | azure, codebuddy-cn, codebuddy-intl, devin-cli, gemini-cli, github, grok-cli, grok-web … +12 |
 | translators | 37/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/concerns/thinking.js, open-sse/translator/formats/claude.js … +3 |
-| repos | 10/11 | nodesRepo |
+| repos | 11/11 |  |
 | settingsKeys | 47/52 | cloudEnabled, dnsToolEnabled, oidcLoginLabel, samlLoginLabel, tunnelProvider |
 
 ## Entries per bounded context
 
 - apikeys: 9
-- catalog: 21
-- connections: 38
+- catalog: 29
+- connections: 44
 - identity: 10
 - media: 15
 - routing: 79
@@ -28,24 +28,8 @@ Entries: 261
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 12
-- REFERENCE_BEHAVIOR: 218
-- SUSPECTED_BUG: 31
-
-## Missing — routes
-
-- api/provider-nodes/[id]
-- api/provider-nodes/validate
-- api/providers/[id]/models
-- api/providers/[id]/test
-- api/providers/[id]/test-models
-- api/providers/client
-- api/providers/kilo/free-models
-- api/providers/suggested-models
-- api/providers/test-batch
-- api/tags
-- api/v1/models/[...model]
-- api/v1beta/models
-- api/v1beta/models/[...path]
+- REFERENCE_BEHAVIOR: 229
+- SUSPECTED_BUG: 34
 
 ## Missing — pages
 
@@ -219,10 +203,6 @@ Entries: 261
 - open-sse/translator/formats/gemini.js
 - open-sse/translator/formats/maxTokens.js
 - open-sse/translator/formats/responsesApi.js
-
-## Missing — repos
-
-- nodesRepo
 
 ## Missing — settingsKeys
 

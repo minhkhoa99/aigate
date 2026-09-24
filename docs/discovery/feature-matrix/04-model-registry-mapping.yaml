@@ -562,3 +562,149 @@
   newModule: catalog
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.v1-single-model-lookup
+  group: Model registry
+  feature: Model catalog
+  subFeature: "GET /v1/models/{kind} and GET /v1/models/{provider}/{model} — kind-filtered listing and single-model lookup on the OpenAI-compatible lane"
+  trigger: A client GETs /v1/models/<something> — either one of the 6 known kind slugs (image/tts/stt/embedding/image-to-text/web) or a provider/model id
+  input: "Catch-all path segments after /v1/models/"
+  output: "A kind slug returns { object: list, data:[...] } (same shape as GET /v1/models, filtered); anything else returns the single matching model object, or a 404 model_not_found error body"
+  businessRules:
+    - "A single path segment is checked against KIND_SLUG_MAP first; only on a miss does the route treat the full joined path as a provider/model identifier — so a kind name can never be misread as a literal model id, and a model id colliding with a kind slug is the only ambiguous case"
+    - "The single-model lookup path reuses buildModelsList([LLM_KIND]) (the same list catalog.model-listing-live-override builds for GET /v1/models) and does a linear find() by id — no separate single-model resolution logic, so it inherits every filter that list already applies: active-connection scoping, enabledModels allowlisting, and isDisabled hiding (catalog.alias-disabled-model-bypass's finding that this filtering exists only in listing endpoints, never the chat/routing path, means this lookup correctly hides a disabled model exactly like the plain list does)"
+    - "The catch-all param is required (rather than a single dynamic segment) specifically because provider-prefixed model ids contain a slash (e.g. openai/gpt-4)"
+  state:
+    reads: ["providerConnections", "combos", "customModels", "modelAliases", "disabledModels — all via buildModelsList"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.model-listing-live-override", "catalog.alias-disabled-model-bypass"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: MODEL_UNAVAILABLE, when: "the joined identifier matches neither a kind slug nor any id in the LLM-kind model list", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Rebuilds the entire LLM model list via buildModelsList on every single-model lookup, then does a linear scan for one id — no dedicated by-id query path"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "CORS is wide open (Access-Control-Allow-Origin: *) on every response including the 404 and 500 error bodies"
+  evidence:
+    - { file: "src/app/api/v1/models/[...model]/route.js", line: 45, note: "single segment checked against KIND_SLUG_MAP before falling through to model-id lookup" }
+    - { file: "src/app/api/v1/models/[...model]/route.js", line: 54, note: "reuses buildModelsList([LLM_KIND]) — the same list GET /v1/models returns" }
+    - { file: "src/app/api/v1/models/[...model]/route.js", line: 55, note: "linear find() by exact id match" }
+    - { file: "src/app/api/v1/models/[...model]/route.js", line: 63, note: "model_not_found error shape mirrors OpenAI's invalid_request_error convention" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.v1beta-models-listing
+  group: Model mapping
+  feature: Gemini-native lane
+  subFeature: "GET /v1beta/models — Gemini-format static model catalog for Gemini-native clients (e.g. Gemini CLI, the @google/genai SDK)"
+  trigger: "A Gemini-native client lists models before calling :generateContent — reachable via 01's endpoint.rewrite-lanes /v1beta/* -> /api/v1beta/* rewrite"
+  input: none
+  output: "{ models: [{ name, displayName, description, supportedGenerationMethods, inputTokenLimit, outputTokenLimit }, ...] }"
+  businessRules:
+    - "Built directly from the static PROVIDER_MODELS table — unlike GET /v1/models (catalog.model-listing-live-override), it does NOT read providerConnections at all, so every configured model for every provider is listed regardless of whether that provider has an active connection, and it does NOT call getDisabledModels — a model disabled via the dashboard still appears here even though it is hidden from /v1/models and /v1/models/{kind} (the same gap catalog.alias-disabled-model-bypass documents for the chat/routing path, but here it affects a listing endpoint specifically, which is the one place that bug's own expectation says filtering SHOULD happen)"
+    - "Every model is exposed twice under two name shapes: models/{provider}/{model.id} (provider-qualified) always, plus a second bare models/{model.id} entry specifically when provider === gemini — the bare form exists so a client asking for a plain Gemini model name (no provider prefix) still resolves"
+    - "inputTokenLimit/outputTokenLimit are hardcoded constants (128000 / 8192) for every model regardless of that model's real context window — unlike /v1/models' context_length/max_completion_tokens fields (catalog.model-listing-live-override), which are derived per-model from getCapabilitiesForModel"
+    - "supportedGenerationMethods is always [generateContent] except the bare gemini-provider entries, which also declare streamGenerateContent — this is what a Gemini SDK checks before offering the streaming call"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.model-listing-live-override", "catalog.alias-disabled-model-bypass"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Rebuilds the full name-doubled list from PROVIDER_MODELS on every request — small static table, no caching needed"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A provider with zero configured connections (or every connection inactive) still appears in this listing, unlike /v1/models where an unconnected provider contributes nothing — a client can discover and attempt to call a model that has no working credential behind it"
+  evidence:
+    - { file: src/app/api/v1beta/models/route.js, line: 20, note: "GET builds the list purely from PROVIDER_MODELS, no providerConnections/disabledModels read" }
+    - { file: src/app/api/v1beta/models/route.js, line: 33, note: "inputTokenLimit/outputTokenLimit hardcoded to 128000/8192 for every model" }
+    - { file: src/app/api/v1beta/models/route.js, line: 46, note: "gemini provider gets a second bare models/{id} entry with streamGenerateContent added" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.v1beta-generate-content-dispatch
+  group: Model mapping
+  feature: Gemini-native lane
+  subFeature: "POST /v1beta/models/{model}:generateContent and :streamGenerateContent — per-model invocation route under the v1beta/models path, translating to/from the internal OpenAI-shaped pipeline"
+  trigger: "A Gemini-native client (Gemini CLI, the @google/genai SDK) invokes a specific model by path+action suffix"
+  input: "Path segments [provider?, model:action] (catch-all), Gemini-format request body (contents/systemInstruction/generationConfig)"
+  output: "Gemini GenerateContentResponse JSON (non-streaming), or a Gemini-shaped SSE stream (streaming) — never the raw OpenAI shape"
+  businessRules:
+    - "Streaming is decided purely by the URL action suffix (:generateContent vs :streamGenerateContent), never by a body field — generationConfig.stream is explicitly called out in the source as not a real Gemini API field, so honoring a stream flag in the body would silently diverge from every real Gemini client's actual behavior"
+    - "A TTS-shaped request (audio response modality requested, or the model id matches the known Gemini TTS model set) is detected and diverted entirely to forwardGeminiNativeRequest — a direct passthrough to Google's own Gemini API (not through handleChat/the internal routing pipeline at all), with its own account-fallback loop over gemini credentials, markAccountUnavailable/clearAccountError, and a dedicated timeout (GEMINI_NATIVE_TTS_FETCH_TIMEOUT_MS)"
+    - "Every other request is converted to the internal OpenAI body shape (convertGeminiToInternal) and dispatched through the same handleChat used by the standard /v1 lane, then the OpenAI response/stream is converted back to Gemini's candidates/usageMetadata shape (or Gemini SSE chunks) on the way out — this route is a pure format adapter around the shared chat pipeline for the non-TTS case, but a fully separate direct-passthrough implementation for the TTS case"
+    - "The TTS passthrough path validates the client's API key itself (validateGeminiNativeClientKey, gated on settings.requireApiKey) because it bypasses handleChat's own endpoint.enforce-require-api-key gate entirely — the non-TTS path relies on handleChat's gate instead"
+  state:
+    reads: ["settings.requireApiKey (TTS path only)", "providerConnections (TTS path, via getProviderCredentials)"]
+    writes: ["providerConnections modelLock_* / testStatus (TTS path, via markAccountUnavailable/clearAccountError on the gemini credential loop)"]
+    runtimeOnly: []
+  dependencies: ["endpoint.rewrite-lanes", "endpoint.enforce-require-api-key", "account.mark-unavailable-lock-reasons", "account.clear-error-on-success"]
+  providerInteraction: "Non-TTS: indirect, through handleChat's normal account-selection/executor path. TTS: direct fetch to Google's generativelanguage.googleapis.com/v1beta/models/{model}{action}"
+  fallback: { hasFallback: true, retry: "TTS path retries across gemini connections on failure, same shouldFallback contract as account.mark-unavailable-lock-reasons; non-TTS path inherits handleChat's own account-fallback loop", timeout: "TTS path: GEMINI_NATIVE_TTS_FETCH_TIMEOUT_MS AbortController per attempt", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "TTS path: model id fails GEMINI_NATIVE_MODEL_PATTERN (blocks path traversal in the upstream URL)", partial: false }
+    - { code: AUTH_ERROR, when: "TTS path: requireApiKey true and the client key is missing/invalid", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "TTS path: every gemini connection is exhausted (allRateLimited or no credentials)", partial: false }
+    - { code: TIMEOUT, when: "TTS path: upstream fetch aborts after GEMINI_NATIVE_TTS_FETCH_TIMEOUT_MS, classified 504", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections rows, TTS path only — same lock/status writes as account.mark-unavailable-lock-reasons"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: "TTS path: request.signal abort is wired to the upstream AbortController and returns 499 Client closed request; non-TTS path inherits handleChat's cancellation behavior", concurrency: null }
+  edgeCases:
+    - "This route lives under the v1beta/models/ path structurally (a per-model action endpoint), not the v1beta/models listing route (catalog.v1beta-models-listing) — despite sharing a URL prefix, the two share no code"
+  evidence:
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 94, note: "stream decided solely by the :streamGenerateContent URL suffix" }
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 158, note: "isGeminiNativeTtsRequest diverts audio-modality or known-TTS-model requests to the direct passthrough" }
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 238, note: "forwardGeminiNativeRequest: own account loop, markAccountUnavailable/clearAccountError, direct fetch to Google" }
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 180, note: "validateGeminiNativeClientKey — TTS path's own requireApiKey gate, independent of handleChat's" }
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 106, note: "non-TTS path calls handleChat directly with a converted body" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.ollama-tags-listing
+  group: Model mapping
+  feature: Ollama-compatible lane
+  subFeature: "GET /api/tags — fixed two-entry fixture list mimicking Ollama's model-discovery response, used by Ollama-compatible tools before they call the ollama chat lane (05's routing.ollama-lane-transform)"
+  trigger: An Ollama-compatible client's startup/model-discovery probe against GET /api/tags before it sends a chat request
+  input: none
+  output: "{ models: [{ name, modified_at, size, digest, details:{format,family,parameter_size,quantization_level} }, ...] } — always exactly the same two hardcoded entries (llama3.2, qwen2.5)"
+  businessRules:
+    - "The entire response is a static, hand-authored object (open-sse/config/ollamaModels.js) — it does not read providerConnections, PROVIDER_MODELS, customModels, modelAliases, or disabledModels, so it is completely disconnected from the real, routable model catalog every other listing endpoint (v1/models, v1beta/models) derives from those sources"
+    - "A grep across open-sse/config and src/shared/constants for the literal strings llama3.2 and qwen2.5 (the two fixture names) finds no other reference anywhere — neither name maps to any real provider/model id, alias, or ollama-local static entry"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.ollama-lane-transform"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "modified_at is a fixed past-dated ISO timestamp baked into source, not a real per-model value — it will read as increasingly stale forever unless the source file is hand-edited"
+  evidence:
+    - { file: src/app/api/tags/route.js, line: 14, note: "GET returns the imported ollamaModels object verbatim, no DB/registry read" }
+    - { file: open-sse/config/ollamaModels.js, line: 1, note: "hardcoded fixture: exactly two models, llama3.2 and qwen2.5" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "The model names an Ollama-compatible client discovers via GET /api/tags are names it can actually use in a subsequent chat request on the Ollama lane (POST /v1/api/chat, routing.ollama-lane-transform) — a discovery endpoint's contract is that its results are usable"
+    actual: "The two fixture names (llama3.2, qwen2.5) do not correspond to any configured provider model, alias, or custom model anywhere in the codebase — they exist purely to make the discovery probe return a non-empty, plausible-looking body"
+    impact: "An Ollama-compatible client that follows the normal discover-then-select flow (list /api/tags, pick a name, chat with it) will pick a model id that fails to resolve on the actual chat request, rather than one of the real configured/aliased models the operator set up"

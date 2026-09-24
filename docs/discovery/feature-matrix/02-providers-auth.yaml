@@ -1050,3 +1050,383 @@
   newModule: connections
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.provider-models-live-fetch
+  group: Providers
+  feature: Provider model discovery
+  subFeature: "GET /api/providers/[id]/models — fetch the live model catalog for one connection from its upstream provider"
+  trigger: Dashboard refresh-models action on a connection, or an internal caller (e.g. api/providers/[id]/test-models) needing a live model list when no static list exists
+  input: "connectionId path param"
+  output: "{ provider, connectionId, models[], warning? } or a 400/401/404/500 error body"
+  businessRules:
+    - "Dispatch is entirely config-driven via PROVIDER_MODELS_CONFIG: openai-compatible-*/anthropic-compatible-* connections use their own providerSpecificData.baseUrl (+/models), most API-key providers use createOpenAIModelsConfig(url) with a fixed upstream URL, and providers needing OAuth-refresh-on-401 or a non-OpenAI response shape (codex, gemini-cli) get a customResolver via buildOAuthResolver"
+    - "buildOAuthResolver retries exactly once: on a 401/403 with a refreshToken present, it refreshes the token, persists the new credentials via updateProviderCredentials, mutates the in-memory connection object, and retries the same fetch — a second 401 is not retried again"
+    - "Providers with their own dedicated resolver (kimchi, cursor, kiro, qoder, grok-cli) fall back to getStaticProviderModels(providerId) (the static PROVIDER_MODELS table) when the live fetch returns zero models, returning a warning string rather than failing the request"
+    - "ollama-local resolves its base host per-connection via resolveOllamaLocalHost(connection) rather than a fixed URL, so each connection can point at a different local Ollama instance"
+  state:
+    reads: ["providerConnections (by id)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.registry-build", "auth.refresh-generic-grant"]
+  providerInteraction: "Direct upstream call to the provider's own /models (or provider-specific) endpoint using the connection's stored credential; codex/gemini-cli refresh via their OAuth token endpoints on a 401"
+  fallback: { hasFallback: true, retry: "One refresh-then-retry cycle for customResolver providers backed by buildOAuthResolver; static-catalog fallback for resolvers with a dedicated live fetcher", timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "connection not found (404), or an openai-compatible-*/anthropic-compatible-* connection has no providerSpecificData.baseUrl (400)", partial: false }
+    - { code: AUTH_ERROR, when: "customResolver's buildOAuthResolver path finds no accessToken at all", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "the provider has no PROVIDER_MODELS_CONFIG entry and is not OpenAI/Anthropic-compatible (400 does-not-support-models-listing)", partial: false }
+  sideEffects:
+    - "A successful OAuth refresh inside buildOAuthResolver persists new access/refresh tokens to the connection row even though the caller only asked to list models"
+  persistence: ["providerConnections row: accessToken/refreshToken/expiresIn, only when a refresh occurred"]
+  performanceConcerns:
+    - "No caching at this layer — every call is a live upstream round-trip (contrast catalog.kilo-free-models-cache's 1h in-memory cache and catalog.suggested-models-open-proxy's client-side 10m cache)"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The plain (non-compatible, non-config) OpenAI-compatible/Anthropic-compatible branches at the top of GET duplicate createOpenAIModelsConfig's shape by hand rather than reusing it — same baseUrl+/models pattern, separately coded"
+  evidence:
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 91, note: "buildOAuthResolver: fetch, refresh-on-401 once, persist via updateProviderCredentials, retry" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 129, note: "PROVIDER_MODELS_CONFIG — per-provider transport config table" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 421, note: "ollama-local customResolver resolves host per-connection via resolveOllamaLocalHost" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 451, note: "isOpenAICompatibleProvider branch: baseUrl required or 400" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 525, note: "config-driven dispatch: customResolver, else static config.url/headers/authHeader" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: connections.test-single-connection
+  group: Provider authentication
+  feature: Connection health check
+  subFeature: "POST /api/providers/[id]/test — probe one connection's credential validity against its provider and persist the result"
+  trigger: Dashboard test-connection action, or internally by connections.test-batch-sequential for each connection in a batch
+  input: "connectionId path param, no body"
+  output: "{ valid, error, refreshed } or 404 Connection-not-found"
+  businessRules:
+    - "apikey/cookie auth types are probed by testApiKeyConnection (one provider-specific request per case, roughly 60 providers switched by id, most treating any non-401/403 status as valid); oauth/other types go through testOAuthConnection driven by OAUTH_TEST_CONFIG"
+    - "testOAuthConnection refreshes proactively (before probing) when shouldRefreshCredentials says the token is expired and the provider is refreshable, rather than waiting for a 401 from the probe itself; providers with checkExpiry:true (claude, kiro, kimi) skip the network probe entirely once expiry is known"
+    - "A soft-success status (e.g. Grok CLI's 402 spending-limit) keeps testStatus:active but writes the soft message into lastError as a warning — this is the same soft-success convention markAccountUnavailable/clearAccountError use for runtime routing (03's account.clear-error-on-success), reused here for a manual test"
+    - "Every call — success or failure — writes testStatus/lastError/lastErrorAt back to the connection row; a passing test also clears a prior error, and an OAuth refresh mid-test persists the new tokens even though the caller only asked to validate"
+  state:
+    reads: ["providerConnections (by id)"]
+    writes: ["providerConnections: testStatus, lastError, lastErrorAt, and on refresh accessToken/refreshToken/idToken/expiresAt/providerSpecificData"]
+    runtimeOnly: []
+  dependencies: ["auth.refresh-generic-grant", "account.clear-error-on-success"]
+  providerInteraction: "One lightweight probe request per provider (a real userinfo/models/messages call with a minimal body, e.g. max_tokens:1 for chat-shaped probes) — this mutates testStatus/lastError directly on the connection row, distinct from the per-model modelLock_* cooldown fields account.mark-unavailable-lock-reasons writes on a real routing failure"
+  fallback: { hasFallback: true, retry: "One refresh-then-retry on a 401 for refreshable OAuth providers (Cline has its own retry-after-refresh branch)", timeout: "15000ms AbortSignal.timeout on every probe fetch via fetchWithConnectionProxy", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "connection not found", partial: false }
+    - { code: AUTH_ERROR, when: "probe returns 401/403, or refresh fails/is absent for an expired token", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "provider has no OAUTH_TEST_CONFIG entry and is not apikey/cookie-testable (Provider-test-not-supported)", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections row, same JSON-blob storage as 03's connection.storage-shape-json-blob"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: "AbortSignal.timeout(15000) aborts the probe fetch", concurrency: null }
+  edgeCases:
+    - "Cursor's tokenExists config path never makes a network call at all (protobuf API, cannot be probed) — valid only means a token string is present, not that it works"
+  evidence:
+    - { file: "src/app/api/providers/[id]/test/route.js", line: 8, note: "POST handler: thin wrapper delegating straight to testSingleConnection(id)" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 320, note: "testOAuthConnection: tokenExists short-circuit, then proactive refresh-if-expired before probing" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 404, note: "classifyOAuthProbeResult drives soft-success vs hard-fail" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 451, note: "fetchWithConnectionProxy applies AbortSignal.timeout(15000) to every probe" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 829, note: "testSingleConnection: dispatch by authType, then always write testStatus/lastError/lastErrorAt" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 862, note: "soft success keeps testStatus active but stores the warning text as lastError" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.provider-test-models-self-dispatch
+  group: Providers
+  feature: Provider model discovery
+  subFeature: "POST /api/providers/[id]/test-models — probe every model configured for one connection through 9router's own internal /v1/* endpoints"
+  trigger: Dashboard test-all-models action for a connection
+  input: "connectionId path param, no body"
+  output: "{ provider, connectionId, results:[{ modelId, name, ok, latencyMs, ... }] } or a 400/404/500 error"
+  businessRules:
+    - "This is a thin per-connection wrapper around the same catalog.model-connectivity-test probe (pingModelByKind) used by /api/models/test — it resolves the connection's model list (static PROVIDER_MODELS, or a live fetch via this route's own /api/providers/[id]/models when the provider is compatible and has no static list) and pings each one"
+    - "The first model is probed alone before the rest run in parallel via Promise.all — a deliberate warm-up to trigger any needed OAuth token refresh once, avoiding a refresh race if all models were dispatched concurrently from a cold/expired token"
+  state:
+    reads: ["providerConnections (by id)"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.model-connectivity-test", "catalog.provider-models-live-fetch"]
+  providerInteraction: "Indirect — every probe is a self-dispatched HTTP call to 127.0.0.1:{port}/api/v1/*, which then dispatches to the real upstream exactly like catalog.model-connectivity-test"
+  fallback: { hasFallback: false, retry: null, timeout: "Each pingModelByKind call carries its own 15000ms AbortSignal.timeout", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "connection not found (404), or the resolved model list is empty (400 No-models-configured)", partial: false }
+  sideEffects:
+    - "Each probed model is a real, metered request through the full routing stack, same as catalog.model-connectivity-test — testing all models for a connection with many models issues that many real upstream calls"
+  persistence: []
+  performanceConcerns:
+    - "The rest-of-models batch after the warm-up call is fully unbounded Promise.all — no concurrency cap, so a connection with many configured models fires that many simultaneous self-dispatched requests"
+  behavior: { streaming: false, cancellation: null, concurrency: "First model sequential warm-up, then all remaining models fire concurrently with no limit" }
+  edgeCases:
+    - "The live-fetch fallback path calls this route's sibling /api/providers/[id]/models over HTTP (self-loopback) rather than importing its logic directly"
+  evidence:
+    - { file: "src/app/api/providers/[id]/test-models/route.js", line: 32, note: "live model list fetched via self-loopback HTTP call to /api/providers/[id]/models" }
+    - { file: "src/app/api/providers/[id]/test-models/route.js", line: 46, note: "warm-up: first model awaited alone before the rest" }
+    - { file: "src/app/api/providers/[id]/test-models/route.js", line: 52, note: "remaining models dispatched via unbounded Promise.all" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: connections.client-listing-sanitized
+  group: Providers
+  feature: Provider connection listing
+  subFeature: "GET /api/providers/client — paginated, field-allowlisted connection listing for browser-side consumers"
+  trigger: Dashboard pages needing a lightweight, paginated connection list (e.g. usage/quota views per 08's quota.dashboard-refresh-and-visibility) rather than the full connection-management listing
+  input: "?provider=&accountStatus=&sort=provider|priority&page=&pageSize= query params"
+  output: "{ connections:[sanitized], providerOptions, pagination:{page,pageSize,total,totalPages}, totals:{...} }"
+  businessRules:
+    - "Only connections passing isUsageEligible (provider in USAGE_SUPPORTED_PROVIDERS, and either oauth authType or provider in USAGE_APIKEY_PROVIDERS) are ever returned — this is a usage-tracking-scoped view, not the full connection set catalog.connection-listing exposes to the dashboard's connection-management page"
+    - "Each connection is passed through sanitize(): only SAFE_FIELDS and SAFE_PSD_FIELDS keys survive — apiKey, accessToken, refreshToken, idToken and any other credential field are never included, by allowlist rather than by blocklist"
+    - "maskName partially masks a long (over 16 char) name that also matches a 32+ char alnum/underscore/hyphen token pattern (e.g. an email-like or token-like display name) down to its first 8 characters — a defense against a raw credential accidentally landing in the display name field"
+    - "pageSize is clamped to MAX_PAGE_SIZE (500); an out-of-range page number is clamped down to the last valid page rather than returning an empty page"
+  state:
+    reads: ["providerConnections"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.connection-listing"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects:
+    - "backfillCodexEmails() runs as a side effect of every GET, a one-time migration-style backfill unrelated to this route's own response"
+  persistence: []
+  performanceConcerns:
+    - "Filters/sorts/paginates the full in-memory connection list on every request — fine at typical connection-count scale, no index/cache"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "SAFE_FIELDS/SAFE_PSD_FIELDS is an explicit allowlist maintained by hand — a new credential-bearing field added to providerConnections elsewhere is safe-by-default here (excluded until explicitly added), the opposite failure mode from a blocklist"
+  evidence:
+    - { file: src/app/api/providers/client/route.js, line: 6, note: "SAFE_FIELDS allowlist — no credential fields" }
+    - { file: src/app/api/providers/client/route.js, line: 26, note: "maskName masks long token-like display names" }
+    - { file: src/app/api/providers/client/route.js, line: 32, note: "sanitize() builds the response object field-by-field from the allowlists" }
+    - { file: src/app/api/providers/client/route.js, line: 46, note: "isUsageEligible scopes the listing to usage-tracked providers only" }
+    - { file: src/app/api/providers/client/route.js, line: 79, note: "backfillCodexEmails() side effect on every GET" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.kilo-free-models-cache
+  group: API-key providers
+  feature: Provider model discovery
+  subFeature: "GET /api/providers/kilo/free-models — live fetch plus a 1-hour server-side cache of Kilo's free-tier model list"
+  trigger: Dashboard Kilo connection setup / model-picker UI
+  input: none
+  output: "{ models:[{id,name,isFree,context_length}], cached } or { models:[], error } on total failure"
+  businessRules:
+    - "The result is cached in a module-scope variable (cachedModels/cacheTimestamp) for 60 minutes — every request within that window is served from memory with zero upstream calls"
+    - "On a fetch failure after the cache expired, a stale cached copy is still served (with a warning field) rather than erroring, as long as any cache exists at all; only a cold cache with a failing fetch returns a 502"
+    - "Filtering to isFree===true happens server-side before caching — the cache stores only the free subset, not the full Kilo catalog"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["module-scope cachedModels/cacheTimestamp — reset on process restart, and per settings.hot-path-read-no-cache's documented Next.js multi-eval caveat this can exist more than once per process"]
+  dependencies: []
+  providerInteraction: "GET https://api.kilo.ai/api/gateway/models, 10s AbortSignal.timeout, no auth header (public catalog endpoint)"
+  fallback: { hasFallback: true, retry: null, timeout: "AbortSignal.timeout(10000)", quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "fetch fails or returns non-OK and no cache (even stale) exists", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "1-hour TTL is coarse for a model catalog that can change, but bounds upstream call volume to at most once per hour per process"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "No stampede protection: two requests racing in after cache expiry both miss and both fetch upstream — low-impact given the 1h TTL and single external endpoint"
+  evidence:
+    - { file: src/app/api/providers/kilo/free-models/route.js, line: 8, note: "module-scope cache, CACHE_TTL_MS = 1 hour" }
+    - { file: src/app/api/providers/kilo/free-models/route.js, line: 15, note: "cache hit path returns immediately, cached:true" }
+    - { file: src/app/api/providers/kilo/free-models/route.js, line: 47, note: "on error, serve stale cache with a warning rather than fail" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.suggested-models-open-proxy
+  group: Providers
+  feature: Provider model discovery
+  subFeature: "GET /api/providers/suggested-models — generic server-side fetch proxy that filters a caller-supplied URL's JSON through one of three named shapers"
+  trigger: "The dashboard's fetchSuggestedModels (providerModelsFetcher.js) calling out during provider connection setup for openrouter-free/opencode-free/mimo-free suggestions"
+  input: "?url=<any URL>&type=openrouter-free|opencode-free|mimo-free query params"
+  output: "{ data:[...] } (shape depends on FILTERS[type]) — or { data: [] } on any upstream failure/non-JSON body"
+  businessRules:
+    - "type must match a key in FILTERS (a fixed set of 3 response-shaping functions); url is NOT validated against any allowlist of known provider endpoints — the route fetches whatever URL string is supplied, server-side, and echoes the filtered result back"
+    - "In normal use, url is always one of a handful of hardcoded fetcher.url values baked into the AI_PROVIDERS registry (the client only ever calls this with those), but nothing in this route itself enforces that — the constraint lives entirely in the caller's discipline, not the server"
+    - "Fetch failures (network error, non-OK status, non-JSON body) are swallowed to { data: [] } rather than surfaced as an error status, so a caller cannot distinguish blocked/unreachable from legitimately empty"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "A plain, unauthenticated fetch(url) to whatever URL the caller supplies"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "url or type missing, or type not in FILTERS", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Unlike connections.provider-node-validate-partial-ssrf (which imports ssrfGuard's assertPublicUrl for the equivalent user-supplied-URL case), this route performs no SSRF check at all — no isLocalRequest gate, no assertPublicUrl/assertPublicUrlResolved, and it uses a plain fetch() rather than fetchPublic — on a deployment where this route is reachable by an untrusted or remote caller, it functions as a generic server-side URL fetcher whose response is filtered but not blocked from targeting an internal address"
+  evidence:
+    - { file: src/app/api/providers/suggested-models/route.js, line: 8, note: "url read directly from the query string, no allowlist check" }
+    - { file: src/app/api/providers/suggested-models/route.js, line: 21, note: "plain fetch(url) — no SSRF guard, no timeout" }
+    - { file: src/app/api/providers/suggested-models/filters.js, line: 7, note: "FILTERS — the fixed set of 3 response shapers keyed by type" }
+    - { file: src/shared/utils/providerModelsFetcher.js, line: 20, note: "normal caller always passes a fixed fetcher.url from the provider registry, enforced client-side only" }
+  newModule: catalog
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A server-side fetch proxy that accepts an arbitrary URL from the query string validates that URL the same way provider-nodes/validate does (SSRF guard) before fetching it, regardless of which UI feature happens to be the only current caller"
+    actual: "No SSRF check of any kind runs on url — the route trusts the browser-side caller to only ever pass one of a small fixed set of URLs, a constraint enforced nowhere on the server"
+    impact: "Any client able to reach this route (its own auth posture is not established by this trace) can use it as a blind/semi-blind server-side URL fetcher against internal addresses (e.g. cloud metadata, loopback services); the FILTERS shaping limits which response fields are echoed back but does not block the request from being made"
+
+- id: connections.test-batch-sequential
+  group: Provider authentication
+  feature: Connection health check
+  subFeature: "POST /api/providers/test-batch — test-connection sweep across a group of connections selected by mode"
+  trigger: Dashboard bulk test-all-oauth / test-all-free / test-all-apikey / test-provider / test-all actions
+  input: "{ mode: provider|oauth|free|apikey|compatible|all, providerId? }"
+  output: "{ mode, providerId, results:[{provider,connectionId,connectionName,authType,valid,latencyMs,error,diagnosis,statusCode,testedAt}], summary:{total,passed,failed}, testedAt }"
+  businessRules:
+    - "Only isActive connections are ever candidates (getProviderConnections({ isActive: true })) — inactive connections are silently excluded from every mode, not just skipped-and-reported"
+    - "mode:provider requires providerId and filters to that provider only; the other modes (oauth/free/apikey/compatible/all) classify every active connection via getAuthGroup, the same free-vs-oauth-vs-apikey classification connections.test-single-connection's OAUTH_TEST_CONFIG dispatch implicitly relies on"
+    - "Each connection is tested by calling the exact same testSingleConnection(id) used by connections.test-single-connection — this route adds no separate test logic, only grouping/iteration and a richer per-result response shape (connectionName, diagnosis, statusCode)"
+    - "A per-connection test() call that throws (rather than resolving with {valid:false}) is caught individually and still produces a results entry (diagnosis.type: network_error) — one connection's exception never aborts the batch"
+  state:
+    reads: ["providerConnections (isActive:true)"]
+    writes: ["providerConnections: testStatus/lastError/lastErrorAt per tested connection — identical write shape to connections.test-single-connection, once per connection in the batch"]
+    runtimeOnly: []
+  dependencies: ["connections.test-single-connection"]
+  providerInteraction: "Same per-provider probes as connections.test-single-connection, issued once per connection in the selected group"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "mode is missing, or is not one of provider/oauth/free/apikey/compatible/all (provider mode additionally needs providerId)", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections rows, one write per tested connection"]
+  performanceConcerns:
+    - "Connections are tested strictly sequentially in a for...of loop with await — not concurrent — so a large group multiplies by each connection's up-to-15s probe timeout; unlike catalog.provider-test-models-self-dispatch's unbounded-parallel model sweep, this is the opposite extreme (fully serial, no concurrency at all)"
+  behavior: { streaming: false, cancellation: null, concurrency: "Fully sequential — one connection probed at a time, next one only starts after the previous testSingleConnection call resolves" }
+  edgeCases:
+    - "mode:compatible reclassifies using isCompatibleProvider (prefix check) rather than getAuthGroup, a second, narrower classification function defined in this same file rather than reused from getAuthGroup's own compatible branch"
+  evidence:
+    - { file: src/app/api/providers/test-batch/route.js, line: 52, note: "getProviderConnections({ isActive: true }) — inactive connections excluded from every mode" }
+    - { file: src/app/api/providers/test-batch/route.js, line: 85, note: "for...of with await testSingleConnection(conn.id) — sequential, not Promise.all" }
+    - { file: src/app/api/providers/test-batch/route.js, line: 100, note: "per-connection try/catch keeps one failure from aborting the batch" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: connections.provider-node-update-delete
+  group: Providers
+  feature: Custom provider nodes
+  subFeature: "PUT/DELETE /api/provider-nodes/[id] — rename/reconfigure or remove a custom OpenAI/Anthropic/embedding-compatible provider node"
+  trigger: Dashboard edit or delete action on a custom provider node (a user-defined OpenAI-compatible, Anthropic-compatible, or custom-embedding endpoint)
+  input: "PUT: { name, prefix, apiType?, baseUrl }. DELETE: none (id in path)"
+  output: "PUT: { node: updated }. DELETE: { success: true }. Both 404 if the node id does not exist"
+  businessRules:
+    - "PUT re-derives apiType validation and baseUrl sanitization from node.type read back from storage, not from a type field in the request body — a caller cannot change a node's type through this route, only its name/prefix/baseUrl(/apiType if openai-compatible)"
+    - "baseUrl sanitization mirrors the create route's per-type rules: anthropic-compatible strips a trailing /messages, custom-embedding strips a trailing /embeddings — both exist to prevent double-appending that suffix again at request-build time"
+    - "PUT fans the rename out to every existing connection under this node's provider id (getProviderConnections({ provider: id })), rewriting providerSpecificData.prefix/apiType/baseUrl/nodeName on each — so an in-flight connection immediately reflects the node's new baseUrl/prefix without needing to be recreated"
+    - "DELETE cascades: deleteProviderConnectionsByProvider(id) removes every connection under this node before deleteProviderNode(id) removes the node itself — deleting a node silently deletes all its connections too, with no confirmation or count returned"
+  state:
+    reads: ["providerNodes (by id)", "providerConnections (by provider=id, PUT only)"]
+    writes: ["providerNodes row (PUT: fields; DELETE: removed)", "providerConnections rows under this provider (PUT: providerSpecificData fanout; DELETE: all removed)"]
+    runtimeOnly: []
+  dependencies: ["connections.provider-node-repo-storage"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "node not found (404), or PUT is missing name/prefix/baseUrl, or apiType is invalid for an openai-compatible node", partial: false }
+  sideEffects:
+    - "DELETE removes every connection configured under this node — an irreversible, cascading side effect not called out in the response body"
+  persistence: ["providerNodes and providerConnections rows, same SQLite-backed storage as connections.provider-node-repo-storage / 03's connection.storage-shape-json-blob"]
+  performanceConcerns:
+    - "PUT's connection fanout uses Promise.all over every connection under the node — unbounded, but scoped to one node's own connections so realistically small"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A node's id (e.g. the custom-embedding-<generated> prefix assigned at creation) IS the provider id every connection under it stores — renaming name/prefix does not change this id, so routing/model-resolution keyed on provider id is unaffected by a rename"
+  evidence:
+    - { file: "src/app/api/provider-nodes/[id]/route.js", line: 25, note: "apiType validated only for node.type === openai-compatible, read from storage not from the request" }
+    - { file: "src/app/api/provider-nodes/[id]/route.js", line: 36, note: "anthropic-compatible / custom-embedding baseUrl suffix stripping, same rule as node creation" }
+    - { file: "src/app/api/provider-nodes/[id]/route.js", line: 64, note: "PUT fans the update out to every connection under this provider id" }
+    - { file: "src/app/api/provider-nodes/[id]/route.js", line: 93, note: "DELETE cascades: connections removed before the node itself" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: connections.provider-node-validate-partial-ssrf
+  group: Provider authentication
+  feature: Custom provider nodes
+  subFeature: "POST /api/provider-nodes/validate — probe a user-supplied baseUrl+apiKey before a custom provider node is saved"
+  trigger: Dashboard custom-node creation/edit form, on the validate/test step before the node is persisted
+  input: "{ baseUrl, apiKey, type: openai-compatible|anthropic-compatible|custom-embedding, modelId? }"
+  output: "{ valid, error?, method?, dimensions? } — 500 with a classified network-error message on a thrown fetch error"
+  businessRules:
+    - "SSRF protection is applied ONLY when isLocalRequest(request) is false — a request from the loopback dashboard UI itself skips the check entirely (deliberate, so a self-hosted target like ollama-local's 127.0.0.1 base URL still validates); a remote caller is checked via ssrfGuard's assertPublicUrl before any fetch happens"
+    - "The SSRF check used here is assertPublicUrl — the synchronous, literal-hostname/IP-only layer described in ssrfGuard.js's own header comment as layer 1 of 3. It does NOT call assertPublicUrlResolved (layer 2: DNS-resolves the hostname and blocks a domain that merely resolves to a private/loopback/metadata address) and the subsequent fetchWithTimeout() is a plain fetch, not fetchPublic (layer 3: re-validates every redirect hop) — a non-local caller supplying a hostname that resolves to an internal address (e.g. a wildcard-DNS domain pointed at 127.0.0.1), or a public URL that 302s to an internal target, passes this route's check and is fetched anyway"
+    - "custom-embedding validates by POSTing a real /embeddings request (requires modelId); anthropic-compatible and the openai-compatible default both try GET /models first, then fall back to a minimal POST /chat/completions (max_tokens:1) if modelId is supplied and /models isn't conclusive (a non-401/403 non-OK status)"
+    - "401/403 short-circuits straight to a hard fail (API key unauthorized) without attempting the chat fallback — only an ambiguous non-auth failure on /models triggers the secondary chat probe"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "A real GET /models (or POST /embeddings or /chat/completions) request to the caller-supplied baseUrl, 10s manual timeout via Promise.race"
+  fallback: { hasFallback: true, retry: null, timeout: "fetchWithTimeout: 10000ms via Promise.race against the fetch", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl or apiKey missing, baseUrl is not a parseable URL, or (non-local caller) the URL is blocked by assertPublicUrl", partial: false }
+    - { code: AUTH_ERROR, when: "upstream returns 401/403", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "network error (ECONNREFUSED/ENOTFOUND/ETIMEDOUT/timeout/cert errors), classified into a specific user-facing message", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "isLocalRequest's loopback-only exemption means the SSRF gap above is only reachable by a caller that is NOT the local dashboard itself — e.g. a request forwarded through a reverse proxy (x-9r-via-proxy set) or a remote/tunnel-exposed instance, exactly the deployment shapes 13's tunnel.* entries document as reachable from outside localhost"
+  evidence:
+    - { file: src/app/api/provider-nodes/validate/route.js, line: 70, note: "SSRF check only runs when !isLocalRequest(request)" }
+    - { file: src/app/api/provider-nodes/validate/route.js, line: 72, note: "assertPublicUrl — literal-only layer 1 check, not assertPublicUrlResolved" }
+    - { file: src/app/api/provider-nodes/validate/route.js, line: 6, note: "fetchWithTimeout wraps plain fetch(), not ssrfGuard's fetchPublic (no redirect re-validation)" }
+    - { file: src/shared/utils/ssrfGuard.js, line: 1, note: "module header documents 3 layers; assertPublicUrl is explicitly layer 1 only" }
+    - { file: src/app/api/provider-nodes/validate/route.js, line: 128, note: "401/403 short-circuits before the chat/completions fallback is attempted" }
+  newModule: connections
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A remote (non-local) caller's user-supplied baseUrl is validated with the same DNS-resolution and redirect-safe protection ssrfGuard.js documents as necessary (assertPublicUrlResolved / fetchPublic) — the module comment explicitly says layer 1 alone leaves DNS-rebinding and redirect bypasses open"
+    actual: "Only assertPublicUrl (layer 1, literal hostname/IP string check) runs, and the actual request uses a plain fetch with no manual redirect re-validation"
+    impact: "A non-local caller (e.g. through a reverse proxy or a tunnel-exposed instance) can supply a hostname that resolves to an internal/metadata address, or a URL that redirects to one, and this route will still fetch it and echo back a validity signal — a lower-severity but real SSRF gap next to provider-nodes/validate's own documented threat model"
+
+- id: connections.provider-node-repo-storage
+  group: Providers
+  feature: Custom provider nodes
+  subFeature: "nodesRepo (src/lib/db/repos/nodesRepo.js) — storage shape and CRUD primitives backing custom/compatible provider nodes"
+  trigger: "Called by the /api/provider-nodes* routes (list/create/update/delete) — never called directly by the request/routing path"
+  input: "Node objects: { id, type, name, prefix, apiType?, baseUrl, createdAt, updatedAt }"
+  output: "Plain JS node objects (rowToNode flattens the JSON data blob back onto the row)"
+  businessRules:
+    - "Storage is a hybrid row/blob shape: id/type/name/createdAt/updatedAt are real SQLite columns on providerNodes, while every other field (prefix, apiType, baseUrl, and anything else callers add) is serialized into a single data JSON text column and rehydrated by rowToNode — the same pattern 03's connection.storage-shape-json-blob documents for providerConnections, applied one layer up to nodes"
+    - "updateProviderNode does a read-merge-write inside a db.transaction: it reads the current row, spreads existing fields under the partial update, and re-upserts the whole merged object — a caller can pass only the changed fields and everything else survives untouched"
+    - "upsert always writes via INSERT ... ON CONFLICT(id) DO UPDATE, so createProviderNode and the merge-write inside updateProviderNode share one code path — there is no separate UPDATE statement"
+    - "A node's own id string carries its type-specific prefix (openai-compatible-, anthropic-compatible-, custom-embedding- from src/shared/constants/providers.js), assigned once at creation by the /api/provider-nodes POST route — nodesRepo itself is prefix-agnostic and stores whatever id it's given"
+  state:
+    reads: ["providerNodes table"]
+    writes: ["providerNodes table (insert/update/delete)"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["providerNodes table — id/type/name/createdAt/updatedAt as columns, everything else JSON-serialized into the data column"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A node becomes a live provider at routing time purely by its id existing as a provider on a providerConnections row and having no entry in the PROVIDERS registry — routing.default-executor-openai-fallback documents the SUSPECTED_BUG this produces for a custom-embedding-* node reached from an unexpected lane (e.g. chat): the DefaultExecutor falls back to PROVIDERS.openai's transport config instead of the node's own baseUrl, because nodesRepo/providerNodes is never consulted by the executor-selection path at all — only providerConnections.providerSpecificData.baseUrl is, and only for the openai-compatible-/anthropic-compatible- prefixes specifically"
+  evidence:
+    - { file: src/lib/db/repos/nodesRepo.js, line: 5, note: "rowToNode: JSON data column merged back onto id/type/name/createdAt/updatedAt columns" }
+    - { file: src/lib/db/repos/nodesRepo.js, line: 30, note: "upsert: single INSERT ... ON CONFLICT DO UPDATE path for both create and update" }
+    - { file: src/lib/db/repos/nodesRepo.js, line: 72, note: "updateProviderNode: transactional read-merge-write" }
+    - { file: src/app/api/provider-nodes/route.js, line: 54, note: "node id is assigned its type prefix once, at creation, by the route — not by nodesRepo" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
