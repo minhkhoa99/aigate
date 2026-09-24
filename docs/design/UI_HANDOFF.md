@@ -1,9 +1,9 @@
 # UI ownership handoff
 
 The user asked for the interface from `docs/design/stitch-export` to be built
-before Claude connects application logic. The implementation lives on branch
-`feat/ui-first` in `.worktrees/ui-first`; the discovery branch has this marker
-but not the UI code. Merge `feat/ui-first` before wiring the frontend.
+before Claude connects application logic. The implementation was built on
+`feat/ui-first` in `.worktrees/ui-first` and has been fast-forwarded into the
+current `feat/m1-discovery` branch. `apps/web` is ready for logic integration.
 
 **`UI_READY` means the screen's visual layout is implemented in React with demo
 data. It does not mean its API, authentication, mutation, validation, SSE, or
@@ -50,8 +50,8 @@ a completed mutation. No stored credential value is rendered.
 
 ## Claude's integration boundary
 
-1. Merge the UI branch, then implement feature API adapters, TanStack Query
-   hooks, real forms/validation, mutation outcomes, SSE, auth, i18n, and error
+1. Implement feature API adapters, TanStack Query hooks, real forms/validation,
+   mutation outcomes, SSE, auth, i18n, and error
    boundary per the spec. Replace fixture arrays with sanitized API data.
 2. Keep `app/shell.tsx`, `styles.css`, `shared/ui.tsx`, and visual markup in
    `features/*/screens.tsx` as the UI source. Change them only where data binding

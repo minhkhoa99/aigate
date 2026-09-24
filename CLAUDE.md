@@ -2,10 +2,10 @@
 
 ## UI ownership handoff
 
-Read `docs/design/UI_HANDOFF.md` before changing frontend files. The user assigned visual
-UI implementation to a separate `feat/ui-first` worktree. Do not redesign or duplicate
-screens marked `UI_READY` there; work on contracts, backend logic, and API integration.
-The handoff names the exact branch, routes, and remaining wiring work.
+Read `docs/design/UI_HANDOFF.md` before changing frontend files. The visual UI
+from `feat/ui-first` is already integrated in this branch under `apps/web`.
+Do not redesign or duplicate screens marked `UI_READY`; work on contracts,
+backend logic, and API integration. The handoff lists the routes and wiring work.
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
