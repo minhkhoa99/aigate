@@ -1,16 +1,16 @@
 # Discovery coverage
 
-Entries: 210
+Entries: 231
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
-| routes | 94/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +52 |
+| routes | 115/154 | api/auth/logout, api/auth/oidc/callback, api/auth/oidc/start, api/auth/oidc/test, api/auth/reset-password, api/auth/saml/acs, api/auth/saml/metadata, api/auth/saml/start … +31 |
 | pages | 5/28 | (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind]/[id] … +15 |
 | providers | 15/122 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +99 |
 | executors | 9/29 | azure, codebuddy-cn, codebuddy-intl, devin-cli, gemini-cli, github, grok-cli, grok-web … +12 |
 | translators | 37/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/concerns/thinking.js, open-sse/translator/formats/claude.js … +3 |
 | repos | 10/11 | nodesRepo |
-| settingsKeys | 32/52 | cloudEnabled, dnsToolEnabled, mitmRouterBaseUrl, oidcClientId, oidcIssuerUrl, oidcLoginLabel, oidcScopes, samlAttributeEmail … +12 |
+| settingsKeys | 33/52 | cloudEnabled, dnsToolEnabled, oidcClientId, oidcIssuerUrl, oidcLoginLabel, oidcScopes, samlAttributeEmail, samlAttributeName … +11 |
 
 ## Entries per bounded context
 
@@ -21,15 +21,15 @@ Entries: 210
 - media: 15
 - routing: 79
 - settings: 7
-- tooling: 3
+- tooling: 24
 - transport: 14
 - usage: 23
 
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 9
-- REFERENCE_BEHAVIOR: 175
-- SUSPECTED_BUG: 26
+- REFERENCE_BEHAVIOR: 193
+- SUSPECTED_BUG: 29
 
 ## Missing — routes
 
@@ -43,29 +43,8 @@ Entries: 210
 - api/auth/saml/start
 - api/auth/saml/test
 - api/auth/status
-- api/cli-tools/all-statuses
-- api/cli-tools/antigravity-mitm
-- api/cli-tools/antigravity-mitm/alias
-- api/cli-tools/claude-settings
-- api/cli-tools/cline-settings
-- api/cli-tools/codex-settings
-- api/cli-tools/copilot-settings
-- api/cli-tools/cowork-mcp-registry
-- api/cli-tools/cowork-mcp-tools
-- api/cli-tools/cowork-settings
-- api/cli-tools/deepseek-tui-settings
-- api/cli-tools/devin-settings
-- api/cli-tools/droid-settings
-- api/cli-tools/grok-build-settings
-- api/cli-tools/hermes-settings
-- api/cli-tools/jcode-settings
-- api/cli-tools/kilo-settings
-- api/cli-tools/openclaw-settings
-- api/cli-tools/opencode-settings
 - api/health
 - api/init
-- api/mcp/[plugin]/message
-- api/mcp/[plugin]/sse
 - api/provider-nodes/[id]
 - api/provider-nodes/validate
 - api/providers/[id]/models
@@ -275,7 +254,6 @@ Entries: 210
 
 - cloudEnabled
 - dnsToolEnabled
-- mitmRouterBaseUrl
 - oidcClientId
 - oidcIssuerUrl
 - oidcLoginLabel

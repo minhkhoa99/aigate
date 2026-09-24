@@ -1,0 +1,764 @@
+# Task 17: CLI Tools, Skills, MCP (§5 #16, #19, plus MCP — an API with no UI found during spec work)
+# Traced against E:\9router (read-only). newModule: tooling for all entries in this file.
+
+- id: clitools.all-statuses-batch
+  group: CLI Tool Integration
+  feature: Dashboard tool-status aggregation
+  subFeature: all-statuses batches 13 per-tool GETs into one response
+  trigger: Dashboard "Integrations" page load (or refresh) fetching combined tool status
+  input: none (GET, no query params)
+  output: "JSON object keyed by toolId → that tool's own GET response body (or null if its handler threw)"
+  businessRules:
+    - "STATUS_GETTERS re-imports the GET function of exactly 13 of the 19 cli-tools route files (claude, codex, opencode, droid, openclaw, hermes, cowork, cline, kilo, deepseek-tui, jcode, grok-build, devin) and calls each in-process — not over HTTP"
+    - "The other 6 route.js files are deliberately excluded: antigravity-mitm and antigravity-mitm/alias (proxy/DNS control, not an installed-tool status card), copilot-settings (no install-detection step to batch — see clitools.copilot-settings-array-upsert), cowork-mcp-registry and cowork-mcp-tools (MCP marketplace helpers, not tool-status cards), and all-statuses itself"
+    - "Each per-tool getter is invoked via Promise.all so all 13 run concurrently; a getter that throws is caught per-entry and mapped to null rather than failing the whole batch"
+  state: { reads: ["~/.claude/settings.json", "~/.codex/config.toml", "~/.config/opencode/opencode.json", "~/.factory/settings.json", "~/.openclaw/openclaw.json", "~/.hermes/config.yaml", "Claude Desktop configLibrary", "~/.cline/data/globalState.json", "~/.local/share/kilo/auth.json", "~/.deepseek/config.toml", "~/.jcode/config.toml", "~/.grok/config.toml", "devin CLI presence"], writes: [], runtimeOnly: [] }
+  dependencies: ["clitools.claude-settings-config"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "an individual tool's GET handler throws (e.g. unreadable settings file); that tool's slot becomes null, other 12 slots are unaffected", partial: true }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Every one of the 13 delegated GETs does its own installed-check first, which on Windows shells out to `where <tool>` (spawns a child process); batching means 13 concurrent process spawns per page load instead of 13 sequential ones if the dashboard had called each route separately over HTTP, but the child-process cost itself is not eliminated"
+    - "Q3 answer: the route exists to collapse what would otherwise be 13 separate client-initiated HTTP round trips (each triggering its own `where`/`which` spawn plus file reads) into a single request whose 13 sub-calls run concurrently server-side via Promise.all, instead of being serialized by the browser's per-host connection limit"
+  behavior: { streaming: false, cancellation: null, concurrency: "Promise.all — all 13 getters run concurrently, independent of each other" }
+  edgeCases:
+    - "A change to STATUS_GETTERS (new tool added) requires remembering to also add it here; there is no runtime check that this list stays in sync with the actual route directories"
+  evidence:
+    - { file: src/app/api/cli-tools/all-statuses/route.js, line: 18, note: "STATUS_GETTERS — exactly 13 of the 19 cli-tools GET handlers re-imported directly" }
+    - { file: src/app/api/cli-tools/all-statuses/route.js, line: 36, note: "Promise.all over Object.entries(STATUS_GETTERS): concurrent in-process calls, not 13 HTTP requests" }
+    - { file: src/app/api/cli-tools/all-statuses/route.js, line: 41, note: "per-tool try/catch → null on failure, does not fail the whole batch" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.claude-settings-config
+  group: CLI Tool Integration
+  feature: Claude Code CLI settings integration
+  subFeature: GET/POST/DELETE for ~/.claude/settings.json env vars plus the exa MCP toggle in ~/.claude.json
+  trigger: Dashboard "Claude Code" card — GET on load, POST on Apply, DELETE on Reset
+  input: "POST body { env: {ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, ...}, exaMcpEnabled, maxContextTokens }"
+  output: "GET: { installed, settings, has9Router, exaMcpEnabled, settingsPath }. POST/DELETE: { success, message }"
+  businessRules:
+    - "checkClaudeInstalled tries `where`/`which claude` first, falls back to checking settings.json existence — either satisfies 'installed'"
+    - "ANTHROPIC_BASE_URL is normalised to end in exactly \"/v1\" before being written (endsWith check, append if missing) — see clitools.baseurl-v1-suffix-normalization for the shared rule and its edge case"
+    - "env fields are merged into the existing settings.env object (spread), not replaced — unrelated existing env keys survive an Apply"
+    - "CLAUDE_CODE_MAX_CONTEXT_TOKENS is set only when maxContextTokens is truthy; a falsy value (0, empty, 'Default') deletes the key so Claude Code falls back to the model's own context window"
+    - "The exa MCP toggle is written to a DIFFERENT file, ~/.claude.json, under mcpServers.exa — because 'Claude Code CLI reads mcpServers from ~/.claude.json (NOT settings.json)' (source comment); the entry itself is reused verbatim from coworkPlugins.DEFAULT_PLUGINS' exa definition"
+    - "DELETE removes a fixed RESET_ENV_KEYS list from settings.env (not the whole env object) and unconditionally strips the injected exa entry from ~/.claude.json, regardless of whether it toggled it on originally"
+  state:
+    reads: ["~/.claude/settings.json", "~/.claude.json (mcpServers.exa)"]
+    writes: ["~/.claude/settings.json", "~/.claude.json (mcpServers.exa)"]
+    runtimeOnly: []
+  dependencies: ["clitools.write-not-atomic", "clitools.baseurl-v1-suffix-normalization"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "POST body has no env object (or env is not an object) — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "any fs read/write throws unexpectedly (not ENOENT) — 500", partial: false }
+  sideEffects: ["Overwrites ~/.claude/settings.json", "Overwrites ~/.claude.json's mcpServers.exa entry"]
+  persistence: ["~/.claude/settings.json (user's own file, outside 9router's data dir)", "~/.claude.json (same)"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The POST handler comment says 'Backup old fields and write new settings' (line 123) but no backup file is ever written — the 'backup' is only the in-memory merge of the previously-read settings object before the single overwrite; see clitools.write-not-atomic"
+    - "settings.json is tolerant of JSONC (trailing commas stripped by regex) on read, but is always written back as strict JSON — round-tripping a hand-edited JSONC file silently reformats it"
+  evidence:
+    - { file: src/app/api/cli-tools/claude-settings/route.js, line: 26, note: "comment: Claude Code CLI reads mcpServers from ~/.claude.json, not settings.json" }
+    - { file: src/app/api/cli-tools/claude-settings/route.js, line: 123, note: "'Backup old fields and write new settings' comment on the POST handler" }
+    - { file: src/app/api/cli-tools/claude-settings/route.js, line: 154, note: "ANTHROPIC_BASE_URL normalised to end in /v1" }
+    - { file: src/app/api/cli-tools/claude-settings/route.js, line: 160, note: "env merged via spread into currentSettings.env, not replaced" }
+    - { file: src/app/api/cli-tools/claude-settings/route.js, line: 171, note: "CLAUDE_CODE_MAX_CONTEXT_TOKENS set-or-delete based on truthiness of maxContextTokens" }
+    - { file: src/app/api/cli-tools/claude-settings/route.js, line: 178, note: "single fs.writeFile of the merged settings object — no temp file, no rename" }
+    - { file: src/app/api/cli-tools/claude-settings/route.js, line: 182, note: "writeClaudeJsonMcp toggles the exa entry in ~/.claude.json, separate file from settings.json" }
+    - { file: src/app/api/cli-tools/claude-settings/route.js, line: 231, note: "DELETE removes only RESET_ENV_KEYS, not the whole env object" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.write-not-atomic
+  group: CLI Tool Integration
+  feature: User config file durability
+  subFeature: Every cli-tools write is a single non-atomic fs.writeFile with no on-disk backup
+  trigger: Any POST/DELETE/PATCH across all 13 write-capable cli-tools routes
+  input: "Any tool-config write triggered by that tool's own POST/DELETE/PATCH handler"
+  output: "The write either lands intact or, on a mid-write failure, leaves the target file truncated/corrupted with no recovery path"
+  businessRules:
+    - "Q2 answer: the write is NOT atomic. Every route (claude-settings, cline-settings, codex-settings, copilot-settings, cowork-settings, deepseek-tui-settings, droid-settings, grok-build-settings, hermes-settings, jcode-settings, kilo-settings, openclaw-settings, opencode-settings — including openclaw's per-agent models.json files and cowork's per-instance configLibrary/*.json) calls fs.writeFile(path, content) directly on the FINAL path. None use a temp-file-then-rename swap, and none write a recoverable .bak copy of the previous content"
+    - "The codebase already has an atomic-write helper for this exact purpose elsewhere: src/lib/mitmAliasCache.js's writeAtomic() writes to '<file>.tmp' then fs.renameSync()s over the real file — that pattern is simply not used for any of the user's own CLI/IDE config files"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "process dies, disk fills, or power is lost between fs.writeFile's buffer flush and the OS completing the write", partial: true }
+  sideEffects: ["Can leave the user's real tool config file truncated or containing invalid JSON/TOML/YAML"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "No lock: two concurrent Apply calls for the same tool both read-merge-write independently; whichever writeFile lands last silently wins and drops the other request's fields" }
+  edgeCases:
+    - "Every route's own read path treats a JSON.parse/parseTOML failure as 'no config' (returns null), not as an error — so the read immediately AFTER a corrupted write reports the tool as unconfigured, and the next Apply starts from an empty object, discarding whatever else was in the file before 9router ever touched it"
+    - "Two concurrent Apply calls to the same tool race with no lock, since each does read-then-merge-then-write independently"
+  evidence:
+    - { file: src/app/api/cli-tools/claude-settings/route.js, line: 178, note: "direct fs.writeFile, no temp file, despite the adjacent 'Backup' comment at line 123" }
+    - { file: src/app/api/cli-tools/droid-settings/route.js, line: 161, note: "same pattern: read, mutate in memory, single fs.writeFile" }
+    - { file: src/app/api/cli-tools/opencode-settings/route.js, line: 162, note: "same pattern" }
+    - { file: src/app/api/cli-tools/cline-settings/route.js, line: 97, note: "same pattern, plus a second writeFile for secrets.json two files later with no cross-file transaction" }
+    - { file: src/lib/mitmAliasCache.js, line: 15, note: "writeAtomic() — temp file + fs.renameSync — the atomic pattern that exists in this codebase but is not applied to any user CLI config write" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Given every one of these writes targets the user's own IDE/CLI configuration file (not 9router's own data), and one of the affected routes' own comment explicitly promises 'Backup old fields and write new settings', a crash mid-write should not be able to corrupt or truncate that file — either via a temp-file-then-rename swap (the exact pattern already implemented in this codebase at src/lib/mitmAliasCache.js:15-21 for 9router's own alias cache) or an actual on-disk backup copy."
+    actual: "All 13 write-capable cli-tools routes call fs.writeFile(path, content) directly on the final path with no temp file, no rename, and no backup copy anywhere on disk. The 'backup' language in the claude-settings POST comment refers only to merging the previously-read JSON object in memory before the single overwrite call — nothing is preserved outside process memory."
+    impact: "A crash, OOM kill, disk-full error, or power loss during any of these writes can truncate or corrupt the user's real tool config (e.g. ~/.claude/settings.json, ~/.codex/config.toml, ~/.openclaw/openclaw.json). Because every route's read path treats an unparseable file as simply 'no config', the damage is silent: the next status check reports the tool as unconfigured, and the next Apply starts from empty, permanently discarding whatever unrelated settings that file held before 9router wrote to it."
+
+- id: clitools.baseurl-v1-suffix-normalization
+  group: CLI Tool Integration
+  feature: Base URL normalisation for CLI tool configs
+  subFeature: Each POST handler independently appends (or strips) a literal "/v1" suffix before writing baseUrl
+  trigger: Every write-capable cli-tools POST handler, before the baseUrl value is written into that tool's own config format
+  input: "baseUrl string supplied by the dashboard (normally the 9router base URL the user is pointing the tool at)"
+  output: "baseUrl string with (or without) a trailing /v1, as that specific tool's config format expects"
+  businessRules:
+    - "Q4 rule, reimplemented independently (not shared code) in at least 9 route files: `baseUrl.endsWith(\"/v1\") ? baseUrl : baseUrl + \"/v1\"`. Because the check is an exact suffix match, re-running Apply on a baseUrl that already ends in /v1 is a no-op — nothing extra is appended. That is the direct answer to 'what breaks if a base URL already ends in /v1': nothing, the check is idempotent for the exact string"
+    - "cline-settings does the INVERSE (`endsWith(\"/v1\") ? baseUrl.slice(0, -3) : baseUrl`) because, per its own comment, 'Cline expects base WITHOUT /v1'"
+    - "This is a client-config-generation concern only — separate from how 9router's own executor builds its OUTBOUND upstream URLs. That path (open-sse/executors/base.js, see routing.build-url in 05-routing-and-fallback.yaml) does a single-trailing-slash strip and appends an endpoint path with NO /v1 detection at all; the two normalisation rules exist for unrelated reasons and must not be conflated during parity design"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.build-url"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "endsWith(\"/v1\") is a literal match: a trailing-slash variant like \"http://localhost:20128/v1/\" does not match, so the append branch fires anyway, producing \"http://localhost:20128/v1//v1\" — a broken double-suffixed URL. The same risk applies to cline's inverse check on a trailing-slash variant"
+    - "The rule is copy-pasted independently into claude-settings, codex-settings, droid-settings, opencode-settings, grok-build-settings, hermes-settings, jcode-settings, deepseek-tui-settings and kilo-settings rather than shared — a future change to the rule has to be made in 9 places"
+  evidence:
+    - { file: src/app/api/cli-tools/claude-settings/route.js, line: 154, note: "endsWith(/v1) ? keep : append — canonical form of the rule" }
+    - { file: src/app/api/cli-tools/cline-settings/route.js, line: 88, note: "comment: Cline expects base WITHOUT /v1" }
+    - { file: src/app/api/cli-tools/cline-settings/route.js, line: 89, note: "inverse rule: strip trailing /v1 via slice(0, -3) when present" }
+    - { file: src/app/api/cli-tools/codex-settings/route.js, line: 137, note: "same append rule, comment 'Ensure /v1 suffix is added only once'" }
+    - { file: src/app/api/cli-tools/droid-settings/route.js, line: 118, note: "same append rule" }
+    - { file: src/app/api/cli-tools/deepseek-tui-settings/route.js, line: 56, note: "same append rule inside build9RouterConfig" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.cline-settings-dual-file
+  group: CLI Tool Integration
+  feature: Cline VS Code extension settings integration
+  subFeature: Split write across globalState.json (provider/model) and secrets.json (API key)
+  trigger: Dashboard "Cline" card — GET/POST/DELETE
+  input: "POST body { baseUrl, apiKey, model }"
+  output: "{ success, message, globalStatePath }"
+  businessRules:
+    - "Detection (has9RouterConfig) requires BOTH actModeApiProvider/planModeApiProvider === 'openai' AND openAiBaseUrl containing localhost/127.0.0.1/'9router'"
+    - "Applying sets both actMode and planMode provider to 'openai' and writes openAiBaseUrl/openAiModelId/planModeOpenAiModelId into globalState.json, then writes the plaintext API key into a SEPARATE file, secrets.json, as openAiApiKey — mirroring Cline's own on-disk split between non-secret state and secrets"
+    - "DELETE only clears the 9Router-related fields (and flips the provider back to 'cline') when actModeApiProvider was 'openai' — if the user had switched Cline to a different provider in between, Reset leaves that provider untouched but still deletes secrets.openAiApiKey unconditionally"
+  state: { reads: ["~/.cline/data/globalState.json", "~/.cline/data/secrets.json"], writes: ["~/.cline/data/globalState.json", "~/.cline/data/secrets.json"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic", "clitools.baseurl-v1-suffix-normalization"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl, apiKey or model missing from POST body — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "unexpected fs error on either file", partial: false }
+  sideEffects: ["Overwrites globalState.json and secrets.json independently — two writes, no shared transaction"]
+  persistence: ["~/.cline/data/globalState.json", "~/.cline/data/secrets.json"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "If the process dies between the two writes, globalState.json can end up pointing at 9router while secrets.json still holds the OLD api key (or vice-versa on Reset) — a cross-file partial-failure window unique to tools that split config across more than one file"
+  evidence:
+    - { file: src/app/api/cli-tools/cline-settings/route.js, line: 12, note: "two paths: globalState.json and secrets.json" }
+    - { file: src/app/api/cli-tools/cline-settings/route.js, line: 89, note: "baseUrl stripped of trailing /v1 (Cline convention)" }
+    - { file: src/app/api/cli-tools/cline-settings/route.js, line: 97, note: "write globalState.json" }
+    - { file: src/app/api/cli-tools/cline-settings/route.js, line: 101, note: "separate write to secrets.json for openAiApiKey" }
+    - { file: src/app/api/cli-tools/cline-settings/route.js, line: 117, note: "DELETE only rewrites provider fields when actModeApiProvider was openai" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.codex-settings-toml-split-secret
+  group: CLI Tool Integration
+  feature: Codex CLI settings integration
+  subFeature: TOML config.toml (model/provider) plus a static bearer header carrying the API key, separate auth.json cleanup
+  trigger: Dashboard "Codex" card — GET/POST/DELETE
+  input: "POST body { baseUrl, apiKey, model, subagentModel }"
+  output: "{ success, message, configPath }"
+  businessRules:
+    - "Uses the confbox library to parse/stringify TOML (unlike deepseek-tui's hand-rolled regex parser)"
+    - "The API key is NOT written into config.toml's provider section as an api_key field — Codex's custom-provider auth.json mechanism is bypassed entirely by putting the key directly into a static `http_headers.Authorization: Bearer <key>` header on the provider entry, because (per comment) 'Custom providers ignore auth.json — the key must travel as a static header'. This means the API key is stored in PLAINTEXT inside config.toml itself, not in the more restrictively-named auth.json"
+    - "agents.subagent (legacy key) is deleted and replaced by agents.default_subagent_model on every Apply"
+    - "DELETE only removes the root model/model_provider fields if model_provider is currently exactly '9router' (so switching Codex to a different provider first prevents 9router's Reset from clobbering it), but ALWAYS deletes model_providers.9router and the subagent keys regardless"
+    - "DELETE also strips OPENAI_API_KEY and auth_mode from auth.json (a file this integration never wrote to), deleting the whole file if it becomes empty"
+  state: { reads: ["~/.codex/config.toml", "~/.codex/auth.json"], writes: ["~/.codex/config.toml", "~/.codex/auth.json (delete-only)"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic", "clitools.baseurl-v1-suffix-normalization"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl, apiKey or model missing — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "unexpected fs/TOML error", partial: false }
+  sideEffects: ["API key stored in cleartext inside config.toml, a non-secrets file"]
+  persistence: ["~/.codex/config.toml", "~/.codex/auth.json"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because the key rides in a config.toml header rather than auth.json, any tool or backup process that treats config.toml as non-sensitive (unlike auth.json, whose name signals secrecy) will leak the 9router API key"
+  evidence:
+    - { file: src/app/api/cli-tools/codex-settings/route.js, line: 138, note: "comment: custom providers ignore auth.json; key must travel as a static header" }
+    - { file: src/app/api/cli-tools/codex-settings/route.js, line: 139, note: "http_headers.Authorization set directly on the provider TOML section — plaintext key in config.toml" }
+    - { file: src/app/api/cli-tools/codex-settings/route.js, line: 147, note: "legacy agents.subagent deleted, replaced by agents.default_subagent_model" }
+    - { file: src/app/api/cli-tools/codex-settings/route.js, line: 186, note: "root model/model_provider only cleared if model_provider === '9router'" }
+    - { file: src/app/api/cli-tools/codex-settings/route.js, line: 203, note: "auth.json OPENAI_API_KEY/auth_mode cleanup, file deleted if left empty" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.copilot-settings-array-upsert
+  group: CLI Tool Integration
+  feature: GitHub Copilot Chat (VS Code) settings integration
+  subFeature: Array-based upsert into chatLanguageModels.json, and a missing install-detection step
+  trigger: Dashboard "Copilot" card — GET/POST/DELETE
+  input: "POST body { baseUrl, apiKey, models[] }"
+  output: "{ success, message, configPath }"
+  businessRules:
+    - "Config is an array of provider entries (not a keyed object like every other tool); the 9Router entry is found/replaced/appended by name === '9Router'"
+    - "vendor is hardcoded to 'azure' and each model entry is given a fixed toolCalling:true, vision:false, maxInputTokens:128000, maxOutputTokens:16000 regardless of the model's real capabilities"
+    - "apiKey defaults to the literal string 'sk_9router' when the caller supplies none"
+    - "URL is built as `${baseUrl}/chat/completions#models.ai.azure.com` — a different suffix convention than the /v1 rule used by every other tool (see clitools.baseurl-v1-suffix-normalization), because VS Code's Copilot Chat model picker keys entries by this azure-style URL fragment"
+  state: { reads: ["VS Code User/chatLanguageModels.json (OS-specific path)"], writes: ["same file"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl missing or models[] empty — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "unexpected fs error", partial: false }
+  sideEffects: []
+  persistence: ["chatLanguageModels.json"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "GET never calls an install-detection step (no `where`/`which copilot`, no probe of a Copilot-specific marker file) — it unconditionally returns installed: true even on a machine with no VS Code or Copilot extension at all, unlike every one of the other 12 GET-batched tools"
+  evidence:
+    - { file: src/app/api/cli-tools/copilot-settings/route.js, line: 44, note: "GET has no checkInstalled call at all" }
+    - { file: src/app/api/cli-tools/copilot-settings/route.js, line: 50, note: "installed: true is returned unconditionally" }
+    - { file: src/app/api/cli-tools/copilot-settings/route.js, line: 83, note: "endpointUrl uses '#models.ai.azure.com' suffix, not /v1" }
+    - { file: src/app/api/cli-tools/copilot-settings/route.js, line: 89, note: "keyToUse defaults to literal 'sk_9router' when apiKey omitted" }
+    - { file: src/app/api/cli-tools/copilot-settings/route.js, line: 102, note: "array upsert by name === '9Router'" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Like every other cli-tools GET handler (claude, codex, cline, droid, kilo, etc.), Copilot's GET should reflect a real detection check — a `where`/`which` lookup or a marker-file probe — before reporting installed: true, so the dashboard only shows Copilot as available on a machine that actually has it."
+    actual: "copilot-settings/route.js's GET performs no detection at all: it reads chatLanguageModels.json (which may not exist, in which case config is null) and always returns installed: true regardless."
+    impact: "The dashboard's Copilot integration card (and any 'all installed tools' summary the UI derives from installed flags) will show Copilot as installed on any machine, even one with no VS Code and no Copilot extension, inviting the user to Apply — which just writes a file nobody will ever read."
+
+- id: clitools.droid-settings-custommodels
+  group: CLI Tool Integration
+  feature: Factory Droid CLI settings integration
+  subFeature: customModels array rebuild with reorder-to-front default selection
+  trigger: Dashboard "Droid" card — GET/POST/DELETE
+  input: "POST body { baseUrl, apiKey, model | models[], activeModel }"
+  output: "{ success, message, settingsPath }"
+  businessRules:
+    - "Accepts either legacy single `model` (string) or `models` (array); normalises to modelsArray"
+    - "Every Apply first strips ALL existing entries whose id starts with 'custom:9Router' before rebuilding — prevents unbounded duplicate accumulation across repeated Applies"
+    - "activeModel selects which of the rebuilt entries is moved to index 0 (droid's 'default' convention appears to be array position); an explicit empty-string activeModel means 'no default', leaving index 0 as whichever model happened to be pushed first"
+  state: { reads: ["~/.factory/settings.json"], writes: ["same file"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic", "clitools.baseurl-v1-suffix-normalization"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl missing or no models resolved — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "unexpected fs error", partial: false }
+  sideEffects: []
+  persistence: ["~/.factory/settings.json"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "DELETE removes entries by id prefix only ('custom:9Router') and deletes the customModels array entirely if it becomes empty, but leaves the rest of settings.json untouched — targeted removal, contrast with clitools.deepseek-tui-full-overwrite"
+  evidence:
+    - { file: src/app/api/cli-tools/droid-settings/route.js, line: 90, note: "accepts model (legacy) or models (array)" }
+    - { file: src/app/api/cli-tools/droid-settings/route.js, line: 115, note: "strips all existing custom:9Router* entries before rebuild" }
+    - { file: src/app/api/cli-tools/droid-settings/route.js, line: 152, note: "reorder: unshift the chosen default entry to index 0, re-index the rest" }
+    - { file: src/app/api/cli-tools/droid-settings/route.js, line: 195, note: "DELETE: targeted removal by id prefix, array deleted only if now empty" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.kilo-settings-dual-file
+  group: CLI Tool Integration
+  feature: Kilo Code CLI settings integration
+  subFeature: auth.json write plus a best-effort, error-swallowed VS Code settings.json write
+  trigger: Dashboard "Kilo Code" card — GET/POST/DELETE
+  input: "POST body { baseUrl, apiKey, model }"
+  output: "{ success, message, authPath }"
+  businessRules:
+    - "Primary write is auth.json's 'openai-compatible' entry (type, apiKey, baseUrl, model)"
+    - "A second, best-effort write mirrors the same values into the VS Code extension's own settings.json (kilocode.customProvider / kilocode.defaultModel) wrapped in its own try/catch — a failure there (e.g. VS Code not installed, path not writable) is silently swallowed and does not affect the reported success of the Apply"
+  state: { reads: ["~/.local/share/kilo/auth.json", "VS Code User/settings.json"], writes: ["same two files"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic", "clitools.baseurl-v1-suffix-normalization"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl, apiKey or model missing — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "auth.json write itself fails (the VS Code write failing does NOT produce an error)", partial: true }
+  sideEffects: []
+  persistence: ["~/.local/share/kilo/auth.json", "VS Code User/settings.json"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The VS Code settings.json write can fail entirely (path doesn't exist, permissions) with no signal to the caller at all — the response always says 'applied successfully' even if the VS Code half silently no-op'd"
+  evidence:
+    - { file: src/app/api/cli-tools/kilo-settings/route.js, line: 12, note: "two paths: auth.json and VS Code User settings.json" }
+    - { file: src/app/api/cli-tools/kilo-settings/route.js, line: 92, note: "primary write: auth.json" }
+    - { file: src/app/api/cli-tools/kilo-settings/route.js, line: 95, note: "best-effort VS Code write wrapped in try/catch with comment 'VS Code settings not writable'" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.opencode-settings-provider-map
+  group: CLI Tool Integration
+  feature: OpenCode CLI settings integration
+  subFeature: provider.models map merge, active-model selection, and an always-rewritten subagent entry
+  trigger: Dashboard "OpenCode" card — GET/POST/PATCH/DELETE
+  input: "POST body { baseUrl, apiKey, model | models[], activeModel, subagentModel }; PATCH { clearActiveModel }; DELETE ?model=<id>"
+  output: "{ success, message, configPath }"
+  businessRules:
+    - "provider['9router'].models is a map merged with existing entries (models not in the current request are preserved), unlike tools that fully rebuild their model list on each Apply"
+    - "config.agent.explorer is unconditionally (re)written on every successful POST to point at effectiveSubagentModel (subagentModel if given, else the first requested model) — even if the caller only intended to change the base URL"
+    - "PATCH supports a narrow clearActiveModel-only operation that blanks config.model without touching the provider/models map"
+    - "DELETE supports removing a single model (?model=<id>) — if it was the active model, the first remaining model becomes active; if models becomes empty, the whole provider entry and config.model are removed. With no ?model, the whole 9router provider and agent.explorer subagent are removed"
+  state: { reads: ["~/.config/opencode/opencode.json"], writes: ["same file"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic", "clitools.baseurl-v1-suffix-normalization"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl missing or no models resolved on POST — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "unexpected fs/JSON error on any of GET/POST/PATCH/DELETE", partial: false }
+  sideEffects: []
+  persistence: ["~/.config/opencode/opencode.json"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Every Apply overwrites agent.explorer even for callers that never asked for a subagent model — there is no way to Apply base settings without also touching the subagent config"
+  evidence:
+    - { file: src/app/api/cli-tools/opencode-settings/route.js, line: 122, note: "existingProvider preserved and merged, models map extended rather than replaced" }
+    - { file: src/app/api/cli-tools/opencode-settings/route.js, line: 155, note: "agent.explorer subagent entry unconditionally (re)written on every POST" }
+    - { file: src/app/api/cli-tools/opencode-settings/route.js, line: 192, note: "PATCH clearActiveModel-only path" }
+    - { file: src/app/api/cli-tools/opencode-settings/route.js, line: 230, note: "DELETE single-model removal with active-model reassignment" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.openclaw-settings-per-agent-fanout
+  group: CLI Tool Integration
+  feature: OpenClaw CLI settings integration
+  subFeature: Main openclaw.json plus one models.json per agent, written in a non-transactional fan-out
+  trigger: Dashboard "OpenClaw" card — GET/POST/DELETE
+  input: "POST body { baseUrl, apiKey, model, agentModels: { [agentId]: modelId } }"
+  output: "{ success, message, settingsPath }"
+  businessRules:
+    - "agent.model may be stored by OpenClaw as either a plain string or { primary, fallbacks }; resolveAgentModel() normalises both forms to a string for internal `.startsWith()` checks, and the GET response coerces every agent's model field the same way before returning it"
+    - "POST rebuilds agents.defaults.model.primary, the agents.defaults.models allowlist (all old '9router/*' keys dropped, fresh ones added for every unique model referenced across the default and all per-agent overrides), and updates each named agent's model field in agents.list"
+    - "For every agent in agents.list that has an agentDir, a SEPARATE models.json file under that agent's own directory is written with that agent's resolved provider/model config — one extra fs.writeFile per agent, all fired via Promise.all, BEFORE the main openclaw.json write happens"
+    - "DELETE performs targeted removal only (9router provider entry, 9router/* allowlist keys, agents.defaults.model.primary if it points at 9router) — preserves all unrelated openclaw settings, unlike clitools.deepseek-tui-full-overwrite"
+  state: { reads: ["~/.openclaw/openclaw.json", "<agentDir>/models.json per agent"], writes: ["same files"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic", "clitools.baseurl-v1-suffix-normalization"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl or model missing — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "unexpected fs error on the main file or any per-agent file", partial: true }
+  sideEffects: ["Up to N+1 independent file writes per Apply, none of them coordinated"]
+  persistence: ["~/.openclaw/openclaw.json", "one models.json per agent with an agentDir"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "Per-agent models.json writes run concurrently via Promise.all, then the single openclaw.json write happens afterward" }
+  edgeCases:
+    - "If the process dies during the per-agent Promise.all loop (or between it and the final openclaw.json write), some agents' models.json files reflect the new 9router model while others (and/or the main settings file) still reflect the old state — a multi-file partial-failure window on top of the single-file non-atomicity already covered by clitools.write-not-atomic"
+  evidence:
+    - { file: src/app/api/cli-tools/openclaw-settings/route.js, line: 15, note: "resolveAgentModel normalises string vs {primary,fallbacks} model shapes" }
+    - { file: src/app/api/cli-tools/openclaw-settings/route.js, line: 118, note: "writeAgentModels — one models.json write per agent" }
+    - { file: src/app/api/cli-tools/openclaw-settings/route.js, line: 213, note: "per-agent models.json writes fired via Promise.all" }
+    - { file: src/app/api/cli-tools/openclaw-settings/route.js, line: 224, note: "main openclaw.json write happens after the per-agent fan-out" }
+    - { file: src/app/api/cli-tools/openclaw-settings/route.js, line: 258, note: "DELETE: targeted removal, rest of the file preserved" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.deepseek-tui-full-overwrite
+  group: CLI Tool Integration
+  feature: DeepSeek TUI settings integration
+  subFeature: Both POST and DELETE replace the entire config.toml with a fixed template, discarding unrelated content
+  trigger: Dashboard "DeepSeek TUI" card — GET/POST/DELETE
+  input: "POST body { baseUrl, apiKey, model }"
+  output: "{ success, message, configPath }"
+  businessRules:
+    - "GET uses a hand-rolled regex TOML parser (parseToml) rather than a real TOML library (contrast with codex-settings and jcode-settings, which use confbox) — it only understands flat `key = \"value\"` lines and `[section]` headers, storing dotted-section content under a single flat key like config['providers.openai'] rather than a nested object"
+    - "POST does NOT read the existing config.toml at all before writing: build9RouterConfig() returns a brand-new fixed template string (`provider = \"openai\"\\n[providers.openai]\\n...`) that is written verbatim, replacing the entire file"
+    - "DELETE writes the hardcoded DEFAULT_CONFIG string (`provider = \"deepseek\"\\n`) verbatim, again replacing the entire file"
+  state: { reads: ["~/.deepseek/config.toml"], writes: ["same file"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic", "clitools.baseurl-v1-suffix-normalization"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl or model missing — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "unexpected fs error", partial: false }
+  sideEffects: ["Destroys any pre-existing DeepSeek TUI settings unrelated to 9router on both Apply and Reset"]
+  persistence: ["~/.deepseek/config.toml"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Compare to clitools.grok-build-settings-restore-on-reset, which surgically edits only the 9router-owned TOML sections and remembers/restores the user's previous default — deepseek-tui is the one tool in this set that does neither a merge nor a targeted removal"
+  evidence:
+    - { file: src/app/api/cli-tools/deepseek-tui-settings/route.js, line: 18, note: "hand-rolled regex TOML parser, not a real TOML library" }
+    - { file: src/app/api/cli-tools/deepseek-tui-settings/route.js, line: 55, note: "build9RouterConfig returns a brand-new template string, ignoring any existing config" }
+    - { file: src/app/api/cli-tools/deepseek-tui-settings/route.js, line: 67, note: "DEFAULT_CONFIG hardcoded reset template" }
+    - { file: src/app/api/cli-tools/deepseek-tui-settings/route.js, line: 135, note: "POST: readConfigToml's result is not consulted; template written directly" }
+    - { file: src/app/api/cli-tools/deepseek-tui-settings/route.js, line: 158, note: "DELETE: DEFAULT_CONFIG written verbatim, replacing the whole file" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Like every other tool's Apply/Reset in this set (codex, droid, opencode, openclaw, grok-build, hermes, jcode, kilo, cline, cowork all read-merge-write or perform a targeted key removal), DeepSeek TUI's POST should merge 9router's fields into whatever config.toml already contains, and DELETE should remove only what 9router added — preserving any other DeepSeek TUI settings the user configured."
+    actual: "Both POST and DELETE build a fixed, hand-written TOML string from scratch and write it directly, completely replacing the file's prior contents regardless of what else was in it (POST never even calls the file's own readConfigToml() result; DELETE writes a hardcoded 2-line default)."
+    impact: "The first time a user clicks Apply or Reset for DeepSeek TUI in the 9router dashboard, any other settings they had configured directly in ~/.deepseek/config.toml (other providers, TUI preferences, anything not related to 9router) are silently and irrecoverably destroyed."
+
+- id: clitools.grok-build-settings-restore-on-reset
+  group: CLI Tool Integration
+  feature: Grok Build CLI settings integration
+  subFeature: Surgical TOML section editing with a marker-comment mechanism to remember and restore the user's prior default/subagent config
+  trigger: Dashboard "Grok Build" card — GET/POST/DELETE
+  input: "POST body { baseUrl, apiKey, model, contextWindow, subagentModels }"
+  output: "{ success, message, configPath, modelSlot: '9router' }"
+  businessRules:
+    - "Delegates all TOML editing to src/lib/grokBuildConfig.js — a regex-based section reader/writer (not a general TOML library) that edits only `[model.9router]`, `[model.9router-<subagent-type>]` and the `default`/`subagents.models.<type>` keys, leaving all other TOML content untouched"
+    - "Before overwriting models.default (or a subagent mapping) with 9router's slot, rememberPreviousDefault/rememberPreviousSubagent insert a `# 9router-prev-default = \"...\"` (or per-type) marker COMMENT recording what the value was beforehand — but only if no such marker already exists (idempotent across repeated Applies)"
+    - "resetGrokBuildConfig restores the remembered previous default/subagent values from those markers (falling back to GROK_BUILTIN_DEFAULT = 'grok-build' if none was recorded) and removes the 9router model sections — this is the one tool in the set that round-trips the user's PRE-9router configuration on Reset rather than just deleting 9router's own additions"
+    - "getCapabilitiesForModel (open-sse/providers/capabilities.js) supplies a default context_window when the caller doesn't specify one, tying this integration to the shared model-capability registry"
+  state: { reads: ["~/.grok/config.toml"], writes: ["same file"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic", "clitools.baseurl-v1-suffix-normalization", "catalog.capability-tier-fallback"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl or model missing — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "unexpected fs error", partial: false }
+  sideEffects: []
+  persistence: ["~/.grok/config.toml"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "If a user manually deletes the `# 9router-prev-*` marker comment by hand, Reset falls back to the hardcoded GROK_BUILTIN_DEFAULT ('grok-build') instead of their real prior value — the restore mechanism is only as reliable as the marker surviving untouched"
+  evidence:
+    - { file: src/lib/grokBuildConfig.js, line: 131, note: "rememberPreviousDefault — inserts a marker comment with the pre-9router default, once" }
+    - { file: src/lib/grokBuildConfig.js, line: 138, note: "restorePreviousDefault — reads the marker back and restores it on reset" }
+    - { file: src/lib/grokBuildConfig.js, line: 234, note: "resetGrokBuildConfig — removes 9router sections and restores prior default/subagents" }
+    - { file: src/app/api/cli-tools/grok-build-settings/route.js, line: 109, note: "applyGrokBuildConfig invoked with baseUrl/apiKey/model/contextWindow/subagentModels" }
+    - { file: src/app/api/cli-tools/grok-build-settings/route.js, line: 54, note: "normalizeContextWindow falls back to getCapabilitiesForModel(...).contextWindow when unspecified" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.hermes-settings-regex-block
+  group: CLI Tool Integration
+  feature: Hermes Agent settings integration
+  subFeature: Regex-based YAML model-block upsert plus a separate .env file for the API key
+  trigger: Dashboard "Hermes Agent" card — GET/POST/DELETE
+  input: "POST body { baseUrl, apiKey, model }"
+  output: "{ success, message, configPath }"
+  businessRules:
+    - "config.yaml is edited with a hand-written regex (MODEL_BLOCK_RE) that matches the top-level `model:` block up to the next non-indented line and replaces it wholesale — everything else in the YAML file is left untouched as raw text (no YAML parser is used at all)"
+    - "The written model block always references the key via `${OPENAI_API_KEY}` (a literal YAML env-var placeholder), while the actual secret is upserted into a SEPARATE .env file via a simple `KEY=value` regex line replace — apiKey is only written to .env when the caller supplies one; omitting it on a later Apply leaves the previous key in .env untouched"
+    - "DELETE removes the model: block from config.yaml entirely (removeModelBlock) but does not touch .env — OPENAI_API_KEY is left in .env after a Reset"
+  state: { reads: ["~/.hermes/config.yaml", "~/.hermes/.env"], writes: ["same two files"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic", "clitools.baseurl-v1-suffix-normalization"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl or model missing — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "unexpected fs error", partial: false }
+  sideEffects: []
+  persistence: ["~/.hermes/config.yaml", "~/.hermes/.env"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "DELETE removes the model: block but leaves OPENAI_API_KEY sitting in .env indefinitely — Reset is not a full undo of Apply for this tool"
+    - "The regex-based block match assumes the model: block is a top-level key with no unusual indentation; hand-edited YAML with different formatting could fail to match, silently falling through to the 'prepend a new block' branch (upsertModelBlock) and leaving a stale duplicate model: block behind"
+  evidence:
+    - { file: src/app/api/cli-tools/hermes-settings/route.js, line: 20, note: "MODEL_BLOCK_RE — regex match for the top-level model: block, no YAML parser" }
+    - { file: src/app/api/cli-tools/hermes-settings/route.js, line: 22, note: "buildModelBlock references the key via a literal ${OPENAI_API_KEY} placeholder" }
+    - { file: src/app/api/cli-tools/hermes-settings/route.js, line: 42, note: "upsertModelBlock replaces the matched block, or prepends a new one if no match" }
+    - { file: src/app/api/cli-tools/hermes-settings/route.js, line: 140, note: ".env only written when apiKey is supplied on this call" }
+    - { file: src/app/api/cli-tools/hermes-settings/route.js, line: 169, note: "DELETE removes only the model: block from config.yaml, .env is untouched" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.jcode-settings-env-split
+  group: CLI Tool Integration
+  feature: jcode CLI settings integration
+  subFeature: confbox TOML provider entry plus a separate quoted-KEY=VALUE env file for the API key
+  trigger: Dashboard "jcode" card — GET/POST/DELETE
+  input: "POST body { baseUrl, apiKey, models[] }"
+  output: "{ success, message, configPath }"
+  businessRules:
+    - "has9RouterConfig detects either an explicit providers['9router'] entry OR any provider whose base_url contains 'localhost:20128' — a looser heuristic than most other tools' name-only checks"
+    - "config.toml gets a providers['9router'] entry with api_key_env: 'JCODE_9ROUTER_API_KEY' and env_file: 'provider-9router.env' pointing at where the actual key lives; the key never appears in config.toml itself"
+    - "The env file path is derived from XDG_CONFIG_HOME (falling back to ~/.config), independent of the jcode config directory itself (~/.jcode) — two different base directories for the two files"
+    - "default_model falls back to a hardcoded 'cc/claude-opus-4-7' if models[] is empty"
+  state: { reads: ["~/.jcode/config.toml", "$XDG_CONFIG_HOME/jcode/provider-9router.env"], writes: ["same two files"], runtimeOnly: [] }
+  dependencies: ["clitools.write-not-atomic", "clitools.baseurl-v1-suffix-normalization"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl or apiKey missing — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "any error thrown is passed through as error.message with a 500", partial: false }
+  sideEffects: []
+  persistence: ["~/.jcode/config.toml", "$XDG_CONFIG_HOME/jcode/provider-9router.env"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The API key is stored in the env file as a double-quoted value with no escaping of embedded quotes — a key containing a literal `\"` would produce a malformed env line"
+  evidence:
+    - { file: src/app/api/cli-tools/jcode-settings/route.js, line: 16, note: "env file path derived from XDG_CONFIG_HOME, independent of the config.toml directory" }
+    - { file: src/app/api/cli-tools/jcode-settings/route.js, line: 55, note: "has9RouterConfig also matches any provider base_url containing localhost:20128" }
+    - { file: src/app/api/cli-tools/jcode-settings/route.js, line: 152, note: "provider entry stores api_key_env + env_file pointers, not the key itself" }
+    - { file: src/app/api/cli-tools/jcode-settings/route.js, line: 158, note: "default_model falls back to hardcoded 'cc/claude-opus-4-7'" }
+    - { file: src/app/api/cli-tools/jcode-settings/route.js, line: 103, note: "env values written double-quoted with no escaping" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.devin-settings-detect-only
+  group: CLI Tool Integration
+  feature: Devin CLI integration
+  subFeature: The one tool in the set with GET only — no config file is ever written
+  trigger: Dashboard "Devin" card — GET only (no POST/DELETE exported)
+  input: none
+  output: "{ installed, source, version, message } or { installed:false, message, installUrl }"
+  businessRules:
+    - "Detection first tries PATH lookup (`where`/`which devin`), then falls back to a hardcoded list of known installer paths per OS (mirrors, per its own comment, the executor's resolveDevinBin discovery so dashboard status matches what the runtime actually spawns)"
+    - "There is no config to write: the comment states the Devin binary handles its own auth via `devin auth login`, so this route only ever detects and reports — it is the only one of the 19 route files with no POST or DELETE export at all"
+  state: { reads: ["PATH", "OS-specific installer path candidates"], writes: [], runtimeOnly: [] }
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "unexpected error during detection — 500", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Because there's no Apply/Reset, this tool never appears in any of the write-related concerns (clitools.write-not-atomic, clitools.baseurl-v1-suffix-normalization) that affect the other 18 route files"
+  evidence:
+    - { file: src/app/api/cli-tools/devin-settings/route.js, line: 66, note: "comment: install detection only, no config to write — binary handles its own auth" }
+    - { file: src/app/api/cli-tools/devin-settings/route.js, line: 12, note: "candidateDevinPaths mirrors the executor's resolveDevinBin discovery, per comment" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.cowork-settings-desktop-mcp
+  group: CLI Tool Integration
+  feature: Claude Desktop (Cowork/3p mode) settings integration
+  subFeature: Per-instance configLibrary/<uuid>.json write, deploymentMode bootstrap in the real Claude Desktop config, and managed MCP server assembly
+  trigger: Dashboard "Claude Desktop (Cowork)" card — GET/POST/DELETE
+  input: "POST body { baseUrl, apiKey, models[], plugins[], localPlugins[], customPlugins[] }"
+  output: "{ success, bootstrapped, message, configPath, skipApprovals, localMcp }"
+  businessRules:
+    - "Claude Desktop's '3p' (third-party provider) mode stores its actual active config under an OS-specific 'Claude-3p' or 'Claude' configLibrary directory, keyed by a UUID (_meta.json's appliedId) — a NEW uuid is minted only if no _meta.json/appliedId is found anywhere on read OR write side"
+    - "bootstrapDeploymentMode reads/writes the REAL Claude Desktop app config (claude_desktop_config.json under Library/Application Support/Claude or APPDATA/Claude) to flip deploymentMode to '3p' — this is a write to the actual first-party desktop app's own settings file, not just 9router's derived config"
+    - "Every Apply also unconditionally applies a SECURITY_RELAX profile (coworkEgressAllowedHosts:['*'], all telemetry disabled, unsigned desktop extensions allowed, etc.) merged into the same config object — this is a broad, silent security-posture change bundled into what the UI presents only as 'Cowork settings applied'"
+    - "managedMcpServers = DEFAULT_PLUGINS (remote exa/tavily, from coworkPlugins.js, built via buildManagedMcpServers) + local stdio bridge entries (one per name in localPlugins[], pointing at this app's own /api/mcp/<name>/sse — see mcp.stdio-sse-bridge) + custom URL-only entries supplied by the caller (e.g. from McpMarketplaceModal via cowork-mcp-marketplace-fetch) — three different sources merged into one array on every Apply"
+    - "Local-bridge and custom entries get an x-9r-cli-token header injected (derived from getConsistentMachineId, cached module-scope) ONLY when their url starts with this app's own local /api/mcp/ prefix — remote plugins (exa/tavily) never get this header"
+    - "writeSkipApprovals writes a SEPARATE config.json with operonSkipMcpApprovals set to true for every managed server name, so Claude Desktop auto-approves tool calls from all of them with no per-tool prompt"
+    - "cleanup1pLegacy best-effort removes any of LOCAL_STDIO_PLUGINS' names from the FIRST-PARTY (1p) claude_desktop_config.json's mcpServers, in case an older 9router version wrote stdio entries there directly"
+    - "DELETE does not remove the instance file or _meta.json; it overwrites the active configLibrary/<uuid>.json with an empty object {} — Cowork keeps pointing at the same (now-empty) instance"
+  state: { reads: ["configLibrary/_meta.json", "configLibrary/<uuid>.json", "claude_desktop_config.json (1p)", "config.json (skip-approvals)"], writes: ["same four files"], runtimeOnly: ["cachedCliToken (module scope)"] }
+  dependencies: ["clitools.write-not-atomic", "mcp.stdio-sse-bridge", "clitools.cowork-mcp-marketplace-fetch"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "baseUrl/apiKey missing, or models[] resolves empty — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "unexpected fs error on any of the four files touched", partial: true }
+  sideEffects: ["Writes to the real Claude Desktop app's own config file (deploymentMode), not just a 9router-owned instance file", "Silently disables telemetry and relaxes egress/extension restrictions on every Apply"]
+  persistence: ["configLibrary/_meta.json", "configLibrary/<uuid>.json", "claude_desktop_config.json (1p)", "config.json"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "SECURITY_RELAX is applied unconditionally with no opt-out toggle exposed to the user; the response message only ever says settings were 'applied', never that telemetry was disabled or egress was opened to '*'"
+    - "DELETE leaves an orphaned empty instance file and _meta.json pointing at it, rather than reverting deploymentMode or removing the instance"
+  evidence:
+    - { file: src/app/api/cli-tools/cowork-settings/route.js, line: 37, note: "SECURITY_RELAX profile applied on every Apply" }
+    - { file: src/app/api/cli-tools/cowork-settings/route.js, line: 135, note: "bootstrapDeploymentMode writes deploymentMode:'3p' into the real Claude Desktop app config" }
+    - { file: src/app/api/cli-tools/cowork-settings/route.js, line: 156, note: "buildLocalBridgeEntries — points at this app's own /api/mcp/<name>/sse" }
+    - { file: src/app/api/cli-tools/cowork-settings/route.js, line: 229, note: "writeSkipApprovals — separate config.json auto-approving all managed servers" }
+    - { file: src/app/api/cli-tools/cowork-settings/route.js, line: 331, note: "managedMcpServers = default + bridge + custom entries merged" }
+    - { file: src/app/api/cli-tools/cowork-settings/route.js, line: 378, note: "DELETE overwrites the instance file with {} rather than removing it" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.antigravity-mitm-control
+  group: CLI Tool Integration
+  feature: Antigravity/MITM local proxy control
+  subFeature: Start/stop the local MITM server, toggle per-tool hosts-file DNS interception, and manage per-tool model-alias rewrite mappings
+  trigger: Dashboard "MITM" card — GET/POST/DELETE/PATCH on the base route; GET/PUT on the alias sub-route
+  input: "POST { apiKey, sudoPassword, mitmRouterBaseUrl, forceKillPort443 }; PATCH { tool, action, sudoPassword }; alias PUT { tool, mappings }"
+  output: "Status objects (running/pid/cert/dnsStatus/isAdmin) or { success, ... }"
+  businessRules:
+    - "Not a CLI config-file writer like the other 18 routes: this manages 9router's OWN local MITM proxy process and the machine's hosts file/DNS state for the tool hostnames in src/shared/constants/mitmToolHosts.js, plus a Root CA install into the OS trust store"
+    - "Privilege model: on Windows, checkIsAdmin probes `net session`; on other platforms, root or a cached/stored sudo password is required unless isSudoPasswordRequired() is false. POST/PATCH refuse with 403 if the caller lacks the needed privilege"
+    - "startServer's 409 PORT_443_BUSY error carries a portOwner so the caller can offer to force-kill whatever is squatting on 443 (forceKillPort443 flag)"
+    - "DELETE (stop) kills the MITM server process first, THEN (inside stopServer, manager.js) strips every tool hostname from the OS hosts file in one unconditional pass — not just whichever tools the DB recorded as currently enabled — so a stop always undoes every tool's interception, not just the ones the caller named"
+    - "The per-tool DNS enable/disable state and cached sudo password are persisted via initDbHooks(getSettings, updateSettings) into 9router's own SQLite settings row (mitmRouterBaseUrl, dnsStatus) — not a user CLI config file"
+    - "The alias sub-route's PUT requires DNS to already be enabled for that tool (403 otherwise) before it will accept model-alias rewrite mappings for that tool's intercepted traffic"
+    - "Alias mappings are persisted twice: source of truth in SQLite (aliasRepo's mitmAlias kv scope, via getMitmAlias/setMitmAliasAll) AND mirrored into a JSON read-replica file (src/lib/mitmAliasCache.js) so the standalone MITM server process — which has no SQLite binding — can read it. That mirror write DOES use the atomic temp-file+rename pattern (writeAtomic), unlike every cli-tools config write covered by clitools.write-not-atomic"
+  state: { reads: ["9router SQLite settings (mitmRouterBaseUrl, dnsStatus)", "cached/encrypted sudo password", "9router SQLite mitmAlias kv"], writes: ["9router SQLite settings", "OS hosts file (via addDNSEntry/removeDNSEntry)", "OS trust store (Root CA)", "aliases.json read-replica (atomic)"], runtimeOnly: ["cachedSudoPassword (globalThis)"] }
+  dependencies: ["transport.mitm-dns-bypass"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "start/stop/DNS-toggle attempted without admin (Windows) or without a valid sudo password when one is required — 403", partial: false }
+    - { code: INVALID_REQUEST, when: "POST missing apiKey, PATCH missing tool/action, or alias PUT missing tool/mappings — 400", partial: false }
+    - { code: INTERNAL_ERROR, when: "port 443 already in use by another process on start — 409 with portOwner", partial: false }
+  sideEffects: ["Rewrites the OS hosts file for the configured tool hostnames", "Installs a Root CA into the OS trust store"]
+  persistence: ["9router SQLite settings + mitmAlias kv", "aliases.json read-replica"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Stopping the MITM server always disables DNS for every tool, even ones the caller never asked to touch in that request"
+    - "The alias JSON mirror uses the codebase's own atomic-write helper — direct evidence that the temp-file+rename pattern was available to reuse for the user-config writes flagged in clitools.write-not-atomic, but wasn't"
+  evidence:
+    - { file: src/app/api/cli-tools/antigravity-mitm/route.js, line: 106, note: "checkPrivilege gates start on admin (Windows) or sudo password (unix)" }
+    - { file: src/app/api/cli-tools/antigravity-mitm/route.js, line: 131, note: "PORT_443_BUSY 409 carries portOwner for force-kill flow" }
+    - { file: src/app/api/cli-tools/antigravity-mitm/route.js, line: 152, note: "DELETE handler calls stopServer(pwd)" }
+    - { file: src/mitm/manager.js, line: 767, note: "stopServer: after killing the process, strips every TOOL_HOSTS entry from the OS hosts file unconditionally (Windows branch)" }
+    - { file: src/mitm/manager.js, line: 796, note: "stopServer: non-Windows branch calls removeAllDNSEntries after the kill, same unconditional all-hosts cleanup" }
+    - { file: src/app/api/cli-tools/antigravity-mitm/alias/route.js, line: 32, note: "alias PUT requires DNS already enabled for that tool — 403 otherwise" }
+    - { file: src/app/api/cli-tools/antigravity-mitm/alias/route.js, line: 46, note: "setMitmAliasAll — SQLite write (source of truth)" }
+    - { file: src/app/api/cli-tools/antigravity-mitm/alias/route.js, line: 47, note: "writeAliasForTool — mirrors the same write into the JSON read-replica" }
+    - { file: src/lib/mitmAliasCache.js, line: 15, note: "writeAtomic — the alias mirror IS written atomically, unlike the cli-tools config writes" }
+    - { file: src/mitm/manager.js, line: 823, note: "enableToolDNS calls addDNSEntry then persists state via saveDnsToolState" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: clitools.cowork-mcp-marketplace-fetch
+  group: CLI Tool Integration
+  feature: MCP marketplace backing endpoints
+  subFeature: Registry fetch (with in-memory cache) and per-server tool-list probe (with SSRF guard), consumed by McpMarketplaceModal
+  trigger: McpMarketplaceModal opening (registry fetch) and expanding a server row (tools probe)
+  input: "registry: none (optional ?refresh=1); tools: POST { url }"
+  output: "registry: { cached, servers[], total }; tools: { tools[] } or { requiresAuth:true } or { error }"
+  businessRules:
+    - "cowork-mcp-registry paginates Anthropic's public MCP registry (api.anthropic.com/mcp-registry/v0/servers) up to 20 pages of 500, filters to isDirectConnect entries only (excludes mcp.claude.com-mediated and api.anthropic.com/mcp entries, and any URL containing a template placeholder < or {), dedupes by url, and caches the result in a module-scope globalThis map for 1 hour unless ?refresh=1 is passed"
+    - "cowork-mcp-tools probes an arbitrary caller-supplied MCP server URL with a 3-step handshake (initialize → notifications/initialized → tools/list), handling both a plain JSON response and an SSE-framed one (parsing `data:` lines), under an 8s AbortController timeout"
+    - "A 401/403 from the probed server at either the initialize or tools/list step is reported back as { requiresAuth:true, tools:[] } rather than an error — this is what lets the modal show 'OAuth required — add now, discover tools later' instead of failing the add flow"
+    - "SSRF guard (assertPublicUrl) is applied to the tools probe ONLY when the request is not local (isLocalRequest check) — the dashboard's own same-origin calls skip the guard entirely since the browser calling its own localhost server is treated as trusted"
+  state: { reads: [], writes: [], runtimeOnly: ["__9routerCoworkMcpRegistryCache (globalThis, 1h TTL)"] }
+  dependencies: []
+  providerInteraction: "Anthropic's public MCP registry (api.anthropic.com/mcp-registry/v0/servers) for the catalog; an arbitrary caller-specified MCP server URL for the tools probe"
+  fallback: { hasFallback: false, retry: null, timeout: "8s AbortController on the tools probe; none on the registry fetch loop itself", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "tools probe: url missing, not a string, or blocked by the SSRF guard for a non-local caller — 400", partial: false }
+    - { code: TIMEOUT, when: "tools probe: any of the three HTTP calls exceeds 8s — reported as error:'timeout'", partial: false }
+    - { code: INTERNAL_ERROR, when: "registry fetch fails outright (non-ok on the first page) — 500 with empty servers", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "The registry cache is a plain globalThis map with no cross-instance sharing and no persistence — a server restart (or, per the module-reevaluation quirk documented elsewhere for Next.js, a fresh module load) means the next request re-fetches all pages from Anthropic"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "isDirectConnect's URL-template check (`/[<{]/`) rejects registry entries whose remote URL contains a literal '{' or '<' placeholder the client would need to fill in — those servers are silently dropped from the marketplace list rather than surfaced with a 'needs configuration' state"
+  evidence:
+    - { file: src/app/api/cli-tools/cowork-mcp-registry/route.js, line: 16, note: "isDirectConnect filters out claude.ai-mediated and templated-URL registry entries" }
+    - { file: src/app/api/cli-tools/cowork-mcp-registry/route.js, line: 65, note: "1-hour globalThis cache, bypassed by ?refresh=1" }
+    - { file: src/app/api/cli-tools/cowork-mcp-tools/route.js, line: 30, note: "401/403 on initialize reported as requiresAuth, not an error" }
+    - { file: src/app/api/cli-tools/cowork-mcp-tools/route.js, line: 62, note: "SSE-framed tools/list response parsed via data: line extraction" }
+    - { file: src/app/api/cli-tools/cowork-mcp-tools/route.js, line: 93, note: "SSRF guard applied only when the caller is not local" }
+    - { file: src/shared/components/McpMarketplaceModal.js, line: 6, note: "modal calls exactly these two cli-tools endpoints, not the /api/mcp/[plugin]/* bridge" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: skills.catalogue-raw-github-contract
+  group: Agent Skills
+  feature: Agent Skills catalogue
+  subFeature: Single source-of-truth array mapping each capability to a raw GitHub SKILL.md URL third parties fetch directly
+  trigger: /dashboard/skills page render (reads SKILLS to list cards); any third-party AI agent fetching a copied raw URL at its own setup/tool-load time
+  input: "a skill id"
+  output: "a raw.githubusercontent.com URL: https://raw.githubusercontent.com/decolua/9router/refs/heads/master/skills/<id>/SKILL.md"
+  businessRules:
+    - "SKILLS is a flat array of 8 entries: one 'entry' hub skill (isEntry:true, endpoint:null, meant to be pasted first) plus 7 capability skills, each carrying the exact /v1/* endpoint path it documents (chat, images/generations, audio/speech, audio/transcriptions, embeddings, search, web/fetch) — this array is the only place these ids/endpoints are declared for the dashboard"
+    - "getSkillRawUrl/getSkillBlobUrl build their URLs purely from three module-level constants (REPO='decolua/9router', BRANCH='master', SKILL_PATH='skills') and the skill's id — there is no indirection, redirect, or version pin beyond the hardcoded branch name"
+    - "Q5 answer — who fetches it: the user copies the raw URL from the dashboard and pastes it into an arbitrary third-party AI agent/tool framework, which fetches SKILL.md over plain HTTP at ITS OWN request/setup time; 9router's own server has no further role once the URL is handed out"
+    - "Q5 answer — what breaks if a SKILL.md moves: because the URL is built from fixed constants with no fallback, a rename/move/deletion of skills/<id>/SKILL.md in the decolua/9router repo (or a branch rename away from 'master') makes every previously-copied raw URL 404 on its next fetch by any third party, silently and with no way for 9router's own runtime to detect or warn about it — the fetch happens entirely outside this codebase"
+    - "Per CLAUDE.md's own note, skills.js (this catalogue) and the actual files under skills/ (tracked separately in skills/README.md's table) are two independently-maintained sources kept in sync only by convention/process, not by any code in this repository"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A skill id present in SKILLS with no matching skills/<id>/SKILL.md file in the actual repo (or vice versa) is not caught by anything in this codebase — the mismatch only ever surfaces as a live 404 to whichever third party fetches it"
+  evidence:
+    - { file: src/shared/constants/skills.js, line: 4, note: "REPO/BRANCH/SKILL_PATH constants the raw URL is built from" }
+    - { file: src/shared/constants/skills.js, line: 12, note: "SKILLS array — 1 entry hub skill + 7 capability skills, each with a fixed /v1/* endpoint" }
+    - { file: src/shared/constants/skills.js, line: 72, note: "getSkillRawUrl — builds the raw.githubusercontent.com URL from id + the module constants, no fallback" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: mcp.stdio-sse-bridge
+  group: MCP
+  feature: Local stdio-to-SSE MCP bridge
+  subFeature: The two /api/mcp/[plugin]/* routes spawn an allowlisted local MCP server process and bridge it over SSE
+  trigger: An MCP client (Claude Desktop, wired up via clitools.cowork-settings-desktop-mcp's local bridge entries) opening a GET SSE stream to /api/mcp/<plugin>/sse, then POSTing JSON-RPC frames to /api/mcp/<plugin>/message
+  input: "GET: plugin name (route param). POST: a JSON-RPC message body + sessionId (query param, implied by the SSE handshake)"
+  output: "GET: an SSE stream (endpoint handshake frame, then message frames). POST: 202 Accepted (the real reply arrives asynchronously over the SSE stream, not in the POST response)"
+  businessRules:
+    - "Q6 answer — what the 2 routes do: GET /sse validates the plugin name against findPlugin (LOCAL_STDIO_PLUGINS allowlist), spawns the plugin's child process on first use (getOrSpawn, one process shared across all sessions for that plugin name), registers a per-connection send callback, and immediately sends an `event: endpoint` frame telling the client where to POST (`/api/mcp/<plugin>/message?sessionId=<sid>`) — this hand-implements the HTTP+SSE MCP transport variant (separate stream/POST endpoints keyed by session id), not the newer single-endpoint streamable-HTTP transport"
+    - "POST /message validates the same allowlist, then writes the raw JSON-RPC body straight to the spawned child's stdin (sendToChild) and returns 202 with no correlation to a specific response — the actual JSON-RPC reply comes back later over the child's stdout, broadcast to all sessions currently registered for that plugin over their SSE streams"
+    - "Only names present in the hardcoded LOCAL_STDIO_PLUGINS constant (currently just 'browsermcp', spawning `npx -y @browsermcp/mcp@latest`) may be spawned — per the source comment, this is deliberate RCE prevention: no user-supplied command can ever reach spawn(). This is exactly why cowork-settings' buildCustomEntries (for plugins added via the marketplace modal) only accepts URL-based (remote HTTP/SSE) custom entries and has no stdio path for user input"
+    - "The child process is reused across all SSE sessions for that plugin name and is killed automatically once the last session disconnects (unregisterSession — 'avoid idle orphan process leak'); killAllBridges() is the app-shutdown hook that force-kills any still-running bridges"
+    - "Outbound tool-result text content over 2000 chars is passed through smartFilterText/collapseRepeated before being broadcast — truncating to 50000 chars and collapsing runs of ≥30 same-role sibling lines down to a head/tail sample — a bandwidth/token-shaping transform local to this bridge, separate from and unrelated to open-sse/rtk's token saver pipeline"
+    - "Q6 answer — where MCP server defs get written: NOT here. This pair of routes only serves already-spawned local plugins; the actual managedMcpServers list (which combines these local bridge entries with remote DEFAULT_PLUGINS and marketplace-modal custom entries) is written to Claude Desktop's own config by clitools.cowork-settings-desktop-mcp"
+    - "Q6 answer — what the marketplace modal reads: McpMarketplaceModal.js does NOT call either of these two routes at all — it calls /api/cli-tools/cowork-mcp-registry (catalog) and /api/cli-tools/cowork-mcp-tools (tool-list probe), both traced under clitools.cowork-mcp-marketplace-fetch. This bridge is consumed only by whatever MCP client cowork-settings wired a bridge URL into (Claude Desktop itself), never directly by the dashboard UI"
+  state: { reads: [], writes: [], runtimeOnly: ["__9routerMcpBridges (globalThis Map: plugin name → {proc, sessions, buffer})"] }
+  dependencies: ["clitools.cowork-settings-desktop-mcp"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "plugin name not found in LOCAL_STDIO_PLUGINS — 404 on both GET and POST", partial: false }
+    - { code: INTERNAL_ERROR, when: "POST called while no session/process is running for that plugin (Bridge not running) — 500", partial: false }
+  sideEffects: ["Spawns a local child process (npx-installed MCP server) on demand"]
+  persistence: []
+  performanceConcerns:
+    - "One process per plugin NAME is shared across every connected session — a busy multi-session bridge serializes all output through a single child's stdout parser"
+  behavior: { streaming: true, cancellation: "SSE stream cancel() unregisters the session and kills the child once the last session for that plugin disconnects", concurrency: "Multiple SSE sessions can share one spawned child; stdout frames are broadcast to every registered session" }
+  edgeCases:
+    - "sendToChild throws synchronously if the target process isn't running (e.g. all sessions already disconnected and the child was killed) — a POST racing a just-closed SSE stream gets a 500 instead of quietly reconnecting"
+    - "The newline-delimited JSON-RPC framing assumes the child never emits a bare newline inside a single frame; a plugin binary that pretty-prints its own stdout would desynchronize the buffer parser"
+  evidence:
+    - { file: "src/app/api/mcp/[plugin]/sse/route.js", line: 8, note: "findPlugin allowlist check, 404 if unknown" }
+    - { file: "src/app/api/mcp/[plugin]/sse/route.js", line: 19, note: "registerSession(plugin, send) — spawns/reuses the child and registers this connection's sender" }
+    - { file: "src/app/api/mcp/[plugin]/sse/route.js", line: 21, note: "endpoint handshake frame naming the POST URL with sessionId" }
+    - { file: "src/app/api/mcp/[plugin]/message/route.js", line: 14, note: "sendToChild writes the JSON-RPC body to the child's stdin, replies 202" }
+    - { file: src/lib/mcp/stdioSseBridge.js, line: 104, note: "comment: only preset stdio plugins may spawn — RCE prevention" }
+    - { file: src/lib/mcp/stdioSseBridge.js, line: 109, note: "getOrSpawn reuses one child process per plugin name across all sessions" }
+    - { file: src/lib/mcp/stdioSseBridge.js, line: 156, note: "unregisterSession kills the child once the last session disconnects" }
+    - { file: src/lib/mcp/stdioSseBridge.js, line: 15, note: "smartFilterText truncates/collapses large tool-result text before broadcast" }
+    - { file: src/shared/components/McpMarketplaceModal.js, line: 6, note: "modal calls the cli-tools registry/tools endpoints, never /api/mcp/[plugin]/*" }
+  newModule: tooling
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
