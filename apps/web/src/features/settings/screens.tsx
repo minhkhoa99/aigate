@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button, CopyField, Field, Input, PageHeading, Panel, Pill, SecretField, StateBlock, Tabs, Warning } from "../../shared/ui";
+import { useToast } from "../../shared/toast";
 
 export function SettingsGeneral() {
   return <><PageHeading eyebrow="Settings / General" title="General settings" description="Defaults for gateway operation and dashboard presentation." action={<Button variant="primary">Save changes</Button>} />
@@ -29,9 +30,10 @@ export function SettingsDeveloper({ enabled, onChange }: { enabled: boolean; onC
 
 export function Login() {
   const [error, setError] = useState(false);
+  const showToast = useToast();
   return <div className="standalone"><div className="auth-card"><div className="auth-brand"><span>⌘</span><strong>AIGate</strong></div><h1>Welcome back</h1><p>Sign in to manage your local gateway.</p>
     {error && <Warning tone="danger"><code>ERR_AUTH_CREDENTIAL_MISMATCH</code> · The password did not match. Check it and try again.</Warning>}
-    <form onSubmit={(e) => { e.preventDefault(); setError(true); }}><Field label="Password"><Input type="password" placeholder="Enter your password" /></Field><Button type="submit" variant="primary">Sign in</Button></form>
+    <form onSubmit={(e) => { e.preventDefault(); setError(true); showToast({ tone: "error", code: "ERR_AUTH_CREDENTIAL_MISMATCH", message: "The password did not match. Check it and try again." }); }}><Field label="Password"><Input type="password" placeholder="Enter your password" /></Field><Button type="submit" variant="primary">Sign in</Button></form>
     <small>Local instance · your data stays on this machine</small></div></div>;
 }
 
@@ -49,4 +51,3 @@ export function Onboarding() {
     <div className="modal-actions"><Button disabled={step === 1} onClick={() => setStep(step - 1)}>Back</Button><Button variant="primary" onClick={() => setStep(Math.min(3, step + 1))}>{step === 3 ? "Open dashboard" : "Continue"}</Button></div>
   </div></div>;
 }
-

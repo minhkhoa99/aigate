@@ -30,7 +30,7 @@ keep the existing screen layout/components instead of recreating Stitch HTML.**
 
 | Project area | UI status | React screens |
 |---|---|---|
-| U0/U1 design system and shell | UI_READY | theme, sidebar, topbar, responsive layout, shared states/dialogs |
+| U0/U1 design system and shell | UI_READY | theme, sidebar, topbar, responsive layout, shared states/dialogs/toast |
 | U2 auth, onboarding, settings | UI_READY | `/welcome`, `/login`, `/callback`, `/settings/{general,auth,developer}` |
 | U3 endpoint and keys | UI_READY | `/gateway/endpoint` |
 | U4 providers and AuthFlow | UI_READY | `/providers`, `/providers/{new,anthropic,connections}` and add-connection modal |
@@ -60,7 +60,9 @@ a completed mutation. No stored credential value is rendered.
 3. Shared loading/empty/error visuals can be inspected on any shell route with
    `?uiState=loading`, `?uiState=empty`, or `?uiState=error`. Wire real query
    states to these components; remove the preview parameter when no longer
-   useful. Destructive actions use a Radix type-to-confirm dialog.
+   useful. Call `useToast()` from `shared/toast.tsx` for transient mutation
+   errors/successes; login currently demonstrates an error toast. Destructive
+   actions use a Radix type-to-confirm dialog.
 4. Run `pnpm install`, `pnpm web`, and `pnpm web:build` from the repo root.
 
 This branch is **visual UI complete for U0–U11, not M3 functionally complete**.
