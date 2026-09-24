@@ -683,7 +683,7 @@
   output: "{ models: [{ name, modified_at, size, digest, details:{format,family,parameter_size,quantization_level} }, ...] } — always exactly the same two hardcoded entries (llama3.2, qwen2.5)"
   businessRules:
     - "The entire response is a static, hand-authored object (open-sse/config/ollamaModels.js) — it does not read providerConnections, PROVIDER_MODELS, customModels, modelAliases, or disabledModels, so it is completely disconnected from the real, routable model catalog every other listing endpoint (v1/models, v1beta/models) derives from those sources"
-    - "A grep across open-sse/config and src/shared/constants for the literal strings llama3.2 and qwen2.5 (the two fixture names) finds no other reference anywhere — neither name maps to any real provider/model id, alias, or ollama-local static entry"
+    - "A repo-wide grep for the two fixture names finds llama3.2 also hardcoded in src/app/api/v1/api/chat/route.js (the ollama chat lane, routing.ollama-lane-transform) as modelName's fallback default when the request body's own model field is missing or fails to parse — but that is a response-label default for the outgoing {model, message, done} shape, not a resolution/routing mechanism (handleChat still dispatches on the real, unmodified request body). Neither llama3.2 nor qwen2.5 maps to any real provider/model id, alias, or ollama-local static entry anywhere — the fixture list still names nothing a chat request can actually resolve to"
   state:
     reads: []
     writes: []
@@ -701,6 +701,8 @@
   evidence:
     - { file: src/app/api/tags/route.js, line: 14, note: "GET returns the imported ollamaModels object verbatim, no DB/registry read" }
     - { file: open-sse/config/ollamaModels.js, line: 1, note: "hardcoded fixture: exactly two models, llama3.2 and qwen2.5" }
+    - { file: src/app/api/v1/api/chat/route.js, line: 28, note: "llama3.2 also hardcoded here, but only as modelName's fallback default for the response label" }
+    - { file: src/app/api/v1/api/chat/route.js, line: 31, note: "modelName = body.model || llama3.2 — a display default, not a routing input; handleChat(request) on the next line still dispatches on the real, unmodified request body" }
   newModule: catalog
   parityStatus: traced
   labels: [SUSPECTED_BUG]

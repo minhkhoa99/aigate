@@ -1092,11 +1092,11 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
-- id: connections.test-single-connection
+- id: connection.test-single-connection
   group: Provider authentication
   feature: Connection health check
   subFeature: "POST /api/providers/[id]/test — probe one connection's credential validity against its provider and persist the result"
-  trigger: Dashboard test-connection action, or internally by connections.test-batch-sequential for each connection in a batch
+  trigger: Dashboard test-connection action, or internally by connection.test-batch-sequential for each connection in a batch
   input: "connectionId path param, no body"
   output: "{ valid, error, refreshed } or 404 Connection-not-found"
   businessRules:
@@ -1167,7 +1167,7 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
-- id: connections.client-listing-sanitized
+- id: connection.client-listing-sanitized
   group: Providers
   feature: Provider connection listing
   subFeature: "GET /api/providers/client — paginated, field-allowlisted connection listing for browser-side consumers"
@@ -1251,12 +1251,13 @@
     - "type must match a key in FILTERS (a fixed set of 3 response-shaping functions); url is NOT validated against any allowlist of known provider endpoints — the route fetches whatever URL string is supplied, server-side, and echoes the filtered result back"
     - "In normal use, url is always one of a handful of hardcoded fetcher.url values baked into the AI_PROVIDERS registry (the client only ever calls this with those), but nothing in this route itself enforces that — the constraint lives entirely in the caller's discipline, not the server"
     - "Fetch failures (network error, non-OK status, non-JSON body) are swallowed to { data: [] } rather than surfaced as an error status, so a caller cannot distinguish blocked/unreachable from legitimately empty"
+    - "This is NOT an unauthenticated route: src/proxy.js runs dashboardGuard.js's proxy() as Next's middleware on every request, and /api/providers is one of PROTECTED_API_PATHS — a caller must present a valid dashboard session cookie (auth_token, JWT) or a valid machineId-derived x-9r-cli-token, UNLESS settings.requireLogin is false, in which case dashboardGuard's isAuthenticated() short-circuits to true for anyone who reaches the deny-by-default /api/* branch"
   state:
     reads: []
     writes: []
     runtimeOnly: []
   dependencies: []
-  providerInteraction: "A plain, unauthenticated fetch(url) to whatever URL the caller supplies"
+  providerInteraction: "A plain fetch(url) to whatever URL the caller supplies, gated by dashboardGuard's session/CLI-token requirement in front of the route, not by anything inside the route itself"
   fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
   errorCases:
     - { code: INVALID_REQUEST, when: "url or type missing, or type not in FILTERS", partial: false }
@@ -1265,21 +1266,29 @@
   performanceConcerns: []
   behavior: { streaming: false, cancellation: null, concurrency: null }
   edgeCases:
-    - "Unlike connections.provider-node-validate-partial-ssrf (which imports ssrfGuard's assertPublicUrl for the equivalent user-supplied-URL case), this route performs no SSRF check at all — no isLocalRequest gate, no assertPublicUrl/assertPublicUrlResolved, and it uses a plain fetch() rather than fetchPublic — on a deployment where this route is reachable by an untrusted or remote caller, it functions as a generic server-side URL fetcher whose response is filtered but not blocked from targeting an internal address"
+    - "Unlike connection.provider-node-validate-partial-ssrf (which imports ssrfGuard's assertPublicUrl for the equivalent user-supplied-URL case), this route performs no SSRF check at all — no isLocalRequest gate, no assertPublicUrl/assertPublicUrlResolved, and it uses a plain fetch() rather than fetchPublic"
+    - "Being a GET route with url in the query string (not a POST+JSON body like provider-nodes/validate) makes it reachable via a crafted top-level-navigation link, not just same-origin JS: the auth_token cookie is set sameSite:'lax' (dashboardSession.js), which browsers exclude from cross-site subresource requests (fetch/XHR/img/iframe) but DO still attach on a cross-site top-level GET navigation (a link click, or a script-driven location change) — so an attacker who lures an already-logged-in dashboard user into opening a crafted /api/providers/suggested-models?url=...&type=... link gets a blind, session-riding SSRF trigger even though they cannot read the JSON response themselves (the navigation replaces their own page). provider-nodes/validate's POST+JSON shape is not reachable this way because sameSite:lax excludes the cookie from cross-site POST"
+    - "If settings.requireLogin is false, dashboardGuard's session/CLI-token requirement drops away entirely and this route (like the rest of PROTECTED_API_PATHS) becomes reachable by any caller who can reach the port with no auth of any kind — the same requireLogin:false precondition 13's tunnel.enable-lacks-server-side-security-gate documents as unenforced when a tunnel is enabled, so a tunnel-exposed instance running with requireLogin off exposes this as an open, internet-reachable SSRF proxy"
   evidence:
     - { file: src/app/api/providers/suggested-models/route.js, line: 8, note: "url read directly from the query string, no allowlist check" }
     - { file: src/app/api/providers/suggested-models/route.js, line: 21, note: "plain fetch(url) — no SSRF guard, no timeout" }
     - { file: src/app/api/providers/suggested-models/filters.js, line: 7, note: "FILTERS — the fixed set of 3 response shapers keyed by type" }
     - { file: src/shared/utils/providerModelsFetcher.js, line: 20, note: "normal caller always passes a fixed fetcher.url from the provider registry, enforced client-side only" }
+    - { file: src/proxy.js, line: 8, note: "Next proxy/middleware matcher covers essentially every path, including /api/providers/suggested-models" }
+    - { file: src/dashboardGuard.js, line: 54, note: "/api/providers is in PROTECTED_API_PATHS" }
+    - { file: src/dashboardGuard.js, line: 227, note: "deny-by-default /api/* branch: hasValidCliToken(request) || isAuthenticated(request), else 401" }
+    - { file: src/dashboardGuard.js, line: 183, note: "isAuthenticated: hasValidToken(request) — a valid dashboard session cookie" }
+    - { file: src/dashboardGuard.js, line: 185, note: "isAuthenticated: settings.requireLogin === false short-circuits to true, no session/token needed" }
+    - { file: src/lib/auth/dashboardSession.js, line: 65, note: "auth_token cookie is sameSite: lax — excluded from cross-site POST/subresource requests but attached on cross-site top-level GET navigation" }
   newModule: catalog
   parityStatus: traced
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "A server-side fetch proxy that accepts an arbitrary URL from the query string validates that URL the same way provider-nodes/validate does (SSRF guard) before fetching it, regardless of which UI feature happens to be the only current caller"
-    actual: "No SSRF check of any kind runs on url — the route trusts the browser-side caller to only ever pass one of a small fixed set of URLs, a constraint enforced nowhere on the server"
-    impact: "Any client able to reach this route (its own auth posture is not established by this trace) can use it as a blind/semi-blind server-side URL fetcher against internal addresses (e.g. cloud metadata, loopback services); the FILTERS shaping limits which response fields are echoed back but does not block the request from being made"
+    actual: "No SSRF check of any kind runs on url — the route trusts the browser-side caller to only ever pass one of a small fixed set of URLs, a constraint enforced nowhere on the server. dashboardGuard.js does require a valid dashboard session, a valid CLI token, or settings.requireLogin===false to reach the route at all — this is not an anonymous-internet-facing endpoint by default"
+    impact: "Exploitability is scoped to: (1) an authenticated dashboard session itself performing the request (limited value — a logged-in admin SSRFing their own server), (2) a CSRF-style crafted link that rides an already-logged-in admin's sameSite:lax session cookie via a top-level GET navigation — a blind SSRF trigger the attacker cannot read the response of, but the internal request still fires, (3) a leaked/stolen CLI token, or (4) settings.requireLogin=false, which removes the auth requirement entirely and, combined with 13's tunnel.enable-lacks-server-side-security-gate (tunnel exposure has no server-side requireLogin/requireApiKey check), can leave this reachable by any internet caller with no auth at all"
 
-- id: connections.test-batch-sequential
+- id: connection.test-batch-sequential
   group: Provider authentication
   feature: Connection health check
   subFeature: "POST /api/providers/test-batch — test-connection sweep across a group of connections selected by mode"
@@ -1288,15 +1297,15 @@
   output: "{ mode, providerId, results:[{provider,connectionId,connectionName,authType,valid,latencyMs,error,diagnosis,statusCode,testedAt}], summary:{total,passed,failed}, testedAt }"
   businessRules:
     - "Only isActive connections are ever candidates (getProviderConnections({ isActive: true })) — inactive connections are silently excluded from every mode, not just skipped-and-reported"
-    - "mode:provider requires providerId and filters to that provider only; the other modes (oauth/free/apikey/compatible/all) classify every active connection via getAuthGroup, the same free-vs-oauth-vs-apikey classification connections.test-single-connection's OAUTH_TEST_CONFIG dispatch implicitly relies on"
-    - "Each connection is tested by calling the exact same testSingleConnection(id) used by connections.test-single-connection — this route adds no separate test logic, only grouping/iteration and a richer per-result response shape (connectionName, diagnosis, statusCode)"
+    - "mode:provider requires providerId and filters to that provider only; the other modes (oauth/free/apikey/compatible/all) classify every active connection via getAuthGroup, the same free-vs-oauth-vs-apikey classification connection.test-single-connection's OAUTH_TEST_CONFIG dispatch implicitly relies on"
+    - "Each connection is tested by calling the exact same testSingleConnection(id) used by connection.test-single-connection — this route adds no separate test logic, only grouping/iteration and a richer per-result response shape (connectionName, diagnosis, statusCode)"
     - "A per-connection test() call that throws (rather than resolving with {valid:false}) is caught individually and still produces a results entry (diagnosis.type: network_error) — one connection's exception never aborts the batch"
   state:
     reads: ["providerConnections (isActive:true)"]
-    writes: ["providerConnections: testStatus/lastError/lastErrorAt per tested connection — identical write shape to connections.test-single-connection, once per connection in the batch"]
+    writes: ["providerConnections: testStatus/lastError/lastErrorAt per tested connection — identical write shape to connection.test-single-connection, once per connection in the batch"]
     runtimeOnly: []
-  dependencies: ["connections.test-single-connection"]
-  providerInteraction: "Same per-provider probes as connections.test-single-connection, issued once per connection in the selected group"
+  dependencies: ["connection.test-single-connection"]
+  providerInteraction: "Same per-provider probes as connection.test-single-connection, issued once per connection in the selected group"
   fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
   errorCases:
     - { code: INVALID_REQUEST, when: "mode is missing, or is not one of provider/oauth/free/apikey/compatible/all (provider mode additionally needs providerId)", partial: false }
@@ -1315,7 +1324,7 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
-- id: connections.provider-node-update-delete
+- id: connection.provider-node-update-delete
   group: Providers
   feature: Custom provider nodes
   subFeature: "PUT/DELETE /api/provider-nodes/[id] — rename/reconfigure or remove a custom OpenAI/Anthropic/embedding-compatible provider node"
@@ -1331,14 +1340,14 @@
     reads: ["providerNodes (by id)", "providerConnections (by provider=id, PUT only)"]
     writes: ["providerNodes row (PUT: fields; DELETE: removed)", "providerConnections rows under this provider (PUT: providerSpecificData fanout; DELETE: all removed)"]
     runtimeOnly: []
-  dependencies: ["connections.provider-node-repo-storage"]
+  dependencies: ["connection.provider-node-repo-storage"]
   providerInteraction: null
   fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
   errorCases:
     - { code: INVALID_REQUEST, when: "node not found (404), or PUT is missing name/prefix/baseUrl, or apiType is invalid for an openai-compatible node", partial: false }
   sideEffects:
     - "DELETE removes every connection configured under this node — an irreversible, cascading side effect not called out in the response body"
-  persistence: ["providerNodes and providerConnections rows, same SQLite-backed storage as connections.provider-node-repo-storage / 03's connection.storage-shape-json-blob"]
+  persistence: ["providerNodes and providerConnections rows, same SQLite-backed storage as connection.provider-node-repo-storage / 03's connection.storage-shape-json-blob"]
   performanceConcerns:
     - "PUT's connection fanout uses Promise.all over every connection under the node — unbounded, but scoped to one node's own connections so realistically small"
   behavior: { streaming: false, cancellation: null, concurrency: null }
@@ -1353,7 +1362,7 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
-- id: connections.provider-node-validate-partial-ssrf
+- id: connection.provider-node-validate-partial-ssrf
   group: Provider authentication
   feature: Custom provider nodes
   subFeature: "POST /api/provider-nodes/validate — probe a user-supplied baseUrl+apiKey before a custom provider node is saved"
@@ -1365,6 +1374,7 @@
     - "The SSRF check used here is assertPublicUrl — the synchronous, literal-hostname/IP-only layer described in ssrfGuard.js's own header comment as layer 1 of 3. It does NOT call assertPublicUrlResolved (layer 2: DNS-resolves the hostname and blocks a domain that merely resolves to a private/loopback/metadata address) and the subsequent fetchWithTimeout() is a plain fetch, not fetchPublic (layer 3: re-validates every redirect hop) — a non-local caller supplying a hostname that resolves to an internal address (e.g. a wildcard-DNS domain pointed at 127.0.0.1), or a public URL that 302s to an internal target, passes this route's check and is fetched anyway"
     - "custom-embedding validates by POSTing a real /embeddings request (requires modelId); anthropic-compatible and the openai-compatible default both try GET /models first, then fall back to a minimal POST /chat/completions (max_tokens:1) if modelId is supplied and /models isn't conclusive (a non-401/403 non-OK status)"
     - "401/403 short-circuits straight to a hard fail (API key unauthorized) without attempting the chat fallback — only an ambiguous non-auth failure on /models triggers the secondary chat probe"
+    - "This is NOT an unauthenticated route: src/proxy.js runs dashboardGuard.js's proxy() as Next's middleware on every request, and /api/provider-nodes is one of PROTECTED_API_PATHS — a caller must present a valid dashboard session cookie (auth_token, JWT) or a valid machineId-derived x-9r-cli-token to reach this route at all, UNLESS settings.requireLogin is false. dashboardGuard's own isLocalRequest() (the same function this route calls to decide whether to run ssrfGuard) plays no role in THAT gate — being on the loopback socket does not bypass the session/CLI-token requirement for PROTECTED_API_PATHS, only LOCAL_ONLY_PATHS (a different, smaller list this route is not on)"
   state:
     reads: []
     writes: []
@@ -1381,22 +1391,30 @@
   performanceConcerns: []
   behavior: { streaming: false, cancellation: null, concurrency: null }
   edgeCases:
-    - "isLocalRequest's loopback-only exemption means the SSRF gap above is only reachable by a caller that is NOT the local dashboard itself — e.g. a request forwarded through a reverse proxy (x-9r-via-proxy set) or a remote/tunnel-exposed instance, exactly the deployment shapes 13's tunnel.* entries document as reachable from outside localhost"
+    - "isLocalRequest's loopback-only exemption means the SSRF gap above is only reachable by a caller that is NOT the local dashboard itself — e.g. a request forwarded through a reverse proxy (x-9r-via-proxy set) or a remote/tunnel-exposed instance, exactly the deployment shapes 13's tunnel.* entries document as reachable from outside localhost. Since dashboardGuard.js's PROTECTED_API_PATHS gate ALSO applies to that same non-local caller, reaching this branch additionally requires a valid dashboard session, a valid CLI token, or settings.requireLogin===false — it is not reachable pre-auth by default"
+    - "Unlike catalog.suggested-models-open-proxy's GET+query-string shape, this route is POST with a JSON body — the auth_token cookie's sameSite:'lax' attribute (dashboardSession.js) excludes it from cross-site POST requests, so a classic cross-site CSRF form/fetch cannot ride an admin's session here the way a crafted top-level-navigation link can against the GET route; realistic exploitation needs an actual authenticated actor (the admin's own browser via same-origin JS, a compromised extension/DevTools session, a leaked auth_token/CLI token) or settings.requireLogin===false"
   evidence:
     - { file: src/app/api/provider-nodes/validate/route.js, line: 70, note: "SSRF check only runs when !isLocalRequest(request)" }
     - { file: src/app/api/provider-nodes/validate/route.js, line: 72, note: "assertPublicUrl — literal-only layer 1 check, not assertPublicUrlResolved" }
     - { file: src/app/api/provider-nodes/validate/route.js, line: 6, note: "fetchWithTimeout wraps plain fetch(), not ssrfGuard's fetchPublic (no redirect re-validation)" }
     - { file: src/shared/utils/ssrfGuard.js, line: 1, note: "module header documents 3 layers; assertPublicUrl is explicitly layer 1 only" }
     - { file: src/app/api/provider-nodes/validate/route.js, line: 128, note: "401/403 short-circuits before the chat/completions fallback is attempted" }
+    - { file: src/proxy.js, line: 8, note: "Next proxy/middleware matcher covers essentially every path, including /api/provider-nodes/validate" }
+    - { file: src/dashboardGuard.js, line: 55, note: "/api/provider-nodes is in PROTECTED_API_PATHS" }
+    - { file: src/dashboardGuard.js, line: 227, note: "deny-by-default /api/* branch: hasValidCliToken(request) || isAuthenticated(request), else 401" }
+    - { file: src/dashboardGuard.js, line: 183, note: "isAuthenticated: hasValidToken(request) — a valid dashboard session cookie" }
+    - { file: src/dashboardGuard.js, line: 185, note: "isAuthenticated: settings.requireLogin === false short-circuits to true, no session/token needed" }
+    - { file: src/dashboardGuard.js, line: 164, note: "canAccessLocalOnlyRoute (LOCAL_ONLY_PATHS only) — the loopback+authenticated combo this route does NOT get, since it is gated by PROTECTED_API_PATHS instead" }
+    - { file: src/lib/auth/dashboardSession.js, line: 65, note: "auth_token cookie is sameSite: lax — excluded from cross-site POST, unlike the GET+query-string suggested-models route" }
   newModule: connections
   parityStatus: traced
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "A remote (non-local) caller's user-supplied baseUrl is validated with the same DNS-resolution and redirect-safe protection ssrfGuard.js documents as necessary (assertPublicUrlResolved / fetchPublic) — the module comment explicitly says layer 1 alone leaves DNS-rebinding and redirect bypasses open"
-    actual: "Only assertPublicUrl (layer 1, literal hostname/IP string check) runs, and the actual request uses a plain fetch with no manual redirect re-validation"
-    impact: "A non-local caller (e.g. through a reverse proxy or a tunnel-exposed instance) can supply a hostname that resolves to an internal/metadata address, or a URL that redirects to one, and this route will still fetch it and echo back a validity signal — a lower-severity but real SSRF gap next to provider-nodes/validate's own documented threat model"
+    actual: "Only assertPublicUrl (layer 1, literal hostname/IP string check) runs, and the actual request uses a plain fetch with no manual redirect re-validation. dashboardGuard.js does require a valid dashboard session, a valid CLI token, or settings.requireLogin===false to reach the route at all — this is not an anonymous-internet-facing endpoint by default, and its POST+JSON-body shape is not CSRF-reachable the way a GET route would be under a sameSite:lax cookie"
+    impact: "Exploitability is scoped to a caller that is BOTH non-local (reverse-proxied or tunnel-exposed, so isLocalRequest() is false and the route's own SSRF check actually runs) AND already past dashboardGuard's auth gate (a valid dashboard session, a valid CLI token, or settings.requireLogin===false) — e.g. an operator's own tunnel-exposed dashboard session, a compromised/leaked session or CLI token, or a requireLogin:false deployment combined with 13's tunnel.enable-lacks-server-side-security-gate (tunnel exposure enforces no requireLogin/requireApiKey check of its own). Within that scope, such a caller can supply a hostname that resolves to an internal/metadata address, or a URL that redirects to one, and this route will still fetch it and echo back a validity signal — a real but narrower-than-anonymous-internet SSRF gap, and one that (unlike catalog.suggested-models-open-proxy) is not reachable via a simple crafted-link CSRF because of its POST+JSON shape"
 
-- id: connections.provider-node-repo-storage
+- id: connection.provider-node-repo-storage
   group: Providers
   feature: Custom provider nodes
   subFeature: "nodesRepo (src/lib/db/repos/nodesRepo.js) — storage shape and CRUD primitives backing custom/compatible provider nodes"
