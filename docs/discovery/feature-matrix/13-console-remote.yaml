@@ -324,7 +324,7 @@
   output: "The tunnel or Tailscale Funnel is enabled and the gateway becomes reachable from the public internet, regardless of settings.requireApiKey, settings.requireLogin, or whether the dashboard still has the default password"
   businessRules:
     - "EndpointPageClient.js's Cloudflare-row Enable handler refuses to open the enable modal when isLoginUnsafe (requireLogin off, or the dashboard still has the default password) or !requireApiKey is true, showing 'Security required: ...' instead — proving the product's own intended invariant is 'never let a user turn on public exposure while the endpoint has no key or the dashboard has weak auth'"
-    - "That client-side guard is itself inconsistently applied: the Cloudflare row's onClick checks both isLoginUnsafe and !requireApiKey, but the Tailscale row's onClick checks only isLoginUnsafe — it never checks requireApiKey at all, so even the UI does not stop a user from enabling Tailscale Funnel while 'Require API key' is off"
+    - "That client-side guard is itself inconsistently applied: the Cloudflare row's onClick checks both isLoginUnsafe and !requireApiKey, but the Tailscale row's primary onClick (the not-yet-enabled state) checks only isLoginUnsafe — it never checks requireApiKey at all, so even the UI does not stop a user from enabling Tailscale Funnel while 'Require API key' is off. The Tailscale row's error-retry state (tsStatus?.type === 'error') is guarded even less: its Enable button calls handleOpenTsModal() directly with no check at all, not even isLoginUnsafe — so once a Tailscale enable attempt has failed once, retrying from that state skips every client-side guard entirely"
     - "None of this is enforced server-side: src/app/api/tunnel/enable/route.js and src/app/api/tunnel/tailscale-enable/route.js call enableTunnel()/enableTailscale() unconditionally on POST — neither route, nor src/lib/tunnel/**, nor src/mitm/manager.js (which both share code with) ever reads settings.requireApiKey, settings.requireLogin, or a 'dashboard has default password' flag"
     - "dashboardGuard.js does gate who may call these routes at all (LOCAL_ONLY_PATHS requires a loopback+authenticated caller or a valid machineId-derived CLI token; PROTECTED_API_PATHS additionally requires isAuthenticated for the /api/tunnel prefix generally) — but that answers 'is the caller allowed to manage the tunnel', not 'is it safe to expose the endpoint publicly given its current API-key/login posture'; those are two independent questions and only the first is enforced server-side"
     - "Once exposed, dashboardGuard.js's canAccessPublicLlmApi() (the /v1 gate) does not read settings.requireApiKey either — it grants access on isLocalRequest() OR a valid CLI token OR a real row in the apiKeys table (hasValidApiKey), independent of the 'Require API key' toggle. requireApiKey only gates the request inside each src/sse/handlers/*.js (e.g. chat.js, per endpoint.enforce-require-api-key) — reachable only for callers isLocalRequest() already let through"
@@ -343,15 +343,25 @@
   behavior: { streaming: false, cancellation: null, concurrency: null }
   edgeCases:
     - "requireApiKey defaults to true (src/lib/db/repos/settingsRepo.js), so a fresh install is not exposed by default — the gap only matters once an admin has deliberately turned requireApiKey off (e.g. for local-only testing) and later enables the tunnel without realizing the UI guard (where it exists at all) is the only thing stopping that combination"
-    - "Even without a server-side gate, a request dashboardGuard.js's isLocalRequest() correctly classifies as non-local (e.g. the tunnel daemon forwards an X-Forwarded-For header identifying the real remote client) still needs a real apiKeys-table key via hasValidApiKey — so the practical severity depends on how reliably tunnel/Funnel-forwarded traffic is classified as non-local by the loopback-socket-based check in src/dashboardGuard.js, which this task did not independently verify against cloudflared/tailscale's actual header-forwarding behavior and is worth a follow-up check"
+    - "Resolved (was an open concern in fix round 0, now traced): a tunnel-forwarded request landing on the loopback socket is NOT misclassified as local, provided the tunnel daemon forwards X-Forwarded-For or X-Real-Ip. custom-server.js's http.createServer wrapper stamps req.headers['x-9r-via-proxy']='1' whenever the incoming request carries either header, regardless of the TCP peer address (viaProxy = !!(xff || xRealIp), checked before the loopback-socket branch). dashboardGuard.js's isLocalRequest() checks that exact flag FIRST — `if (request.headers.get('x-9r-via-proxy')) return false;` — before it ever reaches the loopback-peer check, so any such request is classified non-local and still has to satisfy canAccessPublicLlmApi's real-API-key requirement regardless of settings.requireApiKey. The one residual dependency is outside this repo: whether cloudflared's quick-tunnel edge and tailscaled's Funnel path actually forward X-Forwarded-For/X-Real-Ip for every request they proxy — that is daemon/vendor behavior this task could not verify from source, so it is recorded here as an open question for a reviewer with live-traffic access, not as a finding of its own"
+    - "This defense is conditional on custom-server.js being in the request path at all. Per the root package.json's scripts, `npm run dev` / `dev:webpack` / `dev:bun` invoke `next dev` directly and never load custom-server.js, so the x-9r-via-proxy stamping never happens in that run mode — isLoopbackPeer() then falls through to its NODE_ENV==='development' branch, which trusts the raw (spoofable) Host header instead, a fallback the code's own comment says is 'confined to development'. Production paths all do load the wrapper: `npm start` runs `node custom-server.js` directly, the Dockerfile's CMD is `[\"node\", \"custom-server.js\"]`, and the published CLI launcher (cli/cli.js) explicitly prefers custom-server.js when present — so the gap is scoped to local `next dev` sessions, not to any shipped/production run mode"
   evidence:
     - { file: src/app/api/tunnel/enable/route.js, line: 10, note: "enableTunnel() called with no requireApiKey/requireLogin check anywhere in the route" }
     - { file: src/app/api/tunnel/tailscale-enable/route.js, line: 8, note: "enableTailscale() called with no requireApiKey/requireLogin check anywhere in the route" }
     - { file: "src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js", line: 819, note: "Cloudflare row's client-only guard: onClick refuses to open the enable modal when !requireApiKey" }
-    - { file: "src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js", line: 901, note: "Tailscale row's onClick checks isLoginUnsafe only — no !requireApiKey check at all" }
+    - { file: "src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js", line: 901, note: "Tailscale row's primary onClick checks isLoginUnsafe only — no !requireApiKey check at all" }
+    - { file: "src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js", line: 895, note: "Tailscale row's error-retry state: Enable button calls handleOpenTsModal() with no guard at all, not even isLoginUnsafe" }
     - { file: "src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js", line: 991, note: "UI-only warning banner (not a blocking check) shown when isRemoteHost && !requireApiKey" }
     - { file: src/dashboardGuard.js, line: 68, note: "/api/tunnel is only in PROTECTED_API_PATHS (who may call it), never checked against requireApiKey" }
     - { file: src/dashboardGuard.js, line: 155, note: "canAccessPublicLlmApi does not read settings.requireApiKey at all" }
+    - { file: custom-server.js, line: 60, note: "viaProxy = !!(xff || xRealIp) — computed from headers alone, independent of the TCP peer address" }
+    - { file: custom-server.js, line: 72, note: "x-9r-via-proxy stamped '1' whenever viaProxy is true, regardless of whether the socket itself is loopback" }
+    - { file: src/dashboardGuard.js, line: 124, note: "isLocalRequest checks the x-9r-via-proxy flag first and returns false before ever reaching the loopback-peer check" }
+    - { file: src/dashboardGuard.js, line: 115, note: "isLoopbackPeer's NODE_ENV==='development' fallback trusts the raw Host header when custom-server.js never ran" }
+    - { file: package.json, line: 7, note: "npm run dev invokes `next dev` directly — custom-server.js is not loaded in this script" }
+    - { file: package.json, line: 12, note: "npm start runs `node custom-server.js` directly — the wrapper is always in the path for this script" }
+    - { file: Dockerfile, line: 59, note: "container CMD is [\"node\", \"custom-server.js\"] — the shipped Docker image always loads the wrapper" }
+    - { file: cli/cli.js, line: 531, note: "the published CLI launcher explicitly prefers custom-server.js when present, over a bare Next standalone server.js" }
   newModule: tooling
   parityStatus: traced
   labels: [SUSPECTED_BUG]
@@ -422,7 +432,7 @@
     - { file: src/mitm/cert/install.js, line: 77, note: "checkCertInstalledWindows compares the exact certificate fingerprint via certutil, not just the CN" }
     - { file: src/mitm/manager.js, line: 557, note: "Linux no-sudo path: system trust skipped, NSS DBs still updated separately" }
     - { file: src/mitm/winElevated.js, line: 41, note: "zero-popup path when already admin; one UAC popup otherwise" }
-    - { file: src/mitm/manager.js, line: 711, note: "failed health poll only kills the process/cleans lock files — no uninstallCert call" }
+    - { file: src/mitm/manager.js, line: 712, note: "failed health poll only kills the process/cleans lock files — no uninstallCert call" }
     - { file: src/mitm/cert/install.js, line: 138, note: "uninstallCert exists but is only ever called from manager.js's expiry-regeneration branch, never on startup failure or from stopServer" }
   newModule: tooling
   parityStatus: traced
@@ -458,11 +468,11 @@
     - "removeAllDNSEntriesSync (used during process-shutdown signal handlers, where async ops aren't safe) does a single synchronous fs.writeFileSync with no atomic rename and no rollback on any platform including Windows — the atomic path (atomicWriteHostsWin) is only used by the async addDNSEntry/removeDNSEntry functions, not by this shutdown-time sync variant"
   evidence:
     - { file: src/mitm/dns/dnsConfig.js, line: 14, note: "atomicWriteHostsWin — temp file + rename + rollback-on-failure, Windows only" }
-    - { file: src/mitm/dns/dnsConfig.js, line: 25, note: "rollback: rename .bak back onto target, or raw writeFileSync as a last resort" }
+    - { file: src/mitm/dns/dnsConfig.js, line: 24, note: "rollback: rename .bak back onto target, or raw writeFileSync as a last resort" }
     - { file: src/mitm/dns/dnsConfig.js, line: 172, note: "POSIX addDNSEntry: direct sudo tee overwrite, no temp file, no backup" }
     - { file: src/mitm/dns/dnsConfig.js, line: 234, note: "removeAllDNSEntriesSync: plain writeFileSync, no atomic rename on any platform" }
-    - { file: src/mitm/manager.js, line: 777, note: "stopServer Windows admin path: direct fs write, unconditional full-hosts cleanup" }
-    - { file: src/mitm/manager.js, line: 782, note: "stopServer Windows non-admin path: separate PowerShell regex-filter script, independent write path from atomicWriteHostsWin" }
+    - { file: src/mitm/manager.js, line: 773, note: "stopServer Windows admin path: direct fs write, unconditional full-hosts cleanup" }
+    - { file: src/mitm/manager.js, line: 781, note: "stopServer Windows non-admin path: separate PowerShell regex-filter script, independent write path from atomicWriteHostsWin" }
     - { file: src/mitm/dns/dnsConfig.js, line: 118, note: "checkDNSEntry: try/catch around a raw file read, false on any read error" }
   newModule: tooling
   parityStatus: traced
