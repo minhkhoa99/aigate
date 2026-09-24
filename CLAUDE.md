@@ -1,5 +1,12 @@
 # CLAUDE.md
 
+## UI ownership handoff
+
+Read `docs/design/UI_HANDOFF.md` before changing frontend files. The user assigned visual
+UI implementation to a separate `feat/ui-first` worktree. Do not redesign or duplicate
+screens marked `UI_READY` there; work on contracts, backend logic, and API integration.
+The handoff names the exact branch, routes, and remaining wiring work.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project map — read this before planning any AIGate work
