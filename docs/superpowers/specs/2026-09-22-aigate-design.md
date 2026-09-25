@@ -232,7 +232,7 @@ CandidateResolver → [attempt] → classify(error) → recoverable? ─yes→ n
 | Mutex **global** khi chọn account | Head-of-line blocking giữa các provider | Mutex **keyed theo provider** |
 | `modelLock_{model}` là key string trong JSON blob | Thiếu domain model | Entity `AccountLock` |
 | `appendRequestLog()` no-op rỗng | Xác chết | Xoá |
-| Ghi usage đồng bộ mỗi request | Bottleneck trên hot path | Buffered writer: flush theo interval **hoặc** max-batch, queue có trần, drop-oldest + đếm số drop |
+| Ghi usage mỗi request theo kiểu fire-and-forget, lỗi bị nuốt bằng `.catch(() => {})` (`usage.write-not-synchronous`; trước đây ghi nhầm là ghi đồng bộ) | Mỗi request một lần ghi DB; crash hoặc lỗi ghi làm mất dòng mà không ai biết | Buffered writer: flush theo interval **hoặc** max-batch, queue có trần, drop-oldest + đếm số drop **và** số lần ghi lỗi |
 | Token refresh chạy song song N lần | Lãng phí + race | **Single-flight** theo connectionId |
 | `RING_CAP` / `HEAD_KEEP` / `CHARS_PER_TOKEN` magic number | Không đặt tên | Config có tên, có đơn vị |
 | Proxy agent LRU không TTL | Socket chết vẫn nằm trong cache | LRU + TTL |

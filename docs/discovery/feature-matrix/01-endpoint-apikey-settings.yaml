@@ -199,7 +199,7 @@
   sideEffects: []
   persistence: []
   performanceConcerns:
-    - "One SQL lookup per request on the hot path, no cache; WHERE key = ? has no explicit index, so cost scales with the size of the apiKeys table (small in practice — dashboard-managed, single install)"
+    - "One SQL lookup per request on the hot path, no cache; WHERE key = ? is served by the UNIQUE constraint on apiKeys.key (schema.js:81) plus idx_ak_key (schema.js:87), so each lookup is an index probe (corrected 2026-09-25; an earlier trace said there was no index)"
     - "The lookup uses the database engine's own string equality (not crypto.timingSafeEqual), so response-time differences between 'no match' and 'match at byte N' are whatever the underlying adapter's B-tree/string compare naturally produces — a timing side-channel is theoretically possible depending on adapter (better-sqlite3 vs sql.js) though impractical to exploit over HTTP jitter"
   behavior: { streaming: false, cancellation: null, concurrency: null }
   edgeCases:

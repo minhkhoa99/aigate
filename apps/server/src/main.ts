@@ -1,4 +1,6 @@
-import { resolve } from "node:path";
+import { mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { createServer } from "./server.js";
 
 const DEFAULT_PORT = 20200;
@@ -15,5 +17,11 @@ function readPort(value: string | undefined): number {
 // Loopback by default: the gateway will hold provider credentials. Set HOST to expose it.
 const host = process.env.HOST ?? "127.0.0.1";
 const port = readPort(process.env.PORT);
-const app = await createServer(resolve(import.meta.dirname, "../../web/dist"));
+// Owner-only: the database will hold provider credentials.
+const dataDir = process.env.AIGATE_DATA_DIR ?? join(homedir(), ".aigate");
+mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+const app = await createServer({
+  databaseFile: join(dataDir, "aigate.db"),
+  webDist: resolve(import.meta.dirname, "../../web/dist"),
+});
 await app.listen(port, host);

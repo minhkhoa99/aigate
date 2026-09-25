@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { fileURLToPath } from "node:url";
 import { drizzle, type AsyncBatchRemoteCallback, type AsyncRemoteCallback, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
 import { migrate } from "drizzle-orm/sqlite-proxy/migrator";
 import { openers, type DriverName, type SyncClient } from "./clients.js";
@@ -12,9 +13,12 @@ export interface DatabaseHandle {
   close(): Promise<void>;
 }
 
+// AIGate's own migrations. Each bounded context adds its tables here when its SP lands.
+export const MIGRATIONS_FOLDER = fileURLToPath(new URL("../drizzle", import.meta.url));
+
 export interface OpenOptions {
   file: string;
-  migrationsFolder: string;
+  migrationsFolder?: string;
   // Force one driver instead of the runtime's fallback chain.
   driver?: DriverName;
 }
@@ -102,7 +106,7 @@ export async function openDatabase(options: OpenOptions): Promise<DatabaseHandle
         for (const query of queries) client.exec(query, [], "run");
       }),
     );
-  await migrate(db, runMigrations, { migrationsFolder: options.migrationsFolder });
+  await migrate(db, runMigrations, { migrationsFolder: options.migrationsFolder ?? MIGRATIONS_FOLDER });
 
   return {
     db,

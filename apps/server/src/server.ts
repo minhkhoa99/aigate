@@ -4,7 +4,10 @@ import { join } from "node:path";
 import fastifyStatic from "@fastify/static";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import { openDatabase } from "@aigate/database";
 import { AppModule } from "./app.module.js";
+
+export { DATABASE } from "./database.provider.js";
 
 // Paths the SPA fallback must never answer: an unknown API path stays a JSON 404.
 const API_PREFIXES = ["/api", "/v1", "/v1beta", "/codex", "/responses"];
@@ -15,8 +18,20 @@ function isSpaRoute(url: string): boolean {
   return !/\.[a-z0-9]+$/i.test(path);
 }
 
-export async function createServer(webDist?: string): Promise<NestFastifyApplication> {
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
+export interface ServerOptions {
+  databaseFile: string;
+  webDist?: string;
+}
+
+export async function createServer({ databaseFile, webDist }: ServerOptions): Promise<NestFastifyApplication> {
+  const database = await openDatabase({ file: databaseFile });
+  let app: NestFastifyApplication;
+  try {
+    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database), new FastifyAdapter());
+  } catch (error) {
+    await database.close();
+    throw error;
+  }
   app.enableShutdownHooks();
 
   if (webDist && existsSync(join(webDist, "index.html"))) {
