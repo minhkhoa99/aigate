@@ -75,7 +75,7 @@
     - { file: src/app/api/v1/responses/route.js, line: 29, note: "POST /v1/responses — same handleChat call, Responses format detected downstream" }
     - { file: open-sse/translator/index.js, line: 276, note: "initTranslators() only calls the empty ensureInitialized()" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: routing.request-preflight
@@ -115,7 +115,7 @@
     - { file: src/sse/handlers/chat.js, line: 71, note: "if (settings.requireApiKey) — missing/invalid key both 401" }
     - { file: src/sse/handlers/chat.js, line: 83, note: "if (!modelStr) return 400 Missing model — after the auth gate" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: routing.bypass-canned-responses
@@ -266,7 +266,7 @@
     - { file: src/sse/services/model.js, line: 71, note: "bare name checked as combo before alias" }
     - { file: src/sse/handlers/chat.js, line: 218, note: "400 Invalid model format" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: routing.account-fallback-loop
@@ -1029,7 +1029,7 @@
     - { file: src/sse/services/auth.js, line: 124, note: "allRateLimited when every connection is locked" }
     - { file: open-sse/utils/error.js, line: 119, note: "unavailableResponse — Retry-After header, no CORS header" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: routing.response-mode-dispatch
@@ -1110,7 +1110,7 @@
     - { file: open-sse/utils/stream.js, line: 224, note: "non-JSON data lines skipped silently" }
     - { file: open-sse/utils/stream.js, line: 400, note: "[DONE] suppressed for gemini-family providers" }
   newModule: routing
-  parityStatus: contracted
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: routing.non-streaming-response
@@ -1186,7 +1186,7 @@
     - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 86, note: "synthesized terminal only for Responses passthrough" }
     - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 47, note: "onRequestSuccess fired at header time" }
   newModule: routing
-  parityStatus: contracted
+  parityStatus: implemented
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "A stream cut off mid-answer is signalled to the client as an error (error event or missing terminal it can detect), and the account is not marked healthy"
@@ -1229,7 +1229,7 @@
     - { file: src/sse/handlers/chat.js, line: 268, note: "handleChatCore called without onDisconnect or request.signal" }
     - { file: src/sse/handlers/videoGeneration.js, line: 143, note: "contrast: video lane passes request.signal" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "A client disconnect cancels the upstream call and stops retry/fallback at any stage"

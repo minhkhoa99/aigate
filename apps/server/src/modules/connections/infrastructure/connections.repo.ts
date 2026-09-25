@@ -95,6 +95,19 @@ export class ConnectionsRepository {
     return row ? { ...row, apiKey: this.cipher.open(row.sealed, sealContext(id)) } : undefined;
   }
 
+  // The key routing uses (SP12): only an active connection counts; its test status does not.
+  // Throws SecretUnreadableError when the secret key changed since the key was saved.
+  async activeKey(provider: string): Promise<string | undefined> {
+    const row = await this.database.db.select({ id: t.id, sealed: t.apiKeySealed }).from(t)
+      .where(and(eq(t.provider, provider), eq(t.isActive, true))).get();
+    return row ? this.cipher.open(row.sealed, sealContext(row.id)) : undefined;
+  }
+
+  async activeProviders(): Promise<Set<string>> {
+    const rows = await this.database.db.select({ provider: t.provider }).from(t).where(eq(t.isActive, true)).limit(MAX_CONNECTIONS);
+    return new Set(rows.map((row) => row.provider));
+  }
+
   // Written only if the key is still the one that was tested; a key replaced mid-test keeps its untested state.
   async recordTest(id: string, sealed: string, outcome: TestOutcome): Promise<ConnectionView | undefined> {
     const [row] = await this.database.db.update(t).set({ ...outcome, lastTestedAt: new Date() })

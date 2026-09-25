@@ -33,6 +33,25 @@ export const useSetKeyActive = () =>
     api<ApiKey>(`/api/keys/${encodeURIComponent(id)}`, { method: "PATCH", body: { isActive } }));
 export const useDeleteKey = () => useKeyMutation((id: string) => apiVoid(`/api/keys/${encodeURIComponent(id)}`, "DELETE"));
 
+// Shared with the providers feature by query key only (docs/contracts/chat-lane.md, "UI").
+const connectionsKey = ["connections"] as const;
+interface ConnectionState {
+  isActive: boolean;
+  testStatus: "untested" | "active" | "invalid" | "no_quota" | "unreachable";
+}
+export type ChatReadiness = "ready" | "no-connection" | "check-connection";
+
+// Whether /v1 can answer: an active connection is required; a passed test means it should work.
+export const useChatReadiness = () => useQuery({
+  queryKey: connectionsKey,
+  queryFn: () => api<ConnectionState[]>("/api/connections"),
+  select: (connections): ChatReadiness => {
+    const active = connections.filter((c) => c.isActive);
+    if (active.length === 0) return "no-connection";
+    return active.some((c) => c.testStatus === "active") ? "ready" : "check-connection";
+  },
+});
+
 interface RequireApiKey {
   requireApiKey: boolean;
 }

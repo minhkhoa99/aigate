@@ -33,6 +33,7 @@ If an SP adds no HTTP API (for example `packages/engine`), write "no UI" in its 
 | `PATCH /api/connections/:id` | same | `Connections` → Replace key modal, Disable/Enable | `useUpdateConnection` | Wired: a new key resets to Not tested, then is tested |
 | `DELETE /api/connections/:id` | same | `Connections` → Delete (type-to-confirm) | `useDeleteConnection` | Wired |
 | `POST /api/connections/:id/test` | same | `Connections` → Test; runs after every save | `useTestConnection` (25 s client timeout) | Wired: one toast per result (`features/providers/test-result.ts`) |
+| `POST /v1/chat/completions`, `GET /v1/models` | `contracts/chat-lane.md` | API clients (SDKs, IDEs), not the dashboard. `/gateway/endpoint` → `EndpointKeys` shows readiness: "Ready", "Connect a provider", or "Check connection" | `features/gateway/api.ts` `useChatReadiness` (the `["connections"]` query) | Wired: readiness pill, a curl test request, and a note that keyless mode is local-only |
 | `GET /health` | — | none (probe) | — | No UI |
 
 ## Waiting for backend
@@ -44,7 +45,6 @@ Each screen keeps its fixture data until the SP in the second column lands. When
 | `/` → `Overview` | SP12 routing, usage SPs | Live requests, needs attention |
 | `/settings/general` → `SettingsGeneral` | adds its settings keys by migration | Instance name, language, default model, observability |
 | `/settings/auth` OIDC and SAML tabs | M2 (OIDC/SAML) | Visual only |
-| `/gateway/endpoint` base URL pill | SP12 (`/v1`) | Shows "Chat API pending" until `/v1` exists |
 | `/providers/quota` → `Quota` | SP24 (`usage`: quota) | Quota numbers are fixture data |
 | `/providers/new` custom provider form | SP13 | Preview only; the save button is disabled |
 | OAuth on `Connections` (AuthFlow modal) | SP16 | SP11 has API-key connections only |
@@ -64,7 +64,7 @@ Each screen keeps its fixture data until the SP in the second column lands. When
 | SP7 `packages/engine` (CIP core, registry, capability resolution, retry helper) | No UI. It has no HTTP API; `/v1` (SP12) is the first thing a screen can show. |
 | SP8 `transport` (`HttpTransportPort`, direct branch plus timeout) | No UI. Outbound HTTP only; its error codes (`TIMEOUT`, `PROVIDER_UNAVAILABLE`, `INVALID_REQUEST`) reach users through `/v1` in SP12. |
 | SP9 `OpenAICompatibleAdapter` (CIP ↔ chat completions, error classification, bounded SSE) | No UI. `validateCredential` will back "Test connection" on `/providers` (SP11): `AUTH_ERROR` / `QUOTA_EXHAUSTED` are answers about the key, anything else is a connection problem. Chat errors reach users through `/v1` (SP12). |
-| SP10 OpenAI Chat protocol (`parseOpenAIChatRequest`, `toOpenAIChatCompletion`, `OpenAIChatStreamEncoder`, `toOpenAIError`) | No UI. SP12 mounts it on `/v1/chat/completions`; the `/gateway/endpoint` "Chat API pending" pill waits for that. API clients (not the dashboard) read its errors as `{error:{message,type,code,param}}`, with an upstream `AUTH_ERROR` as 502 `upstream_auth_error`. |
+| SP10 OpenAI Chat protocol (`parseOpenAIChatRequest`, `toOpenAIChatCompletion`, `OpenAIChatStreamEncoder`, `toOpenAIError`) | No UI. SP12 mounts it on `/v1/chat/completions`; SP12 did that; the endpoint screen shows readiness. API clients (not the dashboard) read its errors as `{error:{message,type,code,param}}`, with an upstream `AUTH_ERROR` as 502 `upstream_auth_error`. |
 
 ## Error handling
 

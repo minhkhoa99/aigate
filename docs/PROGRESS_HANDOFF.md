@@ -22,7 +22,8 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M1 SP9 `engine`: OpenAI-compatible adapter | Done, no UI | `docs/contracts/provider-openai.md` |
 | M1 SP10 `engine`: protocol adapter in/out (OpenAI only) | Done, no UI | `docs/contracts/protocol-openai.md` |
 | M1 SP11 `connections` (one API-key account) | Done, UI wired | `docs/contracts/connections.md` |
-| M1 SP12 routing + `/v1` streaming | **Next** | SP11 below |
+| M1 SP12 routing + `/v1` streaming | Done, UI wired | `docs/contracts/chat-lane.md` |
+| M1 acceptance gate (parity tiers 1+2, 13 golden scenarios) | **Next**: needs M0 SP3 | SP12 below |
 
 ## Completed and verified
 
@@ -359,13 +360,44 @@ Checks and status:
   - `implemented`: `connection.storage-shape-json-blob`, `catalog.connection-listing`, `catalog.connection-detail-crud`, and `connection.test-single-connection`.
   - `contracted`: `connection.create-dedup-and-priority-assignment`, `connection.client-listing-sanitized`, and `connection.delete-and-reorder`.
 
-**Next step, M1 SP12 (`routing`: chat lane on `/v1/chat/completions`):**
-- **Route.** A Fastify raw route. It checks the client key through `ApiKeysRepository.isValid` when `requireApiKey` is on, then parses with `parseOpenAIChatRequest`.
-- **Provider.** It resolves the provider and model from the registry, reads the active connection (`ConnectionsRepository`), and runs `assertModelSupports`.
-- **Execution.** It calls `OpenAICompatibleAdapter.execute` or `stream`, under one `ExecCtx` signal (client disconnect + request budget).
-- **Streaming.**
-  - Write the `OpenAIChatStreamEncoder` output with backpressure.
-  - Add an idle timeout between chunks.
-  - Call `fail()` when the stream is cut off partway.
-  - Map errors with `toOpenAIError`.
-- **UI.** Turn the `/gateway/endpoint` "Chat API pending" pill live in the same SP.
+**M1 SP12 (`routing`: the `/v1` chat lane) is complete locally, with the UI wired.** The contract is `docs/contracts/chat-lane.md`. The M1 slice (one streaming chat endpoint, a valid API key, one provider) works end to end.
+
+- **Routes.** `POST /v1/chat/completions` and `GET /v1/models` are registered directly on Fastify (`modules/routing/infrastructure/v1-routes.ts`), outside the dashboard session guard. The chat body limit is 16 MiB; the rest of the server keeps 1 MiB.
+- **Key gate (`onRequest`, before the body is read).**
+  - With `requireApiKey` on, a missing or invalid key is 401 (`missing_api_key` / `invalid_api_key`).
+  - With it off, only this machine is served (`isLocalRequest`: loopback socket, `Host`, and `Origin`). Anything else is 403 `api_key_required`. This is a `SUSPECTED_BUG` fix: 9router served every host, and DNS-rebinding pages, when keyless.
+  - There is no CORS on `/v1`, and `Content-Type: application/json` is required (415 otherwise).
+- **Model resolution.**
+  - `provider/model` accepts any model id for a registry provider.
+  - A bare id must be declared in the registry.
+  - Unknown models are 404 `model_not_found`, with both accepted forms in the message.
+  - Without an active connection the answer is 404 `no_active_connection`. A key that can no longer be decrypted is 500 `credential_unreadable`.
+  - `assertModelSupports` runs before any upstream call.
+- **`ChatLane` (`chat-lane.ts`).**
+  - One `ExecCtx.signal` combines the client disconnect (the response `close` event), a 600 s budget whose reason is `EngineError TIMEOUT`, and, for streams, the idle watchdog.
+  - JSON responses go through `execute` and `toOpenAIChatCompletion`.
+  - Streams wait for the first chunk before sending any header, so an early failure is a real JSON status. Then `reply.hijack()` and `text/event-stream`.
+  - Writes respect backpressure: a false `write()` waits for `drain`, and the wait ends if the client leaves.
+  - The idle timeout, `AIGATE_STREAM_IDLE_TIMEOUT_MS` (default 300 000, allowed 1 000–600 000), aborts the upstream with `TIMEOUT` and sends an error event.
+  - A mid-stream failure sends `encoder.fail` and no `[DONE]`. The upstream body is always cancelled.
+  - Expected failures are not logged; bugs are, with the request id only.
+- **Connections.** `ConnectionsRepository.activeKey` and `activeProviders` were added. An active connection is used even if it is untested.
+- **UI.** `/gateway/endpoint`:
+  - A readiness pill from the shared `["connections"]` query: Ready, Connect a provider, or Check connection, with a link to Connections.
+  - A copyable curl test request using `openai/gpt-4.1-mini`.
+  - The format labels were cut to OpenAI; the others come with SP15.
+  - The Require API key row now says "When off, only this machine can call the chat API".
+- **Checks.**
+  - Server tests pass 53/53, with 10 new chat-lane tests. Three of them run on real sockets: client disconnect, backpressure (a paused reader stops the upstream reads), and the idle timeout.
+  - 11 mutations were run and all were caught: backpressure, disconnect, idle timer, key gate, local-only keyless, headers before the first chunk, swallowed mid-stream error, content-type, disabled connection, capability check, prefix stripping.
+  - Live smoke on port 20299 against the real OpenAI API:
+    - `/v1/models` listed `openai/*`.
+    - No key gave 401.
+    - With a fake upstream key, JSON and stream requests both gave 502 `upstream_auth_error` with an `x-request-id`.
+    - The endpoint pill showed "Check connection".
+  - A successful chat needs a real OpenAI key: add one in Connections, then run the Test request.
+- **Matrix.**
+  - `implemented`: `endpoint.enforce-require-api-key`, `routing.request-preflight`, `routing.client-disconnect-propagation`, `routing.streaming-pipeline`, and `fallback.partial-stream-failure`.
+  - `contracted`: `routing.lane-entry-routes`, `routing.model-resolution`, `fallback.accounts-exhausted-response`, and `catalog.model-listing-live-override`.
+
+**Next step: the M1 acceptance gate (spec §9: parity tiers 1+2 clean, 13 golden scenarios green).** This needs **M0 SP3, the parity harness**: a recording proxy, tapes, a normalizer, and a semantic SSE diff. It then runs the golden scenarios in `.agents/skills/porting-behavior-not-code/golden-scenarios.md` against `/v1`. After the gate come M2 (SP13 catalog and the rest) and M0 SP4 (`tools/extract`).

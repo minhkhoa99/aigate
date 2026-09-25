@@ -4,9 +4,14 @@ import { type FormEvent } from "react";
 import { Button, ConfirmDialog, CopyField, Dot, Field, Input, Metric, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
-import { useApiKeys, useCreateKey, useDeleteKey, useRequireApiKey, useSetKeyActive, useSetRequireApiKey, type ApiKey, type CreatedApiKey } from "./api";
+import { useApiKeys, useChatReadiness, useCreateKey, useDeleteKey, useRequireApiKey, useSetKeyActive, useSetRequireApiKey, type ApiKey, type ChatReadiness, type CreatedApiKey } from "./api";
 
-
+const READINESS: Record<ChatReadiness, { tone: "healthy" | "warning"; label: string; hint?: string }> = {
+  ready: { tone: "healthy", label: "Ready" },
+  "no-connection": { tone: "warning", label: "Connect a provider", hint: "The chat API answers once a provider is connected." },
+  "check-connection": { tone: "warning", label: "Check connection", hint: "A provider is connected, but its key has not passed a test yet." },
+};
+const SAMPLE_BODY = JSON.stringify({ model: "openai/gpt-4.1-mini", messages: [{ role: "user", content: "Hello" }] });
 
 export function EndpointKeys() {
   const [showCreate, setShowCreate] = useState(false);
@@ -20,8 +25,11 @@ export function EndpointKeys() {
   const setRequireApiKey = useSetRequireApiKey();
   const showToast = useToast();
   const fail = (error: unknown) => showToast({ tone: "error", ...toProblem(error) });
-  // The chat API (/v1) lands in SP12; this is the URL clients will use on this origin.
+  // The chat API (docs/contracts/chat-lane.md) on this origin.
   const baseUrl = `${window.location.origin}/v1`;
+  const readiness = useChatReadiness();
+  const state = readiness.data ? READINESS[readiness.data] : undefined;
+  const curl = `curl ${baseUrl}/chat/completions -H "Authorization: Bearer <your AIGate key>" -H "Content-Type: application/json" -d '${SAMPLE_BODY}'`;
   const closeCreate = () => { setShowCreate(false); setCreated(null); createKey.reset(); };
 
   const submitCreate = (event: FormEvent<HTMLFormElement>) => {
@@ -32,10 +40,13 @@ export function EndpointKeys() {
 
   return <>
     <PageHeading eyebrow="Gateway / Endpoint & Keys" title="Gateway endpoints" description="Configure your client base URL and manage access tokens." />
-    <Panel title="Base URL" detail="Use this URL in OpenAI-compatible clients." action={<Pill tone="warning">Chat API pending</Pill>}>
+    <Panel title="Base URL" detail="Use this URL in OpenAI-compatible clients." action={state ? <Pill tone={state.tone}>{state.label}</Pill> : <Pill>{readiness.isError ? "Status unavailable" : "Checking…"}</Pill>}>
+      {state?.hint && <Warning>{state.hint} <a href="/providers/connections">Open Connections</a></Warning>}
       <CopyField label="OpenAI compatible endpoint" value={baseUrl} />
-      <div className="endpoint-examples"><span>OpenAI</span><span>Anthropic</span><span>Gemini</span><span>Codex</span></div>
+      <div className="endpoint-examples"><span>OpenAI</span></div>
+      <p className="muted">Anthropic, Gemini, and Codex formats arrive with SP15. List models at <code>/v1/models</code>, or send <code>provider/model</code> such as <code>openai/gpt-4.1-mini</code>.</p>
       <CopyField label="Terminal example" value={`export OPENAI_BASE_URL=${baseUrl}`} />
+      <CopyField label="Test request" value={curl} />
     </Panel>
     <Panel title="API keys" detail="Manage scoped gateway tokens for upstream client authentication." className="section-gap panel-flush" action={<Button variant="primary" onClick={() => setShowCreate(true)}>+ Create key</Button>}>
       {keys.isPending ? <StateBlock state="loading" />
@@ -48,7 +59,7 @@ export function EndpointKeys() {
         ])} />}
     </Panel>
     <Panel title="Security settings" detail="Protect this gateway from requests without a valid key." className="section-gap">
-      <div className="list-row"><div><strong>Require API key</strong><small>Requests without a valid key are rejected.</small></div><input type="checkbox" checked={requireApiKey.data ?? true} disabled={requireApiKey.data === undefined || setRequireApiKey.isPending} onChange={(e) => setRequireApiKey.mutate(e.target.checked, { onError: fail })} aria-label="Require API key" /></div>
+      <div className="list-row"><div><strong>Require API key</strong><small>Requests without a valid key are rejected. When off, only this machine can call the chat API.</small></div><input type="checkbox" checked={requireApiKey.data ?? true} disabled={requireApiKey.data === undefined || setRequireApiKey.isPending} onChange={(e) => setRequireApiKey.mutate(e.target.checked, { onError: fail })} aria-label="Require API key" /></div>
     </Panel>
     {showCreate && <Modal title="Create API key" onClose={closeCreate}>
       {created ? <><Warning>Copy this key now. It is shown only once and cannot be recovered.</Warning><CopyField label={created.name} value={created.key} /><div className="modal-actions"><Button variant="primary" onClick={closeCreate}>Done</Button></div></>

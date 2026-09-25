@@ -103,7 +103,7 @@
     - { file: src/app/api/v1/models/route.js, line: 197, note: "AbortController 5000ms timeout on fetchCompatibleModelIds" }
     - { file: src/app/api/v1/models/route.js, line: 502, note: "context_length/max_completion_tokens backfilled from static getCapabilitiesForModel when the live entry omits them" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.capability-tier-fallback

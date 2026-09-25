@@ -311,7 +311,7 @@
     - { file: src/sse/handlers/chat.js, line: 70, note: "settings = await getSettings(); enforcement gated on settings.requireApiKey" }
     - { file: src/sse/handlers/chat.js, line: 76, note: "await isValidApiKey(apiKey) — the actual DB-backed check" }
   newModule: apikeys
-  parityStatus: contracted
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: endpoint.rewrite-lanes

@@ -23,6 +23,7 @@ mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const app = await createServer({
   databaseFile: join(dataDir, "aigate.db"),
   secretKey: process.env.AIGATE_SECRET_KEY,
+  streamIdleTimeoutMs: process.env.AIGATE_STREAM_IDLE_TIMEOUT_MS === undefined ? undefined : Number(process.env.AIGATE_STREAM_IDLE_TIMEOUT_MS),
   webDist: resolve(import.meta.dirname, "../../web/dist"),
 });
 await app.listen(port, host);
