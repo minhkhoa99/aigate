@@ -21,8 +21,8 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M1 SP8 `transport` (direct branch + timeout) | Done, no UI | `docs/contracts/transport.md` |
 | M1 SP9 `engine`: OpenAI-compatible adapter | Done, no UI | `docs/contracts/provider-openai.md` |
 | M1 SP10 `engine`: protocol adapter in/out (OpenAI only) | Done, no UI | `docs/contracts/protocol-openai.md` |
-| M1 SP11 `connections` (one API-key account) | **Next** | SP10 below |
-| M1 SP12 routing + `/v1` streaming | Pending | Spec §9 |
+| M1 SP11 `connections` (one API-key account) | Done, UI wired | `docs/contracts/connections.md` |
+| M1 SP12 routing + `/v1` streaming | **Next** | SP11 below |
 
 ## Completed and verified
 
@@ -325,8 +325,46 @@ Checks and status:
 - **Matrix.** `routing.stream-mode-decision` is `implemented`. `routing.source-format-detection`, `routing.request-translation`, and `translator.pivot-loss` are `contracted`.
 - **UI.** No UI, as recorded in `API_UI_MAP.md`. SP12 mounts these functions on `/v1/chat/completions`, which the `/gateway/endpoint` "Chat API pending" pill waits for.
 
-**Next step, M1 SP11 (`connections`: one API-key account per provider):**
-- **Storage.** A `provider_connections` table, with the API key encrypted at rest. The spec's `SecretCipherPort` needs a design choice first.
-- **CRUD API.** Add, list, edit, and delete connections.
-- **Test connection.** It calls `OpenAICompatibleAdapter.validateCredential`. `AUTH_ERROR` and `QUOTA_EXHAUSTED` are answers about the key; anything else is a connection problem.
-- **UI.** Wire the `/providers` screens (`LlmProviders`, `ProviderDetail`, `Connections`) in the same SP, with precise toasts for each code.
+**M1 SP11 (`connections`) is complete locally, with the UI wired.** The contract is `docs/contracts/connections.md`.
+
+- **Decisions (user, 2026-09-25).**
+  - Keys use AES-256-GCM with a key file and an env override.
+  - OpenAI is the only provider, with one API-key account per provider.
+- **Secret storage.**
+  - `apps/server/src/secret-cipher.ts` holds `SecretCipherPort`, `AesGcmCipher`, `loadSecretKey`, and a global `SecretsModule` (`SECRET_CIPHER`).
+  - The format is `v1.` + IV‖tag‖ciphertext, with AAD `provider_connections:<id>:api_key`.
+  - The key comes from `AIGATE_SECRET_KEY` (hex or base64), or otherwise from `secret.key` next to the database. That file is created once through a temp file plus an exclusive link (mode 0600). A bad file stops startup and is never overwritten.
+- **Database.** Migration `0002` adds `provider_connections`:
+  - Typed columns, `provider` UNIQUE, and a CHECK on `test_status`.
+  - The key is stored sealed; only the last 4 characters are in clear.
+- **Server.** The module `modules/connections`:
+  - A pure domain parser (unknown fields are 400).
+  - A repository with an allowlisted view. Create uses `onConflictDoNothing` and returns 409 `ALREADY_CONNECTED`. A new key resets the status to `untested`.
+  - `POST /:id/test`: decrypt, then `OpenAICompatibleAdapter.validateCredential` outside any transaction (20 s budget). The result is written only if the sealed key is unchanged. `CREDENTIAL_UNREADABLE` is 409.
+  - `TransportModule` is now a global `TransportModule.with(transport?)`, and `createServer` takes `{ secretKey, transport }`. Tests pass a fake transport.
+- **UI.**
+  - `features/providers/api.ts` holds the hooks.
+  - `test-result.ts` maps status to a pill and a toast; only `invalid` and `no_quota` blame the key.
+  - `Connections`: a real table with Test, Replace key, Disable/Enable, and Delete, plus a Needs-attention tab and an Add modal that saves, then tests. The fixture rows, the Strategies tab, and the Quota column were removed.
+  - `ProviderDetail`: a live Connection panel, or "Not supported yet".
+  - `LlmProviders`: a Connected pill.
+  - `shared/api.ts` accepts `timeoutMs`, used for the 25 s test. The `TIMEOUT` toast shows the real number of seconds.
+  - `errors.ts` gains `PROVIDER_NOT_SUPPORTED`, `ALREADY_CONNECTED`, and `CREDENTIAL_UNREADABLE`.
+- **Checks.**
+  - Server tests pass 43/43 (7 connection tests, 3 cipher tests). Web tests pass 7/7.
+  - 16 mutations were caught. One more mutation was a non-mutant: `linkSync` cannot overwrite, so a renameSync variant was used instead.
+  - Live smoke test on port 20299, against the real OpenAI API: a fake key was saved sealed, the test returned 401, the row showed "Key rejected", and an `AUTH_ERROR` toast appeared. The provider detail pages showed the connected and "Not supported yet" states.
+- **Matrix.**
+  - `implemented`: `connection.storage-shape-json-blob`, `catalog.connection-listing`, `catalog.connection-detail-crud`, and `connection.test-single-connection`.
+  - `contracted`: `connection.create-dedup-and-priority-assignment`, `connection.client-listing-sanitized`, and `connection.delete-and-reorder`.
+
+**Next step, M1 SP12 (`routing`: chat lane on `/v1/chat/completions`):**
+- **Route.** A Fastify raw route. It checks the client key through `ApiKeysRepository.isValid` when `requireApiKey` is on, then parses with `parseOpenAIChatRequest`.
+- **Provider.** It resolves the provider and model from the registry, reads the active connection (`ConnectionsRepository`), and runs `assertModelSupports`.
+- **Execution.** It calls `OpenAICompatibleAdapter.execute` or `stream`, under one `ExecCtx` signal (client disconnect + request budget).
+- **Streaming.**
+  - Write the `OpenAIChatStreamEncoder` output with backpressure.
+  - Add an idle timeout between chunks.
+  - Call `fail()` when the stream is cut off partway.
+  - Map errors with `toOpenAIError`.
+- **UI.** Turn the `/gateway/endpoint` "Chat API pending" pill live in the same SP.

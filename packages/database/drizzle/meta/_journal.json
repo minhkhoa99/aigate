@@ -15,6 +15,13 @@
       "when": 1790332584056,
       "tag": "0001_warm_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790348425953,
+      "tag": "0002_shiny_blazing_skull",
+      "breakpoints": true
     }
   ]
 }

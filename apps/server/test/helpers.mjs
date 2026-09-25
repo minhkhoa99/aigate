@@ -6,8 +6,8 @@ import { createServer } from "../dist/server.js";
 
 export const PASSWORD = "correct horse battery";
 
-export async function boot(databaseFile) {
-  const app = await createServer({ databaseFile });
+export async function boot(databaseFile, options = {}) {
+  const app = await createServer({ databaseFile, ...options });
   await app.init();
   const fastify = app.getHttpAdapter().getInstance();
   await fastify.ready();

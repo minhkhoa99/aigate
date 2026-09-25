@@ -498,7 +498,7 @@
     - { file: src/lib/db/repos/connectionsRepo.js, line: 160, note: "connectionPriority default: max existing + 1" }
     - { file: src/lib/db/repos/connectionsRepo.js, line: 156, note: "connectionName derivation only for oauth/access_token" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: connection.update-atomic-merge-and-reorder
@@ -565,7 +565,7 @@
     - { file: src/lib/db/repos/connectionsRepo.js, line: 207, note: "deleteProviderConnection — SELECT provider before DELETE, then reorderInTx" }
     - { file: src/lib/db/repos/connectionsRepo.js, line: 220, note: "deleteProviderConnectionsByProvider — bulk delete, no reorder call" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: connection.storage-shape-json-blob
@@ -599,5 +599,5 @@
     - { file: src/lib/db/repos/connectionsRepo.js, line: 232, note: "cleanupProviderConnections — the only active shrink of the JSON blob, fixed field list" }
     - { file: src/lib/db/repos/connectionsRepo.js, line: 252, note: "empty providerSpecificData object dropped entirely during cleanup" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]

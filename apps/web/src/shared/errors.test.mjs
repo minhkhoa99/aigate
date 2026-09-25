@@ -25,3 +25,10 @@ test("validation messages pass through and unknown failures stay honest", () => 
   assert.match(toProblem(new ApiError(502, "HTTP_502", "Bad Gateway")).message, /HTTP 502/);
   assert.equal(toProblem(new ApiError(418, "HTTP_418", "")).message, "Request failed (HTTP 418).");
 });
+
+test("connection codes tell the user what to do next", () => {
+  assert.equal(toProblem(new ApiError(400, "PROVIDER_NOT_SUPPORTED", "x", { message: "deepseek cannot be connected yet. Supported: OpenAI." })).message, "deepseek cannot be connected yet. Supported: OpenAI.");
+  assert.match(toProblem(new ApiError(409, "ALREADY_CONNECTED", "x")).message, /Replace key/);
+  assert.match(toProblem(new ApiError(409, "CREDENTIAL_UNREADABLE", "x")).message, /secret key file changed/);
+  assert.match(toProblem(new ApiError(0, "TIMEOUT", "x", { timeoutSeconds: 25 })).message, /within 25 seconds/);
+});

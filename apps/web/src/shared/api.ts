@@ -20,7 +20,7 @@ export class ApiError extends Error {
   }
 }
 
-async function send(path: string, method: string, body: unknown): Promise<Response> {
+async function send(path: string, method: string, body: unknown, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(path, {
@@ -28,11 +28,11 @@ async function send(path: string, method: string, body: unknown): Promise<Respon
       credentials: "same-origin",
       headers: body === undefined ? undefined : { "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "TimeoutError") {
-      throw new ApiError(0, "TIMEOUT", `AIGate did not answer within ${REQUEST_TIMEOUT_MS / 1000} seconds.`);
+      throw new ApiError(0, "TIMEOUT", `AIGate did not answer within ${timeoutMs / 1000} seconds.`, { timeoutSeconds: timeoutMs / 1000 });
     }
     throw new ApiError(0, "NETWORK_ERROR", "Could not reach AIGate.");
   }
@@ -45,8 +45,9 @@ async function send(path: string, method: string, body: unknown): Promise<Respon
   throw new ApiError(response.status, code, message, record);
 }
 
-export async function api<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
-  const response = await send(path, init.method ?? "GET", init.body);
+// timeoutMs: only for calls the server itself bounds longer, such as a connection test.
+export async function api<T>(path: string, init: { method?: string; body?: unknown; timeoutMs?: number } = {}): Promise<T> {
+  const response = await send(path, init.method ?? "GET", init.body, init.timeoutMs);
   try {
     const data: T = await response.json();
     return data;

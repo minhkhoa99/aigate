@@ -1,11 +1,13 @@
 import "reflect-metadata";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import fastifyStatic from "@fastify/static";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { openDatabase } from "@aigate/database";
+import type { HttpTransportPort } from "@aigate/engine";
 import { AppModule } from "./app.module.js";
+import { AesGcmCipher, loadSecretKey } from "./secret-cipher.js";
 
 export { DATABASE } from "./database.provider.js";
 
@@ -21,15 +23,21 @@ function isSpaRoute(url: string): boolean {
 export interface ServerOptions {
   databaseFile: string;
   webDist?: string;
+  // AIGATE_SECRET_KEY; when unset, secret.key next to the database is used (created once).
+  secretKey?: string;
+  // Tests only: replaces the direct transport, so no request leaves the machine.
+  transport?: HttpTransportPort;
 }
 
-export async function createServer({ databaseFile, webDist }: ServerOptions): Promise<NestFastifyApplication> {
+export async function createServer({ databaseFile, webDist, secretKey, transport }: ServerOptions): Promise<NestFastifyApplication> {
+  // Loaded before the database opens: a bad key stops startup before anything else happens.
+  const cipher = new AesGcmCipher(loadSecretKey(secretKey, join(dirname(databaseFile), "secret.key")));
   const database = await openDatabase({ file: databaseFile });
   let app: NestFastifyApplication;
   try {
     // bodyParser:false drops the urlencoded parser Nest adds, so a cross-site HTML form cannot produce a
     // body these handlers accept; Fastify's own JSON parser (prototype-poisoning safe) stays.
-    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database), new FastifyAdapter(), { bodyParser: false });
+    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, transport), new FastifyAdapter(), { bodyParser: false });
   } catch (error) {
     await database.close();
     throw error;

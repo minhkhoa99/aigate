@@ -6,7 +6,7 @@ export type Problem = { code: string; message: string };
 
 const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => string | undefined)> = {
   NETWORK_ERROR: "Could not reach AIGate. Check that the server is running, then try again.",
-  TIMEOUT: "AIGate did not answer within 10 seconds. Try again.",
+  TIMEOUT: (body) => `AIGate did not answer within ${typeof body.timeoutSeconds === "number" ? body.timeoutSeconds : 10} seconds. Try again.`,
   BAD_RESPONSE: "AIGate returned a response the dashboard could not read. Refresh the page.",
   UNAUTHENTICATED: "Your session ended. Sign in again.",
   INVALID_CREDENTIALS: (body) => typeof body.remainingBeforeLock === "number"
@@ -20,6 +20,10 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   SETUP_REQUIRED: "Set a dashboard password first.",
   LIMIT_REACHED: "You have reached the maximum of 100 API keys. Revoke one you no longer use.",
   NOT_FOUND: "That item no longer exists. The list was refreshed.",
+  // docs/contracts/connections.md. The server message names the providers that can be connected.
+  PROVIDER_NOT_SUPPORTED: (body) => typeof body.message === "string" ? body.message : "This provider cannot be connected yet.",
+  ALREADY_CONNECTED: "This provider is already connected. Use Replace key on its row instead.",
+  CREDENTIAL_UNREADABLE: "The saved key can no longer be decrypted, because the secret key file changed. Use Replace key to enter it again.",
 };
 
 export function toProblem(error: unknown): Problem {

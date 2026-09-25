@@ -22,6 +22,7 @@ const dataDir = process.env.AIGATE_DATA_DIR ?? join(homedir(), ".aigate");
 mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const app = await createServer({
   databaseFile: join(dataDir, "aigate.db"),
+  secretKey: process.env.AIGATE_SECRET_KEY,
   webDist: resolve(import.meta.dirname, "../../web/dist"),
 });
 await app.listen(port, host);

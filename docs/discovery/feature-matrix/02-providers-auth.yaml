@@ -229,7 +229,7 @@
     - { file: src/app/api/providers/route.js, line: 64, note: "safeConnections map — name resolution order for compatible providers" }
     - { file: src/app/api/providers/route.js, line: 72, note: "apiKey/accessToken/refreshToken/idToken: undefined — the actual stripping" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.connection-detail-crud
@@ -266,7 +266,7 @@
     - { file: "src/app/api/providers/[id]/route.js", line: 138, note: "providerSpecificData merge: existing spread + incoming spread" }
     - { file: "src/app/api/providers/[id]/route.js", line: 179, note: "DELETE — 404 when deleteProviderConnection returns falsy" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: auth.transport-auth-combined-bearer
@@ -1129,7 +1129,7 @@
     - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 829, note: "testSingleConnection: dispatch by authType, then always write testStatus/lastError/lastErrorAt" }
     - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 862, note: "soft success keeps testStatus active but stores the warning text as lastError" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.provider-test-models-self-dispatch
@@ -1202,7 +1202,7 @@
     - { file: src/app/api/providers/client/route.js, line: 46, note: "isUsageEligible scopes the listing to usage-tracked providers only" }
     - { file: src/app/api/providers/client/route.js, line: 79, note: "backfillCodexEmails() side effect on every GET" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.kilo-free-models-cache
