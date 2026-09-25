@@ -10,7 +10,8 @@ export type MediaSource =
 
 export type ContentPart =
   | { readonly type: "text"; readonly text: string; readonly cacheControl?: "ephemeral" }
-  | { readonly type: "image"; readonly source: MediaSource }
+  // detail is the OpenAI vision cost/quality hint; other targets may ignore it only if it is "auto".
+  | { readonly type: "image"; readonly source: MediaSource; readonly detail?: "low" | "high" | "auto" }
   | { readonly type: "audio"; readonly source: MediaSource }
   | { readonly type: "video"; readonly source: MediaSource }
   | { readonly type: "file"; readonly mediaType: string; readonly source: MediaSource; readonly name?: string }
@@ -29,6 +30,8 @@ export interface ToolDefinition {
   readonly description?: string;
   // JSON Schema for the arguments, carried as given.
   readonly parameters: Readonly<Record<string, unknown>>;
+  // Strict schema adherence (OpenAI structured outputs).
+  readonly strict?: boolean;
 }
 
 export type ToolChoice = "auto" | "none" | "required" | { readonly name: string };

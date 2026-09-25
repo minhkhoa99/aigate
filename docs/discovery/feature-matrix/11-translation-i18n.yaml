@@ -198,7 +198,7 @@
     - { file: open-sse/translator/concerns/toolCall.js, line: 34, note: "ensureToolCallIds regenerates the id when it fails TOOL_ID_PATTERN, instead of preserving the original string" }
     - { file: open-sse/translator/concerns/thinkingUnified.js, line: 348, note: "applyThinking recomputes effort/budget fresh per request from captured intent, not from a stored prior value" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.response-pivot-dispatch

@@ -20,8 +20,9 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M1 SP7 `engine` core | Done, no UI | `docs/contracts/engine.md` |
 | M1 SP8 `transport` (direct branch + timeout) | Done, no UI | `docs/contracts/transport.md` |
 | M1 SP9 `engine`: OpenAI-compatible adapter | Done, no UI | `docs/contracts/provider-openai.md` |
-| M1 SP10 `engine`: protocol adapter in/out (OpenAI only) | **Next** | SP9 below |
-| M1 SP11–SP12 | Pending | Spec §9 |
+| M1 SP10 `engine`: protocol adapter in/out (OpenAI only) | Done, no UI | `docs/contracts/protocol-openai.md` |
+| M1 SP11 `connections` (one API-key account) | **Next** | SP10 below |
+| M1 SP12 routing + `/v1` streaming | Pending | Spec §9 |
 
 ## Completed and verified
 
@@ -299,8 +300,33 @@ Checks and status:
   - `validateCredential` backs "Test connection" on `/providers` in SP11.
   - Adapter errors reach clients through `/v1` in SP12.
 
-**Next step, M1 SP10 (`engine`: protocol adapter in/out, OpenAI only):** map the client-facing OpenAI Chat Completions format to and from CIP.
-- **Inbound.** The request body goes to `CanonicalRequest`: messages, tools, `tool_choice`, `max_tokens`/`max_completion_tokens`, and `stream`. An omitted `stream` means non-streaming; `routing.stream-mode-decision` is a `SUSPECTED_BUG`. Unknown fields go to `vendorExtensions.openai`.
-- **Outbound.** `CanonicalResponse` and `StreamChunk` go back to the OpenAI JSON and SSE shapes, with `[DONE]`. A partial-stream error must be visible to the client.
-- **Validation.** Validate at the boundary, with bounded arrays and strings. `INVALID_REQUEST` names the field.
-- **UI.** No UI; `/v1` wiring is SP12.
+**M1 SP10 (`engine`: OpenAI Chat Completions protocol adapter) is complete locally.** The contract is `docs/contracts/protocol-openai.md`.
+
+- **Code.** Pure functions in `packages/engine/src/protocols/openai-chat.ts`: `parseOpenAIChatRequest`, `toOpenAIChatCompletion`, `OpenAIChatStreamEncoder`, and `toOpenAIError`. Shared JSON narrowing now lives in `src/json.ts`, which the provider adapter uses too.
+- **Inbound.**
+  - Every malformed field is `INVALID_REQUEST` with `details.param` naming it (for example `messages[3].content`). Unknown message fields are rejected, as OpenAI does.
+  - Valid OpenAI that CIP cannot carry is `UnsupportedFeatureError`: `file_id`, a system message mid-conversation, the message `name`, the legacy function role and `function_call`, assistant refusal or audio, custom tools, and `allowed_tools`.
+  - Unknown top-level fields (at most 64) go to `vendorExtensions.openai`, and so does a non-standard `reasoning_effort`.
+  - `null` counts as unset. `n` must be 1.
+  - Bounds: 10,000 messages, 512 parts, 128 tools, 128 tool calls, 4 stop strings. A `data:` URL is split at the first comma, never regex-scanned.
+- **Stream flag.** An omitted `stream` means JSON. `routing.stream-mode-decision` is a `SUSPECTED_BUG` and is now `implemented`.
+- **CIP.** Image `detail` and tool `strict` were added, so an OpenAI → OpenAI trip keeps them. The provider adapter maps both.
+- **Outbound.**
+  - `chat.completion`: `thinking` becomes `reasoning_content`, and both are kept. `prompt_tokens` includes cache reads and writes.
+  - Streaming: usage comes after the finish chunk, and only with `include_usage`. `end()` sends `[DONE]`. `fail()` sends one error event and no `[DONE]`, so a cut-off answer is visible to the client.
+- **Errors.** `toOpenAIError` gives one status, type, and code per `ErrorCode`.
+  - An upstream `AUTH_ERROR` becomes **502 `upstream_auth_error`**, not 401, so a client does not blame its own AIGate key.
+  - A safe upstream code such as `context_length_exceeded` is kept.
+  - A non-`EngineError` or `INTERNAL_ERROR` returns only "Internal error".
+- **Not ported.** Tool-id normalization and empty tool answers (`translator.tool-id-normalization`) belong to the Anthropic adapters in SP15. An invented tool answer would be fabricated content.
+- **Checks.**
+  - Engine tests pass 42/42; there are 12 new protocol tests, including round trips through `OpenAICompatibleAdapter` for JSON, SSE, and a cut-off stream.
+  - 20 mutations were run and all were caught.
+- **Matrix.** `routing.stream-mode-decision` is `implemented`. `routing.source-format-detection`, `routing.request-translation`, and `translator.pivot-loss` are `contracted`.
+- **UI.** No UI, as recorded in `API_UI_MAP.md`. SP12 mounts these functions on `/v1/chat/completions`, which the `/gateway/endpoint` "Chat API pending" pill waits for.
+
+**Next step, M1 SP11 (`connections`: one API-key account per provider):**
+- **Storage.** A `provider_connections` table, with the API key encrypted at rest. The spec's `SecretCipherPort` needs a design choice first.
+- **CRUD API.** Add, list, edit, and delete connections.
+- **Test connection.** It calls `OpenAICompatibleAdapter.validateCredential`. `AUTH_ERROR` and `QUOTA_EXHAUSTED` are answers about the key; anything else is a connection problem.
+- **UI.** Wire the `/providers` screens (`LlmProviders`, `ProviderDetail`, `Connections`) in the same SP, with precise toasts for each code.

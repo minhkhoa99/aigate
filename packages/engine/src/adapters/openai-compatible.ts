@@ -1,6 +1,7 @@
 import { UnsupportedFeatureError, type CanonicalRequest, type CanonicalResponse, type ContentPart, type MediaSource, type StopReason, type StreamChunk, type TokenUsage } from "../cip.js";
 import { EngineError, type ErrorCode } from "../errors.js";
 import { readBoundedText } from "../http.js";
+import { isRecord, list, parseJson, record, text, type Json } from "../json.js";
 import type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, HttpResponse, HttpTransportPort, ListedModel } from "../ports.js";
 import { MODEL_ID, type ModelDescriptor, type ProviderDescriptor } from "../registry.js";
 import { withRetry } from "../retry.js";
@@ -26,22 +27,8 @@ const STOP_REASONS = new Map<string, StopReason>([
   ["stop", "end_turn"], ["length", "max_tokens"], ["tool_calls", "tool_use"], ["function_call", "tool_use"], ["content_filter", "content_filter"],
 ]);
 
-type Json = Record<string, unknown>;
-
-const isRecord = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value);
-const record = (value: unknown): Json => (isRecord(value) ? value : {});
-const text = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 const count = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0);
-const list = (value: unknown): readonly unknown[] => (Array.isArray(value) ? value : []);
 const unsupported = (feature: string) => new UnsupportedFeatureError(feature, TARGET);
-
-function parseJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return undefined;
-  }
-}
 
 // ---- CIP -> chat completions ----
 
@@ -67,7 +54,7 @@ function textParts(parts: readonly ContentPart[], where: string): Json[] {
 function userPart(part: ContentPart): Json {
   switch (part.type) {
     case "text": return { type: "text", text: part.text };
-    case "image": return { type: "image_url", image_url: { url: mediaUrl(part.source) } };
+    case "image": return { type: "image_url", image_url: { url: mediaUrl(part.source), ...(part.detail ? { detail: part.detail } : {}) } };
     case "audio": {
       const format = part.source.kind === "base64" ? AUDIO_FORMATS.get(part.source.mediaType) : undefined;
       if (part.source.kind !== "base64" || format === undefined) throw unsupported("audio other than base64 wav or mp3");
@@ -121,7 +108,10 @@ function toBody(request: CanonicalRequest, stream: boolean): Json {
   const body: Json = { ...extensions.openai, model: request.model, messages: toMessages(request), stream };
   if (stream) body.stream_options = { include_usage: true };
   if (request.tools && request.tools.length > 0) {
-    body.tools = request.tools.map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } }));
+    body.tools = request.tools.map((tool) => ({
+      type: "function",
+      function: { name: tool.name, description: tool.description, parameters: tool.parameters, ...(tool.strict !== undefined ? { strict: tool.strict } : {}) },
+    }));
   }
   if (request.toolChoice !== undefined) {
     body.tool_choice = typeof request.toolChoice === "string" ? request.toolChoice : { type: "function", function: { name: request.toolChoice.name } };

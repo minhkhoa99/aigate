@@ -379,7 +379,7 @@
     - { file: open-sse/services/provider.js, line: 37, note: "body sniff: input without messages -> openai-responses" }
     - { file: open-sse/services/provider.js, line: 110, note: "default openai" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: routing.target-format-transport
@@ -456,7 +456,7 @@
     - { file: open-sse/handlers/chatCore.js, line: 133, note: "deepseek-tui forced non-stream" }
     - { file: open-sse/handlers/chatCore.js, line: 140, note: "Accept application/json without SSE -> non-stream" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "An omitted stream flag means non-streaming, as in the OpenAI and Anthropic APIs this endpoint emulates"
@@ -572,7 +572,7 @@
     - { file: open-sse/handlers/chatCore.js, line: 194, note: "falsy result -> createErrorResult 400" }
     - { file: open-sse/handlers/chatCore.js, line: 201, note: "stripContinuityFields on the outbound body" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: routing.token-saver-pipeline
