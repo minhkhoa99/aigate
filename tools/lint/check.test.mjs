@@ -33,6 +33,17 @@ test("unbounded or wildcard repository SELECT fails lint", async () => {
   await expectRule('db.query("SELECT * FROM usage");', "aigate/bounded-query", repo);
 });
 
+test("Drizzle repository selects need explicit columns and a row bound", async () => {
+  const repo = "apps/server/src/modules/settings/infrastructure/settings.repo.ts";
+  await expectRule("db.select().from(settings).limit(1);", "aigate/bounded-query", repo);
+  await expectRule("db.select({ id: t.id }).from(t).where(x);", "aigate/bounded-query", repo);
+  await expectRule("await db.selectDistinct({ id: t.id }).from(t).orderBy(t.id);", "aigate/bounded-query", repo);
+  for (const source of ["db.select({ id: t.id }).from(t).where(x).limit(10);", "db.select({ id: t.id }).from(t).where(x).get();"]) {
+    const [result] = await eslint.lintText(source, { filePath: repo });
+    assert.deepEqual(result.messages, [], source);
+  }
+});
+
 test("bounded operations pass and opaque fetch signals fail lint", async () => {
   const source = "Promise.all([a(), b()]); fetch('/api', { signal: AbortSignal.timeout(1000) }); const modes = ['a'] as const; console.log(monkey, modes);";
   const [result] = await eslint.lintText(source, { filePath });

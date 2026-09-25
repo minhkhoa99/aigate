@@ -68,11 +68,25 @@ export const aigateRules = {
   "bounded-query": {
     meta: { type: "problem", messages: {
       selectStar: "Select explicit columns instead of SELECT *.",
-      noLimit: "SELECT queries in repositories need a LIMIT.",
+      noLimit: "SELECT queries in repositories need a LIMIT (Drizzle: .limit() or .get()).",
     } },
     create(context) {
+      // Drizzle builder: db.select(...).from(t)... must name its columns and end in .limit() or .get().
+      function checkDrizzleSelect(node) {
+        const select = node.callee.object;
+        if (select?.type !== "CallExpression" || !["select", "selectDistinct"].includes(select.callee.property?.name)) return;
+        if (select.arguments.length === 0) context.report({ node: select, messageId: "selectStar" });
+        const methods = [];
+        let current = node;
+        while (current.parent?.type === "MemberExpression" && current.parent.object === current && current.parent.parent?.type === "CallExpression") {
+          methods.push(current.parent.property.name);
+          current = current.parent.parent;
+        }
+        if (!methods.includes("limit") && !methods.includes("get")) context.report({ node, messageId: "noLimit" });
+      }
       return {
         CallExpression(node) {
+          if (node.callee.property?.name === "from") return checkDrizzleSelect(node);
           if (node.callee.name !== "query" && node.callee.property?.name !== "query") return;
           const argument = node.arguments[0];
           const sql = argument?.type === "Literal" ? argument.value

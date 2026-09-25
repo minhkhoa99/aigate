@@ -39,10 +39,11 @@ describe("M-1 exit gate", () => {
     expect(dim("repos").missing).toEqual([]);
   });
 
-  it("assigns every entry to a bounded context and marks it traced", () => {
+  it("assigns every entry to a bounded context and has traced it at least", () => {
+    // Later SPs move entries past "traced"; the M-1 gate only forbids untraced ones.
     for (const e of result.entries) {
       expect(e.newModule).toBeTruthy();
-      expect(e.parityStatus).toBe("traced");
+      expect(["traced", "contracted", "implemented", "verified"]).toContain(e.parityStatus);
     }
   });
 

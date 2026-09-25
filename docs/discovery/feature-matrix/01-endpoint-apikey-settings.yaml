@@ -378,7 +378,7 @@
     - { file: src/lib/db/repos/settingsRepo.js, line: 74, note: "mergeWithDefaults — spread + fill-undefined loop, one special-cased key (outboundProxyEnabled)" }
     - { file: src/lib/db/repos/settingsRepo.js, line: 92, note: "getSettings — readRaw() then mergeWithDefaults(raw)" }
   newModule: settings
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: settings.hot-path-read-no-cache
@@ -410,7 +410,7 @@
     - { file: src/lib/db/repos/settingsRepo.js, line: 67, note: "readRaw — unconditional SELECT on every call, no memoization" }
     - { file: src/sse/handlers/chat.js, line: 70, note: "await getSettings() on every chat request, before the requireApiKey check" }
   newModule: settings
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: settings.get-secret-stripping
@@ -442,7 +442,7 @@
     - { file: src/app/api/settings/route.js, line: 17, note: "GET — destructure password/oidcClientSecret out, compute oidcConfigured/hasPassword" }
     - { file: src/app/api/settings/route.js, line: 23, note: "enableRequestLogs/enableTranslator read straight from process.env, appended after the settings spread" }
   newModule: settings
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: settings.patch-protected-keys
@@ -474,7 +474,7 @@
     - { file: src/app/api/settings/route.js, line: 15, note: "PROTECTED_SETTING_KEYS definition, with CWE-915 comment" }
     - { file: src/app/api/settings/route.js, line: 42, note: "for (const key of PROTECTED_SETTING_KEYS) delete body[key] — runs before any other PATCH logic" }
   newModule: settings
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: settings.patch-password-change

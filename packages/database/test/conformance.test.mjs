@@ -94,12 +94,13 @@ test("sql-js persists committed writes without a close", async () => {
   }
 });
 
-test("AIGate's own migrations folder opens before any context has tables", async () => {
+test("AIGate's own migrations create each context's tables", async () => {
   const { file, cleanup } = tempFile();
   const handle = await openDatabase({ file });
   try {
     const tables = await handle.db.all(sql`select name from sqlite_master where type = 'table' and name not like 'sqlite_%' order by name`);
-    assert.deepEqual(tables.map((t) => t.name ?? t[0]), ["__drizzle_migrations"]);
+    assert.deepEqual(tables.map((t) => t.name ?? t[0]), ["__drizzle_migrations", "settings"]);
+    await assert.rejects(() => handle.db.run(sql`insert into settings (id) values (2)`), "settings is a single row");
   } finally {
     await handle.close();
     cleanup();

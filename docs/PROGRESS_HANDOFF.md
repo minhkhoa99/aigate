@@ -129,12 +129,30 @@ Wiring changes:
 
   Discovery still validates 283 entries, and the generated outputs are unchanged.
 
-**Next step, M1 SP5 (`settings` context):**
-1. Read the `settings.*` Feature Matrix entries and label every rule.
-2. Define the contract: read, merge defaults, and the mass-assignment guard.
-3. Add `packages/database/src/schema/settings.ts` per the conventions, and point `drizzle.config.ts` at `src/schema` instead of the fixture.
-4. Generate the first real migration.
-5. Write the repository at `apps/server/src/modules/settings/infrastructure/settings.repo.ts`. That file is also the first real target for the deferred SP0.1 `aigate/bounded-query` check.
+**M1 SP5 (`settings`) is complete locally.** The contract is `docs/contracts/settings.md`. It labels every rule from the four in-scope matrix entries, now marked `parityStatus: implemented`; six other `settings.*` entries were assigned to their owning SPs.
+
+Decisions:
+- A typed single-row table, with defaults as column defaults, replaces the JSON blob.
+- The dropped `outboundProxyEnabled` inference is an `IMPLEMENTATION_ACCIDENT`.
+- Secrets are not settings; identity owns them.
+- PATCH uses an allowlist. Unknown, secret, or wrongly typed keys return 400 with nothing changed, where 9router silently stripped two names and stored everything else.
+- The cache is write-through.
+- SP5 keys are only `requireLogin` and `requireApiKey`. Later contexts add theirs by migration.
+
+Changes:
+- **Schema:** `packages/database/src/schema/settings.ts`, with `CHECK id = 1`. The first real migration is `drizzle/0000_lonely_patriot.sql`, and `drizzle.config.ts` now points at `src/schema`.
+- **Server:** `modules/settings/{domain,infrastructure}` and `SettingsModule`. `DATABASE` is now a global `DatabaseModule`.
+- **Access:** until identity lands in SP6, every `/api/*` route answers loopback clients only; others get 403. SP6 must replace this with the dashboard guard.
+- **Deferred SP0.1 check done:** `aigate/bounded-query` now checks Drizzle chains. `select()` without columns is flagged, and a `select(...).from(...)` chain must end in `.limit()` or `.get()`. There are new `lint:check` tests (10/10). Removing `.get()` from the real repository is reported.
+
+Tests:
+- Server 7/7, database 6/6.
+- Mutations of the loopback guard, the cache update, and `no-store` each made a test fail.
+- **Test gap found and fixed.** Disabling the allowlist first went unnoticed, because every unknown key in the test had a non-boolean value and the type check caught it. Cases `{somethingNew:true}` and `{id:true}` now fail when the allowlist is off.
+
+The M-1 gate test used to require every entry to stay exactly `traced`. It now accepts `traced` or later (`contracted`, `implemented`, `verified`), because SPs advance entries. The full gate passed: discovery 54/54, database 6/6, server 7/7, `lint:check` 10/10, Bun tests, build, and `git diff --check`.
+
+**Next step, M1 SP6 (`identity` + `apikeys`):** password login and API key validation, per spec §9. Start from the `identity.*`, `apikey.*`, `settings.patch-password-change` (`SUSPECTED_BUG`, hardcoded `'123456'`), and `settings.require-login-public-status` entries. Decide the new API key format (spec §13) and store keys hashed (conventions §9). Then replace the loopback-only `/api` hook with the dashboard auth guard.
 
 Before starting, inspect `docs/superpowers/specs/2026-09-22-aigate-design.md` §9 and §11, `docs/governance/rules.md`, and this handoff. Do not treat `UI_READY` as working API integration or copy the 9Router implementation accidents into AIGate.
 
