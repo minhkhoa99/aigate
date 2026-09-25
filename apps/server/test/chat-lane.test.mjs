@@ -47,21 +47,55 @@ test("keyless mode serves only this machine", () =>
 
 test("model resolution: bare catalog id, provider prefix, unknown model, no active connection", () =>
   withTempDb(async (file) => {
-    const upstream = fakeUpstream(json(200, completion), json(200, completion));
+    const upstream = fakeUpstream(json(200, completion), json(200, completion), json(200, completion));
     const { app, dash, connection, chat } = await ready(file, upstream);
     assert.equal((await chat({ ...hello, model: "openai/gpt-5-mini" })).statusCode, 200, "an undeclared model with a provider prefix");
     assert.equal(JSON.parse(upstream.calls[0].request.body).model, "gpt-5-mini");
     assert.equal((await chat(hello)).statusCode, 200);
-    for (const model of ["claude-sonnet", "deepseek/deepseek-chat", "openai/"]) {
+    for (const model of ["claude-sonnet", "openai/"]) {
       const res = await chat({ ...hello, model });
       assert.deepEqual([res.statusCode, res.json().error.code], [404, "model_not_found"], model);
       assert.match(res.json().error.message, /openai\//);
     }
+    // A catalog provider without a connection, by id, alias, or a bare model id only it declares.
+    for (const model of ["deepseek/deepseek-chat", "ds/deepseek-chat", "deepseek-chat"]) {
+      const res = await chat({ ...hello, model });
+      assert.deepEqual([res.statusCode, res.json().error.code], [404, "no_active_connection"], model);
+      assert.match(res.json().error.message, /DeepSeek/);
+    }
+    const blocked = await chat({ ...hello, model: "claude/claude-sonnet-4" });
+    assert.deepEqual([blocked.statusCode, blocked.json().error.code], [400, "provider_not_supported"]);
+    assert.match(blocked.json().error.message, /Needs the anthropic adapter/);
+    // Once connected, the alias routes to the provider's own chat URL with its own key.
+    await dash({ method: "POST", url: "/api/connections", body: { provider: "deepseek", apiKey: "sk-deepseek-key-5555" } });
+    assert.equal((await chat({ ...hello, model: "ds/deepseek-chat" })).statusCode, 200);
+    assert.equal(upstream.calls[2].request.url, "https://api.deepseek.com/chat/completions");
+    assert.equal(upstream.calls[2].request.headers.authorization, "Bearer sk-deepseek-key-5555");
+    assert.equal(JSON.parse(upstream.calls[2].request.body).model, "deepseek-chat");
     await dash({ method: "PATCH", url: `/api/connections/${connection.id}`, body: { isActive: false } });
     const off = await chat(hello);
     assert.deepEqual([off.statusCode, off.json().error.code], [404, "no_active_connection"]);
     assert.match(off.json().error.message, /Providers → Connections/);
-    assert.equal(upstream.calls.length, 2);
+    assert.equal(upstream.calls.length, 3);
+    await app.close();
+  }));
+
+test("a bare id declared by several providers goes to the one with an active connection", () =>
+  withTempDb(async (file) => {
+    const upstream = fakeUpstream(json(200, completion));
+    const { app, dash, chat } = await ready(file, upstream);
+    // glm-5 is declared by six catalog providers; the message names three and says there are more.
+    const none = await chat({ ...hello, model: "glm-5" });
+    assert.deepEqual([none.statusCode, none.json().error.code], [404, "no_active_connection"]);
+    assert.match(none.json().error.message, /Alibaba Coding, Alibaba, GLM \(China\), …/);
+    // A "/" inside a model id is not a provider prefix when no provider has that name.
+    const slashed = await chat({ ...hello, model: "zai-org/GLM-5.2" });
+    assert.deepEqual([slashed.statusCode, slashed.json().error.code], [404, "no_active_connection"]);
+    assert.match(slashed.json().error.message, /Featherless/);
+    await dash({ method: "POST", url: "/api/connections", body: { provider: "glm-cn", apiKey: "sk-glm-key-7777" } });
+    assert.equal((await chat({ ...hello, model: "glm-5" })).statusCode, 200);
+    assert.equal(upstream.calls[0].request.url, "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions", "the third declaring provider, the only one connected");
+    assert.equal(JSON.parse(upstream.calls[0].request.body).model, "glm-5");
     await app.close();
   }));
 

@@ -79,7 +79,8 @@ export function assertModelSupports(request: CanonicalRequest, providerId: strin
   const available = resolveCapabilities(model, modelId);
   const missing = [...detectRequiredCapabilities(request)].filter((capability) => !available[capability]).sort();
   if (missing.length > 0) throw new EngineError("MODEL_UNAVAILABLE", `${target} does not support: ${missing.join(", ")}`, { target, missing });
-  if (model && request.maxOutputTokens !== undefined && request.maxOutputTokens > model.maxOutputTokens) {
+  // Checked only when the catalog declares the limit; an undeclared one is the vendor's to enforce.
+  if (model && model.maxOutputTokens !== null && request.maxOutputTokens !== undefined && request.maxOutputTokens > model.maxOutputTokens) {
     throw new EngineError("INVALID_REQUEST", `maxOutputTokens ${request.maxOutputTokens} exceeds the ${model.maxOutputTokens} limit of ${target}`, {
       target, limit: model.maxOutputTokens,
     });

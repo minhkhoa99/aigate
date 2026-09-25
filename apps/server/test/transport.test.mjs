@@ -124,7 +124,7 @@ test("the OpenAI-compatible adapter streams through the direct transport end to 
       if (offset >= text.length) { clearInterval(timer); res.end(); }
     }, 2);
   }, async (base, hits) => {
-    const provider = { ...builtinRegistry.provider("openai"), baseUrl: base };
+    const provider = { ...builtinRegistry.provider("openai"), chatUrl: `${base}/chat/completions`, modelsUrl: `${base}/models` };
     const adapter = new OpenAICompatibleAdapter(provider, transport);
     const chunks = [];
     for await (const chunk of adapter.stream({ model: "local", stream: true, messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }] }, { kind: "api-key", apiKey: SECRET }, ctx())) chunks.push(chunk);

@@ -18,13 +18,15 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://coding-intl.dashscope.aliyuncs.com/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [
+      "preserveCacheControl"
+    ],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
-    "unmodelled": [
-      "transport.headers",
-      "transport.quirks"
-    ],
+    "unmodelled": [],
     "models": [
       {"id":"qwen3.5-plus","name":"Qwen3.5 Plus","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":true,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":1000000,"maxOutputTokens":65536},
       {"id":"kimi-k2.5","name":"Kimi K2.5","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":262144,"maxOutputTokens":262144},
@@ -50,13 +52,15 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://coding.dashscope.aliyuncs.com/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [
+      "preserveCacheControl"
+    ],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
-    "unmodelled": [
-      "transport.headers",
-      "transport.quirks"
-    ],
+    "unmodelled": [],
     "models": [
       {"id":"qwen3.5-plus","name":"Qwen3.5 Plus","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":true,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":1000000,"maxOutputTokens":65536},
       {"id":"kimi-k2.5","name":"Kimi K2.5","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":262144,"maxOutputTokens":262144},
@@ -83,15 +87,19 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.anthropic.com/v1/messages",
     "modelsUrl": null,
+    "headers": {
+      "anthropic-version": "2023-06-01",
+      "Anthropic-Beta": "claude-code-20250219,interleaved-thinking-2025-05-14"
+    },
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "imageToText"
     ],
     "hidden": false,
     "deprecated": false,
-    "unmodelled": [
-      "transport.headers"
-    ],
+    "unmodelled": [],
     "models": [
       {"id":"claude-sonnet-4-20250514","name":"Claude Sonnet 4","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"default","contextWindow":null,"maxOutputTokens":null},
       {"id":"claude-opus-4-20250514","name":"Claude Opus 4","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"default","contextWindow":null,"maxOutputTokens":null},
@@ -115,6 +123,11 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {
+      "User-Agent": "antigravity/ide/2.11.0 darwin/arm64"
+    },
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "image",
@@ -131,7 +144,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "transport.baseUrls",
       "transport.clientId",
       "transport.clientSecret",
-      "transport.headers",
       "transport.retry",
       "transport.usage"
     ],
@@ -176,6 +188,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.assemblyai.com/v1/audio/transcriptions",
     "modelsUrl": "https://api.assemblyai.com/v1/account",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "stt"
     ],
@@ -209,6 +224,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -235,12 +253,14 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
-      "hasProviderSpecificData",
-      "transport.headers"
+      "hasProviderSpecificData"
     ],
     "models": []
   },
@@ -261,6 +281,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "image"
     ],
@@ -296,6 +319,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.blackbox.ai/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm"
     ],
@@ -335,6 +361,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webSearch"
     ],
@@ -362,14 +391,15 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://ark.ap-southeast.bytepluses.com/api/coding/v3/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm"
     ],
     "hidden": false,
     "deprecated": false,
-    "unmodelled": [
-      "transport.headers"
-    ],
+    "unmodelled": [],
     "models": [
       {"id":"seed-2-0-pro-260328","name":"Seed 2.0 Pro","kind":"llm","upstreamModelId":null,"capabilities":{"vision":false,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":false},"capabilitySource":"default","contextWindow":null,"maxOutputTokens":null},
       {"id":"seed-2-0-code-preview-260328","name":"Seed 2.0 Code Preview","kind":"llm","upstreamModelId":null,"capabilities":{"vision":false,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":false},"capabilitySource":"default","contextWindow":null,"maxOutputTokens":null},
@@ -395,6 +425,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -420,12 +453,15 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.cerebras.ai/v1/chat/completions",
     "modelsUrl": "https://api.cerebras.ai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [
+      "dropClientMetadata"
+    ],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
-    "unmodelled": [
-      "transport.quirks"
-    ],
+    "unmodelled": [],
     "models": [
       {"id":"gpt-oss-120b","name":"GPT OSS 120B","kind":"llm","upstreamModelId":null,"capabilities":{"vision":false,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":128000,"maxOutputTokens":null},
       {"id":"zai-glm-4.7","name":"ZAI GLM 4.7","kind":"llm","upstreamModelId":null,"capabilities":{"vision":false,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":200000,"maxOutputTokens":128000},
@@ -452,6 +488,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://llm.chutes.ai/v1/chat/completions",
     "modelsUrl": "https://llm.chutes.ai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -475,14 +514,32 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.anthropic.com/v1/messages",
     "modelsUrl": null,
+    "headers": {
+      "Anthropic-Version": "2023-06-01",
+      "Anthropic-Beta": "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,advanced-tool-use-2025-11-20,effort-2025-11-24,structured-outputs-2025-12-15,fast-mode-2026-02-01,redact-thinking-2026-02-12,token-efficient-tools-2026-03-28",
+      "Anthropic-Dangerous-Direct-Browser-Access": "true",
+      "User-Agent": "claude-cli/2.1.280 (external, sdk-cli)",
+      "X-App": "cli",
+      "X-Stainless-Helper-Method": "stream",
+      "X-Stainless-Retry-Count": "0",
+      "X-Stainless-Runtime-Version": "v24.14.0",
+      "X-Stainless-Package-Version": "0.80.0",
+      "X-Stainless-Runtime": "node",
+      "X-Stainless-Lang": "js",
+      "X-Stainless-Arch": "arm64",
+      "X-Stainless-Os": "MacOS",
+      "X-Stainless-Timeout": "600"
+    },
+    "forceStream": false,
+    "quirks": [
+      "cloakToolsOnOAuth"
+    ],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": true,
     "unmodelled": [
       "features",
       "oauth",
-      "transport.headers",
-      "transport.quirks",
       "transport.urlSuffix",
       "transport.usage"
     ],
@@ -512,13 +569,19 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.cline.bot/api/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {
+      "HTTP-Referer": "https://cline.bot",
+      "X-Title": "Cline"
+    },
+    "forceStream": false,
+    "quirks": [
+      "clineEnvelope"
+    ],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
       "oauth",
-      "transport.headers",
-      "transport.quirks",
       "transport.refreshUrl",
       "transport.tokenUrl"
     ],
@@ -549,14 +612,20 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.cline.bot/api/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {
+      "HTTP-Referer": "https://cline.bot",
+      "X-Title": "Cline"
+    },
+    "forceStream": false,
+    "quirks": [
+      "clineEnvelope"
+    ],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
       "oauth",
-      "thinkingConfig",
-      "transport.headers",
-      "transport.quirks"
+      "thinkingConfig"
     ],
     "models": [
       {"id":"cline-pass/glm-5.2","name":"GLM-5.2 (ClinePass)","kind":"llm","upstreamModelId":null,"capabilities":{"vision":false,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":1000000,"maxOutputTokens":131072},
@@ -588,6 +657,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "image"
@@ -646,14 +718,22 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://copilot.tencent.com/v2/chat/completions",
     "modelsUrl": null,
+    "headers": {
+      "User-Agent": "CLI/2.108.1 CodeBuddy/2.108.1",
+      "X-Product": "SaaS",
+      "X-IDE-Type": "CLI",
+      "X-IDE-Name": "CLI",
+      "x-requested-with": "XMLHttpRequest",
+      "x-codebuddy-request": "1"
+    },
+    "forceStream": true,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
       "features",
       "oauth",
-      "transport.forceStream",
-      "transport.headers",
       "transport.thinkingFormat",
       "transport.usage"
     ],
@@ -690,6 +770,12 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://chatgpt.com/backend-api/codex/responses",
     "modelsUrl": null,
+    "headers": {
+      "originator": "codex_cli_rs",
+      "User-Agent": "codex_cli_rs/0.154.0"
+    },
+    "forceStream": true,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "image"
@@ -703,8 +789,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "oauth",
       "thinkingConfig",
       "transport.cliVersion",
-      "transport.forceStream",
-      "transport.headers",
       "transport.usage"
     ],
     "models": [
@@ -752,6 +836,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.cohere.ai/v1/chat/completions",
     "modelsUrl": "https://api.cohere.ai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -777,6 +864,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "image"
     ],
@@ -808,13 +898,17 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.commandcode.ai/alpha/generate",
     "modelsUrl": null,
+    "headers": {
+      "x-command-code-version": "0.25.7",
+      "x-cli-environment": "cli"
+    },
+    "forceStream": true,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
-      "features",
-      "transport.forceStream",
-      "transport.headers"
+      "features"
     ],
     "models": [
       {"id":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","kind":"llm","upstreamModelId":null,"capabilities":{"vision":false,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":1000000,"maxOutputTokens":384000},
@@ -856,6 +950,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -883,14 +980,21 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api2.cursor.sh",
     "modelsUrl": null,
+    "headers": {
+      "connect-accept-encoding": "gzip",
+      "connect-protocol-version": "1",
+      "Content-Type": "application/connect+proto",
+      "User-Agent": "connect-es/1.6.1"
+    },
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
       "oauth",
       "transport.chatPath",
-      "transport.clientVersion",
-      "transport.headers"
+      "transport.clientVersion"
     ],
     "models": [
       {"id":"default","name":"Auto (Server Picks)","kind":"llm","upstreamModelId":null,"capabilities":{"vision":false,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":false},"capabilitySource":"default","contextWindow":null,"maxOutputTokens":null},
@@ -926,6 +1030,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.deepgram.com/v1/listen",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "stt"
     ],
@@ -959,12 +1066,16 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.deepseek.com/chat/completions",
     "modelsUrl": "https://api.deepseek.com/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [
+      "claudeSupportedToolTypes"
+    ],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
       "features",
-      "transport.quirks",
       "transport.reasoningInject",
       "transports"
     ],
@@ -994,6 +1105,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -1022,6 +1136,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -1047,6 +1164,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webSearch",
       "webFetch"
@@ -1076,6 +1196,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "image"
     ],
@@ -1113,6 +1236,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.featherless.ai/v1/chat/completions",
     "modelsUrl": "https://api.featherless.ai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -1142,6 +1268,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webFetch"
     ],
@@ -1167,6 +1296,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.fireworks.ai/inference/v1/chat/completions",
     "modelsUrl": "https://api.fireworks.ai/inference/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "embedding"
@@ -1200,6 +1332,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://cloudcode-pa.googleapis.com/v1internal",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": true,
@@ -1238,6 +1373,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://generativelanguage.googleapis.com/v1beta/models",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "embedding",
@@ -1308,6 +1446,20 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.githubcopilot.com/chat/completions",
     "modelsUrl": null,
+    "headers": {
+      "copilot-integration-id": "vscode-chat",
+      "editor-version": "vscode/1.110.0",
+      "editor-plugin-version": "copilot-chat/0.38.0",
+      "user-agent": "GitHubCopilotChat/0.38.0",
+      "openai-intent": "conversation-panel",
+      "x-github-api-version": "2025-04-01",
+      "x-vscode-user-agent-library-version": "electron-fetch",
+      "X-Initiator": "user",
+      "Accept": "application/json",
+      "Content-Type": "application/json"
+    },
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "embedding"
@@ -1319,7 +1471,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "features",
       "oauth",
       "transport.copilot",
-      "transport.headers",
       "transport.messagesUrl",
       "transport.responsesUrl",
       "transport.usage"
@@ -1361,6 +1512,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://gitlab.com/api/v4/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": true,
     "deprecated": false,
@@ -1384,12 +1538,14 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
       "features",
-      "transport.headers",
       "transport.usage"
     ],
     "models": [
@@ -1420,6 +1576,12 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.z.ai/api/anthropic/v1/messages",
     "modelsUrl": null,
+    "headers": {
+      "Anthropic-Version": "2023-06-01",
+      "Anthropic-Beta": "claude-code-20250219,interleaved-thinking-2025-05-14"
+    },
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "webSearch"
@@ -1429,7 +1591,6 @@ export const CATALOG: readonly CatalogProvider[] = [
     "unmodelled": [
       "features",
       "searchConfig",
-      "transport.headers",
       "transport.urlSuffix",
       "transport.usage",
       "transports"
@@ -1462,6 +1623,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webSearch"
     ],
@@ -1487,6 +1651,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -1517,6 +1684,13 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://cli-chat-proxy.grok.com/v1/responses",
     "modelsUrl": "https://cli-chat-proxy.grok.com/v1/models",
+    "headers": {
+      "User-Agent": "grok-shell/0.2.99 (linux; x86_64)",
+      "x-grok-client-identifier": "grok-shell",
+      "x-grok-client-version": "0.2.99"
+    },
+    "forceStream": true,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -1527,8 +1701,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "transport.billingUrl",
       "transport.clientIdentifier",
       "transport.clientVersion",
-      "transport.forceStream",
-      "transport.headers",
       "transport.retry",
       "transport.tokenAuth",
       "transport.usage",
@@ -1559,6 +1731,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://grok.com/rest/app-chat/conversations/new",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -1596,6 +1771,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.groq.com/openai/v1/chat/completions",
     "modelsUrl": "https://api.groq.com/openai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "imageToText",
@@ -1637,6 +1815,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "image",
       "stt"
@@ -1695,6 +1876,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.hyperbolic.xyz/v1/chat/completions",
     "modelsUrl": "https://api.hyperbolic.xyz/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -1727,12 +1911,16 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://apis.iflow.cn/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {
+      "User-Agent": "iFlow-Cli"
+    },
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": true,
     "deprecated": false,
     "unmodelled": [
       "oauth",
-      "transport.headers",
       "transport.thinkingFormat"
     ],
     "models": [
@@ -1768,6 +1956,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -1795,6 +1986,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "embedding"
     ],
@@ -1820,6 +2014,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webFetch"
     ],
@@ -1847,14 +2044,16 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.kilo.ai/api/openrouter/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
       "modelsFetcher",
       "oauth",
-      "passthroughModels",
-      "transport.headers"
+      "passthroughModels"
     ],
     "models": [
       {"id":"anthropic/claude-sonnet-4-20250514","name":"Claude Sonnet 4","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"default","contextWindow":null,"maxOutputTokens":null},
@@ -1883,6 +2082,11 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://llm.kimchi.dev/openai/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {
+      "User-Agent": "kimchi/0.1.50"
+    },
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "imageToText"
@@ -1891,8 +2095,7 @@ export const CATALOG: readonly CatalogProvider[] = [
     "deprecated": false,
     "unmodelled": [
       "oauth",
-      "passthroughModels",
-      "transport.headers"
+      "passthroughModels"
     ],
     "models": [
       {"id":"minimax-m3","name":"MiniMax-M3","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":1000000,"maxOutputTokens":131072},
@@ -1924,6 +2127,12 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.kimi.com/coding/v1/messages",
     "modelsUrl": null,
+    "headers": {
+      "Anthropic-Version": "2023-06-01",
+      "Anthropic-Beta": "claude-code-20250219,interleaved-thinking-2025-05-14"
+    },
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "webSearch"
@@ -1935,7 +2144,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "oauth",
       "searchViaChat",
       "transport.clientId",
-      "transport.headers",
       "transport.refreshUrl",
       "transport.tokenUrl",
       "transport.urlSuffix",
@@ -1971,6 +2179,14 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://runtime.us-east-1.kiro.dev/generateAssistantResponse",
     "modelsUrl": null,
+    "headers": {
+      "Content-Type": "application/json",
+      "Accept": "application/vnd.amazon.eventstream",
+      "User-Agent": "AWS-SDK-JS/3.0.0 kiro-ide/1.0.0",
+      "X-Amz-User-Agent": "aws-sdk-js/3.0.0 kiro-ide/1.0.0"
+    },
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": true,
@@ -1982,7 +2198,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "oauth",
       "transport.authUrl",
       "transport.baseUrls",
-      "transport.headers",
       "transport.retry",
       "transport.tokenUrl",
       "transport.usage"
@@ -2049,6 +2264,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webSearch"
     ],
@@ -2074,6 +2292,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -2102,6 +2323,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.xiaomimimo.com/api/free-ai/openai/chat",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": true,
     "deprecated": false,
@@ -2129,6 +2353,15 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.minimaxi.com/anthropic/v1/messages",
     "modelsUrl": null,
+    "headers": {
+      "Anthropic-Version": "2023-06-01",
+      "Anthropic-Beta": "claude-code-20250219,interleaved-thinking-2025-05-14"
+    },
+    "forceStream": false,
+    "quirks": [
+      "dropOutputConfig",
+      "requireClaudeToolType"
+    ],
     "serviceKinds": [
       "llm",
       "tts"
@@ -2138,8 +2371,6 @@ export const CATALOG: readonly CatalogProvider[] = [
     "unmodelled": [
       "features",
       "models[].targetFormat",
-      "transport.headers",
-      "transport.quirks",
       "transport.reasoningInject",
       "transport.urlSuffix",
       "transport.usage",
@@ -2176,6 +2407,15 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.minimax.io/anthropic/v1/messages",
     "modelsUrl": null,
+    "headers": {
+      "Anthropic-Version": "2023-06-01",
+      "Anthropic-Beta": "claude-code-20250219,interleaved-thinking-2025-05-14"
+    },
+    "forceStream": false,
+    "quirks": [
+      "dropOutputConfig",
+      "requireClaudeToolType"
+    ],
     "serviceKinds": [
       "llm",
       "image",
@@ -2191,8 +2431,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "models[].params",
       "models[].targetFormat",
       "searchViaChat",
-      "transport.headers",
-      "transport.quirks",
       "transport.reasoningInject",
       "transport.urlSuffix",
       "transport.usage",
@@ -2230,6 +2468,11 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.mistral.ai/v1/chat/completions",
     "modelsUrl": "https://api.mistral.ai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [
+      "dropClientMetadata"
+    ],
     "serviceKinds": [
       "llm",
       "imageToText",
@@ -2238,8 +2481,7 @@ export const CATALOG: readonly CatalogProvider[] = [
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
-      "embeddingConfig",
-      "transport.quirks"
+      "embeddingConfig"
     ],
     "models": [
       {"id":"mistral-large-latest","name":"Mistral Large 3","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":false},"capabilitySource":"declared","contextWindow":256000,"maxOutputTokens":null},
@@ -2263,6 +2505,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.xiaomimimo.com/api/free-ai/openai/chat",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": true,
     "deprecated": false,
@@ -2288,6 +2533,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.nanobananaapi.ai/v1/chat/completions",
     "modelsUrl": "https://api.nanobananaapi.ai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "image"
     ],
@@ -2318,6 +2566,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.studio.nebius.ai/v1/chat/completions",
     "modelsUrl": "https://api.studio.nebius.ai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "embedding"
@@ -2347,6 +2598,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://integrate.api.nvidia.com/v1/chat/completions",
     "modelsUrl": "https://integrate.api.nvidia.com/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "tts",
@@ -2389,6 +2643,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "http://localhost:11434/api/chat",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm"
     ],
@@ -2414,6 +2671,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://ollama.com/api/chat",
     "modelsUrl": "https://ollama.com/api/tags",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "webFetch"
@@ -2451,6 +2711,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webSearch"
     ],
@@ -2480,6 +2743,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://gateway.qoder.com.cn/algo/api/v2/service/pro/sse/agent_chat_generation",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -2487,7 +2753,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "authHint",
       "features",
       "oauth",
-      "transport.headers",
       "transport.stallTimeoutMs",
       "transport.timeoutMs",
       "transport.usage"
@@ -2526,6 +2791,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.openai.com/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": true,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "embedding",
@@ -2544,7 +2812,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "searchViaChat",
       "sttConfig",
       "thinkingConfig",
-      "transport.forceStream",
       "ttsConfig"
     ],
     "models": [
@@ -2603,6 +2870,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://opencode.ai/zen/go/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -2610,7 +2880,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "features",
       "models[].supportedFormats",
       "models[].targetFormat",
-      "transport.headers",
       "transport.usage",
       "transports"
     ],
@@ -2662,6 +2931,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://opencode.ai/zen/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "systemone"
@@ -2675,7 +2947,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "models[].targetFormat",
       "passthroughModels",
       "systemoneConfig",
-      "transport.headers",
       "transport.usage",
       "transports"
     ],
@@ -2773,6 +3044,13 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://opencode.ai",
     "modelsUrl": null,
+    "headers": {
+      "x-opencode-client": "desktop"
+    },
+    "forceStream": true,
+    "quirks": [
+      "forceAutoToolChoiceModels"
+    ],
     "serviceKinds": [
       "llm",
       "systemone"
@@ -2784,10 +3062,7 @@ export const CATALOG: readonly CatalogProvider[] = [
       "modelsFetcher",
       "models[].targetFormat",
       "passthroughModels",
-      "systemoneConfig",
-      "transport.forceStream",
-      "transport.headers",
-      "transport.quirks"
+      "systemoneConfig"
     ],
     "models": [
       {"id":"muse-spark-1.2-contributor-free","name":"Muse Spark 1.2 Contributor Free","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":1048576,"maxOutputTokens":131072},
@@ -2811,6 +3086,12 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://openrouter.ai/api/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {
+      "HTTP-Referer": "https://endpoint-proxy.local",
+      "X-Title": "Endpoint Proxy"
+    },
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "embedding",
@@ -2829,7 +3110,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "models[].params",
       "passthroughModels",
       "systemoneConfig",
-      "transport.headers",
       "transport.thinkingFormat",
       "ttsConfig",
       "videoConfig"
@@ -2872,6 +3152,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://www.perplexity.ai/rest/sse/perplexity_ask",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -2905,6 +3188,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.perplexity.ai/chat/completions",
     "modelsUrl": "https://api.perplexity.ai/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "webSearch"
@@ -2938,6 +3224,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.perplexity.ai/v1/responses",
     "modelsUrl": "https://api.perplexity.ai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "webSearch"
@@ -2978,6 +3267,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -3006,6 +3298,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api3.qoder.sh/algo/api/v2/service/pro/sse/agent_chat_generation",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -3013,7 +3308,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "authHint",
       "features",
       "oauth",
-      "transport.headers",
       "transport.stallTimeoutMs",
       "transport.timeoutMs",
       "transport.usage"
@@ -3052,6 +3346,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "image"
     ],
@@ -3083,6 +3380,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "image"
     ],
@@ -3114,6 +3414,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "image"
     ],
@@ -3143,6 +3446,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webSearch"
     ],
@@ -3168,6 +3474,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webSearch"
     ],
@@ -3193,6 +3502,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webSearch"
     ],
@@ -3218,6 +3530,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.siliconflow.com/v1/chat/completions",
     "modelsUrl": "https://api.siliconflow.com/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -3260,6 +3575,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "image"
     ],
@@ -3292,6 +3610,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webSearch",
       "webFetch"
@@ -3319,6 +3640,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.together.xyz/v1/chat/completions",
     "modelsUrl": "https://api.together.xyz/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "embedding"
@@ -3352,6 +3676,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "image"
     ],
@@ -3375,6 +3702,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -3402,6 +3732,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.venice.ai/api/v1/chat/completions",
     "modelsUrl": "https://api.venice.ai/api/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "embedding",
@@ -3452,6 +3785,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://ai-gateway.vercel.sh/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "embedding",
@@ -3491,6 +3827,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://aiplatform.googleapis.com",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -3519,6 +3858,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://aiplatform.googleapis.com",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "imageToText",
@@ -3558,12 +3900,13 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
-    "unmodelled": [
-      "transport.headers"
-    ],
+    "unmodelled": [],
     "models": [
       {"id":"Doubao-Seed-2.0-Code","name":"Doubao-Seed-2.0-Code","kind":"llm","upstreamModelId":null,"capabilities":{"vision":false,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":false},"capabilitySource":"default","contextWindow":null,"maxOutputTokens":null},
       {"id":"Doubao-Seed-2.0-pro","name":"Doubao-Seed-2.0-pro","kind":"llm","upstreamModelId":null,"capabilities":{"vision":false,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":false},"capabilitySource":"default","contextWindow":null,"maxOutputTokens":null},
@@ -3593,6 +3936,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "embedding"
     ],
@@ -3627,6 +3973,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.x.ai/v1/chat/completions",
     "modelsUrl": "https://api.x.ai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "imageToText",
@@ -3677,6 +4026,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.xiaomimimo.com/v1/chat/completions",
     "modelsUrl": "https://api.xiaomimimo.com/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "tts"
@@ -3720,6 +4072,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -3759,6 +4114,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webSearch"
     ],
@@ -3784,13 +4142,15 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [
+      "preserveCacheControl"
+    ],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
-    "unmodelled": [
-      "transport.headers",
-      "transport.quirks"
-    ],
+    "unmodelled": [],
     "models": [
       {"id":"qwen3.5-plus","name":"Qwen3.5 Plus","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":true,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":1000000,"maxOutputTokens":65536},
       {"id":"kimi-k2.5","name":"Kimi K2.5","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":262144,"maxOutputTokens":262144},
@@ -3819,14 +4179,22 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://www.codebuddy.ai/v2/chat/completions",
     "modelsUrl": null,
+    "headers": {
+      "User-Agent": "IDE/2.108.1 CodeBuddy/2.108.1",
+      "X-Product": "SaaS",
+      "X-IDE-Type": "IDE",
+      "X-IDE-Name": "IDE",
+      "x-requested-with": "XMLHttpRequest",
+      "x-codebuddy-request": "1"
+    },
+    "forceStream": true,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
       "features",
       "oauth",
-      "transport.forceStream",
-      "transport.headers",
       "transport.thinkingFormat",
       "transport.usage"
     ],
@@ -3865,6 +4233,11 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://cloud.zed.dev/completions",
     "modelsUrl": "https://cloud.zed.dev/models",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "forceStream": true,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -3872,8 +4245,6 @@ export const CATALOG: readonly CatalogProvider[] = [
       "features",
       "oauth",
       "passthroughModels",
-      "transport.forceStream",
-      "transport.headers",
       "transport.usage"
     ],
     "models": []
@@ -3896,14 +4267,18 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.airforce/v1/chat/completions",
     "modelsUrl": "https://api.airforce/v1/models",
+    "headers": {
+      "HTTP-Referer": "https://endpoint-proxy.local",
+      "X-Title": "Endpoint Proxy"
+    },
+    "forceStream": true,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
     "unmodelled": [
       "modelsFetcher",
-      "passthroughModels",
-      "transport.forceStream",
-      "transport.headers"
+      "passthroughModels"
     ],
     "models": [
       {"id":"gpt-oss-120b","name":"GPT-OSS 120B (Free)","kind":"llm","upstreamModelId":null,"capabilities":{"vision":false,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":131072,"maxOutputTokens":null},
@@ -3930,6 +4305,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://qianfan.baidubce.com/v2/chat/completions",
     "modelsUrl": "https://qianfan.baidubce.com/v2/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -3962,6 +4340,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://bazaarlink.ai/api/v1/chat/completions",
     "modelsUrl": "https://bazaarlink.ai/api/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -4011,6 +4392,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.bluesminds.com/v1/chat/completions",
     "modelsUrl": "https://api.bluesminds.com/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": true,
     "deprecated": false,
@@ -4050,6 +4434,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.kilo.ai/api/gateway/chat/completions",
     "modelsUrl": "https://api.kilo.ai/api/gateway/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -4080,6 +4467,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.llm7.io/v1/chat/completions",
     "modelsUrl": "https://api.llm7.io/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -4112,6 +4502,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.sambanova.ai/v1/chat/completions",
     "modelsUrl": "https://api.sambanova.ai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": true,
     "deprecated": false,
@@ -4138,6 +4531,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.hunyuan.cloud.tencent.com/v1/chat/completions",
     "modelsUrl": "https://api.hunyuan.cloud.tencent.com/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -4164,6 +4560,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.morphllm.com/v1/chat/completions",
     "modelsUrl": "https://api.morphllm.com/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -4194,6 +4593,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://inference.poolside.ai/v1/chat/completions",
     "modelsUrl": "https://inference.poolside.ai/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
@@ -4220,6 +4622,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://api.tokenrouter.com/v1/chat/completions",
     "modelsUrl": "https://api.tokenrouter.com/v1/models",
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "llm",
       "embedding",
@@ -4275,6 +4680,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "stt"
     ],
@@ -4305,6 +4713,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -4335,6 +4746,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "embedding"
     ],
@@ -4366,6 +4780,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "tts"
     ],
@@ -4391,13 +4808,15 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [
+      "preserveCacheControl"
+    ],
     "serviceKinds": [],
     "hidden": false,
     "deprecated": false,
-    "unmodelled": [
-      "transport.headers",
-      "transport.quirks"
-    ],
+    "unmodelled": [],
     "models": [
       {"id":"qwen3.8-max-preview","name":"Qwen3.8 Max Preview","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":1000000,"maxOutputTokens":65536},
       {"id":"qwen3.7-max","name":"Qwen3.7 Max","kind":"llm","upstreamModelId":null,"capabilities":{"vision":true,"pdf":false,"audioInput":false,"videoInput":false,"tools":true,"reasoning":true},"capabilitySource":"declared","contextWindow":1000000,"maxOutputTokens":65536},
@@ -4422,6 +4841,9 @@ export const CATALOG: readonly CatalogProvider[] = [
     },
     "chatUrl": null,
     "modelsUrl": null,
+    "headers": {},
+    "forceStream": false,
+    "quirks": [],
     "serviceKinds": [
       "webSearch"
     ],

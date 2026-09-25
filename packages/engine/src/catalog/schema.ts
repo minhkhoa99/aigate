@@ -43,6 +43,12 @@ export interface CatalogProvider {
   // The request URL as 9router uses it; null when each connection brings its own (Azure).
   readonly chatUrl: string | null;
   readonly modelsUrl: string | null;
+  // Static request headers the provider expects (public constants, e.g. OpenRouter attribution); never credentials.
+  readonly headers: Readonly<Record<string, string>>;
+  // The upstream answers only streaming requests.
+  readonly forceStream: boolean;
+  // Names of 9router request quirks (behaviour flags); their handling belongs to the SP that models each.
+  readonly quirks: readonly string[];
   readonly serviceKinds: readonly string[];
   readonly hidden: boolean;
   readonly deprecated: boolean;

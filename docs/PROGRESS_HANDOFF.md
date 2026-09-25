@@ -1,6 +1,6 @@
 # AIGate progress handoff
 
-Updated: 2026-09-25. Read this before continuing the project plan.
+Updated: 2026-09-26. Read this before continuing the project plan.
 
 ## Task board
 
@@ -13,7 +13,6 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M0 SP1 Monorepo skeleton | Done | SP1 below |
 | M0 SP2 SPIKE-1 and database driver chain | Done | SP2 below, `packages/database` |
 | M0 SP3 Parity harness | Done, no UI | `docs/contracts/parity.md` |
-| M0 SP4 `tools/extract` registry extraction | **Not started** | Needed before SP13 |
 | M1 SP5 `settings` | Done, UI wired | `docs/contracts/settings.md` |
 | M1 SP6 `identity` + `apikeys` | Done, UI wired | `docs/contracts/identity-apikeys.md` |
 | Error handling and the API↔UI map | Done | `docs/design/API_UI_MAP.md` |
@@ -25,7 +24,8 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M1 SP12 routing + `/v1` streaming | Done, UI wired | `docs/contracts/chat-lane.md` |
 | M1 acceptance gate (parity tiers 1+2, 13 golden scenarios) | **Passed** (tier 1 11/11, golden 10/10 + 3 deferred); tier 2 waits for an OpenAI key | `docs/parity/m1-gate-report.md` |
 | M0 SP4 `tools/extract` registry extraction | Done, no UI | `docs/contracts/registry-extract.md` |
-| M2 SP13 registry 123 providers (connect more on `/providers`) | **Next** | SP4 below |
+| M2 SP13 catalog → runtime registry (41 connectable providers) | Done, UI wired | `docs/contracts/catalog-providers.md` |
+| M2 SP13b custom OpenAI-compatible providers, then delete `tools/extract` | **Next** | SP13 below |
 
 ## Completed and verified
 
@@ -456,13 +456,21 @@ Checks and status:
 - **Checks.** Extract tests pass 3/3 in CI (the diff, no stale file, defaults restored). Engine tests pass 46/46, with 4 catalog tests. Six mutations were caught.
 - **Matrix.** `catalog.registry-build`, `catalog.registry-entry-shape`, and `catalog.model-registry-global` are `contracted`.
 
-**Next step, M2 SP13 (the catalog becomes the runtime registry):**
-1. **Registry.** Build `builtinRegistry` from `CATALOG` for the 46 openai-compatible API-key providers. The adapter should use `chatUrl` and `modelsUrl` instead of appending `/chat/completions`.
-2. **Headers.** Model `transport.headers`, where those providers need it.
-3. **Models and connections.** Model resolution by id and aliases. Connections accept any registry provider.
-4. **Screens, wired in the same SP.**
-   - `/providers` catalog from the API instead of the static `catalog.ts`.
-   - `ProviderDetail` models.
-   - `Connections` for every connectable provider.
-5. **Custom providers.** The OpenAI-compatible `provider_nodes` go with it.
-6. **Cleanup.** Delete `tools/extract` at the end.
+**M2 SP13 (the catalog becomes the runtime registry) is complete.** The contract is `docs/contracts/catalog-providers.md`.
+
+- **Registry.** `builtinRegistry` is built from `CATALOG` in `packages/engine/src/builtin-registry.ts`. **41 of 121** providers are connectable; `unsupportedReason()` gives every other one a reason the UI shows (adapter SP14, OAuth SP16, per-account URL, forceStream, the Cline envelope, hidden, services SP22/23).
+  - SP4 counted 46 candidates; 5 drop out on `forceStream` or `clineEnvelope`. OpenAI is the one `forceStream` exception (`IMPLEMENTATION_ACCIDENT`: its API answers non-streaming, and the SP3 tapes replay that way).
+  - `ProviderDescriptor` is `chatUrl`, `modelsUrl`, static `headers`, `aliases`, `auth { header, scheme }`. `providers/openai.ts` is deleted.
+  - Limits may be `null`. An output limit above the context window (tencent hunyuan: 262144 > 200000) is not trusted and becomes `null`.
+- **Adapter.** Calls `chatUrl`/`modelsUrl` directly. Catalog headers first, the key last, so a catalog header never replaces it; a `raw` scheme sends the key alone.
+- **`/v1` resolution.** `provider-or-alias/model`; a non-connectable catalog prefix is 400 `provider_not_supported` with the reason; a bare id goes to the first declaring provider **with an active connection** (`glm-5` has six), else 404 `no_active_connection` naming three. A `/` whose prefix names no provider is part of the id (`zai-org/GLM-5.2`).
+- **API.** `GET /api/providers` (all 121, with `connectable` and `reason`) and `GET /api/providers/:id` (+ `chatUrl`, models; 404 `NOT_FOUND`) in the new `catalog` module. `GET /api/connections/providers` is removed. `PROVIDER_NOT_SUPPORTED` now carries the catalog reason, or "is not in the catalog".
+- **UI, wired.** `/providers` (`LlmProviders`) lists the 77 non-service, non-hidden providers from the API, grouped by category, with Connected / Coming later pills. `ProviderDetail` shows the Connection panel or the reason, plus a Models table (`not declared` for unknown limits). The Connections Add modal lists the 41 connectable providers; a `?provider=` that cannot be connected shows its reason. `features/providers/catalog.ts` keeps only the media lists.
+- **Checks.** Engine 47/47, server 65/65 (new `test/catalog.test.mjs`, new resolution tests), web 7/7, parity 5/5, extract 3/3, discovery 54/54; `pnpm lint`, `pnpm build`, `pnpm discovery validate` (284) all pass. 13 mutations were caught, 0 survived: bare id ignoring connections, unknown prefix rejected, blocked prefix falling through, empty model, aliases off, the not-supported message, the catalog reason, the kind mapping, catalog headers dropped, headers overriding the key, raw scheme as bearer, the OpenAI stream exception, the tencent sanitizer.
+- **Matrix.** `catalog.registry-build` and `catalog.registry-entry-shape` are `implemented` (`catalog.connection-listing` already was). `routing.model-resolution` stays `contracted` until combos (SP19).
+
+**Next step, M2 SP13b (custom OpenAI-compatible providers):**
+1. Contract first: `docs/contracts/custom-providers.md`, from the 9router `provider_nodes` matrix entries.
+2. A `provider_nodes` table (migration `0003`), a custom-providers module with CRUD, and a registry that merges built-in and custom descriptors per request.
+3. Wire `/providers/new` (the form is a preview today) and the "Custom providers" section on `/providers`.
+4. Then delete `tools/extract` (spec §2) and its CI step, keeping `providers.generated.ts`.

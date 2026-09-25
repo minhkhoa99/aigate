@@ -28,8 +28,10 @@ If an SP adds no HTTP API (for example `packages/engine`), write "no UI" in its 
 | `POST /api/auth/password` | same | `/settings/auth` → `SettingsAuth`, "Password login" | `useChangePassword` | Wired |
 | `GET/PATCH /api/settings` | `contracts/settings.md` | `/settings/auth`: "Require dashboard login" and "Require API key"; `/gateway/endpoint`: "Require API key" | `useSettings`, `usePatchSettings`; `features/gateway/api.ts` `useRequireApiKey` | Wired |
 | `GET/POST /api/keys`, `PATCH/DELETE /api/keys/:id` | `contracts/identity-apikeys.md` | `/gateway/endpoint` → `EndpointKeys` | `useApiKeys`, `useCreateKey`, `useSetKeyActive`, `useDeleteKey` | Wired: key shown once; disable/enable; revoke with type-to-confirm |
-| `GET /api/connections/providers`, `GET /api/connections` | `contracts/connections.md` | `/providers/connections` → `Connections`; `/providers/detail` → `ProviderDetail` (Connection panel); `/providers` → `LlmProviders` (Connected pill) | `features/providers/api.ts` `useSupportedProviders`, `useConnections` | Wired: providers that are not supported show "Not supported yet" |
-| `POST /api/connections` | same | `Connections` → Add connection modal (only supported providers; a query `?provider=` preselects or warns) | `useCreateConnection` | Wired: save, then test at once |
+| `GET /api/providers` | `contracts/catalog-providers.md` | `/providers` → `LlmProviders` (cards by category, Connected / Coming later pills); `Connections` → Add connection modal (the connectable list) | `features/providers/api.ts` `useProviders` | Wired: loading, error with Retry; a `?provider=` that cannot be connected shows its reason |
+| `GET /api/providers/:id` | same | `/providers/detail?provider=…` → `ProviderDetail` (type, Connection panel or reason, Models table) | `useProvider` | Wired: 404 `NOT_FOUND` shows "Provider not found" |
+| `GET /api/connections` | `contracts/connections.md` | `/providers/connections` → `Connections`; `/providers/detail` → `ProviderDetail` (Connection panel); `/providers` → `LlmProviders` (Connected pill) | `useConnections` | Wired |
+| `POST /api/connections` | same | `Connections` → Add connection modal (the 41 connectable providers; a query `?provider=` preselects or shows the reason); `PROVIDER_NOT_SUPPORTED` toasts the server's reason | `useCreateConnection` | Wired: save, then test at once |
 | `PATCH /api/connections/:id` | same | `Connections` → Replace key modal, Disable/Enable | `useUpdateConnection` | Wired: a new key resets to Not tested, then is tested |
 | `DELETE /api/connections/:id` | same | `Connections` → Delete (type-to-confirm) | `useDeleteConnection` | Wired |
 | `POST /api/connections/:id/test` | same | `Connections` → Test; runs after every save | `useTestConnection` (25 s client timeout) | Wired: one toast per result (`features/providers/test-result.ts`) |
@@ -46,10 +48,9 @@ Each screen keeps its fixture data until the SP in the second column lands. When
 | `/settings/general` → `SettingsGeneral` | adds its settings keys by migration | Instance name, language, default model, observability |
 | `/settings/auth` OIDC and SAML tabs | M2 (OIDC/SAML) | Visual only |
 | `/providers/quota` → `Quota` | SP24 (`usage`: quota) | Quota numbers are fixture data |
-| `/providers/new` custom provider form | SP13 | Preview only; the save button is disabled |
+| `/providers/new` custom provider form | SP13b | Preview only; the save button is disabled |
 | OAuth on `Connections` (AuthFlow modal) | SP16 | SP11 has API-key connections only |
 | Multi-account, priority, strategies on `Connections` | SP17 | SP11 has one API-key account per provider |
-| Full provider catalog (connect more than OpenAI), models on `ProviderDetail` | SP13 | Other providers show "Not supported yet" |
 | `/providers/media*` → `MediaProviders` | SP23 | |
 | `/gateway/routing*`, `/gateway/token-saver` → `Routing`, `ComboCreate`, `TokenSaver` | SP19, SP20 | Combo form is a local draft |
 | `/traffic/usage`, `/traffic/requests*` → `Usage`, `Requests`, `RequestDetail` | usage SPs | |
@@ -64,7 +65,7 @@ Each screen keeps its fixture data until the SP in the second column lands. When
 | SP7 `packages/engine` (CIP core, registry, capability resolution, retry helper) | No UI. It has no HTTP API; `/v1` (SP12) is the first thing a screen can show. |
 | SP8 `transport` (`HttpTransportPort`, direct branch plus timeout) | No UI. Outbound HTTP only; its error codes (`TIMEOUT`, `PROVIDER_UNAVAILABLE`, `INVALID_REQUEST`) reach users through `/v1` in SP12. |
 | SP9 `OpenAICompatibleAdapter` (CIP ↔ chat completions, error classification, bounded SSE) | No UI. `validateCredential` will back "Test connection" on `/providers` (SP11): `AUTH_ERROR` / `QUOTA_EXHAUSTED` are answers about the key, anything else is a connection problem. Chat errors reach users through `/v1` (SP12). |
-| M0 SP4 `tools/extract` + `CATALOG` | No UI yet. SP13 serves the catalog to `/providers` (`LlmProviders`, `ProviderDetail` models) in place of the static `features/providers/catalog.ts`. |
+| M0 SP4 `tools/extract` + `CATALOG` | Served by SP13 `GET /api/providers` to `/providers` (`LlmProviders`, `ProviderDetail` models). The static `features/providers/catalog.ts` keeps only the media lists (SP23). |
 | M0 SP3 parity harness (`tools/parity`) | No UI. Dev-only; it checks the `/v1` responses API clients see against 9router tapes. |
 | SP10 OpenAI Chat protocol (`parseOpenAIChatRequest`, `toOpenAIChatCompletion`, `OpenAIChatStreamEncoder`, `toOpenAIError`) | No UI. SP12 mounts it on `/v1/chat/completions`; SP12 did that; the endpoint screen shows readiness. API clients (not the dashboard) read its errors as `{error:{message,type,code,param}}`, with an upstream `AUTH_ERROR` as 502 `upstream_auth_error`. |
 
@@ -89,7 +90,7 @@ When you add a server code, add its row here and in `errors.ts`.
 | `ALREADY_SET_UP` / `SETUP_REQUIRED` (409) | setup raced, or login before setup | Redirects to `/login` / `/welcome` |
 | `LIMIT_REACHED` (409) | the 101st API key | Toast: revoke an unused key |
 | `NOT_FOUND` (404) | a key or connection deleted in another tab | Toast, then the list refetches (`onSettled`) |
-| `PROVIDER_NOT_SUPPORTED` (400) | connecting a provider outside the registry (only OpenAI in SP11) | Toast with the server message, which names the supported providers |
+| `PROVIDER_NOT_SUPPORTED` (400) | connecting a catalog provider that is not connectable yet, or an id not in the catalog | Toast with the server message, which gives the catalog reason (for example "Needs OAuth sign-in (SP16)") |
 | `ALREADY_CONNECTED` (409) | a second connection for the same provider | Toast: use Replace key on its row |
 | `CREDENTIAL_UNREADABLE` (409) | a test after `secret.key` or `AIGATE_SECRET_KEY` changed | Toast: enter the key again with Replace key |
 | Test result `invalid` / `no_quota` / `unreachable` (200, not an error) | `POST /api/connections/:id/test` | Status pill plus a toast: "rejected the key", "no quota or credit", or "could not check the key … not judged" with the provider's message and `lastErrorCode` |

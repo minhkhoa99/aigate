@@ -261,7 +261,7 @@ export class OpenAICompatibleAdapter implements AIProviderPort {
   }
 
   async getModels(credential: Credential, ctx: ExecCtx): Promise<readonly ListedModel[]> {
-    const response = await this.send(this.request("GET", "/models", credential, METADATA_TIMEOUT_MS), credential, ctx, RETRY.maxAttempts);
+    const response = await this.send(this.request("GET", this.provider.modelsUrl, credential, METADATA_TIMEOUT_MS), credential, ctx, RETRY.maxAttempts);
     const data = record(parseJson(await readBoundedText(response.body))).data;
     if (!Array.isArray(data)) throw this.invalid("a model list without a data array");
     const listed: ListedModel[] = [];
@@ -278,7 +278,7 @@ export class OpenAICompatibleAdapter implements AIProviderPort {
   // 5xx says nothing about the key, so it is thrown.
   async validateCredential(credential: Credential, ctx: ExecCtx): Promise<CredentialStatus> {
     try {
-      const response = await this.send(this.request("GET", "/models", credential, METADATA_TIMEOUT_MS), credential, ctx, 1);
+      const response = await this.send(this.request("GET", this.provider.modelsUrl, credential, METADATA_TIMEOUT_MS), credential, ctx, 1);
       await response.body?.cancel();
       return { valid: true };
     } catch (error) {
@@ -290,7 +290,7 @@ export class OpenAICompatibleAdapter implements AIProviderPort {
   }
 
   private chat(request: CanonicalRequest, credential: Credential, stream: boolean): HttpRequest {
-    const base = this.request("POST", "/chat/completions", credential, stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS);
+    const base = this.request("POST", this.provider.chatUrl, credential, stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS);
     return {
       ...base,
       headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json" },
@@ -298,11 +298,14 @@ export class OpenAICompatibleAdapter implements AIProviderPort {
     };
   }
 
-  private request(method: HttpRequest["method"], path: string, credential: Credential, timeoutMs: number): HttpRequest {
+  // Catalog headers first, the key last: a static header can never replace the credential.
+  private request(method: HttpRequest["method"], url: string, credential: Credential, timeoutMs: number): HttpRequest {
     if (!API_KEY.test(credential.apiKey)) {
       throw new EngineError("AUTH_ERROR", `The ${this.provider.name} API key is empty, too long, or has spaces or control characters`, { provider: this.provider.id });
     }
-    return { method, url: `${this.provider.baseUrl.replace(/\/+$/, "")}${path}`, headers: { authorization: `Bearer ${credential.apiKey}` }, timeoutMs };
+    const { header, scheme } = this.provider.auth;
+    const headers = { ...this.provider.headers, [header]: scheme === "bearer" ? `Bearer ${credential.apiKey}` : credential.apiKey };
+    return { method, url, headers, timeoutMs };
   }
 
   // The only place the adapter retries, and only before any byte of a stream was used.

@@ -91,30 +91,38 @@ test("every error code has an explicit fallback decision", () => {
   assert.equal(FALLBACK_POLICY.AUTH_ERROR, "next-account");
 });
 
-test("the built-in registry holds the single SP7 entry", () => {
-  assert.deepEqual(builtinRegistry.providers.map((p) => p.id), ["openai"]);
+test("the built-in registry is the connectable part of the catalog, with a reason for the rest", () => {
+  assert.equal(builtinRegistry.providers.length, 41);
   assert.equal(builtinRegistry.model("openai", "gpt-4.1")?.contextWindow, 1_000_000);
   assert.equal(builtinRegistry.model("openai", "missing"), undefined);
+  assert.equal(builtinRegistry.provider("ds")?.id, "deepseek", "aliases resolve");
   assert.equal(builtinRegistry.provider("anthropic"), undefined);
+  assert.deepEqual(builtinRegistry.status("anthropic"), { connectable: false, reason: "Needs the anthropic adapter (SP14)" });
+  assert.deepEqual(builtinRegistry.status("openai"), { connectable: true });
+  assert.equal(builtinRegistry.status("no-such-provider"), undefined);
+  // 9router data defect: an output limit above the context window is not trusted.
+  assert.equal(builtinRegistry.model("tencent", "hunyuan-turbos-latest")?.maxOutputTokens, null);
 });
 
 test("defineRegistry reports every bad entry at once", () => {
   const model = { id: "m", name: "M", kind: "chat", capabilities: resolveCapabilities(undefined, "m"), contextWindow: 10, maxOutputTokens: 5 };
-  const provider = { id: "p", name: "P", protocol: "openai-compatible", baseUrl: "https://api.example.com/v1", auth: { kind: "api-key", header: "authorization", scheme: "Bearer" }, models: [model] };
-  assert.ok(defineRegistry([provider]).model("p", "m"));
+  const provider = { id: "p", name: "P", protocol: "openai-compatible", chatUrl: "https://api.example.com/v1/chat/completions", modelsUrl: "https://api.example.com/v1/models", headers: {}, aliases: ["pp"], auth: { kind: "api-key", header: "authorization", scheme: "bearer" }, models: [model] };
+  const registry = defineRegistry([provider]);
+  assert.ok(registry.model("p", "m"));
+  assert.equal(registry.provider("pp")?.id, "p");
   try {
     defineRegistry([
       provider,
       { ...provider },
-      { ...provider, id: "Bad Id", baseUrl: "http://plain.example.com" },
-      { ...provider, id: "q", models: [model, model, { ...model, id: "big", maxOutputTokens: 20 }, { ...model, id: " spaced" }] },
-      { ...provider, id: "r", baseUrl: "not a url", models: [] },
+      { ...provider, id: "Bad Id", chatUrl: "http://plain.example.com/chat/completions" },
+      { ...provider, id: "q", models: [model, model, { ...model, id: "big", maxOutputTokens: 20 }, { ...model, id: " spaced" }, { ...model, id: "neg", contextWindow: -1 }] },
+      { ...provider, id: "r", modelsUrl: "not a url" },
     ]);
     assert.fail("expected RegistryError");
   } catch (error) {
     assert.ok(error instanceof RegistryError);
     const text = error.problems.join("\n");
-    for (const expected of ["duplicate provider id", "id must match", "must use https", "duplicate model id", "exceeds contextWindow", "is not a URL", "at least one model"]) {
+    for (const expected of ["duplicate provider id", "id must match", "must use https", "duplicate chat model id", "exceeds contextWindow", "is not a URL", "positive integer or null", "printable"]) {
       assert.ok(text.includes(expected), expected);
     }
   }

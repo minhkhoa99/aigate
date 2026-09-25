@@ -1,47 +1,6 @@
-// Built-in LLM catalog from 9Router's visible UI and active, non-hidden registry
-// entries inspected on 2026-09-24. Custom providers are user data.
-export const providerGroups = [
-  { id: "oauth", title: "OAuth providers", providers: [
-    ["claude", "Claude Code"], ["antigravity", "Antigravity"], ["codex", "OpenAI Codex"],
-    ["qoder", "Qoder"], ["github", "GitHub Copilot"], ["cursor", "Cursor IDE"],
-    ["kilocode", "Kilo Code"], ["cline", "Cline"], ["clinepass", "ClinePass"],
-    ["codebuddy-intl", "CodeBuddy"], ["codebuddy-cn", "CodeBuddy CN"], ["kimi", "Kimi"],
-    ["grok-cli", "Grok CLI (Grok Build)"], ["xai", "xAI (Grok)"],
-    ["qoder-cn", "Qoder CN"], ["zed", "Zed"],
-  ] },
-  { id: "free", title: "Free Tier providers", providers: [
-    ["opencode", "OpenCode Free"], ["gemini-cli", "Gemini CLI"], ["kiro", "Kiro AI"],
-    ["openrouter", "OpenRouter"], ["nvidia", "NVIDIA NIM"], ["ollama", "Ollama Cloud"],
-    ["vertex", "Vertex AI"], ["gemini", "Gemini"], ["cloudflare-ai", "Cloudflare"],
-    ["poolside", "Poolside"], ["byteplus", "BytePlus ModelArk"], ["kimchi", "Kimchi"],
-    ["api-airforce", "API.airforce"], ["bazaarlink", "Bazaarlink"], ["kilo-gateway", "Kilo Gateway"],
-  ] },
-  { id: "apikey", title: "API Key providers", providers: [
-    ["alicode", "Alibaba"], ["alicode-intl", "Alibaba Coding"], ["alims-intl", "Alibaba Studio"],
-    ["anthropic", "Anthropic"], ["azure", "Azure OpenAI"], ["baidu", "Baidu Qianfan"],
-    ["blackbox", "Blackbox AI"], ["cerebras", "Cerebras"], ["chutes", "Chutes AI"],
-    ["cohere", "Cohere"], ["commandcode", "Command Code"], ["deepseek", "DeepSeek"],
-    ["featherless", "Featherless"], ["fireworks", "Fireworks AI"], ["glm-cn", "GLM (China)"],
-    ["glm", "GLM Coding"], ["groq", "Groq"], ["hyperbolic", "Hyperbolic"],
-    ["llm7", "LLM7"], ["minimax-cn", "Minimax (China)"], ["minimax", "Minimax Coding"],
-    ["mistral", "Mistral"], ["morph", "Morph"], ["nebius", "Nebius AI"],
-    ["ollama-local", "Ollama Local"], ["openai", "OpenAI"], ["opencode-go", "OpenCode Go"],
-    ["perplexity", "Perplexity"], ["perplexity-agent", "Perplexity Agent"], ["siliconflow", "SiliconFlow"],
-    ["tencent", "Tencent Hunyuan"], ["together", "Together AI"], ["tokenrouter", "TokenRouter"],
-    ["venice", "Venice AI"], ["vercel-ai-gateway", "Vercel AI Gateway"],
-    ["vertex-partner", "Vertex Partner"], ["volcengine-ark", "Volcengine Ark"],
-    ["xiaomi-mimo", "Xiaomi MiMo"], ["xiaomi-tokenplan", "Xiaomi MiMo (Token Plan)"],
-    ["opencode-zen", "OpenCode Zen"], ["alitp-intl", "Alibaba Token Plan"],
-  ] },
-  { id: "webCookie", title: "Web account providers", providers: [
-    ["grok-web", "Grok Web (Subscription)"],
-    ["perplexity-web", "Perplexity Web (Pro/Max)"],
-  ] },
-] as const;
-
-export const providers = providerGroups.flatMap((group) => group.providers.map(([id, name]) => ({ id, name, group: group.id })));
-
-// Capability lists from 9Router's Media Providers UI on the same date. A provider
+// The LLM catalog comes from GET /api/providers (docs/contracts/catalog-providers.md); these media
+// lists stay static until the media lanes (SP22/SP23).
+// Capability lists from 9Router's Media Providers UI, inspected on 2026-09-24. A provider
 // may appear in several lists because each list represents a different lane.
 export const mediaGroups = [
   { id: "embedding", title: "Embeddings", providers: [
@@ -89,8 +48,3 @@ export const mediaGroups = [
     ["exa", "Exa"], ["firecrawl", "Firecrawl"], ["jina-reader", "Jina Reader"], ["tavily", "Tavily"],
   ] },
 ] as const;
-
-export const mediaOnlyProviders = mediaGroups.flatMap((group) => group.providers.map(([id, name]) => ({ id, name, group: "media" })))
-  .filter((provider, index, items) => !providers.some((item) => item.id === provider.id) && items.findIndex((item) => item.id === provider.id) === index);
-
-export const allProviders: { id: string; name: string; group: string }[] = [...providers, ...mediaOnlyProviders];

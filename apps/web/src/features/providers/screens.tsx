@@ -3,9 +3,10 @@ import { Link } from "@tanstack/react-router";
 import { Button, ConfirmDialog, Field, Input, Metric, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
-import { allProviders, mediaGroups, providerGroups, providers } from "./catalog";
+import { mediaGroups } from "./catalog";
 import {
-  useConnections, useCreateConnection, useDeleteConnection, useSupportedProviders, useTestConnection, useUpdateConnection, type Connection,
+  useConnections, useCreateConnection, useDeleteConnection, useProvider, useProviders, useTestConnection, useUpdateConnection, type Connection,
+  type ProviderDetailView,
 } from "./api";
 import { describeTest, needsAttention, statusPill } from "./test-result";
 
@@ -14,70 +15,103 @@ const formText = (form: HTMLFormElement, name: string) => {
   return typeof value === "string" ? value.trim() : "";
 };
 
+// Catalog categories in 9router's page order; "free" (keyless) and "freeTier" share one section there.
+interface Group { id: string; title: string; categories: readonly string[]; detail: string }
+const GROUPS: readonly Group[] = [
+  { id: "oauth", title: "OAuth providers", categories: ["oauth"], detail: "Account sign-in and token based connections." },
+  { id: "free", title: "Free Tier providers", categories: ["free", "freeTier"], detail: "Providers listed under Free Tier in the 9Router reference; access terms vary." },
+  { id: "apikey", title: "API Key providers", categories: ["apikey"], detail: "Connect with a provider-issued API key." },
+  { id: "webCookie", title: "Web account providers", categories: ["webCookie"], detail: "Subscription account connections." },
+];
+const OTHER: Group = { id: "other", title: "Other providers", categories: [], detail: "Providers in a category this dashboard does not name yet." };
+const groupOf = (category: string) => GROUPS.find((g) => g.categories.includes(category)) ?? OTHER;
+const COMING_LATER = "Coming later";
+
 export function LlmProviders() {
   const [filter, setFilter] = useState("");
   const [showAllKeys, setShowAllKeys] = useState(false);
+  const catalog = useProviders();
   const connections = useConnections();
   const connected = new Set(connections.data?.map((c) => c.provider));
   const query = filter.trim().toLocaleLowerCase();
-  return <><PageHeading eyebrow="Providers / Catalog" title="LLM providers" description="Browse built-in providers by connection method. OpenAI can be connected today; the rest arrive with the full catalog (SP13)." />
-    <div className="provider-catalog-toolbar"><input className="input" aria-label="Search providers" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={`Search ${providers.length} providers…`} /><span className="muted mono">{providers.filter((p) => p.name.toLocaleLowerCase().includes(query)).length} / {providers.length} built-in</span></div>
+  // Media and search services have their own screens; hidden entries are hidden in 9router too.
+  const llm = (catalog.data ?? []).filter((p) => p.protocol !== "service" && !p.hidden);
+  const matches = llm.filter((p) => p.name.toLocaleLowerCase().includes(query) || p.id.includes(query));
+  const connectable = llm.filter((p) => p.connectable).length;
+  return <><PageHeading eyebrow="Providers / Catalog" title="LLM providers" description={`Browse built-in providers by connection method. ${connectable} of ${llm.length} can be connected with an API key today.`} />
+    <div className="provider-catalog-toolbar"><input className="input" aria-label="Search providers" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={`Search ${llm.length} providers…`} /><span className="muted mono">{matches.length} / {llm.length} built-in</span></div>
     {!query && <section className="catalog-section"><div className="catalog-section-head"><div><h2>Custom providers</h2><p>OpenAI or Anthropic compatible endpoints you define.</p></div><div className="row"><a className="button" href="/providers/new?protocol=anthropic">+ Anthropic compatible</a><a className="button button-primary" href="/providers/new?protocol=openai">+ OpenAI compatible</a></div></div><div className="catalog-empty">Custom providers are not available yet.</div></section>}
-    {providerGroups.map((group) => {
-      const matches = group.providers.filter(([, name]) => name.toLocaleLowerCase().includes(query));
-      if (!matches.length) return null;
-      const visible = group.id === "apikey" && !query && !showAllKeys ? matches.slice(0, 20) : matches;
-      return <section className="catalog-section" key={group.id} aria-labelledby={`${group.id}-heading`}><div className="catalog-section-head"><div><h2 id={`${group.id}-heading`}>{group.title} <span className="muted mono">{matches.length}</span></h2><p>{group.id === "oauth" ? "Account sign-in and token based connections." : group.id === "free" ? "Providers listed under Free Tier in the 9Router reference; access terms vary." : group.id === "webCookie" ? "Subscription account connections; provider-specific setup is pending." : "Connect with a provider-issued API key."}</p></div></div>
-        <div className="catalog-grid">{visible.map(([id, name]) => <a className="catalog-card" href={`/providers/detail?provider=${id}`} key={id}><span className="catalog-glyph" aria-hidden="true">{name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{name}</strong><small>View provider →</small></span>{connected.has(id) && <Pill tone="healthy">Connected</Pill>}</a>)}</div>
-        {group.id === "apikey" && !query && <button className="catalog-more" type="button" onClick={() => setShowAllKeys(!showAllKeys)}>{showAllKeys ? "Show fewer" : `Show all ${matches.length} providers`}</button>}
-      </section>;
-    })}
-    {query && !providers.some((p) => p.name.toLocaleLowerCase().includes(query)) && <div className="catalog-empty">No providers match “{filter}”.</div>}
+    {catalog.isPending ? <StateBlock state="loading" />
+      : catalog.isError ? <StateBlock state="error" code={toProblem(catalog.error).code} action={<Button onClick={() => void catalog.refetch()}>Retry</Button>} />
+      : <>{[...GROUPS, OTHER].map((group) => {
+        const members = matches.filter((p) => groupOf(p.category) === group);
+        if (!members.length) return null;
+        const visible = group.id === "apikey" && !query && !showAllKeys ? members.slice(0, 20) : members;
+        return <section className="catalog-section" key={group.id} aria-labelledby={`${group.id}-heading`}><div className="catalog-section-head"><div><h2 id={`${group.id}-heading`}>{group.title} <span className="muted mono">{members.length}</span></h2><p>{group.detail}</p></div></div>
+          <div className="catalog-grid">{visible.map((p) => <a className="catalog-card" href={`/providers/detail?provider=${encodeURIComponent(p.id)}`} key={p.id} title={p.reason ?? undefined}><span className="catalog-glyph" aria-hidden="true">{p.name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{p.name}</strong><small>{p.modelCount} model{p.modelCount === 1 ? "" : "s"}</small>{connected.has(p.id) ? <Pill tone="healthy">Connected</Pill> : !p.connectable && <Pill>{COMING_LATER}</Pill>}</span></a>)}</div>
+          {group.id === "apikey" && !query && members.length > 20 && <button className="catalog-more" type="button" onClick={() => setShowAllKeys(!showAllKeys)}>{showAllKeys ? "Show fewer" : `Show all ${members.length} providers`}</button>}
+        </section>;
+      })}
+      {query && !matches.length && <div className="catalog-empty">No providers match “{filter}”.</div>}</>}
   </>;
 }
 
-// The provider detail panel: connected, not connected, or not supported by this version.
-function ProviderConnection({ providerId }: { providerId: string }) {
+// The provider detail panel: connected, not connected, or the catalog's reason it cannot be connected yet.
+function ProviderConnection({ provider }: { provider: ProviderDetailView }) {
   const connections = useConnections();
-  const supported = useSupportedProviders();
-  if (connections.isPending || supported.isPending) return <StateBlock state="loading" />;
-  if (connections.isError || supported.isError) {
-    return <StateBlock state="error" code={toProblem(connections.error ?? supported.error).code} action={<Button onClick={() => { void connections.refetch(); void supported.refetch(); }}>Retry</Button>} />;
-  }
-  if (!supported.data.some((p) => p.id === providerId)) {
-    return <div className="state-block"><strong>Not supported yet</strong><p>This version can connect {supported.data.map((p) => p.name).join(", ")}. The full provider catalog comes with SP13.</p></div>;
-  }
-  const connection = connections.data.find((c) => c.provider === providerId);
+  if (!provider.connectable) return <div className="state-block"><strong>{COMING_LATER}</strong><p>{provider.reason}.</p></div>;
+  if (connections.isPending) return <StateBlock state="loading" />;
+  if (connections.isError) return <StateBlock state="error" code={toProblem(connections.error).code} action={<Button onClick={() => void connections.refetch()}>Retry</Button>} />;
+  const connection = connections.data.find((c) => c.provider === provider.id);
   if (!connection) {
-    return <div className="state-block"><strong>Not connected</strong><p>Add an API key to route requests to this provider.</p><a className="button button-primary" href={`/providers/connections?provider=${providerId}`}>Add connection</a></div>;
+    return <div className="state-block"><strong>Not connected</strong><p>Add an API key to route requests to this provider.</p><a className="button button-primary" href={`/providers/connections?provider=${encodeURIComponent(provider.id)}`}>Add connection</a></div>;
   }
   const pill = statusPill(connection);
   return <div className="list-row"><div><strong>{connection.name}</strong><small>Key <code>{connection.keyHint}</code> · {connection.lastTestedAt ? `tested ${new Date(connection.lastTestedAt).toLocaleString()}` : "not tested yet"}</small></div><Pill tone={pill.tone}>{pill.label}</Pill><a className="button" href="/providers/connections">Manage</a></div>;
 }
 
+const limit = (value: number | null) => (value === null ? <span className="muted">not declared</span> : value.toLocaleString());
+const capabilityList = (capabilities: Record<string, boolean>) => Object.keys(capabilities).filter((name) => capabilities[name]).join(", ") || "—";
+
+function CatalogProvider({ providerId }: { providerId: string }) {
+  const detail = useProvider(providerId);
+  if (detail.isPending) return <StateBlock state="loading" />;
+  if (detail.isError) {
+    const problem = toProblem(detail.error);
+    if (problem.code === "NOT_FOUND") return <><PageHeading eyebrow="Providers / Catalog" title="Provider not found" description={`"${providerId}" is not in the provider catalog.`} /><Link className="button" to="/providers">Back to providers</Link></>;
+    return <StateBlock state="error" code={problem.code} action={<Button onClick={() => void detail.refetch()}>Retry</Button>} />;
+  }
+  const provider = detail.data;
+  const group = groupOf(provider.category);
+  return <><PageHeading eyebrow={`Providers / ${group.title}`} title={provider.name} description="Connection status, credentials, and the models this provider offers." />
+    <div className="grid grid-2"><Panel title="Provider type"><Pill tone="info">{group.title}</Pill><p className="muted">Built-in catalog entry · ID <code>{provider.id}</code></p>{provider.chatUrl && <p className="muted" style={{ overflowWrap: "anywhere" }}>Endpoint <code>{provider.chatUrl}</code></p>}</Panel><Panel title="Connection"><ProviderConnection provider={provider} /></Panel></div>
+    <Panel title="Models" detail={`${provider.models.length} in the catalog. A provider may serve more; "<provider>/<model>" reaches any of them.`} className="section-gap panel-flush">
+      <Table empty="The catalog lists no models for this provider." columns={["Model", "Kind", "Context window", "Max output", "Capabilities"]}
+        rows={provider.models.map((m) => [<div><strong>{m.name}</strong>{m.name !== m.id && <small className="muted"> <code>{m.id}</code></small>}</div>, m.kind, limit(m.contextWindow), limit(m.maxOutputTokens), capabilityList(m.capabilities)])} />
+    </Panel>
+  </>;
+}
+
 export function ProviderDetail({ isNew = false, providerId }: { isNew?: boolean; providerId?: string }) {
-  const provider = providers.find((item) => item.id === providerId);
   const protocol = new URLSearchParams(window.location.search).get("protocol");
   if (isNew) return <><PageHeading eyebrow="Providers / Custom" title="Add custom provider" description="Define an OpenAI or Anthropic compatible endpoint." />
     <Warning>Custom providers are not available yet. This form is a preview and saves nothing.</Warning>
     <div className="split section-gap"><Panel title="Provider details"><div className="stack"><Field label="Provider name"><Input placeholder="Provider name" /></Field><Field label="Protocol"><select className="input" defaultValue={protocol === "anthropic" ? "anthropic" : "openai"}><option value="openai">OpenAI compatible</option><option value="anthropic">Anthropic compatible</option></select></Field><Field label="Base URL"><Input placeholder="https://api.example.com/v1" /></Field><Button variant="primary" disabled>Not available yet</Button></div></Panel><Panel title="Connection checklist"><div className="flow-steps">{["Enter provider details", "Validate endpoint", "Add credentials", "Select models"].map((x, i) => <div key={x}><span>{String(i + 1).padStart(2, "0")}</span><strong>{x}</strong></div>)}</div></Panel></div></>;
-  if (!provider) return <><PageHeading eyebrow="Providers / Catalog" title="Provider not found" description="This provider is not in the current catalog." /><Link className="button" to="/providers">Back to providers</Link></>;
-  const group = providerGroups.find((item) => item.id === provider.group)!;
-  return <><PageHeading eyebrow={`Providers / ${group.title}`} title={provider.name} description="Connection status and credentials for this provider. Models and health arrive with the catalog (SP13)." />
-    <div className="grid grid-2"><Panel title="Provider type"><Pill tone="info">{group.title}</Pill><p className="muted">Built-in catalog entry · ID <code>{provider.id}</code></p></Panel><Panel title="Connection"><ProviderConnection providerId={provider.id} /></Panel></div>
-  </>;
+  if (!providerId) return <><PageHeading eyebrow="Providers / Catalog" title="Provider not found" description="No provider was named in the link." /><Link className="button" to="/providers">Back to providers</Link></>;
+  return <CatalogProvider providerId={providerId} />;
 }
 
 function AddConnection({ requested, connected, onClose, onCreated }: {
   requested: string | null; connected: ReadonlySet<string>; onClose: () => void; onCreated: (connection: Connection) => void;
 }) {
-  const supported = useSupportedProviders();
+  const catalog = useProviders();
   const create = useCreateConnection();
   const showToast = useToast();
-  if (supported.isPending) return <Modal title="Add connection" onClose={onClose}><StateBlock state="loading" /></Modal>;
-  if (supported.isError) return <Modal title="Add connection" onClose={onClose}><StateBlock state="error" code={toProblem(supported.error).code} action={<Button onClick={() => void supported.refetch()}>Retry</Button>} /></Modal>;
-  const available = supported.data.filter((p) => !connected.has(p.id));
-  const requestedName = requested && !supported.data.some((p) => p.id === requested) ? (allProviders.find((p) => p.id === requested)?.name ?? requested) : null;
+  if (catalog.isPending) return <Modal title="Add connection" onClose={onClose}><StateBlock state="loading" /></Modal>;
+  if (catalog.isError) return <Modal title="Add connection" onClose={onClose}><StateBlock state="error" code={toProblem(catalog.error).code} action={<Button onClick={() => void catalog.refetch()}>Retry</Button>} /></Modal>;
+  const available = catalog.data.filter((p) => p.connectable && !connected.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
+  const asked = requested ? catalog.data.find((p) => p.id === requested) : undefined;
+  const blocked = !requested ? null : !asked ? `${requested} is not in the provider catalog.` : asked.connectable ? null : `${asked.name} cannot be connected yet: ${asked.reason}.`;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const name = formText(event.currentTarget, "name");
@@ -85,11 +119,11 @@ function AddConnection({ requested, connected, onClose, onCreated }: {
     create.mutate(body, { onSuccess: onCreated, onError: (error) => showToast({ tone: "error", ...toProblem(error) }) });
   };
   return <Modal title="Add connection" onClose={onClose}>
-    {requestedName && <Warning>{requestedName} cannot be connected yet. This version supports {supported.data.map((p) => p.name).join(", ")}.</Warning>}
-    {available.length === 0 ? <><p>Every supported provider is already connected. Use Replace key on its row to change a key.</p><div className="modal-actions"><Button onClick={onClose}>Close</Button></div></>
+    {blocked && <Warning>{blocked}</Warning>}
+    {available.length === 0 ? <><p>Every connectable provider is already connected. Use Replace key on its row to change a key.</p><div className="modal-actions"><Button onClick={onClose}>Close</Button></div></>
       : <form onSubmit={submit}><p>The key is encrypted before it is saved and is never shown again. AIGate tests it right after saving.</p>
         <div className="stack">
-          <Field label="Provider"><select className="input" name="provider" defaultValue={available.some((p) => p.id === requested) ? requested ?? undefined : available[0].id}>{available.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+          <Field label="Provider" hint={`${available.length} providers can be connected with an API key.`}><select className="input" name="provider" defaultValue={available.some((p) => p.id === requested) ? requested ?? undefined : available[0].id}>{available.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
           <Field label="Name" hint="Optional. Defaults to the provider name."><Input name="name" maxLength={64} placeholder="e.g. Work account" /></Field>
           <Field label="API key"><Input name="apiKey" type="password" required minLength={8} maxLength={4096} autoComplete="off" placeholder="sk-…" /></Field>
         </div>

@@ -96,6 +96,18 @@ test("execute maps CIP to a chat-completions body and the answer back", async ()
   });
 });
 
+test("catalog headers go on every request, but never replace the key; a raw scheme sends the key alone", async () => {
+  const bearer = { ...openai, headers: { "x-title": "AIGate", authorization: "Bearer forged" } };
+  const transport = fakeTransport(json(200, ok), json(200, { data: [] }));
+  await new OpenAICompatibleAdapter(bearer, transport).execute(hello, credential, ctx());
+  assert.equal(transport.calls[0].headers["x-title"], "AIGate");
+  assert.equal(transport.calls[0].headers.authorization, `Bearer ${SECRET}`);
+  const raw = { ...openai, modelsUrl: "https://api.example.com/v2/list", headers: { "x-title": "AIGate" }, auth: { kind: "api-key", header: "x-api-key", scheme: "raw" } };
+  await new OpenAICompatibleAdapter(raw, transport).getModels(credential, ctx());
+  assert.equal(transport.calls[1].url, "https://api.example.com/v2/list");
+  assert.deepEqual([transport.calls[1].headers["x-api-key"], transport.calls[1].headers["x-title"], transport.calls[1].headers.authorization], [SECRET, "AIGate", undefined]);
+});
+
 test("a feature OpenAI cannot carry is refused before any I/O", async () => {
   const user = (part) => ({ ...hello, messages: [{ role: "user", content: [part] }] });
   const cases = [

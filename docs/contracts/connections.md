@@ -5,7 +5,7 @@ Scope, per spec §9: the `connections` context with **one API-key account per pr
 - **UI:** the `/providers` screens, wired in this SP: `Connections`, `ProviderDetail`, and connected pills in `LlmProviders`.
 - **Decisions (user, 2026-09-25):**
   - Keys are encrypted with AES-256-GCM, using a key file, with an env override.
-  - SP11 connects OpenAI only.
+  - SP11 connected OpenAI only; since SP13 any connectable catalog provider (`catalog-providers.md`).
 
 ## Rules from the reference
 
@@ -52,9 +52,8 @@ Every response is `Cache-Control: no-store`. The view is `{ id, provider, provid
 
 | Method and path | Body | Success | Errors |
 |---|---|---|---|
-| `GET /api/connections/providers` | — | 200 `[{ id, name }]`: the providers that can be connected (the registry) | — |
 | `GET /api/connections` | — | 200 `View[]` | — |
-| `POST /api/connections` | `{ provider, apiKey, name? }` | 201 `View` | 400 `INVALID_REQUEST` (names the field); 400 `PROVIDER_NOT_SUPPORTED`; 409 `ALREADY_CONNECTED` |
+| `POST /api/connections` | `{ provider, apiKey, name? }` | 201 `View` | 400 `INVALID_REQUEST` (names the field); 400 `PROVIDER_NOT_SUPPORTED` (the catalog reason, or "is not in the catalog"); 409 `ALREADY_CONNECTED` |
 | `PATCH /api/connections/:id` | any of `{ name, apiKey, isActive }` | 200 `View` | 400 `INVALID_REQUEST`; 404 `NOT_FOUND` |
 | `DELETE /api/connections/:id` | — | 204 | 404 `NOT_FOUND` |
 | `POST /api/connections/:id/test` | — | 200 `View`, with the new `testStatus` | 404 `NOT_FOUND`; 409 `CREDENTIAL_UNREADABLE` |
@@ -72,7 +71,7 @@ The test:
 
 | Screen | What is wired |
 |---|---|
-| `/providers/connections` → `Connections` | Table of real connections: provider, name, key hint, status, last tested, and actions (Test, Replace key, Disable/Enable, Delete). "Needs attention" filters to `invalid`, `no_quota`, `unreachable`, `untested`, and disabled rows. Add connection: provider select (only supported providers can be chosen), name, API key. Save, then test automatically. |
+| `/providers/connections` → `Connections` | Table of real connections: provider, name, key hint, status, last tested, and actions (Test, Replace key, Disable/Enable, Delete). "Needs attention" filters to `invalid`, `no_quota`, `unreachable`, `untested`, and disabled rows. Add connection: provider select (the connectable providers from `GET /api/providers`, SP13), name, API key. Save, then test automatically. |
 | `/providers/detail?provider=…` → `ProviderDetail` | Connection status for the provider, with Add or Manage. Providers that are not supported show "Not supported yet; the full catalog comes with SP13". |
 | `/providers` → `LlmProviders` | A "Connected" pill on connected cards. |
 | Removed, because nothing backs them | Sample account rows, the "Strategies" tab, and the Quota column. Strategies return with SP17 and quota with SP24. |

@@ -51,7 +51,7 @@
     - { file: open-sse/providers/registry/index.js, line: 105, note: "// import p102 from \"./trae.js\" — commented import for a hidden provider" }
     - { file: open-sse/providers/registry/index.js, line: 229, note: "// p102, // trae — hidden, no tool calling — commented array slot with reason" }
   newModule: catalog
-  parityStatus: contracted
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.registry-frozen-after-load
@@ -121,7 +121,7 @@
     - { file: open-sse/providers/REGISTRY_TEMPLATE.js, line: 57, note: "comment: clientId/clientSecret/tokenUrl injected from oauth, do NOT duplicate here" }
     - { file: open-sse/providers/schema.js, line: 5, note: "RegistryEntry JSDoc typedef — only id + category REQUIRED, everything else optional/derived" }
   newModule: catalog
-  parityStatus: contracted
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.multi-format-variants

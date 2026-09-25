@@ -47,6 +47,9 @@ export async function verify() {
     if (entry.noAuth) expect(`${at} auth`, p.auth.kinds, ["none"]);
     if (entry.oauth && !entry.noAuth) expect(`${at} auth has oauth`, p.auth.kinds.includes("oauth"), true);
     expect(`${at} hidden`, p.hidden, Boolean(entry.hidden));
+    expect(`${at} headers`, p.headers, entry.transport?.headers ?? {});
+    expect(`${at} forceStream`, p.forceStream, entry.transport?.forceStream === true);
+    expect(`${at} quirks`, [...p.quirks].sort(), Object.keys(entry.transport?.quirks ?? {}).sort());
     const raw = entry.models ?? [];
     expect(`${at} model ids (in order)`, p.models.map((m) => m.id), raw.map((m) => m.id));
     for (const [i, rawModel] of raw.entries()) {

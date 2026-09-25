@@ -172,15 +172,33 @@ export class ChatLane {
       "Require API key is off, so AIGate only accepts requests from this machine. Turn it on in AIGate: Gateway → Endpoint & Keys, then send a key.");
   }
 
+  // docs/contracts/catalog-providers.md "Resolving a model": "<provider or alias>/<model>" names the provider;
+  // a bare id goes to the first catalog provider that declares it and has an active connection.
   private async resolve(request: CanonicalRequest): Promise<Target> {
     const ref = request.model;
     const slash = ref.indexOf("/");
-    const prefixed = slash > 0 ? builtinRegistry.provider(ref.slice(0, slash)) : undefined;
+    const prefix = slash > 0 ? ref.slice(0, slash) : undefined;
+    const prefixed = prefix === undefined ? undefined : builtinRegistry.provider(prefix);
+    if (prefix !== undefined && !prefixed) {
+      const status = builtinRegistry.status(prefix);
+      if (status && !status.connectable) {
+        throw new GatewayError(400, "invalid_request_error", "provider_not_supported", `${prefix} cannot be connected yet: ${status.reason}.`);
+      }
+    }
     const modelId = prefixed ? ref.slice(slash + 1) : ref;
-    const provider = prefixed ?? builtinRegistry.providers.find((p) => builtinRegistry.model(p.id, ref) !== undefined);
-    if (!provider || modelId === "") {
-      throw new GatewayError(404, "not_found_error", "model_not_found",
-        `The model "${ref}" is not available. Use a catalog model such as "gpt-4.1", or "<provider>/<model>" such as "openai/${modelId || "gpt-4.1"}". Providers: ${builtinRegistry.providers.map((p) => p.id).join(", ")}.`);
+    if (modelId === "") throw this.modelNotFound(ref);
+    const active = await this.connections.activeProviders();
+    let provider = prefixed;
+    if (!provider) {
+      // Model ids may contain "/" (openrouter's "meta-llama/…"), so an unknown prefix is part of the id.
+      const declaring = builtinRegistry.providers.filter((p) => builtinRegistry.model(p.id, ref) !== undefined);
+      if (declaring.length === 0) throw this.modelNotFound(ref);
+      provider = declaring.find((p) => active.has(p.id));
+      if (!provider) {
+        const names = declaring.slice(0, 3).map((p) => p.name).join(", ");
+        throw new GatewayError(404, "not_found_error", "no_active_connection",
+          `No active connection serves "${ref}". Add or enable one for ${names}${declaring.length > 3 ? ", …" : ""} in AIGate: Providers → Connections.`);
+      }
     }
     const apiKey = await this.connections.activeKey(provider.id);
     if (apiKey === undefined) {
@@ -189,6 +207,11 @@ export class ChatLane {
     const upstream: CanonicalRequest = { ...request, model: modelId };
     assertModelSupports(upstream, provider.id, builtinRegistry.model(provider.id, modelId), modelId);
     return { provider, request: upstream, credential: { kind: "api-key", apiKey } };
+  }
+
+  private modelNotFound(ref: string): GatewayError {
+    return new GatewayError(404, "not_found_error", "model_not_found",
+      `The model "${ref}" is not in the catalog. Use "<provider>/<model>" such as "openai/gpt-4.1"; GET /v1/models lists the models of your connected providers.`);
   }
 
   // Headers are sent only after the first chunk, so a failure before it is a normal JSON error.

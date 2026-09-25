@@ -19,9 +19,31 @@ export interface Connection {
   updatedAt: string;
 }
 
-export interface SupportedProvider {
+// docs/contracts/catalog-providers.md
+export interface ProviderSummary {
   id: string;
   name: string;
+  category: string;
+  protocol: string;
+  authKinds: string[];
+  hidden: boolean;
+  connectable: boolean;
+  reason: string | null;
+  modelCount: number;
+}
+
+export interface ProviderModel {
+  id: string;
+  name: string;
+  kind: string;
+  capabilities: Record<string, boolean>;
+  contextWindow: number | null;
+  maxOutputTokens: number | null;
+}
+
+export interface ProviderDetailView extends ProviderSummary {
+  chatUrl: string | null;
+  models: ProviderModel[];
 }
 
 // The server allows 20 s for a test (the provider has 15 s); the client waits a little longer.
@@ -29,8 +51,10 @@ const TEST_TIMEOUT_MS = 25_000;
 const connectionsKey = ["connections"] as const;
 
 export const useConnections = () => useQuery({ queryKey: connectionsKey, queryFn: () => api<Connection[]>("/api/connections") });
-export const useSupportedProviders = () =>
-  useQuery({ queryKey: ["connections", "providers"], queryFn: () => api<SupportedProvider[]>("/api/connections/providers"), staleTime: Infinity });
+// The catalog is built into the server, so it only changes with an AIGate upgrade.
+export const useProviders = () => useQuery({ queryKey: ["providers"], queryFn: () => api<ProviderSummary[]>("/api/providers"), staleTime: Infinity });
+export const useProvider = (id: string) =>
+  useQuery({ queryKey: ["providers", id], queryFn: () => api<ProviderDetailView>(`/api/providers/${encodeURIComponent(id)}`), staleTime: Infinity });
 
 function useConnectionMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
   const client = useQueryClient();

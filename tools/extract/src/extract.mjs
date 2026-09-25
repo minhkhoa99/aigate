@@ -21,7 +21,7 @@ const PROTOCOLS = {
 const CAPABILITY_KEYS = ["vision", "pdf", "audioInput", "videoInput", "tools", "reasoning"];
 // Fields each part of the AIGate catalog models; any other field present is listed in `unmodelled`.
 const MAPPED_TOP = new Set(["id", "alias", "aliases", "uiAlias", "display", "category", "transport", "models", "serviceKinds", "hidden", "noAuth", "authType", "authModes", "hasOAuth", "oauth", "priority"]);
-const MAPPED_TRANSPORT = new Set(["baseUrl", "format", "auth", "modelsUrl", "validateUrl", "noAuth", "authType"]);
+const MAPPED_TRANSPORT = new Set(["baseUrl", "format", "auth", "modelsUrl", "validateUrl", "noAuth", "authType", "headers", "forceStream", "quirks"]);
 const MAPPED_MODEL = new Set(["id", "name", "kind", "type", "upstreamModelId", "contextLength", "maxOutputTokens", "capabilities"]);
 // A sentinel limit: any tier that states limits overwrites it, so a surviving sentinel means "not declared".
 const UNDECLARED = -1;
@@ -99,6 +99,9 @@ export function buildCatalog(source) {
       // An empty baseUrl means each connection brings its own (Azure).
       chatUrl: entry.transport?.baseUrl || null,
       modelsUrl: entry.transport?.modelsUrl ?? entry.transport?.validateUrl ?? null,
+      headers: { ...entry.transport?.headers },
+      forceStream: entry.transport?.forceStream === true,
+      quirks: Object.keys(entry.transport?.quirks ?? {}).sort(),
       serviceKinds: entry.serviceKinds ?? [],
       hidden: Boolean(entry.hidden),
       deprecated: Boolean(entry.display?.deprecated),

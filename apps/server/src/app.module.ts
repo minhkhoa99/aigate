@@ -4,6 +4,7 @@ import type { HttpTransportPort } from "@aigate/engine";
 import { DatabaseModule } from "./database.provider.js";
 import { HealthController } from "./health.controller.js";
 import { ApiKeysModule } from "./modules/apikeys/apikeys.module.js";
+import { CatalogModule } from "./modules/catalog/catalog.module.js";
 import { ConnectionsModule } from "./modules/connections/connections.module.js";
 import type { ChatLimits } from "./modules/routing/infrastructure/chat-lane.js";
 import { RoutingModule } from "./modules/routing/routing.module.js";
@@ -19,7 +20,7 @@ export class AppModule {
       module: AppModule,
       imports: [
         DatabaseModule.with(database), SecretsModule.with(cipher), TransportModule.with(transport),
-        SettingsModule, IdentityModule, ApiKeysModule, ConnectionsModule, RoutingModule.with(limits),
+        SettingsModule, IdentityModule, ApiKeysModule, CatalogModule, ConnectionsModule, RoutingModule.with(limits),
       ],
       controllers: [HealthController],
     };

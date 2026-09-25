@@ -44,10 +44,9 @@ test("connections need a dashboard session", () =>
     await app.close();
   }));
 
-test("create stores the key sealed and never returns it; the provider list comes from the registry", () =>
+test("create stores the key sealed and never returns it", () =>
   withTempDb(async (file) => {
     const { app, as } = await signedIn(file);
-    assert.deepEqual((await as({ url: "/api/connections/providers" })).json(), [{ id: "openai", name: "OpenAI" }]);
     const res = await create(as);
     assert.equal(res.statusCode, 201);
     assert.equal(res.headers["cache-control"], "no-store");
@@ -77,10 +76,14 @@ test("one connection per provider; unsupported providers and bad bodies name the
     const again = await create(as, { provider: "openai", apiKey: "sk-another-key-1234" });
     assert.equal(again.statusCode, 409);
     assert.equal(again.json().code, "ALREADY_CONNECTED");
-    const unsupported = await create(as, { provider: "deepseek", apiKey: SECRET });
+    const unsupported = await create(as, { provider: "claude", apiKey: SECRET });
     assert.equal(unsupported.statusCode, 400);
     assert.equal(unsupported.json().code, "PROVIDER_NOT_SUPPORTED");
-    assert.match(unsupported.json().message, /Supported: OpenAI/);
+    assert.match(unsupported.json().message, /claude cannot be connected yet: Needs the anthropic adapter \(SP14\)\.$/, "the catalog reason");
+    const unknown = await create(as, { provider: "no-such-provider", apiKey: SECRET });
+    assert.deepEqual([unknown.statusCode, unknown.json().code], [400, "PROVIDER_NOT_SUPPORTED"]);
+    assert.match(unknown.json().message, /not in the catalog/);
+    assert.equal((await create(as, { provider: "deepseek", apiKey: SECRET })).statusCode, 201, "any connectable catalog provider");
     for (const [body, pattern] of [
       [{ provider: "openai" }, /apiKey/],
       [{ provider: "openai", apiKey: "short" }, /apiKey/],

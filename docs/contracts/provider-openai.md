@@ -1,6 +1,6 @@
 # OpenAI-compatible provider adapter contract (M1 SP9)
 
-Scope, per spec §9: one `AIProviderPort` for the `openai-compatible` protocol family, over `HttpTransportPort`. It maps CIP to `POST {baseUrl}/chat/completions` and back, classifies upstream failures into the 8 error codes, retries only transient failures before the first chunk, and parses SSE with fixed bounds. SP9 has **no HTTP API and no UI**: `docs/design/API_UI_MAP.md` says so. Its errors reach users through `/v1` in SP12, and `validateCredential` backs the "Test connection" button in SP11.
+Scope, per spec §9: one `AIProviderPort` for the `openai-compatible` protocol family, over `HttpTransportPort`. It maps CIP to `POST {chatUrl}` and back (SP13; before it, `{baseUrl}/chat/completions`), classifies upstream failures into the 8 error codes, retries only transient failures before the first chunk, and parses SSE with fixed bounds. SP9 has **no HTTP API and no UI**: `docs/design/API_UI_MAP.md` says so. Its errors reach users through `/v1` in SP12, and `validateCredential` backs the "Test connection" button in SP11.
 
 - Code: `packages/engine/src/adapters/openai-compatible.ts`, `packages/engine/src/sse.ts`.
 - Construction: `new OpenAICompatibleAdapter(provider, transport)`. The provider is a `ProviderDescriptor` from the registry. There is no default provider config.
@@ -13,7 +13,7 @@ Scope, per spec §9: one `AIProviderPort` for the `openai-compatible` protocol f
 | `fallback.error-classification` | Every failure, including a 400 or 404, locks the account and falls back. The final line is a catch-all `shouldFallback: true`. | `SUSPECTED_BUG` | Each status maps to one code (table below). `INVALID_REQUEST` is terminal through `FALLBACK_POLICY`. Account locks are for routing (SP12+). Status: `contracted`. |
 | `fallback.error-classification` | Text rules win over status: a 400 whose message says "capacity" or "rate limit" counts as a rate limit. | `SUSPECTED_BUG` | Structured fields only: the status and `error.code` / `error.type`. The message text is never matched. |
 | `fallback.executor-retry-budget` | 502 ×3 at 3 s, 503 ×3 at 2 s, 504 ×2 at 3 s, and network errors ×3; 429 and 500 get no in-place retry. The counter is per URL. | `REFERENCE_BEHAVIOR` | Keep the set: 502, 503, 504, and a transport failure with no status (connection refused, DNS, TLS). At most 3 attempts through `withRetry`, with 500 ms then 1000 ms waits, all inside `ctx.signal`. 429, 500, `TIMEOUT`, and redirects go straight to the caller. Status: `implemented`. |
-| `fallback.executor-url-loop` | Multiple base URLs; the connect timer is cleared at headers, so the body is unbounded. | `IMPLEMENTATION_ACCIDENT` (unbounded body) | One `baseUrl` per descriptor. `timeoutMs` bounds headers and body (transport contract). Multi-URL is not ported until a provider needs it. |
+| `fallback.executor-url-loop` | Multiple base URLs; the connect timer is cleared at headers, so the body is unbounded. | `IMPLEMENTATION_ACCIDENT` (unbounded body) | One `chatUrl` per descriptor. `timeoutMs` bounds headers and body (transport contract). Multi-URL is not ported until a provider needs it. |
 | `routing.default-executor-openai-fallback` | A provider id with no registry entry silently gets OpenAI's URL and config. | `SUSPECTED_BUG` | Not possible: the adapter takes a `ProviderDescriptor` and has no default. An unknown provider is a routing error before any I/O. Status: `contracted`. |
 | `routing.non-streaming-response` | A tool call forces `finish_reason` to `tool_calls`. | `REFERENCE_BEHAVIOR` | Keep. Any tool call gives `stopReason: "tool_use"`. |
 | `routing.non-streaming-response` | The whole body is buffered, with no body timeout. | `IMPLEMENTATION_ACCIDENT` | Read with `readBoundedText` (4 MiB) inside the transport `timeoutMs`. |
@@ -88,7 +88,7 @@ Every error has `details.provider`; upstream errors also have `details.status` a
 
 ## Other methods
 
-- `getModels(credential, ctx)` calls `GET {baseUrl}/models` (15 s, retried like chat). It returns `ListedModel[]` as `{ id, descriptor? }`, where `descriptor` is the registry entry when the id is known. It never invents context windows for unknown ids. At most 1000 ids are read, and ids that are not valid model ids are skipped.
+- `getModels(credential, ctx)` calls `GET {modelsUrl}` (15 s, retried like chat). It returns `ListedModel[]` as `{ id, descriptor? }`, where `descriptor` is the registry entry when the id is known. It never invents context windows for unknown ids. At most 1000 ids are read, and ids that are not valid model ids are skipped.
 - `validateCredential(credential, ctx)` makes one `GET /models`, with no retry:
   - 2xx → `{ valid: true }`.
   - `AUTH_ERROR` or `QUOTA_EXHAUSTED` → `{ valid: false, code, message }`.

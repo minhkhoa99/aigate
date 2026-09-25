@@ -15,9 +15,12 @@ type Named = ConnectionView & { providerName: string };
 
 const invalid = (message: string) => new BadRequestException({ code: "INVALID_REQUEST", message });
 const notFound = () => new NotFoundException({ code: "NOT_FOUND", message: "No connection with that id" });
-const notSupported = (id: string) => new BadRequestException({
-  code: "PROVIDER_NOT_SUPPORTED", message: `${id} cannot be connected yet. Supported: ${builtinRegistry.providers.map((p) => p.name).join(", ")}.`,
-});
+// The catalog says why a provider cannot be connected yet (docs/contracts/catalog-providers.md).
+const notSupported = (id: string) => {
+  const status = builtinRegistry.status(id);
+  const message = status === undefined ? `${id} is not in the catalog.` : `${id} cannot be connected yet: ${status.connectable ? "unknown reason" : status.reason}.`;
+  return new BadRequestException({ code: "PROVIDER_NOT_SUPPORTED", message });
+};
 const named = (view: ConnectionView): Named => ({ ...view, providerName: builtinRegistry.provider(view.provider)?.name ?? view.provider });
 
 // Only an answer about the key is invalid or no_quota; anything else means "not checked" (connection.test-single-connection).
@@ -43,12 +46,6 @@ export class ConnectionsController {
     private readonly connections: ConnectionsRepository,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
   ) {}
-
-  @Get("providers")
-  @Header("Cache-Control", "no-store")
-  providers(): { id: string; name: string }[] {
-    return builtinRegistry.providers.map(({ id, name }) => ({ id, name }));
-  }
 
   @Get()
   @Header("Cache-Control", "no-store")
