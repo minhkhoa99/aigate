@@ -1,0 +1,516 @@
+{
+  "nodes": [
+    {
+      "id": "extract_contract",
+      "label": "Registry extraction contract (M0 SP4)",
+      "file_type": "document",
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "9router's registry (0.5.86) → AIGate CATALOG: 121 providers, 935 models, verified by a 0-difference diff. Runtime unchanged until SP13."
+    },
+    {
+      "id": "extract_tool",
+      "label": "tools/extract (pnpm extract) — imports 9router's registry and capability resolver, writes the catalog",
+      "file_type": "code",
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "tools/extract/src/extract.mjs"
+    },
+    {
+      "id": "extract_verify",
+      "label": "tools/extract verify — field-by-field diff against the raw source, independent of the mapper",
+      "file_type": "code",
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "tools/extract/src/verify.mjs"
+    },
+    {
+      "id": "catalog_schema",
+      "label": "CatalogProvider / CatalogModel / validateCatalog (packages/engine/src/catalog/schema.ts)",
+      "file_type": "code",
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/catalog/schema.ts"
+    },
+    {
+      "id": "catalog_generated",
+      "label": "CATALOG — providers.generated.ts (121 providers, 935 models; never hand-edited)",
+      "file_type": "code",
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/catalog/providers.generated.ts"
+    },
+    {
+      "id": "rule_no_invented_limits",
+      "label": "Rule: limits only when declared; 9router's floor 200000/64000 becomes null (sentinel probe)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "IMPLEMENTATION_ACCIDENT in 9router: every undeclared model, even embeddings, got 200000/64000. 254 models have no declared limits."
+    },
+    {
+      "id": "rule_model_key_kind_id",
+      "label": "Rule: model ids unique per (kind, id) — Gemini 2.5 serves both chat and stt",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rule_unmodelled_names_only",
+      "label": "Rule: unmodelled lists field names only, never values (no OAuth secret copied)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sp13_candidates",
+      "label": "46 SP13 candidates: openai-compatible, API key, standard chat URL, not hidden",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_ui_map_row_sp4_no_ui",
+      "label": "API_UI_MAP row: M0 SP4 tools/extract + CATALOG, No UI yet (SP13 serves /providers)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "progress_handoff_next_sp13",
+      "label": "Handoff next step: SP13 — CATALOG becomes the runtime registry; adapter uses chatUrl; /providers from the API; custom providers; delete tools/extract",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sp_sp4",
+      "label": "SP4 — tools/extract: 9router registry data → AIGate schema",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done-no-ui"
+    },
+    {
+      "id": "sp_sp13",
+      "label": "SP13 — Registry of 123 providers",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next"
+    },
+    {
+      "id": "02_providers_auth_catalog_registry_build",
+      "label": "catalog.registry-build",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "02_providers_auth_catalog_registry_entry_shape",
+      "label": "catalog.registry-entry-shape",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "extract_contract",
+      "target": "sp_sp4",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp4",
+      "target": "extract_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp4",
+      "target": "extract_tool",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp4",
+      "target": "extract_verify",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp4",
+      "target": "ctx_catalog",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "extract_tool",
+      "target": "catalog_generated",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "extract_verify",
+      "target": "catalog_generated",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "extract_verify",
+      "target": "catalog_schema",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "catalog_generated",
+      "target": "catalog_schema",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "catalog_schema",
+      "target": "rule_no_invented_limits",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "catalog_schema",
+      "target": "rule_model_key_kind_id",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "extract_tool",
+      "target": "rule_unmodelled_names_only",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "extract_tool",
+      "target": "rule_no_invented_limits",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "rule_no_invented_limits",
+      "target": "adapter_listed_model",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "catalog_schema",
+      "target": "engine_define_registry",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "catalog_generated",
+      "target": "sp13_candidates",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp13_candidates",
+      "target": "adapter_openai_compatible",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "extract_contract",
+      "target": "02_providers_auth_catalog_registry_build",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "extract_contract",
+      "target": "02_providers_auth_catalog_registry_entry_shape",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "extract_contract",
+      "target": "04_model_registry_mapping_catalog_model_registry_global",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "extract_tool",
+      "target": "02_providers_auth_catalog_registry_build",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "catalog_schema",
+      "target": "02_providers_auth_catalog_registry_entry_shape",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp4_no_ui",
+      "target": "sp_sp4",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp4_no_ui",
+      "target": "screen_llm_providers",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_rule_no_ui_row",
+      "target": "sp_sp4",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp4",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp13",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp13",
+      "target": "sp_sp13",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp13",
+      "target": "catalog_generated",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp13",
+      "target": "api_ui_map_screen_llm_providers_wired",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp13",
+      "target": "catalog_generated",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "weight": 1
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "sp4_extract_verify_loop",
+      "label": "SP4 loop: 9router registry → extract → CATALOG → verify diff (0) + validateCatalog",
+      "nodes": [
+        "extract_tool",
+        "catalog_generated",
+        "extract_verify",
+        "catalog_schema",
+        "rule_no_invented_limits"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/registry-extract.md"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

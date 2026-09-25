@@ -54,6 +54,13 @@
       "output_tokens": 0,
       "files": 4,
       "mode": "update (SP3 docs, hand-authored chunk 10)"
+    },
+    {
+      "date": "2026-09-25T19:09:46.729848+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "update (SP4 docs, hand-authored chunk 11)"
     }
   ],
   "total_input_tokens": 574916,
