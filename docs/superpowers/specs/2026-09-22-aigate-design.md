@@ -44,7 +44,7 @@ AIGate là một AI Gateway/Router **mới, độc lập**. Nó có toàn bộ n
 | Backend | NestJS + **Fastify adapter** | SSE là hot path; cần `reply.raw` + backpressure thật |
 | Kiến trúc | Hexagonal, granularity = **bounded context** | Không phải per-endpoint |
 | Ngôn ngữ | TypeScript strict | |
-| DB | SQLite + **Drizzle ORM** | native driver cho `bun:sqlite` + `better-sqlite3`; `node:sqlite` và `sql.js` đi qua `drizzle-orm/sqlite-proxy` |
+| DB | SQLite + **Drizzle ORM** | Cả 4 client (`bun:sqlite`, `better-sqlite3`, `node:sqlite`, `sql.js`) đi qua **một** `drizzle-orm/sqlite-proxy` có khoá tuần tự hoá theo DB: một API async, một kiểu `db`, một migrator (quyết sau SPIKE-1, 2026-09-25) |
 | Engine | **Viết mới 100%**, package framework-free | Dữ liệu registry trích bằng script, schema thiết kế mới |
 | Frontend | **Vite + React SPA**, NestJS serve static | 1 port lúc production |
 | Parity | Contract-level, 3 tầng (xem §8) | |
@@ -55,6 +55,8 @@ AIGate là một AI Gateway/Router **mới, độc lập**. Nó có toàn bộ n
 ### 1.1 Rủi ro kỹ thuật cần spike trước
 
 **SPIKE-1 (chặn M0):** xác minh `drizzle-orm/sqlite-proxy` chạy đủ trên `node:sqlite` và `sql.js`. Nếu thất bại, phải quay lại ngã ba DB (raw repository tự viết, hoặc bỏ `sql.js` và mất bảo đảm "cài không cần build tool").
+
+**Kết quả (2026-09-25):** đạt, nhưng chỉ khi có khoá. `sqlite-proxy` không khoá làm mất dữ liệu khi có transaction async đồng thời. Driver sync gốc thì từ chối, hoặc âm thầm phá, transaction async. Vì vậy cả 4 client đi qua một proxy có khoá (`AsyncLocalStorage` cho lệnh trong transaction, `BEGIN/COMMIT` quanh `batch`). Kết quả: 12/12 trên Node 22/24 và Bun. Hệ quả: trong transaction không được await I/O mạng. Chi tiết: `docs/superpowers/spikes/2026-09-25-spike-1-sqlite-drivers.md`.
 
 ---
 
@@ -1090,4 +1092,4 @@ Quét tới tận đáy, không chỉ tên hiển thị:
 | Format API key mới cụ thể | SP6 |
 | Port mặc định của AIGate | SP1 |
 | Tên package npm và CLI binary | SP1 |
-| `drizzle-orm/sqlite-proxy` có gánh nổi `node:sqlite` + `sql.js` không | **SPIKE-1, chặn M0** |
+| ~~`drizzle-orm/sqlite-proxy` có gánh nổi `node:sqlite` + `sql.js` không~~ | Đã quyết 2026-09-25: đạt khi có khoá, xem §1.1 |

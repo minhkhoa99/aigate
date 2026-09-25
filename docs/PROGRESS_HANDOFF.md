@@ -73,7 +73,7 @@ Checks:
 - **better-sqlite3 13 needs no build tools.** It ships N-API prebuilds. `pnpm-workspace.yaml` denies its build script, because allowing it triggers an implicit `node-gyp rebuild` that fails without Visual Studio. It loads under both pnpm 12 and pnpm 10.34.5.
 - Checks run: full gate passed (install frozen, lint, lint:check, test, discovery validate, build, `git diff --check`), plus a pnpm 10.34.5 frozen install on a clean copy.
 
-**Open decision before building `packages/database`:** spec §1 locks "native driver for `bun:sqlite` and `better-sqlite3`; `node:sqlite` and `sql.js` through `sqlite-proxy`". The spike recommends routing all four through one locked `sqlite-proxy` wrapper, with one async API, one `db` type, and one migrator. This needs the user's confirmation. After that, build the driver chain from the spike code:
+**Decided 2026-09-25 (user):** route all four clients through one locked `sqlite-proxy` wrapper, with one async API, one `db` type, and one migrator. Spec §1, §1.1, and §13 were updated. GitHub Actions run `36118864061` on `fb071cd` passed. Next, build the driver chain from the spike code:
 
 - the lock
 - driver selection: Bun uses bun:sqlite; Node uses better-sqlite3, then node:sqlite, then sql.js
