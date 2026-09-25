@@ -63,6 +63,7 @@ Checks:
   - `pnpm dev` served the server on 20200 and Vite on 5173, and Vite proxied `/health`. Editing the controller restarted the server.
 - Full gate passed: `pnpm install --frozen-lockfile`, `lint`, `lint:check` (9/9), `test` (discovery 54/54, server 2/2), `discovery validate` (283), `build`, catalog test (1/1), `git diff --check`.
 - `pnpm@10.34.5 install --frozen-lockfile` (the CI version) passed on a clean copy of the updated lockfile, which was written by local pnpm 12.5.1.
+- GitHub Actions run `36117513362` on `142be79` passed every step: install, lint, lint checks, test, discovery validate, and build.
 
 **Next step, SP2** (spec §9 row SP2, §1.1): run SPIKE-1 first. Verify that `drizzle-orm/sqlite-proxy` works on both `node:sqlite` and `sql.js`. Only then add `packages/database` with the Drizzle schema, the 4-driver chain, and the migration runner. If the spike fails, return to the DB decision in §1.1 before writing the schema. Once `packages/database` exists, finish the deferred SP0.1 check of repository SQL enforcement against real Drizzle calls.
 
