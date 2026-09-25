@@ -6,10 +6,13 @@
     "node": ">=22"
   },
   "scripts": {
+    "dev": "pnpm --filter @aigate/server --filter @aigate/web --parallel dev",
+    "build": "pnpm --filter @aigate/web build && pnpm --filter @aigate/server build",
+    "start": "pnpm --filter @aigate/server start",
     "web": "pnpm --filter @aigate/web dev",
     "web:build": "pnpm --filter @aigate/web build",
     "discovery": "pnpm --filter @aigate/discovery exec tsx src/cli.ts",
-    "test": "pnpm --filter @aigate/discovery test",
+    "test": "pnpm --filter @aigate/discovery --filter @aigate/server test",
     "lint": "eslint apps tools && depcruise --config .dependency-cruiser.cjs --output-type err apps",
     "lint:check": "node --test tools/lint/check.test.mjs"
   },

@@ -30,4 +30,4 @@ jobs:
       - run: pnpm discovery validate
         env:
           NINEROUTER_PATH: ${{ github.workspace }}/9router
-      - run: pnpm web:build
+      - run: pnpm build

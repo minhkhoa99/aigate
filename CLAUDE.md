@@ -7,6 +7,7 @@ Read `docs/PROGRESS_HANDOFF.md` before resuming work. M-1 discovery is complete 
 
 ## Repository map
 
+- `apps/server` is the NestJS 12 + Fastify backend (ESM, built with `tsc`). So far it has only `GET /health`, and in production it serves `apps/web/dist` on the same port (default `20200`, bound to `127.0.0.1`).
 - `apps/web` is a Vite/React visual preview. Its provider catalog and combo form are UI only; credentials and combos are not persisted to an AIGate backend. Read `docs/design/UI_HANDOFF.md` before frontend work.
 - `tools/discovery` holds the Feature Matrix tooling and parity gates. `docs/discovery/feature-matrix` records reference behavior; `docs/discovery/inventory.json`, `docs/discovery/coverage.md`, and `docs/capabilities.md` are generated outputs.
 - `docs/superpowers/specs/2026-09-22-aigate-design.md` is the architecture and milestone spec. For M0, read sections 9 and 11. Follow `docs/governance/rules.md` for implementation.
@@ -21,7 +22,9 @@ git -C .reference/9router checkout 39e36d3d0c849e0e01dfeacddf111edf892448fc
 $env:NINEROUTER_PATH = (Resolve-Path '.reference/9router').Path
 pnpm test
 pnpm discovery validate
-pnpm web:build
+pnpm build
 ```
+
+`pnpm dev` starts the server and Vite together. `pnpm build && pnpm start` runs the single-port production build.
 
 Before stopping, update `docs/PROGRESS_HANDOFF.md` with work completed, checks run, current work, and the next concrete step. Do not equate a visual UI preview with live backend integration.

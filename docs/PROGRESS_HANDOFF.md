@@ -47,12 +47,24 @@ Caveats:
 
 SP0.1's integration checks remain deferred until `packages/engine` and `packages/database` exist, as described above.
 
-**Next step, SP1** (spec §9 row SP1): build the monorepo skeleton.
-- pnpm workspace, strict TypeScript, and a NestJS+Fastify `apps/server` with `/health`
-- the existing Vite `apps/web` booting alongside it
-- the approved layout: `apps/server`, `packages/engine`, `packages/database`
+**SP1 is complete locally.** `apps/server` is a NestJS 12 + Fastify app with `GET /health`.
 
-Exit: `pnpm dev` starts both; production serves both on one port. Choosing the default AIGate port is an open SP1 decision (spec §13). Run `pnpm lint`, `pnpm lint:check`, `pnpm test`, and `pnpm web:build` after the skeleton lands.
+- NestJS 12 is ESM-only, so the server uses `"type": "module"`, `NodeNext`, and `.js` import suffixes.
+- It builds with `tsc`, because `emitDecoratorMetadata` rules out tsx/esbuild. Dev runs `tsc --watch` and `node --watch` in parallel via `pnpm run "/dev:/"`, with no extra dependency.
+- Production serves `apps/web/dist` on the same port through `@fastify/static`, with an SPA fallback. Unknown `/api`, `/v1`, `/v1beta`, `/codex`, and `/responses` paths and missing asset files stay JSON 404s.
+- Vite proxies those paths and `/health` to the server in dev.
+- **Port decision (spec §13):** the default is `20200`, overridable with `PORT` (validated 1-65535). The server binds `127.0.0.1` unless `HOST` is set. The web preview still shows the old `localhost:20128` in two copy fields (integrations and SAML); update them when those screens get real data. The npm package and CLI binary name stay open until `apps/cli`.
+- New root scripts: `pnpm dev` (server and web), `pnpm build` (web then server), `pnpm start`. `pnpm test` now also runs the server tests. CI runs `pnpm build` instead of `pnpm web:build`.
+
+Checks:
+- The server tests pass 2/2: `/health`, plus single-port SPA serving with the JSON-404 exclusions. Forcing the SPA fallback to always match made the second test fail.
+- Run by hand:
+  - `pnpm build && pnpm start` served `/health` (JSON), `/` and `/traffic/requests` (HTML), and `/v1/nope` (404 JSON) on port 20200. A request to the LAN IP could not connect.
+  - `pnpm dev` served the server on 20200 and Vite on 5173, and Vite proxied `/health`. Editing the controller restarted the server.
+- Full gate passed: `pnpm install --frozen-lockfile`, `lint`, `lint:check` (9/9), `test` (discovery 54/54, server 2/2), `discovery validate` (283), `build`, catalog test (1/1), `git diff --check`.
+- `pnpm@10.34.5 install --frozen-lockfile` (the CI version) passed on a clean copy of the updated lockfile, which was written by local pnpm 12.5.1.
+
+**Next step, SP2** (spec §9 row SP2, §1.1): run SPIKE-1 first. Verify that `drizzle-orm/sqlite-proxy` works on both `node:sqlite` and `sql.js`. Only then add `packages/database` with the Drizzle schema, the 4-driver chain, and the migration runner. If the spike fails, return to the DB decision in §1.1 before writing the schema. Once `packages/database` exists, finish the deferred SP0.1 check of repository SQL enforcement against real Drizzle calls.
 
 Before starting, inspect `docs/superpowers/specs/2026-09-22-aigate-design.md` §9 and §11, `docs/governance/rules.md`, and this handoff. Do not treat `UI_READY` as working API integration or copy the 9Router implementation accidents into AIGate.
 
