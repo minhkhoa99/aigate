@@ -24,7 +24,8 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M1 SP11 `connections` (one API-key account) | Done, UI wired | `docs/contracts/connections.md` |
 | M1 SP12 routing + `/v1` streaming | Done, UI wired | `docs/contracts/chat-lane.md` |
 | M1 acceptance gate (parity tiers 1+2, 13 golden scenarios) | **Passed** (tier 1 11/11, golden 10/10 + 3 deferred); tier 2 waits for an OpenAI key | `docs/parity/m1-gate-report.md` |
-| M0 SP4 `tools/extract` registry extraction | **Next** | SP3 below |
+| M0 SP4 `tools/extract` registry extraction | Done, no UI | `docs/contracts/registry-extract.md` |
+| M2 SP13 registry 123 providers (connect more on `/providers`) | **Next** | SP4 below |
 
 ## Completed and verified
 
@@ -432,6 +433,36 @@ Checks and status:
   - Coverage: 11/284 capabilities by tape.
 - **Checks.** The harness tests pass 5/5. Three mutations were caught: AIGate buffering usage like 9router, a 401 passed through, and the normalizer ignoring the terminal. The full gate is green.
 
-**Next step: M0 SP4 (`tools/extract`).** Generate the provider registry (123 providers, models, capabilities) from 9router, then delete the tool (spec §2). SP13 (the 123-provider registry, and connecting providers beyond OpenAI on `/providers`) depends on it.
-- **Before M2 closes:** run `pnpm parity live` with a real OpenAI key to close tier 2.
-- **From SP15 on:** re-record tapes per protocol adapter.
+**M0 SP4 (`tools/extract`) is complete.** The contract is `docs/contracts/registry-extract.md`.
+
+- **Output.**
+  - `packages/engine/src/catalog/providers.generated.ts`: `CATALOG`, 121 providers and 935 models from 9router 0.5.86 (`39e36d3d`), exported from `@aigate/engine`.
+  - `catalog/schema.ts`: `CatalogProvider`, `CatalogModel`, `CATALOG_PROTOCOLS`, `validateCatalog`.
+  - The runtime is **unchanged**: `builtinRegistry` still holds only OpenAI. SP13 switches it.
+- **Tool.**
+  - `tools/extract`: `pnpm extract` imports 9router's registry and its own `getCapabilitiesForModel` with no install, then writes the file. `pnpm extract verify` diffs against the raw source, independently of the mapper.
+  - It stays until SP13 is done, then is deleted (spec §2), because SP13 may add catalog fields.
+- **Rules.**
+  - Protocol comes by family from `transport.format` (no transport → `service`).
+  - `auth.kinds`: api-key, oauth, cookie, or none.
+  - `chatUrl` is the full URL; an empty one (Azure) is `null`.
+  - Capabilities come from 9router's tiers. Limits are copied **only when declared**. The floor's invented 200000/64000 becomes `null`, found with an in-memory sentinel and checked by an independent probe.
+  - Model ids are unique per `(kind, id)`: Gemini 2.5 is both chat and stt.
+  - `unmodelled` lists field **names only**, never values; no OAuth secret is copied.
+- **Result.** Verify found 0 differences, `validateCatalog` 0 problems, and 254 models have no declared limits.
+  - By protocol: openai-compatible 63, service 38, anthropic 6, other families 14.
+  - By auth: api-key 88, oauth 22, none 9, cookie 2.
+  - **46 SP13 candidates**: openai-compatible, API key, a standard URL, not hidden.
+- **Checks.** Extract tests pass 3/3 in CI (the diff, no stale file, defaults restored). Engine tests pass 46/46, with 4 catalog tests. Six mutations were caught.
+- **Matrix.** `catalog.registry-build`, `catalog.registry-entry-shape`, and `catalog.model-registry-global` are `contracted`.
+
+**Next step, M2 SP13 (the catalog becomes the runtime registry):**
+1. **Registry.** Build `builtinRegistry` from `CATALOG` for the 46 openai-compatible API-key providers. The adapter should use `chatUrl` and `modelsUrl` instead of appending `/chat/completions`.
+2. **Headers.** Model `transport.headers`, where those providers need it.
+3. **Models and connections.** Model resolution by id and aliases. Connections accept any registry provider.
+4. **Screens, wired in the same SP.**
+   - `/providers` catalog from the API instead of the static `catalog.ts`.
+   - `ProviderDetail` models.
+   - `Connections` for every connectable provider.
+5. **Custom providers.** The OpenAI-compatible `provider_nodes` go with it.
+6. **Cleanup.** Delete `tools/extract` at the end.
