@@ -1,0 +1,758 @@
+{
+ "nodes": [
+  {
+   "id": "custom_providers_contract",
+   "label": "Custom providers contract (M2 SP13b)",
+   "file_type": "document",
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null,
+   "rationale": "User-defined OpenAI-compatible providers: name, prefix, base URL; one API-key connection; /v1 reaches them as <prefix>/<model>. Three 9router bugs not ported."
+  },
+  {
+   "id": "sp_sp13b",
+   "label": "SP13b — custom OpenAI-compatible providers (provider_nodes, /api/provider-nodes, /providers/new wired); tools/extract deleted",
+   "file_type": "document",
+   "source_file": "docs/PROGRESS_HANDOFF.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "02_providers_auth_connection_provider_node_create_list",
+   "label": "connection.provider-node-create-list",
+   "file_type": "document",
+   "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null,
+   "rationale": "REFERENCE_BEHAVIOR + SUSPECTED_BUG: default OpenAI base URL, doubled /chat/completions, unreachable prefixes — not ported."
+  },
+  {
+   "id": "02_providers_auth_connection_provider_node_update_delete",
+   "label": "connection.provider-node-update-delete",
+   "file_type": "document",
+   "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "02_providers_auth_connection_provider_node_repo_storage",
+   "label": "connection.provider-node-repo-storage",
+   "file_type": "document",
+   "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "02_providers_auth_connection_provider_node_validate_partial_ssrf",
+   "label": "connection.provider-node-validate-partial-ssrf (stays traced: no validate route)",
+   "file_type": "document",
+   "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "provider_nodes_table",
+   "label": "provider_nodes table (migration 0003: id, name, unique prefix, base_url, timestamps; max 100)",
+   "file_type": "code",
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null,
+   "location": "packages/database/src/schema/connections.ts"
+  },
+  {
+   "id": "provider_node_rules",
+   "label": "provider-node domain rules — prefix token, base URL normalize (strip /chat/completions), https or loopback http",
+   "file_type": "code",
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null,
+   "location": "apps/server/src/modules/connections/domain/provider-node.ts"
+  },
+  {
+   "id": "provider_nodes_repo",
+   "label": "ProviderNodesRepository — list/get/byPrefix, count+insert transaction, cascade delete of the connection; nodeDescriptor()",
+   "file_type": "code",
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null,
+   "location": "apps/server/src/modules/connections/infrastructure/provider-nodes.repo.ts"
+  },
+  {
+   "id": "provider_nodes_controller",
+   "label": "ProviderNodesController — /api/provider-nodes CRUD; PREFIX_RESERVED / PREFIX_TAKEN / NODE_LIMIT",
+   "file_type": "code",
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null,
+   "location": "apps/server/src/modules/connections/infrastructure/provider-nodes.controller.ts"
+  },
+  {
+   "id": "chat_lane_custom_prefix",
+   "label": "/v1: <prefix>/<model> reaches a custom provider after built-in ids, aliases, and catalog prefixes",
+   "file_type": "code",
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null,
+   "location": "apps/server/src/modules/routing/infrastructure/chat-lane.ts"
+  },
+  {
+   "id": "api_get_provider_nodes",
+   "label": "GET /api/provider-nodes",
+   "file_type": "document",
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "api_post_provider_nodes",
+   "label": "POST /api/provider-nodes",
+   "file_type": "document",
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "api_patch_provider_nodes_id",
+   "label": "PATCH /api/provider-nodes/:id",
+   "file_type": "document",
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "api_delete_provider_nodes_id",
+   "label": "DELETE /api/provider-nodes/:id (cascades the connection)",
+   "file_type": "document",
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "hook_use_provider_nodes",
+   "label": "useProviderNodes / useCreateNode / useUpdateNode / useDeleteNode (features/providers/api.ts)",
+   "file_type": "code",
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "screen_custom_providers_section",
+   "label": "/providers → Custom providers section (features/providers/custom.tsx): Connect, Edit, Delete",
+   "file_type": "document",
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "screen_custom_provider_form",
+   "label": "/providers/new → CustomProviderForm (create; ?id= edit); save → Add connection modal preselected",
+   "file_type": "document",
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "err_prefix_reserved",
+   "label": "UI error code: PREFIX_RESERVED (409)",
+   "file_type": "document",
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "err_prefix_taken",
+   "label": "UI error code: PREFIX_TAKEN (409)",
+   "file_type": "document",
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "err_node_limit",
+   "label": "UI error code: NODE_LIMIT (409)",
+   "file_type": "document",
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "provider_nodes_tests",
+   "label": "apps/server/test/provider-nodes.test.mjs (5 tests; 15 mutations caught)",
+   "file_type": "code",
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null,
+   "location": "apps/server/test/provider-nodes.test.mjs"
+  },
+  {
+   "id": "extract_tool",
+   "label": "tools/extract (deleted in SP13b; restorable from git d2783c1) — wrote the catalog from 9router",
+   "file_type": "code",
+   "source_file": "docs/contracts/registry-extract.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  },
+  {
+   "id": "extract_verify",
+   "label": "tools/extract verify (deleted in SP13b with the tool)",
+   "file_type": "code",
+   "source_file": "docs/contracts/registry-extract.md",
+   "source_location": null,
+   "source_url": null,
+   "captured_at": null,
+   "author": null,
+   "contributor": null
+  }
+ ],
+ "edges": [
+  {
+   "source": "custom_providers_contract",
+   "target": "sp_sp13b",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "sp_sp13b",
+   "target": "custom_providers_contract",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "sp_sp13b",
+   "target": "sp_sp14",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/PROGRESS_HANDOFF.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "sp_sp13b",
+   "target": "provider_nodes_table",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "sp_sp13b",
+   "target": "provider_node_rules",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "sp_sp13b",
+   "target": "provider_nodes_repo",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "sp_sp13b",
+   "target": "provider_nodes_controller",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "sp_sp13b",
+   "target": "chat_lane_custom_prefix",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "sp_sp13b",
+   "target": "provider_nodes_tests",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "custom_providers_contract",
+   "target": "02_providers_auth_connection_provider_node_create_list",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "custom_providers_contract",
+   "target": "02_providers_auth_connection_provider_node_update_delete",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "custom_providers_contract",
+   "target": "02_providers_auth_connection_provider_node_repo_storage",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "custom_providers_contract",
+   "target": "02_providers_auth_connection_provider_node_validate_partial_ssrf",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "02_providers_auth_connection_provider_node_create_list",
+   "relation": "implements",
+   "confidence": "INFERRED",
+   "confidence_score": 0.95,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "02_providers_auth_connection_provider_node_update_delete",
+   "relation": "implements",
+   "confidence": "INFERRED",
+   "confidence_score": 0.95,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_repo",
+   "target": "02_providers_auth_connection_provider_node_repo_storage",
+   "relation": "implements",
+   "confidence": "INFERRED",
+   "confidence_score": 0.95,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "provider_node_rules",
+   "relation": "calls",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "provider_nodes_repo",
+   "relation": "calls",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "catalog_generated",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_repo",
+   "target": "provider_nodes_table",
+   "relation": "shares_data_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_repo",
+   "target": "provider_descriptor_catalog",
+   "relation": "shares_data_with",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "connections_controller",
+   "target": "provider_nodes_repo",
+   "relation": "calls",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "chat_lane_custom_prefix",
+   "target": "provider_nodes_repo",
+   "relation": "calls",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "chat_lane_resolution_by_connection",
+   "target": "chat_lane_custom_prefix",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/chat-lane.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "adapter_openai_compatible",
+   "target": "chat_lane_custom_prefix",
+   "relation": "shares_data_with",
+   "confidence": "INFERRED",
+   "confidence_score": 0.85,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "api_get_provider_nodes",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "api_post_provider_nodes",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "api_patch_provider_nodes_id",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "api_delete_provider_nodes_id",
+   "relation": "implements",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "hook_use_provider_nodes",
+   "target": "api_get_provider_nodes",
+   "relation": "calls",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "hook_use_provider_nodes",
+   "target": "api_post_provider_nodes",
+   "relation": "calls",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "hook_use_provider_nodes",
+   "target": "api_patch_provider_nodes_id",
+   "relation": "calls",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "hook_use_provider_nodes",
+   "target": "api_delete_provider_nodes_id",
+   "relation": "calls",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "screen_custom_providers_section",
+   "target": "hook_use_provider_nodes",
+   "relation": "calls",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "screen_custom_provider_form",
+   "target": "hook_use_provider_nodes",
+   "relation": "calls",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "api_ui_map_screen_connections_wired",
+   "target": "hook_use_provider_nodes",
+   "relation": "calls",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "screen_llm_providers",
+   "target": "screen_custom_providers_section",
+   "relation": "references",
+   "confidence": "INFERRED",
+   "confidence_score": 0.95,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "screen_llm_providers",
+   "target": "screen_custom_provider_form",
+   "relation": "references",
+   "confidence": "INFERRED",
+   "confidence_score": 0.95,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "err_prefix_reserved",
+   "target": "api_ui_map_to_problem",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "err_prefix_taken",
+   "target": "api_ui_map_to_problem",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "err_node_limit",
+   "target": "api_ui_map_to_problem",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "err_prefix_reserved",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "err_prefix_taken",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_controller",
+   "target": "err_node_limit",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/design/API_UI_MAP.md",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "provider_nodes_tests",
+   "target": "provider_nodes_controller",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "apps/server/test/provider-nodes.test.mjs",
+   "source_location": null,
+   "weight": 1.0
+  },
+  {
+   "source": "sp_sp13b",
+   "target": "extract_tool",
+   "relation": "references",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/registry-extract.md",
+   "source_location": null,
+   "weight": 1.0
+  }
+ ],
+ "hyperedges": [
+  {
+   "id": "sp13b_custom_provider_flow",
+   "label": "Custom provider: form → /api/provider-nodes → connection → /v1 <prefix>/<model>",
+   "nodes": [
+    "screen_custom_provider_form",
+    "hook_use_provider_nodes",
+    "provider_nodes_controller",
+    "provider_nodes_repo",
+    "connections_controller",
+    "chat_lane_custom_prefix"
+   ],
+   "relation": "form",
+   "confidence": "EXTRACTED",
+   "confidence_score": 1.0,
+   "source_file": "docs/contracts/custom-providers.md"
+  }
+ ],
+ "input_tokens": 0,
+ "output_tokens": 0
+}

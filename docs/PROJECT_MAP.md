@@ -54,6 +54,8 @@ Nguồn: `docs/superpowers/specs/2026-09-22-aigate-design.md` (spec — thắng 
 | **CLI Tools — /integrations/cli-tools, /:toolId** | U10 | tooling | cli_tools | — | — | — |
 | **Connections & AuthFlow — /providers/connections** | U4 | connections | provider_account_management, provider_authentication, multi_account | status_pill | llm_providers | happy_path_only |
 | **Console — /traffic/console (dev only)** | U11 | tooling | console_log | color_tokens, type_scale | — | console_visibility |
+| **/providers/new → CustomProviderForm (create; ?id= edit); save → Add connection modal preselected** | — | — | — | — | — | — |
+| **/providers → Custom providers section (features/providers/custom.tsx): Connect, Edit, Delete** | — | — | — | — | — | — |
 | **Relay deploy wizard (3 steps)** | U9 | transport | proxy_pools | secret_field, state_error | — | happy_path_only, showcase_screens |
 | **Endpoint & Keys — /gateway/endpoint** | U3 | apikeys | endpoint_apikey | copy_field, secret_field, status_pill | — | credential_scan_pass |
 | **LLM Providers — /providers, /:id, /new** | U4 | catalog, connections | providers | health_dot, density_rules | — | — |
