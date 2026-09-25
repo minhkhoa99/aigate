@@ -45,9 +45,11 @@ Each screen keeps its fixture data until the SP in the second column lands. When
 | `/settings/general` → `SettingsGeneral` | adds its settings keys by migration | Instance name, language, default model, observability |
 | `/settings/auth` OIDC and SAML tabs | M2 (OIDC/SAML) | Visual only |
 | `/gateway/endpoint` base URL pill | SP12 (`/v1`) | Shows "Chat API pending" until `/v1` exists |
-| `/providers/quota` → `Quota` | SP16, SP17 | Quota numbers are fixture data |
+| `/providers/quota` → `Quota` | SP24 (`usage`: quota) | Quota numbers are fixture data |
 | `/providers/new` custom provider form | SP13 | Preview only; the save button is disabled |
-| Multi-account, priority, OAuth on `Connections` | SP16 | SP11 has one API-key account per provider |
+| OAuth on `Connections` (AuthFlow modal) | SP16 | SP11 has API-key connections only |
+| Multi-account, priority, strategies on `Connections` | SP17 | SP11 has one API-key account per provider |
+| Full provider catalog (connect more than OpenAI), models on `ProviderDetail` | SP13 | Other providers show "Not supported yet" |
 | `/providers/media*` → `MediaProviders` | SP23 | |
 | `/gateway/routing*`, `/gateway/token-saver` → `Routing`, `ComboCreate`, `TokenSaver` | SP19, SP20 | Combo form is a local draft |
 | `/traffic/usage`, `/traffic/requests*` → `Usage`, `Requests`, `RequestDetail` | usage SPs | |

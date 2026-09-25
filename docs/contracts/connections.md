@@ -1,6 +1,6 @@
 # Connections contract (M1 SP11)
 
-Scope, per spec §9: the `connections` context with **one API-key account per provider**, and only providers in the engine registry (today: `openai`). Multi-account, priority order, OAuth, and account locks come in SP16.
+Scope, per spec §9: the `connections` context with **one API-key account per provider**, and only providers in the engine registry (today: `openai`). OAuth comes in SP16; multi-account, priority order, and account locks in SP17; quota in SP24.
 
 - **UI:** the `/providers` screens, wired in this SP: `Connections`, `ProviderDetail`, and connected pills in `LlmProviders`.
 - **Decisions (user, 2026-09-25):**
@@ -12,12 +12,12 @@ Scope, per spec §9: the `connections` context with **one API-key account per pr
 | Entry | Rule in 9router | Label | AIGate |
 |---|---|---|---|
 | `connection.storage-shape-json-blob` | 9 real columns; the API key, test status, and errors sit in an unchecked JSON `data` blob in plaintext. | `IMPLEMENTATION_ACCIDENT` (blob), `SUSPECTED_BUG` (plaintext key) | Typed columns (`SCHEMA_CONVENTIONS` rule 1). The key is sealed with `SecretCipherPort` (rule 9); only its last 4 characters are stored in clear, for display. Status: `implemented`. |
-| `connection.create-dedup-and-priority-assignment` | API-key connections are deduplicated by exact name; priority is appended. | `REFERENCE_BEHAVIOR` | SP11 allows one connection per provider, through a unique index. A second create is 409 `ALREADY_CONNECTED`, never a silent upsert (rule 6). Priority comes with multi-account (SP16). Status: `contracted`. |
+| `connection.create-dedup-and-priority-assignment` | API-key connections are deduplicated by exact name; priority is appended. | `REFERENCE_BEHAVIOR` | SP11 allows one connection per provider, through a unique index. A second create is 409 `ALREADY_CONNECTED`, never a silent upsert (rule 6). Priority comes with multi-account (SP17). Status: `contracted`. |
 | `catalog.connection-listing` | Secrets are stripped by deleting four named keys, so a new secret field would leak. | `SUSPECTED_BUG` | The view is a positive allowlist; the sealed key never leaves the repository. Status: `implemented`. |
 | `connection.client-listing-sanitized` | The usage listing uses a `SAFE_FIELDS` allowlist. | `REFERENCE_BEHAVIOR` | Same approach, for every read. |
 | `catalog.connection-detail-crud` | `PUT` accepts `lastError` from the client; the key is overwritten only for `apikey` rows. | `SUSPECTED_BUG` (client-writable error state) | Test status and errors are written only by the server's test. `PATCH` takes `name`, `apiKey`, and `isActive`, and anything else is 400. A new key resets the status to `untested`. Status: `implemented`. |
 | `connection.test-single-connection` | Most providers treat any status other than 401/403 as valid. The result is written back to the row. | `SUSPECTED_BUG` (non-auth failures count as valid) | Only a 2xx is `active`. `AUTH_ERROR` → `invalid`, `QUOTA_EXHAUSTED` → `no_quota`, and anything else (network, timeout, 5xx, 429) → `unreachable`, which means "not checked". The result is written back. Status: `implemented`. |
-| `connection.delete-and-reorder` | Delete, then renumber priorities. | `REFERENCE_BEHAVIOR` | Delete only. There is no priority until SP16. |
+| `connection.delete-and-reorder` | Delete, then renumber priorities. | `REFERENCE_BEHAVIOR` | Delete only. There is no priority until SP17. |
 
 ## Secret storage (`SecretCipherPort`)
 
@@ -75,7 +75,7 @@ The test:
 | `/providers/connections` → `Connections` | Table of real connections: provider, name, key hint, status, last tested, and actions (Test, Replace key, Disable/Enable, Delete). "Needs attention" filters to `invalid`, `no_quota`, `unreachable`, `untested`, and disabled rows. Add connection: provider select (only supported providers can be chosen), name, API key. Save, then test automatically. |
 | `/providers/detail?provider=…` → `ProviderDetail` | Connection status for the provider, with Add or Manage. Providers that are not supported show "Not supported yet; the full catalog comes with SP13". |
 | `/providers` → `LlmProviders` | A "Connected" pill on connected cards. |
-| Removed, because nothing backs them | Sample account rows, the "Strategies" tab, and the Quota column. They return with SP16 and SP17. |
+| Removed, because nothing backs them | Sample account rows, the "Strategies" tab, and the Quota column. Strategies return with SP17 and quota with SP24. |
 
 Precise messages:
 - **API errors**, via `shared/errors.ts`: `PROVIDER_NOT_SUPPORTED`, `ALREADY_CONNECTED`, `CREDENTIAL_UNREADABLE`, plus the existing `INVALID_REQUEST` and `NOT_FOUND`.
