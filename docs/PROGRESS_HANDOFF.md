@@ -100,6 +100,7 @@ Wiring changes:
 - `pnpm test` includes the database tests.
 - CI installs Bun 1.3.14 and runs `pnpm --filter @aigate/database test:bun`.
 - Full gate passed locally.
+- GitHub Actions run `36119809123` on `fc4a98c` passed on Linux with Node 24 and Bun 1.3.14, including the Bun database tests.
 
 **Next step (rest of SP2):** write the real Drizzle schema from the 11 traced 9router DB repos, following `porting-behavior-not-code`. Base it on the Feature Matrix entries, not the old tables, and label accidents, such as JSON-blob-over-SQLite storage, before designing tables. Replace the fixture in `drizzle.config.ts`, generate the first real migration, and add repositories.
 
