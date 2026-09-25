@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { EngineError, readBoundedText } from "@aigate/engine";
+import { builtinRegistry, EngineError, OpenAICompatibleAdapter, readBoundedText } from "@aigate/engine";
 import { DirectTransport, MAX_TIMEOUT_MS } from "../dist/modules/transport/infrastructure/direct-transport.js";
 
 const SECRET = "sk-test-secret-value";
@@ -107,3 +107,28 @@ test("timeoutMs must be a bounded integer", async () => {
     await assert.rejects(transport.send(request("https://api.example.com", { timeoutMs }), ctx()), RangeError, String(timeoutMs));
   }
 });
+
+test("the OpenAI-compatible adapter streams through the direct transport end to end", () =>
+  withUpstream((req, res) => {
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    const events = [
+      { id: "c1", model: "local", choices: [{ delta: { content: "Hel" } }] },
+      { choices: [{ delta: { content: "lo" }, finish_reason: "stop" }] },
+    ];
+    // Written in small pieces with pauses, so parsing never relies on one read per event.
+    const text = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("") + "data: [DONE]\n\n";
+    let offset = 0;
+    const timer = setInterval(() => {
+      res.write(text.slice(offset, offset + 17));
+      offset += 17;
+      if (offset >= text.length) { clearInterval(timer); res.end(); }
+    }, 2);
+  }, async (base, hits) => {
+    const provider = { ...builtinRegistry.provider("openai"), baseUrl: base };
+    const adapter = new OpenAICompatibleAdapter(provider, transport);
+    const chunks = [];
+    for await (const chunk of adapter.stream({ model: "local", stream: true, messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }] }, { kind: "api-key", apiKey: SECRET }, ctx())) chunks.push(chunk);
+    assert.deepEqual(hits, ["/chat/completions"]);
+    assert.deepEqual(chunks.map((c) => c.type), ["start", "text_delta", "text_delta", "stop"]);
+    assert.equal(chunks.filter((c) => c.type === "text_delta").map((c) => c.text).join(""), "Hello");
+  }));

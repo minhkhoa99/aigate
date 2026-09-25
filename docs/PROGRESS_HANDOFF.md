@@ -19,8 +19,9 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | Error handling and the API↔UI map | Done | `docs/design/API_UI_MAP.md` |
 | M1 SP7 `engine` core | Done, no UI | `docs/contracts/engine.md` |
 | M1 SP8 `transport` (direct branch + timeout) | Done, no UI | `docs/contracts/transport.md` |
-| M1 SP9 `engine`: OpenAI-compatible adapter | **Next** | SP8 below |
-| M1 SP10–SP12 | Pending | Spec §9 |
+| M1 SP9 `engine`: OpenAI-compatible adapter | Done, no UI | `docs/contracts/provider-openai.md` |
+| M1 SP10 `engine`: protocol adapter in/out (OpenAI only) | **Next** | SP9 below |
+| M1 SP11–SP12 | Pending | Spec §9 |
 
 ## Completed and verified
 
@@ -254,7 +255,7 @@ Checks and status:
 - **Corpus:** the original 7 docs plus `API_UI_MAP.md`, `UI_HANDOFF.md`, the three contracts, and this handoff, 13 files in total.
 - **What it adds:** API endpoint nodes with a `status` of `wired` or `waiting:<SP>`, linked to their screen, hooks, contract, bounded context, SP, and UI error codes. For example, `POST /api/keys` links to `useCreateKey`, the SP6 contract, and `LIMIT_REACHED`.
 - **Not re-extracted:** the Stitch HTML and PNGs and the Feature Matrix YAML. Together they would need about 30 agents; run a full `/graphify docs` when needed.
-- **Python:** use `C:UsersPCAppDataLocalProgramsPythonPython312python.exe`. The `python` on PATH is a venv without graphify.
+- **Python:** use `C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe`. The `python` on PATH is a venv without graphify.
 
 **M1 SP8 (`transport`) is complete locally.** The contract is `docs/contracts/transport.md`.
 
@@ -275,10 +276,31 @@ Checks and status:
 - **Matrix.** `transport.proxy-priority-chain` is `contracted`; its relay and proxy branches come in SP18.
 - **UI.** No UI, as recorded in `API_UI_MAP.md`.
 
-**Next step, M1 SP9 (`engine`: OpenAI-compatible provider adapter):** implement `AIProviderPort` for the `openai-compatible` family over `HttpTransportPort`.
-- **Mapping.** CIP to and from OpenAI chat completions, with `UnsupportedFeatureError` for anything the format cannot carry.
-- **Status classification into `ErrorCode`:** 401/403 → `AUTH_ERROR`, 429 → `RATE_LIMIT` or `QUOTA_EXHAUSTED`, 5xx → `PROVIDER_UNAVAILABLE`, 400 → `INVALID_REQUEST`, 404 → `MODEL_UNAVAILABLE`.
-- **Retries.** Only through `withRetry`, and only before a stream starts.
-- **Streaming.** Parse SSE into `StreamChunk` with bounded buffers.
-- **Tests.** Test against a local fake upstream.
-- **UI.** SP9 has no UI; the first wiring comes with SP11 and SP12.
+**M1 SP9 (`engine`: OpenAI-compatible provider adapter) is complete locally.** The contract is `docs/contracts/provider-openai.md`.
+
+- **Adapter.** `OpenAICompatibleAdapter(provider, transport)` in `packages/engine/src/adapters/openai-compatible.ts` implements `AIProviderPort`. There is no default provider config, so an unknown provider cannot inherit OpenAI settings (`routing.default-executor-openai-fallback` is a `SUSPECTED_BUG`).
+- **Mapping.** CIP maps to and from chat completions. What OpenAI cannot carry throws `UnsupportedFeatureError` before any I/O: video, audio or files by URL, assistant thinking, `tool_result.isError`, `reasoning.budgetTokens`, and non-`openai` vendor extensions. `cacheControl` is the one hint left out.
+- **Usage.** Now normalized in `cip.ts`: `inputTokens` excludes cache reads.
+- **Errors.** Classified by status plus `error.code`/`error.type` only, never by message text. `insufficient_quota` gives `QUOTA_EXHAUSTED`, and `model_not_found` gives `MODEL_UNAVAILABLE`. Messages are at most 300 characters, the credential is redacted, and HTML pages are dropped. An API key with whitespace or control characters is `AUTH_ERROR` before I/O.
+- **Retries.** 502, 503, 504, and an unreachable host get at most 3 attempts through `withRetry` (500 ms, then 1000 ms), and only before the stream starts. 429, 500, `TIMEOUT`, and redirects are never retried in place.
+- **Streaming.**
+  - `readSseData` (`packages/engine/src/sse.ts`) caps a line or an event at 1 Mi characters, splits only the new bytes so a slow drip costs linear time, and cancels the body on an early stop or an error.
+  - A stream that ends with neither `finish_reason` nor `[DONE]`, or that sends an error event, throws `PROVIDER_UNAVAILABLE` with `details.partial`.
+  - Usage is emitted before `stop`.
+- **Port change.** `getModels` returns `ListedModel { id, descriptor? }`. Unknown ids carry no invented limits, and at most 1000 are read. `validateCredential` makes one call and returns `valid: false` only for `AUTH_ERROR` or `QUOTA_EXHAUSTED`; a network failure or 5xx is thrown.
+- **Checks.**
+  - Engine tests pass 30/30. The 15 new adapter tests use a fake transport, with SSE split every 3 bytes, including inside UTF-8.
+  - Server tests pass 33/33, including one end-to-end stream over `DirectTransport` against a local HTTP server.
+  - 16 mutations were run and all were caught. One first survived: the tool-index bound was only failing through the truncated-stream error, so the test was tightened.
+- **Matrix.**
+  - `implemented`: `fallback.upstream-error-result` and `fallback.executor-retry-budget`.
+  - `contracted`: `fallback.error-classification`, `fallback.partial-stream-failure`, `routing.default-executor-openai-fallback`, `routing.non-streaming-response`, and `routing.streaming-pipeline`.
+- **UI.** No UI, as recorded in `API_UI_MAP.md`. The first screens come later:
+  - `validateCredential` backs "Test connection" on `/providers` in SP11.
+  - Adapter errors reach clients through `/v1` in SP12.
+
+**Next step, M1 SP10 (`engine`: protocol adapter in/out, OpenAI only):** map the client-facing OpenAI Chat Completions format to and from CIP.
+- **Inbound.** The request body goes to `CanonicalRequest`: messages, tools, `tool_choice`, `max_tokens`/`max_completion_tokens`, and `stream`. An omitted `stream` means non-streaming; `routing.stream-mode-decision` is a `SUSPECTED_BUG`. Unknown fields go to `vendorExtensions.openai`.
+- **Outbound.** `CanonicalResponse` and `StreamChunk` go back to the OpenAI JSON and SSE shapes, with `[DONE]`. A partial-stream error must be visible to the client.
+- **Validation.** Validate at the boundary, with bounded arrays and strings. `INVALID_REQUEST` names the field.
+- **UI.** No UI; `/v1` wiring is SP12.

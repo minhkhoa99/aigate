@@ -41,6 +41,13 @@ export interface Credential {
   readonly apiKey: string;
 }
 
+// One id from an upstream model list. `descriptor` is the registry entry when the id is known; an
+// unknown id carries no invented limits (docs/contracts/provider-openai.md).
+export interface ListedModel {
+  readonly id: string;
+  readonly descriptor?: ModelDescriptor;
+}
+
 export type CredentialStatus = { readonly valid: true } | { readonly valid: false; readonly code: ErrorCode; readonly message: string };
 
 // Implemented per protocol family (SP9: openai-compatible). Every call takes the context, so even
@@ -49,6 +56,6 @@ export type CredentialStatus = { readonly valid: true } | { readonly valid: fals
 export interface AIProviderPort {
   execute(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): Promise<CanonicalResponse>;
   stream(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): AsyncIterable<StreamChunk>;
-  getModels(credential: Credential, ctx: ExecCtx): Promise<readonly ModelDescriptor[]>;
+  getModels(credential: Credential, ctx: ExecCtx): Promise<readonly ListedModel[]>;
   validateCredential(credential: Credential, ctx: ExecCtx): Promise<CredentialStatus>;
 }

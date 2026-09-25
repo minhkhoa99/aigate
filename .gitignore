@@ -6,4 +6,5 @@ node_modules/
 apps/web/dist/
 apps/server/dist/
 packages/database/dist/
+packages/engine/dist/
 .playwright-mcp/

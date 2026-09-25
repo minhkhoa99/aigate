@@ -54,6 +54,7 @@ Each screen keeps its fixture data until the SP in the second column lands. When
 |---|---|
 | SP7 `packages/engine` (CIP core, registry, capability resolution, retry helper) | No UI. It has no HTTP API; `/v1` (SP12) is the first thing a screen can show. |
 | SP8 `transport` (`HttpTransportPort`, direct branch plus timeout) | No UI. Outbound HTTP only; its error codes (`TIMEOUT`, `PROVIDER_UNAVAILABLE`, `INVALID_REQUEST`) reach users through `/v1` in SP12. |
+| SP9 `OpenAICompatibleAdapter` (CIP ↔ chat completions, error classification, bounded SSE) | No UI. `validateCredential` will back "Test connection" on `/providers` (SP11): `AUTH_ERROR` / `QUOTA_EXHAUSTED` are answers about the key, anything else is a connection problem. Chat errors reach users through `/v1` (SP12). |
 
 ## Error handling
 

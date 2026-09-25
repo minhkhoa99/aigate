@@ -48,6 +48,8 @@ export interface CanonicalRequest {
   readonly vendorExtensions?: VendorExtensions;
 }
 
+// Normalized across providers: inputTokens excludes cache reads and writes, and outputTokens includes
+// reasoningTokens (docs/contracts/provider-openai.md).
 export interface TokenUsage {
   readonly inputTokens: number;
   readonly outputTokens: number;

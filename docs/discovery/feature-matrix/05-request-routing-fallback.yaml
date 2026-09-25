@@ -683,7 +683,7 @@
     - { file: open-sse/executors/default.js, line: 129, note: "falls through to this.config.baseUrl" }
     - { file: open-sse/providers/registry/openai.js, line: 27, note: "OpenAI chat baseUrl https://api.openai.com/v1/chat/completions" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: contracted
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "A provider id with no transport config is rejected (or an embedding-only node is refused on the chat lane) before any upstream call"
@@ -831,7 +831,7 @@
     - { file: open-sse/providers/registry/antigravity.js, line: 28, note: "antigravity 429 x3 (500/503 x3 follow)" }
     - { file: open-sse/providers/registry/vercel-ai-gateway.js, line: 25, note: "vercel-ai-gateway 429 x2" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: fallback.auth-refresh-retry
@@ -917,7 +917,7 @@
     - { file: open-sse/utils/error.js, line: 98, note: "createErrorResult shape" }
     - { file: src/lib/db/repos/usageRepo.js, line: 740, note: "appendRequestLog is an empty no-op" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: fallback.error-classification
@@ -984,7 +984,7 @@
     - { file: open-sse/services/combo.js, line: 337, note: "!shouldFallback branch — unreachable" }
     - { file: open-sse/services/combo.js, line: 345, note: "combo waits only when cooldown <= 5 s on 502/503/504" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: contracted
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "Terminal, request-caused errors (400 invalid request, 404 unknown model, local translation failure, 499 client abort) are returned to the client once, without locking the account (behavioral.md §20: no blind fallback)"
@@ -1110,7 +1110,7 @@
     - { file: open-sse/utils/stream.js, line: 224, note: "non-JSON data lines skipped silently" }
     - { file: open-sse/utils/stream.js, line: 400, note: "[DONE] suppressed for gemini-family providers" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: routing.non-streaming-response
@@ -1146,7 +1146,7 @@
     - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 338, note: "finish_reason forced to tool_calls" }
     - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 392, note: "success result with JSON Response" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: fallback.partial-stream-failure
@@ -1186,7 +1186,7 @@
     - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 86, note: "synthesized terminal only for Responses passthrough" }
     - { file: open-sse/handlers/chatCore/streamingHandler.js, line: 47, note: "onRequestSuccess fired at header time" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: contracted
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "A stream cut off mid-answer is signalled to the client as an error (error event or missing terminal it can detect), and the account is not marked healthy"

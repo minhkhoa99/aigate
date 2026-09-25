@@ -41,7 +41,7 @@ export interface Registry {
 
 const PROVIDER_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 // Model ids keep vendor spelling (dots, colons, slashes), but stay bounded and printable.
-const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+export const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 
 export class RegistryError extends Error {
   readonly problems: readonly string[];
