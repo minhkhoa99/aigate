@@ -1,0 +1,842 @@
+{
+  "nodes": [
+    {
+      "id": "protocol_openai_contract",
+      "label": "OpenAI Chat Completions protocol adapter contract (M1 SP10)",
+      "file_type": "document",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Client-facing half of the OpenAI protocol as pure functions; no HTTP route and no UI. SP12 mounts it on /v1/chat/completions."
+    },
+    {
+      "id": "protocol_parse_openai_chat",
+      "label": "parseOpenAIChatRequest() — OpenAI body → CanonicalRequest (INVALID_REQUEST names the field)",
+      "file_type": "code",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/protocols/openai-chat.ts"
+    },
+    {
+      "id": "protocol_completion_renderer",
+      "label": "toOpenAIChatCompletion() — CanonicalResponse → chat.completion JSON",
+      "file_type": "code",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/protocols/openai-chat.ts"
+    },
+    {
+      "id": "protocol_stream_encoder",
+      "label": "OpenAIChatStreamEncoder — StreamChunk → OpenAI SSE; fail() = error event, no [DONE]",
+      "file_type": "code",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/protocols/openai-chat.ts"
+    },
+    {
+      "id": "protocol_to_openai_error",
+      "label": "toOpenAIError() — ErrorCode → OpenAI status/type/code; internals never leak",
+      "file_type": "code",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/protocols/openai-chat.ts"
+    },
+    {
+      "id": "protocol_stream_default_false",
+      "label": "Rule: an omitted stream flag means non-streaming (JSON)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Fixes 9router SUSPECTED_BUG routing.stream-mode-decision, where curl received SSE."
+    },
+    {
+      "id": "protocol_upstream_auth_502",
+      "label": "Rule: upstream AUTH_ERROR → 502 upstream_auth_error (not 401)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "The client's own AIGate key is checked by apikeys; an upstream credential failure is AIGate configuration, so a 401 would mislead the client."
+    },
+    {
+      "id": "protocol_keep_upstream_code",
+      "label": "Rule: safe upstream codes (context_length_exceeded) reach the client",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "protocol_vendor_extensions_passthrough",
+      "label": "Unknown top-level OpenAI fields (≤64) travel in vendorExtensions.openai",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "protocol_unsupported_inbound",
+      "label": "Refused as UnsupportedFeatureError: file_id, late system message, name, function role, refusal, custom tools, allowed_tools",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "protocol_usage_after_finish",
+      "label": "Usage chunk after the finish chunk, only with stream_options.include_usage",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "protocol_cip_detail_strict",
+      "label": "CIP gains image detail and tool strict (OpenAI → OpenAI trip keeps them)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/cip.ts"
+    },
+    {
+      "id": "protocol_tool_id_not_ported",
+      "label": "Not ported: tool-id normalization and empty tool answers (Anthropic adapters, SP15)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "engine_json_helpers",
+      "label": "src/json.ts — shared JSON narrowing (isRecord, record, text, list, parseJson)",
+      "file_type": "code",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/json.ts"
+    },
+    {
+      "id": "protocol_tests",
+      "label": "packages/engine/test/openai-protocol.test.mjs (12 tests incl. round trips; 20 mutations caught)",
+      "file_type": "code",
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_ui_map_row_sp10_no_ui",
+      "label": "API_UI_MAP row: SP10 OpenAI Chat protocol, No UI",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "SP12 mounts it on /v1/chat/completions; the /gateway/endpoint Chat API pending pill waits for that."
+    },
+    {
+      "id": "progress_handoff_next_sp11",
+      "label": "Handoff next step: SP11 connections (one API-key account, Test connection, /providers screens wired)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Needs a SecretCipherPort design choice for keys at rest; Test connection calls validateCredential."
+    },
+    {
+      "id": "sp_sp10",
+      "label": "SP10 — engine: protocol adapter in/out (OpenAI only)",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done-no-ui"
+    },
+    {
+      "id": "sp_sp11",
+      "label": "SP11 — connections (single apikey account)",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next"
+    },
+    {
+      "id": "05_request_routing_fallback_routing_stream_mode_decision",
+      "label": "routing.stream-mode-decision",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "SUSPECTED_BUG"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_routing_source_format_detection",
+      "label": "routing.source-format-detection",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_routing_request_translation",
+      "label": "routing.request-translation",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "11_translation_i18n_translator_pivot_loss",
+      "label": "translator.pivot-loss",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "11_translation_i18n_translator_tool_id_normalization",
+      "label": "translator.tool-id-normalization",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "traced",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "protocol_openai_contract",
+      "target": "sp_sp10",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp10",
+      "target": "protocol_openai_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_openai_contract",
+      "target": "protocol_parse_openai_chat",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp10",
+      "target": "protocol_parse_openai_chat",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_openai_contract",
+      "target": "protocol_completion_renderer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp10",
+      "target": "protocol_completion_renderer",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_openai_contract",
+      "target": "protocol_stream_encoder",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp10",
+      "target": "protocol_stream_encoder",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_openai_contract",
+      "target": "protocol_to_openai_error",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp10",
+      "target": "protocol_to_openai_error",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_parse_openai_chat",
+      "target": "concept_cip",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_parse_openai_chat",
+      "target": "engine_unsupported_feature_error",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_parse_openai_chat",
+      "target": "engine_json_helpers",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "engine_json_helpers",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_parse_openai_chat",
+      "target": "protocol_stream_default_false",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_parse_openai_chat",
+      "target": "protocol_vendor_extensions_passthrough",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_parse_openai_chat",
+      "target": "protocol_unsupported_inbound",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_parse_openai_chat",
+      "target": "protocol_cip_detail_strict",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "protocol_cip_detail_strict",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_stream_encoder",
+      "target": "protocol_usage_after_finish",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_stream_encoder",
+      "target": "protocol_to_openai_error",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_stream_encoder",
+      "target": "adapter_partial_stream_error",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_stream_encoder",
+      "target": "gs_partial_stream_failure",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_to_openai_error",
+      "target": "protocol_upstream_auth_502",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_to_openai_error",
+      "target": "protocol_keep_upstream_code",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_to_openai_error",
+      "target": "concept_error_taxonomy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_to_openai_error",
+      "target": "engine_fallback_policy_data",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_keep_upstream_code",
+      "target": "adapter_status_classification",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_upstream_auth_502",
+      "target": "api_ui_map_post_api_keys",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_tests",
+      "target": "protocol_parse_openai_chat",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_tests",
+      "target": "adapter_openai_compatible",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp10_no_ui",
+      "target": "sp_sp10",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_rule_no_ui_row",
+      "target": "sp_sp10",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp10_no_ui",
+      "target": "api_ui_map_v1_chat_completions",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp10_no_ui",
+      "target": "api_ui_map_screen_endpoint_base_url_pill",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_v1_chat_completions",
+      "target": "protocol_parse_openai_chat",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp10",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp11",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp11",
+      "target": "sp_sp11",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp11",
+      "target": "adapter_validate_credential",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp11",
+      "target": "api_ui_map_screen_providers",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp11",
+      "target": "port_secret_cipher",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_openai_contract",
+      "target": "05_request_routing_fallback_routing_stream_mode_decision",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_stream_default_false",
+      "target": "05_request_routing_fallback_routing_stream_mode_decision",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_openai_contract",
+      "target": "05_request_routing_fallback_routing_source_format_detection",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_parse_openai_chat",
+      "target": "05_request_routing_fallback_routing_source_format_detection",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_openai_contract",
+      "target": "05_request_routing_fallback_routing_request_translation",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_parse_openai_chat",
+      "target": "05_request_routing_fallback_routing_request_translation",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_openai_contract",
+      "target": "11_translation_i18n_translator_pivot_loss",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_unsupported_inbound",
+      "target": "11_translation_i18n_translator_pivot_loss",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_openai_contract",
+      "target": "11_translation_i18n_translator_tool_id_normalization",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_tool_id_not_ported",
+      "target": "11_translation_i18n_translator_tool_id_normalization",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md",
+      "source_location": null,
+      "weight": 1
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "sp10_openai_protocol_round_trip",
+      "label": "SP10 round trip: parse → CIP → provider adapter → render / encode",
+      "nodes": [
+        "protocol_parse_openai_chat",
+        "concept_cip",
+        "adapter_openai_compatible",
+        "protocol_completion_renderer",
+        "protocol_stream_encoder"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-openai.md"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

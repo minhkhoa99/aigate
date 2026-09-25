@@ -1,39 +1,43 @@
 # Graph Report - docs  (2026-09-25)
 
 ## Corpus Check
-- 15 files · ~39,568 words
+- 16 files · ~41,325 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 516 nodes · 1404 edges · 24 communities
-- Extraction: 83% EXTRACTED · 17% INFERRED · 0% AMBIGUOUS · INFERRED: 232 edges (avg confidence: 0.87)
+- 537 nodes · 1452 edges · 28 communities
+- Extraction: 83% EXTRACTED · 16% INFERRED · 0% AMBIGUOUS · INFERRED: 236 edges (avg confidence: 0.87)
 - Token cost: 574,916 input · 0 output
 
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_API Keys, Identity & Endpoint (SP6)|API Keys, Identity & Endpoint (SP6)]]
-- [[_COMMUNITY_Settings, Network & SSO Screens|Settings, Network & SSO Screens]]
-- [[_COMMUNITY_API-UI Map & Wired Endpoints|API-UI Map & Wired Endpoints]]
+- [[_COMMUNITY_Overview, Usage & Console Screens|Overview, Usage & Console Screens]]
+- [[_COMMUNITY_Discovery Outputs & Behavioral Questions|Discovery Outputs & Behavioral Questions]]
 - [[_COMMUNITY_Providers, Credentials & Architecture|Providers, Credentials & Architecture]]
-- [[_COMMUNITY_Overview, Usage & Observability|Overview, Usage & Observability]]
-- [[_COMMUNITY_Error Classification & Parity Tiers|Error Classification & Parity Tiers]]
-- [[_COMMUNITY_Integrations, Console & Design System|Integrations, Console & Design System]]
-- [[_COMMUNITY_Routing Engine & Token Saver|Routing Engine & Token Saver]]
+- [[_COMMUNITY_Network, Proxy & Integrations|Network, Proxy & Integrations]]
+- [[_COMMUNITY_Routing, Fallback & Gaps|Routing, Fallback & Gaps]]
+- [[_COMMUNITY_API Key Management (SP6)|API Key Management (SP6)]]
 - [[_COMMUNITY_SP9 Adapter Matrix Entries|SP9 Adapter Matrix Entries]]
+- [[_COMMUNITY_API Key Validation & Identity Rules|API Key Validation & Identity Rules]]
+- [[_COMMUNITY_SP10 OpenAI Protocol & Translation|SP10 OpenAI Protocol & Translation]]
+- [[_COMMUNITY_Tracing Protocol & Settings General|Tracing Protocol & Settings General]]
+- [[_COMMUNITY_Settings Context (SP5)|Settings Context (SP5)]]
+- [[_COMMUNITY_Parity Verification & Tapes|Parity Verification & Tapes]]
+- [[_COMMUNITY_Sessions & Password Change (SP6)|Sessions & Password Change (SP6)]]
 - [[_COMMUNITY_Capability Resolution (SP7)|Capability Resolution (SP7)]]
+- [[_COMMUNITY_Chat API v1 & Endpoint Screen|Chat API /v1 & Endpoint Screen]]
 - [[_COMMUNITY_Transport Direct Branch (SP8)|Transport Direct Branch (SP8)]]
-- [[_COMMUNITY_M-1 Discovery Tasks|M-1 Discovery Tasks]]
-- [[_COMMUNITY_Phase Model & Golden Scenarios|Phase Model & Golden Scenarios]]
-- [[_COMMUNITY_Definition of Done & Skills|Definition of Done & Skills]]
-- [[_COMMUNITY_Discovery Outputs & Exit Gate|Discovery Outputs & Exit Gate]]
-- [[_COMMUNITY_Tracing Protocol & Gap Register|Tracing Protocol & Gap Register]]
+- [[_COMMUNITY_First-run Setup & Onboarding|First-run Setup & Onboarding]]
+- [[_COMMUNITY_Error Taxonomy & Classification|Error Taxonomy & Classification]]
+- [[_COMMUNITY_API-UI Map & No-UI Rows|API-UI Map & No-UI Rows]]
 - [[_COMMUNITY_Bounded Retry & Lint Enforcement|Bounded Retry & Lint Enforcement]]
-- [[_COMMUNITY_Core Porting Principles|Core Porting Principles]]
-- [[_COMMUNITY_CIP, ExecCtx & AIProviderPort|CIP, ExecCtx & AIProviderPort]]
-- [[_COMMUNITY_Feature Matrix Schema & Lifecycle|Feature Matrix Schema & Lifecycle]]
+- [[_COMMUNITY_M0 Foundation & Task Board|M0 Foundation & Task Board]]
+- [[_COMMUNITY_Architecture Spec & Monorepo|Architecture Spec & Monorepo]]
+- [[_COMMUNITY_UI Ownership & Wiring Rules|UI Ownership & Wiring Rules]]
+- [[_COMMUNITY_Domain Model & Definition of Done|Domain Model & Definition of Done]]
+- [[_COMMUNITY_Login & Lockout (SP6)|Login & Lockout (SP6)]]
 - [[_COMMUNITY_Latency & Bounded Workloads|Latency & Bounded Workloads]]
 - [[_COMMUNITY_Transient Retry & Provider Unavailable|Transient Retry & Provider Unavailable]]
 - [[_COMMUNITY_Lean Code Rules|Lean Code Rules]]
-- [[_COMMUNITY_Translator & Protocol Separation|Translator & Protocol Separation]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `Identity and API keys contract (M1 SP6)` - 37 edges
@@ -43,21 +47,21 @@
 5. `The 23 feature groups required by behavioral.md §5` - 26 edges
 6. `Bounded context: connections` - 25 edges
 7. `SP6 — identity + apikeys (password login + key validation only)` - 25 edges
-8. `Overview — /` - 22 edges
-9. `Settings contract (M1 SP5)` - 22 edges
-10. `Bounded context: identity` - 20 edges
+8. `OpenAICompatibleAdapter (AIProviderPort for openai-compatible)` - 23 edges
+9. `Overview — /` - 22 edges
+10. `Settings contract (M1 SP5)` - 22 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `identity.machine-id-derivation` --conceptually_related_to--> `Bounded context: identity`  [INFERRED]
+  docs/contracts/identity-apikeys.md → docs/superpowers/specs/2026-09-22-aigate-design.md
 - `TransportModule (injects DirectTransport under HTTP_TRANSPORT)` --implements--> `Bounded context: transport`  [INFERRED]
   docs/contracts/transport.md → docs/superpowers/specs/2026-09-22-aigate-design.md
 - `ErrorCode: TIMEOUT` --conceptually_related_to--> `UI error code: TIMEOUT`  [AMBIGUOUS]
   docs/superpowers/specs/2026-09-22-aigate-design.md → docs/design/API_UI_MAP.md
-- `Feature group — MCP (API with no UI, found during spec work)` --conceptually_related_to--> `The 23 feature groups required by behavioral.md §5`  [AMBIGUOUS]
-  docs/superpowers/plans/2026-09-22-m1-discovery.md → docs/governance/behavioral.md
-- `Rule 4 — Every workload must be BOUNDED` --semantically_similar_to--> `§16 Do not inherit performance issues; all large workloads bounded`  [INFERRED] [semantically similar]
-  docs/governance/rules.md → docs/governance/behavioral.md
-- `?uiState=loading|empty|error preview parameter` --references--> `Required state: error with retry`  [INFERRED]
-  docs/design/UI_HANDOFF.md → docs/design/DESIGN.md
+- `MITM — /network/mitm` --semantically_similar_to--> `Settings · Developer (/settings/developer)`  [INFERRED] [semantically similar]
+  docs/superpowers/specs/2026-09-22-aigate-design.md → docs/design/stitch-briefs.md
+- `Decision (user, 2026-09-25): onboarding is one step (set password, open dashboard)` --references--> `Onboarding — /welcome`  [INFERRED]
+  docs/PROGRESS_HANDOFF.md → docs/superpowers/specs/2026-09-22-aigate-design.md
 
 ## Import Cycles
 - None detected.
@@ -79,104 +83,121 @@
 - **Deferred SP0.1 rules enforced in lint by SP8** — lint_fetch_through_transport, lint_retry_through_helper, lint_fetch_timeout, lint_check_tests, sp_sp0_1 [EXTRACTED 1.00]
 - **SP9 adapter flow: AIProviderPort over HttpTransportPort with status classification and bounded retry** — sp_sp9, port_ai_provider, port_http_transport, sp9_status_classification, engine_with_retry, transport_fail_http_status [INFERRED 0.85]
 - **SP9 adapter failure path: classify, retry transient, fail partial streams** — adapter_status_classification, adapter_retry_transient, adapter_partial_stream_error, engine_fallback_policy_data, engine_with_retry [EXTRACTED 1.00]
+- **SP10 round trip: parse → CIP → provider adapter → render / encode** — protocol_parse_openai_chat, concept_cip, adapter_openai_compatible, protocol_completion_renderer, protocol_stream_encoder [EXTRACTED 1.00]
 
-## Communities (24 total, 0 thin omitted)
+## Communities (28 total, 0 thin omitted)
 
-### Community 0 - "API Keys, Identity & Endpoint (SP6)"
-Cohesion: 0.06
-Nodes (94): apikey.delete-key, apikey.generate-key, apikey.legacy-format-unenforced, apikey.list-keys, apikey.update-key-status, apikey.validate-lookup, endpoint.enforce-require-api-key, identity.auth-status-disclosure (+86 more)
-
-### Community 1 - "Settings, Network & SSO Screens"
+### Community 0 - "Overview, Usage & Console Screens"
 Cohesion: 0.08
-Nodes (63): identity.machine-id-derivation, settings.database-export-import, settings.outbound-proxy-live-apply, settings.proxy-test-outbound-probe, /network/* → ProxyPools, DeployWizard, Tunnel, Mitm, /settings/auth OIDC and SAML tabs, /settings/general → SettingsGeneral, Audit finding: Console shown in sidebar regardless of Developer mode (+55 more)
+Nodes (59): usage.write-not-synchronous, GET /overview/summary, SSE /events/requests, /traffic/console → Console (Developer mode only), / → Overview, /traffic/usage, /traffic/requests* → Usage, Requests, RequestDetail, Audit finding: Console shown in sidebar regardless of Developer mode, Audit PASS: no credential leaked across 27 HTML exports (+51 more)
 
-### Community 2 - "API-UI Map & Wired Endpoints"
+### Community 1 - "Discovery Outputs & Behavioral Questions"
 Cohesion: 0.07
-Nodes (53): endpoint.extract-header-order, transport.proxy-priority-chain, API ↔ UI map (docs/design/API_UI_MAP.md), GET /health, docs/PROJECT_MAP.md (generated U-project ownership map), API_UI_MAP row: SP7 packages/engine, No UI, API_UI_MAP row: SP8 transport, No UI, API_UI_MAP row: SP9 OpenAICompatibleAdapter, No UI (+45 more)
+Nodes (52): docs/capabilities.md (GENERATED capability specification), docs/discovery/coverage.md, docs/discovery/inventory.json, §30 The 12 pre-implementation questions, §3 The 20 behavioral questions (trigger…edge cases), §8 Business rule beats old implementation, §2 Core principles — never port, rename, or translate 9router line by line, §29 Definition of Done — 13 checklist items, no self-declared DONE (+44 more)
 
-### Community 3 - "Providers, Credentials & Architecture"
-Cohesion: 0.11
-Nodes (46): validateCredential(): one call; valid:false only for AUTH_ERROR / QUOTA_EXHAUSTED, /providers/media* → MediaProviders, /providers* → LlmProviders, ProviderDetail, Connections, Quota, §10 New architecture independent of 9router (API/Application/Domain/Ports/Infra), §9 Build an explicit domain model (Provider, Quota, RoutingPolicy…), §5 Feature discovery — inventory every group, do not trust the UI menu, §6 Feature Matrix requirement — nothing is understood until fully traced, §11 Providers reached only through a port (AIProviderPort) (+38 more)
+### Community 2 - "Providers, Credentials & Architecture"
+Cohesion: 0.10
+Nodes (49): validateCredential(): one call; valid:false only for AUTH_ERROR / QUOTA_EXHAUSTED, /providers/media* → MediaProviders, /providers* → LlmProviders, ProviderDetail, Connections, Quota, §10 New architecture independent of 9router (API/Application/Domain/Ports/Infra), §9 Build an explicit domain model (Provider, Quota, RoutingPolicy…), §6 Feature Matrix requirement — nothing is understood until fully traced, §11 Providers reached only through a port (AIProviderPort), AuthFlow — declarative, data-driven auth step framework (+41 more)
 
-### Community 4 - "Overview, Usage & Observability"
+### Community 3 - "Network, Proxy & Integrations"
 Cohesion: 0.13
-Nodes (30): usage.write-not-synchronous, GET /overview/summary, SSE /events/requests, / → Overview, /traffic/usage, /traffic/requests* → Usage, Requests, RequestDetail, §23 Observability per request; never log keys, tokens or secrets, §21 Quota must be understood fully, not copied from the UI tracker, §22 Usage fields to trace per request (tokens, cost, latency, fallback attempts) (+22 more)
+Nodes (39): settings.outbound-proxy-live-apply, settings.proxy-test-outbound-probe, /integrations/* → CliTools, CliToolDetail, Skills, Mcp, /network/* → ProxyPools, DeployWizard, Tunnel, Mitm, Audit finding: MITM CA buttons adjacent, type-to-confirm modal missing, §5 Feature discovery — inventory every group, do not trust the UI menu, The 23 feature groups required by behavioral.md §5, CLI-tool config writes require diff preview + backup (+31 more)
 
-### Community 5 - "Error Classification & Parity Tiers"
-Cohesion: 0.09
-Nodes (27): Status → ErrorCode by status + error.code/type only (never message text), Branding sweep to the bottom of the stack, capabilities.md — parity coverage denominator, Error taxonomy (8 ErrorCodes), Stated limits of tape-based parity, Parity verification — 3 tiers, Recording proxy + 4-part tape, Normalizer + semantic SSE diff (not chunk diff) (+19 more)
+### Community 4 - "Routing, Fallback & Gaps"
+Cohesion: 0.11
+Nodes (37): /gateway/routing*, /gateway/token-saver → Routing, ComboCreate, TokenSaver, /settings/auth OIDC and SAML tabs, docs/discovery/gaps.md (Gap register), §20 No blind fallback — fallback follows error semantics, §12 Router is its own business engine, not controller logic, §18 Streaming is first-class (TTFT, cancellation, backpressure), §13 Translator/protocol separation — canonical vs vendor formats, Canonical Internal Protocol (+29 more)
 
-### Community 6 - "Integrations, Console & Design System"
-Cohesion: 0.23
-Nodes (21): /traffic/console → Console (Developer mode only), /integrations/* → CliTools, CliToolDetail, Skills, Mcp, CLI-tool config writes require diff preview + backup, Bounded context: tooling, Copy field component, Type scale (12/13/14/16/20/32) and mono for identifiers, Feature group: CLI Tools, Feature group: Console Log (+13 more)
-
-### Community 7 - "Routing Engine & Token Saver"
-Cohesion: 0.22
-Nodes (20): endpoint.rewrite-lanes, /gateway/routing*, /gateway/token-saver → Routing, ComboCreate, TokenSaver, §12 Router is its own business engine, not controller logic, Routing simulator (decision-tree dry run), Bounded context: routing (core), GAP: Token Saver screen missing from the U0–U11 table, Feature group: Auto fallback, Feature group: Combo / Vision Adapter (+12 more)
-
-### Community 8 - "SP9 Adapter Matrix Entries"
+### Community 5 - "API Key Management (SP6)"
 Cohesion: 0.14
-Nodes (20): fallback.error-classification, fallback.partial-stream-failure, fallback.upstream-error-result, routing.default-executor-openai-fallback, routing.non-streaming-response, routing.streaming-pipeline, CIP ↔ chat completions mapping (max_completion_tokens, tool messages, data: URLs), ListedModel { id, descriptor? } — getModels never invents limits (≤1000 ids) (+12 more)
+Nodes (28): apikey.delete-key, apikey.generate-key, apikey.list-keys, DELETE /api/keys/:id, UI error code: BAD_RESPONSE, UI error code: HTTP_5xx, UI error code: INVALID_REQUEST (400), UI error code: LIMIT_REACHED (409) (+20 more)
 
-### Community 9 - "Capability Resolution (SP7)"
+### Community 6 - "SP9 Adapter Matrix Entries"
+Cohesion: 0.13
+Nodes (20): fallback.partial-stream-failure, fallback.upstream-error-result, routing.default-executor-openai-fallback, routing.non-streaming-response, routing.streaming-pipeline, CIP ↔ chat completions mapping (max_completion_tokens, tool messages, data: URLs), ListedModel { id, descriptor? } — getModels never invents limits (≤1000 ids), Upstream message ≤300 chars, credential redacted, HTML pages dropped; bad API key → AUTH_ERROR before I/O (+12 more)
+
+### Community 7 - "API Key Validation & Identity Rules"
+Cohesion: 0.15
+Nodes (19): apikey.legacy-format-unenforced, apikey.update-key-status, apikey.validate-lookup, endpoint.rewrite-lanes, identity.auth-status-disclosure, identity.machine-id-derivation, identity.reset-password-local-only, settings.require-login-public-status (+11 more)
+
+### Community 8 - "SP10 OpenAI Protocol & Translation"
+Cohesion: 0.16
+Nodes (19): routing.request-translation, routing.source-format-detection, routing.stream-mode-decision, translator.pivot-loss, translator.tool-id-normalization, Truncated stream or error event → PROVIDER_UNAVAILABLE with details.partial, Golden scenario: partial stream failure, toOpenAIChatCompletion() — CanonicalResponse → chat.completion JSON (+11 more)
+
+### Community 9 - "Tracing Protocol & Settings General"
+Cohesion: 0.25
+Nodes (19): /settings/general → SettingsGeneral, Audit finding: login-callback / deploy-wizard / authflow-modals are showcases, not routes, §7 Trace the behavior — never conclude from a function name, The Tracing Protocol (6 steps, applied by Tasks 6–18), Hard constraint: tunnel requires 'Require API key' enabled, Bounded context: apikeys, Bounded context: identity, Bounded context: settings (+11 more)
+
+### Community 10 - "Settings Context (SP5)"
+Cohesion: 0.24
+Nodes (17): endpoint.enforce-require-api-key, settings.combo-rotation-reset, settings.database-export-import, settings.defaults-and-merge, settings.get-secret-stripping, settings.hot-path-read-no-cache, settings.patch-protected-keys, GET /api/settings (+9 more)
+
+### Community 11 - "Parity Verification & Tapes"
+Cohesion: 0.12
+Nodes (17): Branding sweep to the bottom of the stack, capabilities.md — parity coverage denominator, Stated limits of tape-based parity, Parity verification — 3 tiers, Recording proxy + 4-part tape, Normalizer + semantic SSE diff (not chunk diff), ErrorCode: AUTH_ERROR, ErrorCode: RATE_LIMIT (+9 more)
+
+### Community 12 - "Sessions & Password Change (SP6)"
+Cohesion: 0.19
+Nodes (15): identity.session-cookie-lifecycle, settings.patch-password-change, UI error code: INVALID_CREDENTIALS (401), useChangePassword (features/settings/api.ts), useLogout (features/settings/api.ts), usePatchSettings (features/settings/api.ts), useSettings (features/settings/api.ts), POST /api/auth/logout (+7 more)
+
+### Community 13 - "Capability Resolution (SP7)"
 Cohesion: 0.26
 Nodes (14): catalog.capability-refine-additive-only, catalog.capability-tier-fallback, catalog.capability-vision-pattern-order, catalog.model-registry-global, combo.detect-required-capabilities, assertModelSupports() — MODEL_UNAVAILABLE / INVALID_REQUEST, Engine contract (M1 SP7), defineRegistry() / builtinRegistry (single openai entry, 4 chat models) (+6 more)
 
-### Community 10 - "Transport Direct Branch (SP8)"
+### Community 14 - "Chat API /v1 & Endpoint Screen"
+Cohesion: 0.21
+Nodes (13): endpoint.extract-header-order, transport.proxy-priority-chain, API_UI_MAP row: SP10 OpenAI Chat protocol, No UI, /gateway/endpoint base URL pill ("Chat API pending"), POST /v1/chat/completions (/v1 Chat API), ExecCtx (one shared client-cancel + deadline signal), Golden scenario: client cancellation, extractApiKey() (Authorization: Bearer first, then x-api-key) (+5 more)
+
+### Community 15 - "Transport Direct Branch (SP8)"
 Cohesion: 0.18
 Nodes (13): transport.test.mjs: adapter streams end to end over DirectTransport, ErrorCode: TIMEOUT, Golden scenario: provider timeout, DirectTransport (direct branch implementation), Upstream answers 4xx or 5xx, Failure: malformed URL or non-https (http only to localhost/127.0.0.1/[::1]), Failure: no headers or stalled body within timeoutMs, Failure: timeoutMs not an integer from 1 to 600000 (+5 more)
 
-### Community 11 - "M-1 Discovery Tasks"
-Cohesion: 0.28
-Nodes (13): 07-token-saver.yaml, 10-proxy-pools.yaml, Milestone M-1 · Discovery, Rule 10 — Cache only with a reason: key, TTL, invalidation, max size, Task 1 — Discovery tooling workspace, Task 2 — Feature Matrix schema and validator, Task 3 — Inventory extractor, Task 4 — Coverage checker (+5 more)
+### Community 16 - "First-run Setup & Onboarding"
+Cohesion: 0.23
+Nodes (13): UI error code: ALREADY_SET_UP (409), UI error code: NOT_LOCAL (403), useSetup (features/settings/api.ts), POST /api/auth/setup, /welcome → Onboarding (one step), AIGATE_INITIAL_PASSWORD (first password at boot), Decision 2 (user, 2026-09-25): first password set from the local machine; no default password, Decision 4 (user, 2026-09-25): requireLogin = false exempts local clients only (+5 more)
 
-### Community 12 - "Phase Model & Golden Scenarios"
+### Community 17 - "Error Taxonomy & Classification"
+Cohesion: 0.21
+Nodes (12): fallback.error-classification, Status → ErrorCode by status + error.code/type only (never message text), Error taxonomy (8 ErrorCodes), FALLBACK_POLICY (8 error codes as data), ErrorCode: INTERNAL_ERROR, ErrorCode: INVALID_REQUEST, ErrorCode: MODEL_UNAVAILABLE, ErrorCode: QUOTA_EXHAUSTED (+4 more)
+
+### Community 18 - "API-UI Map & No-UI Rows"
+Cohesion: 0.32
+Nodes (12): API ↔ UI map (docs/design/API_UI_MAP.md), API_UI_MAP row: SP7 packages/engine, No UI, API_UI_MAP row: SP8 transport, No UI, API_UI_MAP row: SP9 OpenAICompatibleAdapter, No UI, Rule: an SP with no HTTP API records "No UI" in its row, Milestone M1 · Walking skeleton (thin end-to-end slice), HttpTransportPort, Next step: M1 SP8 transport (HttpTransportPort, direct + timeout, no UI) (+4 more)
+
+### Community 19 - "Bounded Retry & Lint Enforcement"
 Cohesion: 0.24
-Nodes (12): §30 The 12 pre-implementation questions, §25 Golden scenarios (13 critical flows), Phase model A→F (Discovery, Behavior Extraction, Contract, Design, Implementation, Parity Verification), §24 Characterization/contract tests prove old ≈ new at contract level, Constraint — no Phase C contracts during discovery, Constraint — no AIGate product code in M-1 (only tools/discovery and docs), Phase A — Discovery, Phase B — Behavior Extraction (+4 more)
+Nodes (11): Split: machines block mechanics, skills teach judgement, Iron law: no skill without a failing test first (RED → GREEN → REFACTOR), UI performance constraints, withRetry() — bounded retry helper (≤10 attempts, capped backoff, abortable), tools/lint/check.test.mjs (lint:check 13/13), Lint rule aigate/fetch-through-transport, Lint rule aigate/fetch-timeout (accepts AbortSignal.any([..., AbortSignal.timeout(n)])), Lint rule aigate/retry-through-helper (+3 more)
 
-### Community 13 - "Definition of Done & Skills"
-Cohesion: 0.18
-Nodes (12): Definition of Done — 13 items, not self-awarded, AIGate domain model (Provider, Credential, RoutingPolicy, AccountLock, …), IMPLEMENTATION_ACCIDENT — debt not inherited from 9router, Split: machines block mechanics, skills teach judgement, Mandatory 6-phase feature process (A Discovery → F Parity), Iron law: no skill without a failing test first (RED → GREEN → REFACTOR), UI performance constraints, AccountLock entity (+4 more)
+### Community 20 - "M0 Foundation & Task Board"
+Cohesion: 0.36
+Nodes (10): Milestone M0 · Foundation, Decision (user, 2026-09-25): route all four SQLite clients through one locked sqlite-proxy wrapper, AIGate progress handoff (docs/PROGRESS_HANDOFF.md), Gap: M0 SP3 (parity harness) and SP4 (tools/extract) never built, Locked sqlite-proxy wrapper (AsyncLocalStorage, BEGIN/COMMIT around batch), Task board (PROGRESS_HANDOFF), SP2 — SPIKE-1 + Drizzle schema + 4-tier driver chain + migration runner, SP3 — Parity harness 3 tiers + recording proxy + normalizer + coverage report (+2 more)
 
-### Community 14 - "Discovery Outputs & Exit Gate"
-Cohesion: 0.33
-Nodes (11): docs/discovery/coverage.md, docs/discovery/inventory.json, Evidence with file:line — traced is a test, not a self-declaration, Fixed inventory counts (154 routes, 28 pages, 123 providers, 29 executors, 48 translators, 11 repos, 14 OAuth routes), Task 19 — M-1 exit gate, cli.ts — validate | inventory | coverage | capabilities, coverage.ts — matrix vs inventory coverage report, gate.test.ts — M-1 exit gate test (+3 more)
+### Community 21 - "Architecture Spec & Monorepo"
+Cohesion: 0.28
+Nodes (9): GET /health, Feature-based frontend structure with import boundaries, Hexagonal architecture, granularity = bounded context, Monorepo layout (apps/server, apps/web, apps/cli, packages/engine, contracts, database, tools), Open decisions not settled by this spec, AIGate Design Spec (2026-09-22), Decision 3 (user, 2026-09-25): sessions stored in the database, not a JWT, Port decision (spec §13): default 20200, PORT override, binds 127.0.0.1 (+1 more)
 
-### Community 15 - "Tracing Protocol & Gap Register"
-Cohesion: 0.22
-Nodes (11): docs/discovery/gaps.md (Gap register), §20 No blind fallback — fallback follows error semantics, §18 Streaming is first-class (TTFT, cancellation, backpressure), §7 Trace the behavior — never conclude from a function name, The Tracing Protocol (6 steps, applied by Tasks 6–18), 05-request-routing-fallback.yaml, 13-console-remote.yaml, Rule 8 — Every resource has an explicit lifecycle (+3 more)
+### Community 22 - "UI Ownership & Wiring Rules"
+Cohesion: 0.36
+Nodes (8): docs/PROJECT_MAP.md (generated U-project ownership map), Rule: an API is done only when its UI screen is wired in the same SP, Decision: CLAUDE.md requires wiring the screen in the same SP as its API, Decision (user): build the Stitch UI before connecting application logic, UI ownership handoff (docs/design/UI_HANDOFF.md), Claude's integration boundary (keep shell/screens markup, add feature api.ts hooks), UI_READY — visual layout implemented with demo data only, ?uiState=loading|empty|error preview parameter
 
-### Community 16 - "Bounded Retry & Lint Enforcement"
-Cohesion: 0.27
-Nodes (10): §8 Business rule beats old implementation, §19 Fallback as explicit policy with classified errors, Canonical error classification codes (8 values), withRetry() — bounded retry helper (≤10 attempts, capped backoff, abortable), tools/lint/check.test.mjs (lint:check 13/13), Lint rule aigate/fetch-through-transport, Lint rule aigate/fetch-timeout (accepts AbortSignal.any([..., AbortSignal.timeout(n)])), Lint rule aigate/retry-through-helper (+2 more)
-
-### Community 17 - "Core Porting Principles"
-Cohesion: 0.22
-Nodes (9): docs/capabilities.md (GENERATED capability specification), §2 Core principles — never port, rename, or translate 9router line by line, §14 Feature parity is not code parity, Final principle — 9router says WHAT, never HOW, §1 Goal — build a NEW AI gateway, 9router is reference only, §27 Separate BUSINESS REQUIREMENT from IMPLEMENTATION ACCIDENT, IMPLEMENTATION_ACCIDENT label, 9router checkout (read-only behavioral reference at E:/9router) (+1 more)
-
-### Community 18 - "CIP, ExecCtx & AIProviderPort"
-Cohesion: 0.25
-Nodes (9): Canonical Internal Protocol (CIP), vendorExtensions — typed carry-through field, ExecCtx (one shared client-cancel + deadline signal), Feature group: Translation / language functionality, Golden scenario: client cancellation, AIProviderPort, SP14 — Provider adapters by protocol family (kiro, cursor, commandcode, vertex, azure…), SP15 — Protocol adapters, all 13 formats (+1 more)
-
-### Community 19 - "Feature Matrix Schema & Lifecycle"
+### Community 23 - "Domain Model & Definition of Done"
 Cohesion: 0.29
-Nodes (7): §3 The 20 behavioral questions (trigger…edge cases), §29 Definition of Done — 13 checklist items, no self-declared DONE, §28 Per-feature process: DISCOVER→TRACE→DOCUMENT→…→REVIEW, Feature Matrix entry template (null never "" or "N/A"), parityStatus lifecycle (not-started → traced → contracted → implemented → verified), suspicion block — expected / actual / impact, schema.ts — Zod Feature Matrix entry schema
+Nodes (8): 9router as Behavioral Source of Truth (not a template to port), Definition of Done — 13 items, not self-awarded, AIGate domain model (Provider, Credential, RoutingPolicy, AccountLock, …), IMPLEMENTATION_ACCIDENT — debt not inherited from 9router, Mandatory 6-phase feature process (A Discovery → F Parity), AccountLock entity, Golden scenario: account failover, Skill: porting-behavior-not-code
 
-### Community 20 - "Latency & Bounded Workloads"
+### Community 24 - "Login & Lockout (SP6)"
+Cohesion: 0.52
+Nodes (7): identity.password-login-lockout, UI error code: RATE_LIMITED (429), UI error code: SETUP_REQUIRED (409), useLogin (features/settings/api.ts), POST /api/auth/login, /login → Login, Login lockout: 5 failures → 30 s / 2 min / 10 min / 30 min, capped at 10,000 clients
+
+### Community 25 - "Latency & Bounded Workloads"
 Cohesion: 0.29
 Nodes (7): §17 Latency — clean architecture must not add hot-path I/O, §16 Do not inherit performance issues; all large workloads bounded, Constraint — every filesystem scan uses fast-glob with an explicit ignore list, Rule 4 — Every workload must be BOUNDED, Rule 11 — Review questions beyond "does it run?" (10x/100x traffic, unbounded work), Rule 5 — Low latency: parallelize independent awaits, only when bounded, Rule 3 — Optimize performance at design time, not micro-optimization
 
-### Community 21 - "Transient Retry & Provider Unavailable"
+### Community 26 - "Transient Retry & Provider Unavailable"
 Cohesion: 0.40
 Nodes (6): fallback.executor-retry-budget, In-place retry: 502/503/504 + unreachable host, ≤3 attempts via withRetry, before first chunk, ErrorCode: PROVIDER_UNAVAILABLE, Golden scenario: all providers unavailable, Failure: connection refused, DNS failure, TLS failure, Failure: upstream answers 3xx (redirect not followed)
 
-### Community 22 - "Lean Code Rules"
+### Community 27 - "Lean Code Rules"
 Cohesion: 0.50
 Nodes (4): §15 Code quality — shortest CLEAR implementation, not shortest possible, Rule 1 — Write LEAN code, no over-engineering, Rule 2 — Code must be maintainable, no magic values or hidden side effects, Rule 12 — Priority order: Correctness → Simplicity → Maintainability → Predictable resources → Latency → Throughput → Optimization
-
-### Community 23 - "Translator & Protocol Separation"
-Cohesion: 0.50
-Nodes (4): §13 Translator/protocol separation — canonical vs vendor formats, Canonical Internal Protocol, 11-translation-i18n.yaml, Task 16 — Trace Translation engine and interface language
 
 ## Ambiguous Edges - Review These
 - `ErrorCode: TIMEOUT` → `UI error code: TIMEOUT`  [AMBIGUOUS]
@@ -191,7 +212,7 @@ Nodes (4): §13 Translator/protocol separation — canonical vs vendor formats, 
   docs/contracts/engine.md · relation: rationale_for
 
 ## Knowledge Gaps
-- **19 isolated node(s):** `ErrorCode: INTERNAL_ERROR`, `Parity tier 2 — Vendor acceptance (PASS/FAIL)`, `Parity tier 3 — Upstream shape drift (warning only)`, `Golden scenario: normal completion`, `Golden scenario: stream completion` (+14 more)
+- **18 isolated node(s):** `ErrorCode: INTERNAL_ERROR`, `Parity tier 2 — Vendor acceptance (PASS/FAIL)`, `Parity tier 3 — Upstream shape drift (warning only)`, `Golden scenario: normal completion`, `Golden scenario: stream completion` (+13 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 
 ## Suggested Questions
@@ -207,7 +228,7 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `Open decision (user confirmation pending): scan every message + system prompt for required capabilities` and `detectRequiredCapabilities()`?**
   _Edge tagged AMBIGUOUS (relation: rationale_for) - confidence is low._
-- **Why does `Bounded context: routing (core)` connect `Routing Engine & Token Saver` to `API Keys, Identity & Endpoint (SP6)`, `API-UI Map & Wired Endpoints`, `Providers, Credentials & Architecture`, `Overview, Usage & Observability`, `Error Classification & Parity Tiers`, `M-1 Discovery Tasks`, `Tracing Protocol & Gap Register`, `CIP, ExecCtx & AIProviderPort`, `Translator & Protocol Separation`?**
-  _High betweenness centrality (0.126) - this node is a cross-community bridge._
-- **Why does `Milestone M-1 · Discovery` connect `M-1 Discovery Tasks` to `API-UI Map & Wired Endpoints`, `Providers, Credentials & Architecture`, `Overview, Usage & Observability`, `Error Classification & Parity Tiers`, `Integrations, Console & Design System`, `Phase Model & Golden Scenarios`, `Discovery Outputs & Exit Gate`, `Tracing Protocol & Gap Register`, `Core Porting Principles`, `Translator & Protocol Separation`?**
-  _High betweenness centrality (0.123) - this node is a cross-community bridge._
+- **Why does `Bounded context: routing (core)` connect `Routing, Fallback & Gaps` to `Overview, Usage & Console Screens`, `Discovery Outputs & Behavioral Questions`, `Providers, Credentials & Architecture`, `API Key Validation & Identity Rules`, `SP10 OpenAI Protocol & Translation`, `Tracing Protocol & Settings General`, `Settings Context (SP5)`, `Chat API /v1 & Endpoint Screen`, `Error Taxonomy & Classification`, `API-UI Map & No-UI Rows`?**
+  _High betweenness centrality (0.134) - this node is a cross-community bridge._
+- **Why does `Milestone M-1 · Discovery` connect `Discovery Outputs & Behavioral Questions` to `Overview, Usage & Console Screens`, `Providers, Credentials & Architecture`, `Network, Proxy & Integrations`, `Routing, Fallback & Gaps`, `Tracing Protocol & Settings General`, `Parity Verification & Tapes`, `M0 Foundation & Task Board`?**
+  _High betweenness centrality (0.119) - this node is a cross-community bridge._
