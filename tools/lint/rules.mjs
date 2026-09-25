@@ -1,10 +1,9 @@
 const isMember = (node, object, property) =>
   node?.type === "MemberExpression" && !node.computed && node.object.name === object && node.property.name === property;
 
-const hasTimeoutSignal = (node, allowExecCtx) => node?.type === "ObjectExpression" && node.properties.some((entry) =>
+const hasTimeoutSignal = (node) => node?.type === "ObjectExpression" && node.properties.some((entry) =>
   entry.type === "Property" && entry.key.name === "signal" &&
-  ((entry.value.type === "CallExpression" && isMember(entry.value.callee, "AbortSignal", "timeout")) ||
-    (allowExecCtx && isMember(entry.value, "ctx", "signal"))));
+  entry.value.type === "CallExpression" && isMember(entry.value.callee, "AbortSignal", "timeout"));
 
 export const aigateRules = {
   "bounded-promise-all": {
@@ -22,12 +21,11 @@ export const aigateRules = {
     },
   },
   "fetch-timeout": {
-    meta: { type: "problem", messages: { timeout: "fetch must use AbortSignal.timeout(...) or the bounded ExecCtx signal." } },
+    meta: { type: "problem", messages: { timeout: "fetch must use AbortSignal.timeout(...) or a bounded request helper." } },
     create(context) {
-      const allowExecCtx = context.filename.replaceAll("\\", "/").includes("/apps/api/src/modules/engine/");
       return {
         CallExpression(node) {
-          if (node.callee.name === "fetch" && !hasTimeoutSignal(node.arguments[1], allowExecCtx)) {
+          if (node.callee.name === "fetch" && !hasTimeoutSignal(node.arguments[1])) {
             context.report({ node, messageId: "timeout" });
           }
         },

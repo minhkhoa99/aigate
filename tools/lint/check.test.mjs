@@ -29,17 +29,16 @@ test("secret logging, empty catch, and any fail lint", async () => {
 });
 
 test("unbounded or wildcard repository SELECT fails lint", async () => {
-  const repo = "apps/api/src/modules/usage/infrastructure/usage-repo.ts";
+  const repo = "apps/server/src/modules/usage/infrastructure/usage-repo.ts";
   await expectRule('db.query("SELECT * FROM usage");', "aigate/bounded-query", repo);
 });
 
-test("bounded operations and const assertions pass lint", async () => {
+test("bounded operations pass and opaque fetch signals fail lint", async () => {
   const source = "Promise.all([a(), b()]); fetch('/api', { signal: AbortSignal.timeout(1000) }); const modes = ['a'] as const; console.log(monkey, modes);";
   const [result] = await eslint.lintText(source, { filePath });
   assert.deepEqual(result.messages, []);
-  const [api] = await eslint.lintText("fetch('/api', { signal: ctx.signal });", { filePath: "apps/api/src/modules/engine/infrastructure/provider.ts" });
-  assert.deepEqual(api.messages, []);
-  const [repo] = await eslint.lintText('db.query("SELECT id FROM usage LIMIT 10");', { filePath: "apps/api/src/modules/usage/infrastructure/usage-repo.ts" });
+  await expectRule("fetch('/api', { signal: ctx.signal });", "aigate/fetch-timeout", "apps/server/src/modules/engine/infrastructure/provider.ts");
+  const [repo] = await eslint.lintText('db.query("SELECT id FROM usage LIMIT 10");', { filePath: "apps/server/src/modules/usage/infrastructure/usage-repo.ts" });
   assert.deepEqual(repo.messages, []);
 });
 

@@ -165,7 +165,7 @@ Retry đi qua **một helper** nhận `operation(attempt, signal)`, signal trên
 `maxAttempts` hữu hạn (> 0), `baseDelayMs`, `maxDelayMs`, và `shouldRetry(error)`.
 Helper chặn cấu hình không hợp lệ, dùng exponential backoff có trần và chờ có
 thể huỷ bằng signal; chỉ retry lỗi tạm thời của thao tác an toàn để lặp lại.
-Không retry sau khi đã gửi chunk đầu tiên cho client. Khi dựng `apps/api`, đặt
+Không retry sau khi đã gửi chunk đầu tiên cho client. Khi dựng `packages/engine`, đặt
 helper ở nơi các provider adapter cùng dùng và test giới hạn attempt, abort,
 deadline, và lỗi không thể retry trước khi bật lint cấm retry tự viết.
 
