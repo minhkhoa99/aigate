@@ -1,0 +1,958 @@
+{
+  "nodes": [
+    {
+      "id": "chat_lane_contract",
+      "label": "Chat lane contract (M1 SP12)",
+      "file_type": "document",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "POST /v1/chat/completions + GET /v1/models: one provider, one connection, streaming with backpressure and cancellation. Glues SP6 gate, SP10 protocol, SP11 connection, SP7 capabilities, SP9 adapter, SP8 transport."
+    },
+    {
+      "id": "chat_lane_service",
+      "label": "ChatLane (modules/routing/infrastructure/chat-lane.ts)",
+      "file_type": "code",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/src/modules/routing/infrastructure/chat-lane.ts"
+    },
+    {
+      "id": "v1_routes",
+      "label": "registerV1Routes — Fastify routes outside the dashboard guard, 16 MiB body limit",
+      "file_type": "code",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/src/modules/routing/infrastructure/v1-routes.ts"
+    },
+    {
+      "id": "chat_lane_key_gate",
+      "label": "Key gate in onRequest, before the body is read (401 missing_api_key / invalid_api_key)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chat_lane_keyless_local_only",
+      "label": "Keyless mode serves this machine only (loopback socket, Host, Origin) → 403 api_key_required",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Fixes a SUSPECTED_BUG: 9router served every host and DNS-rebinding pages when requireApiKey was off."
+    },
+    {
+      "id": "chat_lane_no_cors",
+      "label": "No CORS on /v1; JSON content type required (415)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chat_lane_model_resolution",
+      "label": "Model resolution: provider/model (any id) or a bare catalog id; 404 model_not_found / no_active_connection",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chat_lane_shared_signal",
+      "label": "One ExecCtx signal: client disconnect + 600 s budget (TIMEOUT) + idle watchdog",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chat_lane_headers_after_first_chunk",
+      "label": "Stream headers only after the first chunk: earlier failures are real JSON statuses",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chat_lane_backpressure",
+      "label": "Backpressure: a false write() waits for drain; the upstream read pauses with it",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chat_lane_idle_timeout",
+      "label": "Idle timeout between chunks (AIGATE_STREAM_IDLE_TIMEOUT_MS, default 300 s) → TIMEOUT error event",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chat_lane_tests",
+      "label": "apps/server/test/chat-lane.test.mjs (10 tests; real sockets for disconnect, backpressure, idle; 11 mutations caught)",
+      "file_type": "code",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_ui_map_v1_chat_completions",
+      "label": "POST /v1/chat/completions + GET /v1/models (/v1 Chat API)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired"
+    },
+    {
+      "id": "api_ui_map_screen_endpoint_base_url_pill",
+      "label": "/gateway/endpoint readiness pill (Ready / Connect a provider / Check connection) + curl test",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired"
+    },
+    {
+      "id": "web_use_chat_readiness",
+      "label": "features/gateway/api.ts useChatReadiness — shared [\"connections\"] query",
+      "file_type": "code",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/web/src/features/gateway/api.ts"
+    },
+    {
+      "id": "progress_handoff_next_m1_gate",
+      "label": "Handoff next step: M1 acceptance gate (parity tiers 1+2, 13 golden scenarios) — needs M0 SP3 parity harness",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sp_sp12",
+      "label": "SP12 — routing: chat lane + Fastify raw streaming, backpressure, cancellation",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done-ui-wired"
+    },
+    {
+      "id": "sp_sp3",
+      "label": "SP3 — Parity harness 3 tiers + recording proxy + normalizer",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next"
+    },
+    {
+      "id": "01_endpoint_apikey_settings_endpoint_enforce_require_api_key",
+      "label": "endpoint.enforce-require-api-key",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/01-endpoint-apikey-settings.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_routing_lane_entry_routes",
+      "label": "routing.lane-entry-routes",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_routing_request_preflight",
+      "label": "routing.request-preflight",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_routing_model_resolution",
+      "label": "routing.model-resolution",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_routing_client_disconnect_propagation",
+      "label": "routing.client-disconnect-propagation",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "SUSPECTED_BUG"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_routing_streaming_pipeline",
+      "label": "routing.streaming-pipeline",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_fallback_partial_stream_failure",
+      "label": "fallback.partial-stream-failure",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "SUSPECTED_BUG"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_fallback_accounts_exhausted_response",
+      "label": "fallback.accounts-exhausted-response",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "04_model_registry_mapping_catalog_model_listing_live_override",
+      "label": "catalog.model-listing-live-override",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/04-model-registry-mapping.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "chat_lane_contract",
+      "target": "sp_sp12",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp12",
+      "target": "chat_lane_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp12",
+      "target": "ctx_routing",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "ms_m1",
+      "target": "sp_sp12",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "v1_routes",
+      "target": "chat_lane_service",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "api_ui_map_v1_chat_completions",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "chat_lane_key_gate",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "chat_lane_keyless_local_only",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "chat_lane_no_cors",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "chat_lane_model_resolution",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "chat_lane_shared_signal",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "chat_lane_headers_after_first_chunk",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "chat_lane_backpressure",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "chat_lane_idle_timeout",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "protocol_parse_openai_chat",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "protocol_completion_renderer",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "protocol_stream_encoder",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "protocol_to_openai_error",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "adapter_openai_compatible",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "connections_repo",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "engine_assert_model_supports",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "transport_module_global",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_shared_signal",
+      "target": "engine_exec_ctx",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_shared_signal",
+      "target": "behavioral_streaming",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_backpressure",
+      "target": "behavioral_streaming",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_idle_timeout",
+      "target": "transport_deferred_stream_idle_timeout",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_idle_timeout",
+      "target": "gs_provider_timeout",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_headers_after_first_chunk",
+      "target": "adapter_partial_stream_error",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_headers_after_first_chunk",
+      "target": "gs_partial_stream_failure",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_shared_signal",
+      "target": "gs_client_cancellation",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_key_gate",
+      "target": "api_ui_map_post_api_keys",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_tests",
+      "target": "chat_lane_service",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_v1_chat_completions",
+      "target": "chat_lane_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_v1_chat_completions",
+      "target": "api_ui_map_screen_endpoint_base_url_pill",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_screen_endpoint_base_url_pill",
+      "target": "web_use_chat_readiness",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_screen_endpoint_base_url_pill",
+      "target": "api_ui_map_screen_endpoint_keys",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "web_use_chat_readiness",
+      "target": "web_providers_api",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp12",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_m1_gate",
+      "target": "sp_sp3",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_m1_gate",
+      "target": "parity_tier1_client_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_m1_gate",
+      "target": "parity_tier2_vendor_acceptance",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_contract",
+      "target": "01_endpoint_apikey_settings_endpoint_enforce_require_api_key",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_key_gate",
+      "target": "01_endpoint_apikey_settings_endpoint_enforce_require_api_key",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_contract",
+      "target": "05_request_routing_fallback_routing_lane_entry_routes",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_no_cors",
+      "target": "05_request_routing_fallback_routing_lane_entry_routes",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_contract",
+      "target": "05_request_routing_fallback_routing_request_preflight",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "05_request_routing_fallback_routing_request_preflight",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_contract",
+      "target": "05_request_routing_fallback_routing_model_resolution",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_model_resolution",
+      "target": "05_request_routing_fallback_routing_model_resolution",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_contract",
+      "target": "05_request_routing_fallback_routing_client_disconnect_propagation",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_shared_signal",
+      "target": "05_request_routing_fallback_routing_client_disconnect_propagation",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_contract",
+      "target": "05_request_routing_fallback_routing_streaming_pipeline",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_idle_timeout",
+      "target": "05_request_routing_fallback_routing_streaming_pipeline",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_contract",
+      "target": "05_request_routing_fallback_fallback_partial_stream_failure",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_headers_after_first_chunk",
+      "target": "05_request_routing_fallback_fallback_partial_stream_failure",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_contract",
+      "target": "05_request_routing_fallback_fallback_accounts_exhausted_response",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_model_resolution",
+      "target": "05_request_routing_fallback_fallback_accounts_exhausted_response",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_contract",
+      "target": "04_model_registry_mapping_catalog_model_listing_live_override",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "04_model_registry_mapping_catalog_model_listing_live_override",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "sp12_request_path",
+      "label": "SP12 request path: key gate → parse → resolve + capabilities → adapter → encode with backpressure",
+      "nodes": [
+        "chat_lane_key_gate",
+        "protocol_parse_openai_chat",
+        "chat_lane_model_resolution",
+        "adapter_openai_compatible",
+        "protocol_stream_encoder",
+        "chat_lane_backpressure"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}
