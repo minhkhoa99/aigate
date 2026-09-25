@@ -1,0 +1,1194 @@
+{
+  "nodes": [
+    {
+      "id": "connections_contract",
+      "label": "Connections contract (M1 SP11)",
+      "file_type": "document",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "One API-key account per registry provider (OpenAI). Keys sealed with SecretCipherPort. UI wired in the same SP."
+    },
+    {
+      "id": "secret_cipher_aes_gcm",
+      "label": "AesGcmCipher + loadSecretKey (apps/server/src/secret-cipher.ts)",
+      "file_type": "code",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/src/secret-cipher.ts",
+      "rationale": "AES-256-GCM, v1.<iv|tag|ct>, AAD provider_connections:<id>:api_key. Key from AIGATE_SECRET_KEY or secret.key (created once via exclusive link, 0600, never overwritten)."
+    },
+    {
+      "id": "decision_secret_key_file",
+      "label": "Decision (user, 2026-09-25): AES-GCM with a key file and an env override; SP11 connects OpenAI only",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "table_provider_connections",
+      "label": "Table provider_connections (migration 0002: provider unique, test_status CHECK, sealed key + hint)",
+      "file_type": "code",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/database/src/schema/connections.ts"
+    },
+    {
+      "id": "connections_repo",
+      "label": "ConnectionsRepository — allowlisted view, onConflictDoNothing → 409, stale-test guard on sealed key",
+      "file_type": "code",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/src/modules/connections/infrastructure/connections.repo.ts"
+    },
+    {
+      "id": "connections_controller",
+      "label": "ConnectionsController — /api/connections CRUD + POST /:id/test (validateCredential outside any transaction)",
+      "file_type": "code",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/src/modules/connections/infrastructure/connections.controller.ts"
+    },
+    {
+      "id": "connections_test_outcomes",
+      "label": "Test outcomes: active · invalid (AUTH_ERROR) · no_quota (QUOTA_EXHAUSTED) · unreachable (not checked)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "connections_stale_test_guard",
+      "label": "Rule: a test result is written only if the sealed key is unchanged",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transport_module_global",
+      "label": "TransportModule.with(transport?) — global HTTP_TRANSPORT; createServer({ transport }) for tests",
+      "file_type": "code",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/src/modules/transport/transport.module.ts"
+    },
+    {
+      "id": "web_providers_api",
+      "label": "features/providers/api.ts — useConnections, useSupportedProviders, useCreate/Update/Delete/TestConnection",
+      "file_type": "code",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/web/src/features/providers/api.ts"
+    },
+    {
+      "id": "web_test_result",
+      "label": "features/providers/test-result.ts — status pill, needs-attention filter, one toast per test result",
+      "file_type": "code",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/web/src/features/providers/test-result.ts"
+    },
+    {
+      "id": "web_api_timeout_option",
+      "label": "shared/api.ts timeoutMs option (25 s connection test); TIMEOUT toast shows the real seconds",
+      "file_type": "code",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/web/src/shared/api.ts"
+    },
+    {
+      "id": "api_ui_map_get_api_connections",
+      "label": "GET /api/connections (+ /providers)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired",
+      "hook": "useConnections, useSupportedProviders"
+    },
+    {
+      "id": "api_ui_map_post_api_connections",
+      "label": "POST /api/connections",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired",
+      "hook": "useCreateConnection"
+    },
+    {
+      "id": "api_ui_map_patch_api_connections_id",
+      "label": "PATCH /api/connections/:id",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired",
+      "hook": "useUpdateConnection"
+    },
+    {
+      "id": "api_ui_map_delete_api_connections_id",
+      "label": "DELETE /api/connections/:id",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired",
+      "hook": "useDeleteConnection"
+    },
+    {
+      "id": "api_ui_map_post_api_connections_id_test",
+      "label": "POST /api/connections/:id/test",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired",
+      "hook": "useTestConnection"
+    },
+    {
+      "id": "api_ui_map_screen_connections_wired",
+      "label": "/providers/connections → Connections (real table, Add / Replace key / Test / Disable / Delete)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired"
+    },
+    {
+      "id": "api_ui_map_screen_provider_detail_wired",
+      "label": "/providers/detail → ProviderDetail (live Connection panel or Not supported yet)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired"
+    },
+    {
+      "id": "api_ui_map_screen_llm_providers_wired",
+      "label": "/providers → LlmProviders (Connected pill)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired"
+    },
+    {
+      "id": "api_ui_map_screen_providers",
+      "label": "/providers/quota → Quota; custom provider form; multi-account",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "waiting:SP16"
+    },
+    {
+      "id": "api_ui_map_err_provider_not_supported",
+      "label": "UI error code: PROVIDER_NOT_SUPPORTED (400)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_ui_map_err_already_connected",
+      "label": "UI error code: ALREADY_CONNECTED (409)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_ui_map_err_credential_unreadable",
+      "label": "UI error code: CREDENTIAL_UNREADABLE (409)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "connections_tests",
+      "label": "apps/server/test/connections.test.mjs (7) + secret-cipher.test.mjs (3); 16 mutations caught; live OpenAI smoke",
+      "file_type": "code",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "progress_handoff_next_sp12",
+      "label": "Handoff next step: SP12 /v1/chat/completions chat lane (key check, connection, adapter, streaming, pill live)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sp_sp11",
+      "label": "SP11 — connections (single apikey account)",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done-ui-wired"
+    },
+    {
+      "id": "sp_sp12",
+      "label": "SP12 — routing: chat lane + Fastify raw streaming, backpressure, cancellation",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next"
+    },
+    {
+      "id": "03_accounts_multiaccount_connection_storage_shape_json_blob",
+      "label": "connection.storage-shape-json-blob",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/03-accounts-multiaccount.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "03_accounts_multiaccount_connection_create_dedup_and_priority_assignment",
+      "label": "connection.create-dedup-and-priority-assignment",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/03-accounts-multiaccount.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "03_accounts_multiaccount_connection_delete_and_reorder",
+      "label": "connection.delete-and-reorder",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/03-accounts-multiaccount.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "02_providers_auth_catalog_connection_listing",
+      "label": "catalog.connection-listing",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "02_providers_auth_catalog_connection_detail_crud",
+      "label": "catalog.connection-detail-crud",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "02_providers_auth_connection_test_single_connection",
+      "label": "connection.test-single-connection",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "02_providers_auth_connection_client_listing_sanitized",
+      "label": "connection.client-listing-sanitized",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "connections_contract",
+      "target": "sp_sp11",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp11",
+      "target": "connections_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp11",
+      "target": "ctx_connections",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_secret_key_file",
+      "target": "secret_cipher_aes_gcm",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "secret_cipher_aes_gcm",
+      "target": "port_secret_cipher",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_repo",
+      "target": "secret_cipher_aes_gcm",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_repo",
+      "target": "table_provider_connections",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_repo",
+      "target": "connections_stale_test_guard",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "connections_repo",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "adapter_validate_credential",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "transport_module_global",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "connections_test_outcomes",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_test_outcomes",
+      "target": "adapter_status_classification",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "transport_module_global",
+      "target": "port_http_transport",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "ctx_connections",
+      "target": "connections_controller",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_get_api_connections",
+      "target": "connections_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "api_ui_map_get_api_connections",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_get_api_connections",
+      "target": "web_providers_api",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_get_api_connections",
+      "target": "api_ui_map_screen_connections_wired",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_post_api_connections",
+      "target": "connections_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "api_ui_map_post_api_connections",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_post_api_connections",
+      "target": "web_providers_api",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_post_api_connections",
+      "target": "api_ui_map_screen_connections_wired",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_patch_api_connections_id",
+      "target": "connections_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "api_ui_map_patch_api_connections_id",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_patch_api_connections_id",
+      "target": "web_providers_api",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_patch_api_connections_id",
+      "target": "api_ui_map_screen_connections_wired",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_delete_api_connections_id",
+      "target": "connections_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "api_ui_map_delete_api_connections_id",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_delete_api_connections_id",
+      "target": "web_providers_api",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_delete_api_connections_id",
+      "target": "api_ui_map_screen_connections_wired",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_post_api_connections_id_test",
+      "target": "connections_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "api_ui_map_post_api_connections_id_test",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_post_api_connections_id_test",
+      "target": "web_providers_api",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_post_api_connections_id_test",
+      "target": "api_ui_map_screen_connections_wired",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_get_api_connections",
+      "target": "api_ui_map_screen_provider_detail_wired",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_get_api_connections",
+      "target": "api_ui_map_screen_llm_providers_wired",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_post_api_connections_id_test",
+      "target": "web_test_result",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_post_api_connections_id_test",
+      "target": "web_api_timeout_option",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_screen_connections_wired",
+      "target": "screen_connections",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_screen_provider_detail_wired",
+      "target": "screen_provider_detail",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_screen_llm_providers_wired",
+      "target": "screen_llm_providers",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "web_providers_api",
+      "target": "api_ui_map_shared_api_client",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "web_test_result",
+      "target": "connections_test_outcomes",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_err_provider_not_supported",
+      "target": "api_ui_map_to_problem",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "api_ui_map_err_provider_not_supported",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_err_already_connected",
+      "target": "api_ui_map_to_problem",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "api_ui_map_err_already_connected",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_err_credential_unreadable",
+      "target": "api_ui_map_to_problem",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "api_ui_map_err_credential_unreadable",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_err_not_found",
+      "target": "connections_controller",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_tests",
+      "target": "connections_controller",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_tests",
+      "target": "secret_cipher_aes_gcm",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp11",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp12",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp12",
+      "target": "sp_sp12",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp12",
+      "target": "connections_repo",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp12",
+      "target": "protocol_parse_openai_chat",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp12",
+      "target": "api_ui_map_screen_endpoint_base_url_pill",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_contract",
+      "target": "03_accounts_multiaccount_connection_storage_shape_json_blob",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "table_provider_connections",
+      "target": "03_accounts_multiaccount_connection_storage_shape_json_blob",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_contract",
+      "target": "03_accounts_multiaccount_connection_create_dedup_and_priority_assignment",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_repo",
+      "target": "03_accounts_multiaccount_connection_create_dedup_and_priority_assignment",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_contract",
+      "target": "03_accounts_multiaccount_connection_delete_and_reorder",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_repo",
+      "target": "03_accounts_multiaccount_connection_delete_and_reorder",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_contract",
+      "target": "02_providers_auth_catalog_connection_listing",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_repo",
+      "target": "02_providers_auth_catalog_connection_listing",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_contract",
+      "target": "02_providers_auth_catalog_connection_detail_crud",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_controller",
+      "target": "02_providers_auth_catalog_connection_detail_crud",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_contract",
+      "target": "02_providers_auth_connection_test_single_connection",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_test_outcomes",
+      "target": "02_providers_auth_connection_test_single_connection",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_contract",
+      "target": "02_providers_auth_connection_client_listing_sanitized",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_repo",
+      "target": "02_providers_auth_connection_client_listing_sanitized",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "sp11_connection_test_flow",
+      "label": "SP11 test flow: UI Test → controller → decrypt → validateCredential → guarded write → toast",
+      "nodes": [
+        "web_test_result",
+        "connections_controller",
+        "secret_cipher_aes_gcm",
+        "adapter_validate_credential",
+        "connections_stale_test_guard"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

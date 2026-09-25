@@ -257,6 +257,7 @@ Checks and status:
 - **What it adds:** API endpoint nodes with a `status` of `wired` or `waiting:<SP>`, linked to their screen, hooks, contract, bounded context, SP, and UI error codes. For example, `POST /api/keys` links to `useCreateKey`, the SP6 contract, and `LIMIT_REACHED`.
 - **Not re-extracted:** the Stitch HTML and PNGs and the Feature Matrix YAML. Together they would need about 30 agents; run a full `/graphify docs` when needed.
 - **Python:** use `C:\Users\PC\AppData\Local\Programs\Python\Python312\python.exe`. The `python` on PATH is a venv without graphify.
+- **After each SP:** write a hand-authored `graphify-out/.graphify_chunk_NN.json` (nodes carry `status`; SP nodes use the task-board status), then run `graphify-out/merge_chunk.py merge <chunk> [stale,ids]`, label the printed communities, run `merge_chunk.py finish <labels.json> <new doc> "<note>"`, then `build_project_map.py`.
 
 **M1 SP8 (`transport`) is complete locally.** The contract is `docs/contracts/transport.md`.
 
