@@ -123,14 +123,15 @@
     {
       "id": "port_http_transport",
       "label": "HttpTransportPort",
-      "file_type": "rationale",
+      "file_type": "code",
       "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
       "source_location": "\u00a74.2",
       "source_url": null,
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "rationale": "Implementations: relay / proxy / direct / MITM-bypass DNS."
+      "rationale": "Implementations: relay / proxy / direct / MITM-bypass DNS.",
+      "location": "packages/engine/src/ports.ts"
     },
     {
       "id": "port_credential_store",
@@ -243,7 +244,7 @@
     {
       "id": "ctx_transport",
       "label": "Bounded context: transport",
-      "file_type": "rationale",
+      "file_type": "document",
       "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
       "source_location": "\u00a74.4",
       "source_url": null,
@@ -991,7 +992,8 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "rationale": "Phase A+B for all 23 feature groups, producing the full Feature Matrix and capabilities.md. Not one line of product code. A+B done once system-wide because only a whole-system view reveals overlapping features; C\u2192F is decision-and-build and belongs inside each SP, since doing it early makes it stale before use."
+      "rationale": "Phase A+B for all 23 feature groups, producing the full Feature Matrix and capabilities.md. Not one line of product code. A+B done once system-wide because only a whole-system view reveals overlapping features; C\u2192F is decision-and-build and belongs inside each SP, since doing it early makes it stale before use.",
+      "status": "done"
     },
     {
       "id": "ms_m0",
@@ -1060,7 +1062,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "done"
     },
     {
       "id": "sp_sp1",
@@ -1071,7 +1074,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "done"
     },
     {
       "id": "sp_sp2",
@@ -1082,7 +1086,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "done"
     },
     {
       "id": "sp_sp3",
@@ -1093,7 +1098,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "not-started"
     },
     {
       "id": "sp_sp4",
@@ -1104,7 +1110,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "not-started"
     },
     {
       "id": "sp_sp5",
@@ -1115,7 +1122,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "done-ui-wired"
     },
     {
       "id": "sp_sp6",
@@ -1126,7 +1134,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "done-ui-wired"
     },
     {
       "id": "sp_sp7",
@@ -1137,7 +1146,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "done-no-ui"
     },
     {
       "id": "sp_sp8",
@@ -1148,7 +1158,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "done-no-ui"
     },
     {
       "id": "sp_sp9",
@@ -1159,7 +1170,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "next"
     },
     {
       "id": "sp_sp10",
@@ -1170,7 +1182,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "pending"
     },
     {
       "id": "sp_sp11",
@@ -1181,7 +1194,8 @@
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "pending"
     },
     {
       "id": "sp_sp12",
@@ -1193,7 +1207,8 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "rationale": "Explicitly the hardest SP of M1 \u2014 it is why Fastify was chosen over Express (needs real reply.raw + backpressure)."
+      "rationale": "Explicitly the hardest SP of M1 \u2014 it is why Fastify was chosen over Express (needs real reply.raw + backpressure).",
+      "status": "pending"
     },
     {
       "id": "sp_sp13",
@@ -5380,6 +5395,389 @@
       "author": null,
       "contributor": null,
       "rationale": "Spec \u00a76.1 called 9router's usage write synchronous; it is fire-and-forget with swallowed errors. The buffered writer now also counts write failures."
+    },
+    {
+      "id": "transport_contract",
+      "label": "Transport contract (M1 SP8)",
+      "file_type": "document",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Scope per spec section 9: HttpTransportPort, direct branch and timeout only; relay, proxy pools, outbound proxy and MITM-bypass DNS sit behind the same port later (SP18). SP8 has no HTTP API and no UI."
+    },
+    {
+      "id": "transport_http_request",
+      "label": "HttpRequest (requires timeoutMs)",
+      "file_type": "code",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/ports.ts"
+    },
+    {
+      "id": "transport_http_response",
+      "label": "HttpResponse",
+      "file_type": "code",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/ports.ts"
+    },
+    {
+      "id": "transport_read_bounded_text",
+      "label": "readBoundedText() (bounded body reader, default 4 MiB)",
+      "file_type": "code",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/http.ts",
+      "rationale": "A body over maxBytes cancels the stream and throws; a truncated body is never returned."
+    },
+    {
+      "id": "transport_direct_transport",
+      "label": "DirectTransport (direct branch implementation)",
+      "file_type": "code",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/src/modules/transport/infrastructure/direct-transport.ts",
+      "rationale": "https only (http to loopback only), timeoutMs inside ctx.signal covering headers and body, never follows redirects, caller abort keeps its reason, errors name the host only."
+    },
+    {
+      "id": "transport_module",
+      "label": "TransportModule (injects DirectTransport under HTTP_TRANSPORT)",
+      "file_type": "code",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/src/modules/transport"
+    },
+    {
+      "id": "10_proxy_pools_transport_proxy_priority_chain",
+      "label": "transport.proxy-priority-chain",
+      "file_type": "document",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "rationale": "REFERENCE_BEHAVIOR: with no relay and no proxy, 9router sends to the unpatched global fetch. Kept as the direct branch; contracted because relay and proxy branches come in SP18."
+    },
+    {
+      "id": "transport_timeout_ms_rule",
+      "label": "Rule: every call states timeoutMs (1 to 600000 ms), bounding headers and body inside ctx.signal",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "9router fallback.timeout: null means the direct chat fetch had no timeout, labeled IMPLEMENTATION_ACCIDENT; spec section 4.2 requires the shared ctx.signal deadline."
+    },
+    {
+      "id": "transport_rule_host_only_errors",
+      "label": "Rule: error messages and details name the host only; headers (Authorization) never appear",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transport_fail_malformed_url",
+      "label": "Failure: malformed URL or non-https (http only to localhost/127.0.0.1/[::1])",
+      "file_type": "document",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "result": "EngineError INVALID_REQUEST, before any I/O"
+    },
+    {
+      "id": "transport_fail_timeout_range",
+      "label": "Failure: timeoutMs not an integer from 1 to 600000",
+      "file_type": "document",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "result": "RangeError (programming error)"
+    },
+    {
+      "id": "transport_fail_caller_abort",
+      "label": "Failure: caller ctx.signal aborts (client left, budget spent)",
+      "file_type": "document",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "result": "Rejects with ctx.signal.reason unchanged, never relabeled as a provider failure"
+    },
+    {
+      "id": "transport_fail_timeout",
+      "label": "Failure: no headers or stalled body within timeoutMs",
+      "file_type": "document",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "result": "EngineError TIMEOUT with { host, timeoutMs }"
+    },
+    {
+      "id": "transport_fail_network",
+      "label": "Failure: connection refused, DNS failure, TLS failure",
+      "file_type": "document",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "result": "EngineError PROVIDER_UNAVAILABLE with { host }"
+    },
+    {
+      "id": "transport_fail_redirect",
+      "label": "Failure: upstream answers 3xx (redirect not followed)",
+      "file_type": "document",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "result": "EngineError PROVIDER_UNAVAILABLE",
+      "rationale": "Not following the redirect keeps the credential from going to another host."
+    },
+    {
+      "id": "transport_fail_http_status",
+      "label": "Upstream answers 4xx or 5xx",
+      "file_type": "document",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "result": "Returned as a normal HttpResponse; the adapter classifies the status (SP9)"
+    },
+    {
+      "id": "transport_fail_body_too_large",
+      "label": "Failure: body larger than maxBytes in readBoundedText",
+      "file_type": "document",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "result": "Stream cancelled, EngineError PROVIDER_UNAVAILABLE; truncated body never returned"
+    },
+    {
+      "id": "lint_fetch_through_transport",
+      "label": "Lint rule aigate/fetch-through-transport",
+      "file_type": "code",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Spec section 4.2 / SP0.1: raw fetch with an opaque signal stayed rejected until a bounded helper existed; the transport is that helper, so fetch is rejected in server and packages except modules/transport/infrastructure/."
+    },
+    {
+      "id": "lint_retry_through_helper",
+      "label": "Lint rule aigate/retry-through-helper",
+      "file_type": "code",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Spec section 11.2: no uncapped retry, only through the single helper. A loop around an awaited try/catch in server or engine is rejected (retry.ts exempt); use withRetry."
+    },
+    {
+      "id": "lint_fetch_timeout",
+      "label": "Lint rule aigate/fetch-timeout (accepts AbortSignal.any([..., AbortSignal.timeout(n)]))",
+      "file_type": "code",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "lint_check_tests",
+      "label": "tools/lint/check.test.mjs (lint:check 13/13)",
+      "file_type": "code",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transport_tests",
+      "label": "apps/server/test/transport.test.mjs (10 tests, real local HTTP server, 6 mutations caught)",
+      "file_type": "code",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Mutations caught: following redirects, relabeling a caller abort, dropping the per-request timeout, allowing http to any host, returning the raw body without error mapping, an unbounded body read. Each test checks the credential is not in the error."
+    },
+    {
+      "id": "transport_test_timeout_rule",
+      "label": "Rule: server, engine, and database test scripts pass --test-timeout=30000",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "The mutation that dropped the timeout hung the test run instead of failing it."
+    },
+    {
+      "id": "transport_deferred_stream_idle_timeout",
+      "label": "Deferred: streaming idle timeout (gap between chunks) with SP12",
+      "file_type": "document",
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Until SP12, timeoutMs bounds the whole stream."
+    },
+    {
+      "id": "api_ui_map_row_sp8_no_ui",
+      "label": "API_UI_MAP row: SP8 transport, No UI",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Outbound HTTP only; its error codes (TIMEOUT, PROVIDER_UNAVAILABLE, INVALID_REQUEST) reach users through /v1 in SP12."
+    },
+    {
+      "id": "api_ui_map_row_sp7_no_ui",
+      "label": "API_UI_MAP row: SP7 packages/engine, No UI",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "No HTTP API; /v1 (SP12) is the first thing a screen can show."
+    },
+    {
+      "id": "progress_handoff_task_board",
+      "label": "Task board (PROGRESS_HANDOFF)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "User rule 2026-09-25: update the table and the touched SP section every time an SP or subtask finishes."
+    },
+    {
+      "id": "progress_handoff_next_sp9",
+      "label": "Next step: M1 SP9 OpenAI-compatible adapter (AIProviderPort over HttpTransportPort, no UI)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next",
+      "rationale": "SP9 has no UI; the first wiring comes with SP11 and SP12. Tests run against a local fake upstream."
+    },
+    {
+      "id": "sp9_cip_openai_mapping",
+      "label": "SP9 plan: CIP to/from OpenAI chat completions, UnsupportedFeatureError for what the format cannot carry",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sp9_status_classification",
+      "label": "SP9 plan: upstream HTTP status classification into ErrorCode",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "mapping": "401/403 -> AUTH_ERROR; 429 -> RATE_LIMIT or QUOTA_EXHAUSTED; 5xx -> PROVIDER_UNAVAILABLE; 400 -> INVALID_REQUEST; 404 -> MODEL_UNAVAILABLE"
+    },
+    {
+      "id": "sp9_retry_before_stream",
+      "label": "SP9 plan: retries only through withRetry and only before a stream starts",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sp9_sse_stream_parsing",
+      "label": "SP9 plan: parse SSE into StreamChunk with bounded buffers",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
     }
   ],
   "edges": [
@@ -18602,6 +19000,1056 @@
       "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
       "source_location": "\u00a713",
       "weight": 1.0
+    },
+    {
+      "source": "transport_contract",
+      "target": "sp_sp8",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_contract",
+      "target": "ctx_transport",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_contract",
+      "target": "port_http_transport",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_contract",
+      "target": "api_ui_map_doc",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_contract",
+      "target": "sp_sp18",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_direct_transport",
+      "target": "port_http_transport",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_module",
+      "target": "transport_direct_transport",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_module",
+      "target": "ctx_transport",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "port_http_transport",
+      "target": "transport_http_request",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "port_http_transport",
+      "target": "transport_http_response",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_read_bounded_text",
+      "target": "engine_package",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "port_http_transport",
+      "target": "engine_package",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_direct_transport",
+      "target": "transport_read_bounded_text",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_direct_transport",
+      "target": "10_proxy_pools_transport_proxy_priority_chain",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "10_proxy_pools_transport_proxy_priority_chain",
+      "target": "sp_sp18",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_timeout_ms_rule",
+      "target": "10_proxy_pools_transport_proxy_priority_chain",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_timeout_ms_rule",
+      "target": "transport_http_request",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_timeout_ms_rule",
+      "target": "engine_exec_ctx",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_rule_host_only_errors",
+      "target": "transport_direct_transport",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_direct_transport",
+      "target": "transport_fail_malformed_url",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_direct_transport",
+      "target": "transport_fail_timeout_range",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_direct_transport",
+      "target": "transport_fail_caller_abort",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_direct_transport",
+      "target": "transport_fail_timeout",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_direct_transport",
+      "target": "transport_fail_network",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_direct_transport",
+      "target": "transport_fail_redirect",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_direct_transport",
+      "target": "transport_fail_http_status",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_read_bounded_text",
+      "target": "transport_fail_body_too_large",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_fail_malformed_url",
+      "target": "err_invalid_request",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_fail_caller_abort",
+      "target": "engine_exec_ctx",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_fail_caller_abort",
+      "target": "gs_client_cancellation",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_fail_timeout",
+      "target": "err_timeout",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_fail_timeout",
+      "target": "gs_provider_timeout",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_fail_network",
+      "target": "err_provider_unavailable",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_fail_redirect",
+      "target": "err_provider_unavailable",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_fail_body_too_large",
+      "target": "err_provider_unavailable",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_fail_http_status",
+      "target": "transport_http_response",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_fail_http_status",
+      "target": "sp9_status_classification",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "lint_fetch_through_transport",
+      "target": "transport_direct_transport",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "lint_fetch_through_transport",
+      "target": "sp_sp0_1",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "lint_retry_through_helper",
+      "target": "engine_with_retry",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "lint_retry_through_helper",
+      "target": "sp_sp0_1",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "lint_retry_through_helper",
+      "target": "rule_error_handling",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "lint_fetch_timeout",
+      "target": "sp_sp0_1",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "lint_fetch_timeout",
+      "target": "lint_fetch_through_transport",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "lint_check_tests",
+      "target": "lint_fetch_through_transport",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "lint_check_tests",
+      "target": "lint_retry_through_helper",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_tests",
+      "target": "transport_direct_transport",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_tests",
+      "target": "transport_rule_host_only_errors",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_test_timeout_rule",
+      "target": "transport_tests",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_deferred_stream_idle_timeout",
+      "target": "sp_sp12",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "transport_deferred_stream_idle_timeout",
+      "target": "transport_timeout_ms_rule",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_doc",
+      "target": "api_ui_map_row_sp8_no_ui",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_doc",
+      "target": "api_ui_map_row_sp7_no_ui",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_row_sp8_no_ui",
+      "target": "sp_sp8",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_row_sp7_no_ui",
+      "target": "sp_sp7",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_rule_no_ui_row",
+      "target": "api_ui_map_row_sp8_no_ui",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_rule_no_ui_row",
+      "target": "api_ui_map_row_sp7_no_ui",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_row_sp8_no_ui",
+      "target": "err_timeout",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_row_sp8_no_ui",
+      "target": "err_provider_unavailable",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_row_sp8_no_ui",
+      "target": "err_invalid_request",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_row_sp8_no_ui",
+      "target": "api_ui_map_v1_chat_completions",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "err_invalid_request",
+      "target": "api_ui_map_err_invalid_request",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "err_timeout",
+      "target": "api_ui_map_err_timeout",
+      "relation": "conceptually_related_to",
+      "confidence": "AMBIGUOUS",
+      "confidence_score": 0.2,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_doc",
+      "target": "progress_handoff_task_board",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "ms_m_minus_1",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp0",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp1",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp2",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp3",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp4",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp5",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp6",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "api_ui_map_doc",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp7",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp8",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp9",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp10",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp11",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp12",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "progress_handoff_gap_sp3_sp4",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp8",
+      "target": "transport_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp7",
+      "target": "engine_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp5",
+      "target": "settings_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp6",
+      "target": "identity_apikeys_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_next_sp9",
+      "target": "progress_handoff_next_sp8",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_next_sp9",
+      "target": "sp_sp9",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp9",
+      "target": "port_ai_provider",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp9",
+      "target": "port_http_transport",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_next_sp9",
+      "target": "sp9_cip_openai_mapping",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_next_sp9",
+      "target": "sp9_status_classification",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_next_sp9",
+      "target": "sp9_retry_before_stream",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "progress_handoff_next_sp9",
+      "target": "sp9_sse_stream_parsing",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_cip_openai_mapping",
+      "target": "concept_cip",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_cip_openai_mapping",
+      "target": "engine_unsupported_feature_error",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_status_classification",
+      "target": "err_auth_error",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_status_classification",
+      "target": "err_rate_limit",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_status_classification",
+      "target": "err_quota_exhausted",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_status_classification",
+      "target": "err_provider_unavailable",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_status_classification",
+      "target": "err_invalid_request",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_status_classification",
+      "target": "err_model_unavailable",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_status_classification",
+      "target": "concept_error_taxonomy",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_retry_before_stream",
+      "target": "engine_with_retry",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_retry_before_stream",
+      "target": "lint_retry_through_helper",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp9_sse_stream_parsing",
+      "target": "gs_stream_completion",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "err_timeout",
+      "target": "concept_error_taxonomy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
     }
   ],
   "hyperedges": [
@@ -18812,8 +20260,55 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/design/API_UI_MAP.md"
+    },
+    {
+      "id": "sp8_transport_stack",
+      "label": "SP8 transport stack: port, direct implementation, module, bounded reader",
+      "nodes": [
+        "port_http_transport",
+        "transport_direct_transport",
+        "transport_module",
+        "transport_read_bounded_text",
+        "transport_http_request",
+        "transport_http_response"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md"
+    },
+    {
+      "id": "sp8_lint_enforcement",
+      "label": "Deferred SP0.1 rules enforced in lint by SP8",
+      "nodes": [
+        "lint_fetch_through_transport",
+        "lint_retry_through_helper",
+        "lint_fetch_timeout",
+        "lint_check_tests",
+        "sp_sp0_1"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/transport.md"
+    },
+    {
+      "id": "sp9_adapter_flow",
+      "label": "SP9 adapter flow: AIProviderPort over HttpTransportPort with status classification and bounded retry",
+      "nodes": [
+        "sp_sp9",
+        "port_ai_provider",
+        "port_http_transport",
+        "sp9_status_classification",
+        "engine_with_retry",
+        "transport_fail_http_status"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/PROGRESS_HANDOFF.md"
     }
   ],
-  "input_tokens": 475429,
+  "input_tokens": 574916,
   "output_tokens": 0
 }

@@ -104,12 +104,13 @@ Nguồn: `docs/superpowers/specs/2026-09-22-aigate-design.md` (spec — thắng 
 - **Audit finding: login-callback / deploy-wizard / authflow-modals are showcases, not routes** — màn: callback, login, deploy_wizard, authflow
 - **GAP: Token Saver screen missing from the U0–U11 table** — màn: token_saver — sửa ở: U6
 
-Cạnh AMBIGUOUS cần người quyết: **4**
+Cạnh AMBIGUOUS cần người quyết: **5**
 
 - Feature group — MCP (API with no UI, found during spec work) → The 23 feature groups required by behavioral.md §5 (`conceptually_related_to`, Task 17 — MCP is an extra group found during spec work, not one of the 23)
 - GAP: Token Saver screen missing from the U0–U11 table → U6 — Routing & Fallback + Simulator (`references`, §10.10)
 - U6 — Routing & Fallback + Simulator → Token Saver — /gateway/token-saver (`implements`, §10.8 vs §10.10)
 - Open decision (user confirmation pending): scan every message + system prompt for required capabilities → detectRequiredCapabilities() (`rationale_for`, User confirmation pending)
+- ErrorCode: TIMEOUT → UI error code: TIMEOUT (`conceptually_related_to`, )
 
 ## 6 · Tra cứu sâu hơn
 
