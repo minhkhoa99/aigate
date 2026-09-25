@@ -1,13 +1,13 @@
 {
   "docs/superpowers/specs/2026-09-22-aigate-design.md": {
-    "mtime": 1790061904.424618,
-    "ast_hash": "0daaa5c3015a7821b1632a9cc85bac5f",
-    "semantic_hash": "0daaa5c3015a7821b1632a9cc85bac5f"
+    "mtime": 1790334146.656176,
+    "ast_hash": "936cba8a0e60094b17a00e9897d3b9a2",
+    "semantic_hash": "936cba8a0e60094b17a00e9897d3b9a2"
   },
   "docs/superpowers/plans/2026-09-22-m1-discovery.md": {
-    "mtime": 1790065307.8219812,
-    "ast_hash": "b6e7cbdc88b482da270c7f26c17e60f6",
-    "semantic_hash": "b6e7cbdc88b482da270c7f26c17e60f6"
+    "mtime": 1790304403.9357767,
+    "ast_hash": "3baae75f4501ef012a710f76861ca220",
+    "semantic_hash": "3baae75f4501ef012a710f76861ca220"
   },
   "docs/governance/rules.md": {
     "mtime": 1790061879.9869454,
@@ -33,5 +33,35 @@
     "mtime": 1790070301.8460517,
     "ast_hash": "96aa81bf9be6f51b2a5eaa074833bac2",
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
+  },
+  "docs/design/API_UI_MAP.md": {
+    "mtime": 1790340180.5155308,
+    "ast_hash": "8d009447e2228139fd420905defb57f7",
+    "semantic_hash": "8d009447e2228139fd420905defb57f7"
+  },
+  "docs/design/UI_HANDOFF.md": {
+    "mtime": 1790304403.8708513,
+    "ast_hash": "090573d34a2635767c76149ff87b2f93",
+    "semantic_hash": "090573d34a2635767c76149ff87b2f93"
+  },
+  "docs/contracts/settings.md": {
+    "mtime": 1790330660.2203417,
+    "ast_hash": "fc10cce4b6b3f8b2551b63785e2ccc4b",
+    "semantic_hash": "fc10cce4b6b3f8b2551b63785e2ccc4b"
+  },
+  "docs/contracts/identity-apikeys.md": {
+    "mtime": 1790339978.174816,
+    "ast_hash": "823b270ef509f953a68ec098b82d8867",
+    "semantic_hash": "823b270ef509f953a68ec098b82d8867"
+  },
+  "docs/contracts/engine.md": {
+    "mtime": 1790341129.5853865,
+    "ast_hash": "9166eac32c0216437d32f903e87c799e",
+    "semantic_hash": "9166eac32c0216437d32f903e87c799e"
+  },
+  "docs/PROGRESS_HANDOFF.md": {
+    "mtime": 1790341152.2939193,
+    "ast_hash": "08207d8f1e44d1307787cc1d16e2b4e0",
+    "semantic_hash": "08207d8f1e44d1307787cc1d16e2b4e0"
   }
 }

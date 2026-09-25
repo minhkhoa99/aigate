@@ -229,6 +229,13 @@ Checks and status:
 - **Open (user decision):** 9router scans only the trailing user turn for required capabilities. AIGate scans every message and the system prompt, labeled `SUSPECTED_BUG` in the contract.
 - **Gap:** M0 SP3 (the parity harness) and SP4 (`tools/extract`) were never built; SP13 and the parity gates need them.
 
+**Knowledge graph refreshed (2026-09-25).** `graphify-out/graph.json` now has 466 nodes, 1272 edges, and 17 communities. `docs/PROJECT_MAP.md` was regenerated.
+
+- **Corpus:** the original 7 docs plus `API_UI_MAP.md`, `UI_HANDOFF.md`, the three contracts, and this handoff, 13 files in total.
+- **What it adds:** API endpoint nodes with a `status` of `wired` or `waiting:<SP>`, linked to their screen, hooks, contract, bounded context, SP, and UI error codes. For example, `POST /api/keys` links to `useCreateKey`, the SP6 contract, and `LIMIT_REACHED`.
+- **Not re-extracted:** the Stitch HTML and PNGs and the Feature Matrix YAML. Together they would need about 30 agents; run a full `/graphify docs` when needed.
+- **Python:** use `C:UsersPCAppDataLocalProgramsPythonPython312python.exe`. The `python` on PATH is a venv without graphify.
+
 **Next step, M1 SP8 (`transport`: `HttpTransportPort`, direct branch plus timeout only):**
 1. Put the port in `packages/engine` and the direct implementation where spec §4.2 places it.
 2. Use the single `ExecCtx.signal`, and use `withRetry` only for safe calls.

@@ -5,8 +5,15 @@
       "input_tokens": 251553,
       "output_tokens": 0,
       "files": 7
+    },
+    {
+      "date": "2026-09-25T13:14:24.470220+00:00",
+      "input_tokens": 223876,
+      "output_tokens": 0,
+      "files": 7,
+      "mode": "update (7 changed docs)"
     }
   ],
-  "total_input_tokens": 251553,
+  "total_input_tokens": 475429,
   "total_output_tokens": 0
 }
