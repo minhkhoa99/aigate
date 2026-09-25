@@ -207,4 +207,31 @@ Checks:
   - Sign out, the old password rejected, the new password accepted.
   - The only console errors were a missing `favicon.ico` (404), which predates this work.
 
-**Next step, M1 SP7 (`engine`: CIP core, schema registry, capability resolution, one registry entry):** create `packages/engine` (framework-free, spec §2–§3), then implement the bounded retry helper from §4.2 and enforce provider `execute` timeouts and bounded retries (the deferred part of SP0.1).
+**Error handling and the API-to-UI map (2026-09-25).**
+- `apps/web/src/shared/api.ts` turns every failure into an `ApiError` with a stable code: `NETWORK_ERROR`, `TIMEOUT`, `BAD_RESPONSE`, or a server code.
+- `shared/errors.ts` (`toProblem`, unit-tested) holds the one code-to-message table.
+- A 401 `UNAUTHENTICATED` fires a session-ended event: the shell shows "Your session ended" and redirects to `/login`. A deliberate sign-out does not show it; both cases were checked in the browser.
+- Failed mutations re-read the server.
+- `docs/design/API_UI_MAP.md` is the living map from each API to its screen and error handling. `CLAUDE.md` now requires wiring the screen in the same SP as its API.
+
+**M1 SP7 (`engine`) is complete locally.** The contract is `docs/contracts/engine.md`. `packages/engine` has zero npm imports; the dependency-cruiser rule `engine-framework-free` is proven by a `lint:check` fixture, now 11/11. It holds:
+- **CIP core:** superset types, `vendorExtensions`, and `UnsupportedFeatureError`.
+- **Error taxonomy:** the 8 codes, with `FALLBACK_POLICY` as data.
+- **Registry:** `defineRegistry()` validation, and one entry, `openai`, with 4 chat models taken from 9router data.
+- **Capabilities:** declared capabilities are final; undeclared models get the floor plus the additive vision heuristic, which checks `NOT_VISION` first. `detectRequiredCapabilities` scans every message and the system prompt. `assertModelSupports` returns `MODEL_UNAVAILABLE` or `INVALID_REQUEST`.
+- **`withRetry`:** the bounded retry helper deferred from SP0.1. It allows at most 10 attempts, a capped backoff, an abortable wait, and no retry after an abort.
+- **Ports:** `AIProviderPort` and `ExecCtx`.
+
+Checks and status:
+- Engine tests pass 15/15, and 10 mutations each made a test fail.
+- Matrix: 3 capability entries are `implemented`, and 2 registry entries are `contracted`.
+- **No UI:** SP7 has no HTTP API.
+- **Open (user decision):** 9router scans only the trailing user turn for required capabilities. AIGate scans every message and the system prompt, labeled `SUSPECTED_BUG` in the contract.
+- **Gap:** M0 SP3 (the parity harness) and SP4 (`tools/extract`) were never built; SP13 and the parity gates need them.
+
+**Next step, M1 SP8 (`transport`: `HttpTransportPort`, direct branch plus timeout only):**
+1. Put the port in `packages/engine` and the direct implementation where spec §4.2 places it.
+2. Use the single `ExecCtx.signal`, and use `withRetry` only for safe calls.
+3. Then decide how lint enforces "fetch only through the transport, retry only through `withRetry`" against the real code (the deferred SP0.1 rule).
+4. SP8 adds no HTTP API, so it has no UI.
+5. The first UI wiring after SP6 comes with SP11 (connections: the Providers screens) and SP12 (`/v1`: the endpoint pill and Overview).

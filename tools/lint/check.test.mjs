@@ -90,6 +90,13 @@ test("the lint command passes once the violating file is gone", () => {
   execFileSync(process.execPath, ["node_modules/eslint/bin/eslint.js", "apps", "tools"], { stdio: "pipe" });
 });
 
+test("engine import of any npm package fails dependency check", () => {
+  assert.throws(
+    () => execFileSync(process.execPath, ["node_modules/dependency-cruiser/bin/dependency-cruiser.mjs", "--config", ".dependency-cruiser.cjs", "--output-type", "err", "tools/lint/fixtures/engine"], { stdio: "pipe" }),
+    (error) => error.status === 1 && error.stdout.toString().includes("engine-framework-free"),
+  );
+});
+
 test("domain import of vendor package fails dependency check", () => {
   assert.throws(
     () => execFileSync(process.execPath, ["node_modules/dependency-cruiser/bin/dependency-cruiser.mjs", "--config", ".dependency-cruiser.cjs", "--output-type", "err", "tools/lint/fixtures/domain"], { stdio: "pipe" }),

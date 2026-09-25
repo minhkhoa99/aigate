@@ -325,7 +325,7 @@
     - { file: open-sse/services/combo.js, line: 176, note: "messages/input/contents all restricted to trailingUserItems(...)" }
     - { file: open-sse/services/combo.js, line: 181, note: "'search: temporarily disabled in auto-switch (feature not wired yet)'" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.reorder-by-capabilities-tiers

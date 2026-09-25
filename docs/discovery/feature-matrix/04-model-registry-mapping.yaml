@@ -64,7 +64,7 @@
     - { file: src/shared/constants/models.js, line: 36, note: "AI_MODELS built once via Object.entries(MODELS).flatMap — global flat list" }
     - { file: open-sse/providers/index.js, line: 30, note: "PROVIDERS/PROVIDER_MODELS built once at module load (catalog.registry-build)" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.model-listing-live-override
@@ -141,7 +141,7 @@
     - { file: open-sse/providers/capabilities.js, line: 475, note: "tier 4 floor: refine(null, provider, model)" }
     - { file: open-sse/providers/capabilities.js, line: 9, note: "header comment: the two refine() layers 'can[not] override the hand written tables above (steps 1-2 short-circuit before they are consulted)'" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.capability-refine-additive-only
@@ -176,7 +176,7 @@
     - { file: open-sse/providers/capabilities.js, line: 17, note: "header comment: 'Both only ever turn a capability ON'" }
     - { file: open-sse/handlers/chatCore.js, line: 159, note: "getCapabilitiesForModel result feeds stripUnsupportedModalities — a false negative here silently drops client media" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.capability-catalog-sync-majority-vote
@@ -251,7 +251,7 @@
     - { file: open-sse/providers/visionPatterns.js, line: 28, note: "VISION_NAME matches the \"vl\" token" }
     - { file: open-sse/providers/registry/openrouter.js, line: 35, note: "real registry entry nvidia/llama-nemotron-embed-vl-1b-v2:free, kind: \"embedding\" — contains both \"embed\" and \"vl\"" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.alias-resolve-before-capability
