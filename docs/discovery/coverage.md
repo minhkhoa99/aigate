@@ -1,6 +1,6 @@
 # Discovery coverage
 
-Entries: 283
+Entries: 284
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
@@ -17,7 +17,7 @@ Entries: 283
 - apikeys: 9
 - catalog: 29
 - connections: 47
-- identity: 10
+- identity: 11
 - media: 15
 - routing: 81
 - settings: 10
@@ -28,7 +28,7 @@ Entries: 283
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 12
-- REFERENCE_BEHAVIOR: 237
+- REFERENCE_BEHAVIOR: 238
 - SUSPECTED_BUG: 34
 
 ## Missing — pages

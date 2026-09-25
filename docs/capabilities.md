@@ -868,6 +868,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - A second secret (DATA_DIR/auth/cli-secret) is mixed in only when the caller passes the special CLI_AUTH_SALT ('9r-cli-auth'), producing a different, unguessable hash for CLI-to-server auth than for API-key machineId embedding
 - **Errors:** `INTERNAL_ERROR` (both the machine-id file and node-machine-id fail (rare))
 
+### POST /api/auth/login password check with progressive per-client lockout
+
+- **id:** `identity.password-login-lockout` · **module:** `identity`
+- **Trigger:** POST /api/auth/login with { password }
+- **Input:** JSON body { password }, the client's bucket key from getClientIp(), the stored bcrypt hash (or INITIAL_PASSWORD/'123456' when none is stored)
+- **Output:** 200 { success: true } plus the auth_token cookie; 401 with remainingBeforeLock; or 429 with Retry-After while locked
+- **Rules:**
+  - A locked bucket is refused with 429 and a Retry-After header before the password is even compared
+  - Every failed comparison counts against the bucket; the 5th consecutive failure locks it, for 30s, then 2m, 10m, and 30m on each later lock (the last step repeats)
+  - The failure count resets 1h after the last failure when the bucket is not locked, and immediately on a successful login
+  - A failed attempt that does not yet lock answers 401 and tells the client how many attempts remain before lockout
+  - The bucket key is a proxy-stamped real IP only when the custom server proves it set the header, X-Forwarded-For only when TRUST_PROXY=true, and otherwise the single bucket 'unknown', so a client cannot rotate a spoofed header to escape its lockout
+- **Errors:** `AUTH_ERROR` (the password does not match (401)), `RATE_LIMIT` (the client's bucket is locked (429 with Retry-After))
+
 ## MCP
 
 ### The two /api/mcp/[plugin]/* routes spawn an allowlisted local MCP server process and bridge it over SSE

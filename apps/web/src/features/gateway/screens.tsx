@@ -1,34 +1,65 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Button, ConfirmDialog, CopyField, Dot, Field, Input, Metric, Modal, PageHeading, Panel, Pill, Table, Tabs, Warning } from "../../shared/ui";
+import { type FormEvent } from "react";
+import { Button, ConfirmDialog, CopyField, Dot, Field, Input, Metric, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
+import { useToast } from "../../shared/toast";
+import { ApiError } from "../../shared/api";
+import { useApiKeys, useCreateKey, useDeleteKey, useRequireApiKey, useSetKeyActive, useSetRequireApiKey, type ApiKey, type CreatedApiKey } from "./api";
 
-const keyRows = [
-  ["Default Dev Token", "sk-proj-••••-8f21", "2026-08-12", "2m ago", "Active"],
-  ["CI Pipeline", "sk-proj-••••-91a8", "2026-08-19", "14m ago", "Active"],
-  ["Staging Environment", "sk-proj-••••-0d2e", "2026-08-20", "4d ago", "Disabled"],
-];
+const problem = (error: unknown) => error instanceof ApiError
+  ? { code: error.code, message: error.message }
+  : { code: "ERR_GATEWAY_UNAVAILABLE", message: "Could not reach the gateway. Check that AIGate is running." };
 
 export function EndpointKeys() {
   const [showCreate, setShowCreate] = useState(false);
-  const [revoke, setRevoke] = useState<string | null>(null);
+  const [created, setCreated] = useState<CreatedApiKey | null>(null);
+  const [revoke, setRevoke] = useState<ApiKey | null>(null);
+  const keys = useApiKeys();
+  const createKey = useCreateKey();
+  const setActive = useSetKeyActive();
+  const deleteKey = useDeleteKey();
+  const requireApiKey = useRequireApiKey();
+  const setRequireApiKey = useSetRequireApiKey();
+  const showToast = useToast();
+  const fail = (error: unknown) => showToast({ tone: "error", ...problem(error) });
+  // The chat API (/v1) lands in SP12; this is the URL clients will use on this origin.
+  const baseUrl = `${window.location.origin}/v1`;
+  const closeCreate = () => { setShowCreate(false); setCreated(null); createKey.reset(); };
+
+  const submitCreate = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const name = new FormData(event.currentTarget).get("name");
+    createKey.mutate(typeof name === "string" ? name : "", { onSuccess: setCreated, onError: fail });
+  };
+
   return <>
     <PageHeading eyebrow="Gateway / Endpoint & Keys" title="Gateway endpoints" description="Configure your client base URL and manage access tokens." />
-    <Panel title="Base URL" detail="Use this URL in OpenAI-compatible clients." action={<Pill tone="healthy">Listening</Pill>}>
-      <CopyField label="OpenAI compatible endpoint" value="http://localhost:20128/v1" />
+    <Panel title="Base URL" detail="Use this URL in OpenAI-compatible clients." action={<Pill tone="warning">Chat API pending</Pill>}>
+      <CopyField label="OpenAI compatible endpoint" value={baseUrl} />
       <div className="endpoint-examples"><span>OpenAI</span><span>Anthropic</span><span>Gemini</span><span>Codex</span></div>
-      <CopyField label="Terminal example" value="export OPENAI_BASE_URL=http://localhost:20128/v1" />
+      <CopyField label="Terminal example" value={`export OPENAI_BASE_URL=${baseUrl}`} />
     </Panel>
     <Panel title="API keys" detail="Manage scoped gateway tokens for upstream client authentication." className="section-gap panel-flush" action={<Button variant="primary" onClick={() => setShowCreate(true)}>+ Create key</Button>}>
-      <Table columns={["Name", "Masked key", "Created", "Last used", "Status", "Actions"]} rows={keyRows.map((r) => [r[0], <code>{r[1]}</code>, r[2], r[3], <Pill tone={r[4] === "Active" ? "healthy" : "muted"}>{r[4]}</Pill>, <Button variant="ghost" onClick={() => setRevoke(r[0])}>Revoke</Button>])} />
+      {keys.isPending ? <StateBlock state="loading" />
+        : keys.isError ? <StateBlock state="error" code={problem(keys.error).code} action={<Button onClick={() => void keys.refetch()}>Retry</Button>} />
+        : <Table empty="No API keys yet. Create one for each client." columns={["Name", "Masked key", "Created", "Status", "Actions"]} rows={keys.data.map((key) => [
+          key.name, <code>{key.maskedKey}</code>, new Date(key.createdAt).toLocaleDateString(),
+          <Pill tone={key.isActive ? "healthy" : "muted"}>{key.isActive ? "Active" : "Disabled"}</Pill>,
+          <><Button variant="ghost" disabled={setActive.isPending} onClick={() => setActive.mutate({ id: key.id, isActive: !key.isActive }, { onError: fail })}>{key.isActive ? "Disable" : "Enable"}</Button>
+            <Button variant="ghost" onClick={() => setRevoke(key)}>Revoke</Button></>,
+        ])} />}
     </Panel>
     <Panel title="Security settings" detail="Protect this gateway from requests without a valid key." className="section-gap">
-      <div className="list-row"><div><strong>Require API key</strong><small>Requests without a valid key are rejected.</small></div><input type="checkbox" defaultChecked aria-label="Require API key" /></div>
-      <div className="list-row"><div><strong>Reject legacy keys</strong><small>New keys use a versioned format with machine binding.</small></div><input type="checkbox" aria-label="Reject legacy keys" /></div>
+      <div className="list-row"><div><strong>Require API key</strong><small>Requests without a valid key are rejected.</small></div><input type="checkbox" checked={requireApiKey.data ?? true} disabled={requireApiKey.data === undefined || setRequireApiKey.isPending} onChange={(e) => setRequireApiKey.mutate(e.target.checked, { onError: fail })} aria-label="Require API key" /></div>
     </Panel>
-    {showCreate && <Modal title="Create API key" onClose={() => setShowCreate(false)}>
-      <p>Give this key a name. Its value will be shown once after issuance.</p><Field label="Name"><Input placeholder="e.g. Local development" /></Field><div className="modal-actions"><Button onClick={() => setShowCreate(false)}>Cancel</Button><Button variant="primary" onClick={() => setShowCreate(false)}>Create key</Button></div>
+    {showCreate && <Modal title="Create API key" onClose={closeCreate}>
+      {created ? <><Warning>Copy this key now. It is shown only once and cannot be recovered.</Warning><CopyField label={created.name} value={created.key} /><div className="modal-actions"><Button variant="primary" onClick={closeCreate}>Done</Button></div></>
+        : <form onSubmit={submitCreate}><p>Give this key a name. Its value will be shown once after issuance.</p><Field label="Name"><Input name="name" required maxLength={64} placeholder="e.g. Local development" /></Field><div className="modal-actions"><Button onClick={closeCreate}>Cancel</Button><Button type="submit" variant="primary" disabled={createKey.isPending}>{createKey.isPending ? "Creating…" : "Create key"}</Button></div></form>}
     </Modal>}
-    {revoke && <ConfirmDialog name={revoke} onClose={() => setRevoke(null)} onConfirm={() => setRevoke(null)} />}
+    {revoke && <ConfirmDialog name={revoke.name} onClose={() => setRevoke(null)} onConfirm={() => deleteKey.mutate(revoke.id, {
+      onSuccess: () => { setRevoke(null); showToast({ tone: "success", message: `Revoked ${revoke.name}.` }); },
+      onError: (error) => { setRevoke(null); fail(error); },
+    })} />}
   </>;
 }
 

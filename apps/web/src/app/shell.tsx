@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, Navigate, useRouterState } from "@tanstack/react-router";
 import { navigation } from "./navigation";
 import { ScreenView } from "./screens";
-import { Dot } from "../shared/ui";
+import { Dot, StateBlock } from "../shared/ui";
+import { useAuthStatus } from "../features/settings/api";
 
 function currentLabel(path: string): string {
   for (const group of navigation) for (const item of group.items) if (item.href === path) return item.label;
@@ -16,6 +17,7 @@ function currentLabel(path: string): string {
 
 export function Shell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const auth = useAuthStatus();
   const [theme, setTheme] = useState(() => localStorage.getItem("aigate-theme") ?? "dark");
   const [developerMode, setDeveloperMode] = useState(() => localStorage.getItem("aigate-developer") === "true");
   const [collapsed, setCollapsed] = useState(false);
@@ -26,6 +28,12 @@ export function Shell() {
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("aigate-theme", theme); }, [theme]);
   const standalone = path === "/welcome" || path === "/login" || path === "/callback";
   if (standalone) return <ScreenView path={path} developerMode={developerMode} onDeveloperMode={setDeveloperMode} />;
+  // Console pages need a session (docs/contracts/identity-apikeys.md); the server enforces it, this only routes.
+  if (auth.isPending) return <div className="standalone"><div className="auth-card"><StateBlock state="loading" /></div></div>;
+  if (auth.isError) return <div className="standalone"><div className="auth-card"><StateBlock state="error" code="ERR_GATEWAY_UNAVAILABLE"
+    action={<button type="button" className="button button-primary" onClick={() => void auth.refetch()}>Retry</button>} /></div></div>;
+  if (auth.data.setupRequired) return <Navigate to="/welcome" />;
+  if (!auth.data.authenticated) return <Navigate to="/login" />;
 
   const visibleGroups = navigation.map((group) => ({ ...group, items: group.items.filter((item) =>
     (!("devOnly" in item) || developerMode) && (!search || item.label.toLowerCase().includes(search.toLowerCase())))

@@ -59,10 +59,12 @@ export function Field({ label, children, hint }: { label: string; children: Reac
   return <label className="field"><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>;
 }
 
-export function Input({ placeholder, type = "text", defaultValue, disabled }: {
+export function Input({ placeholder, type = "text", defaultValue, disabled, name, required, minLength, maxLength, autoComplete }: {
   placeholder?: string; type?: string; defaultValue?: string; disabled?: boolean;
+  name?: string; required?: boolean; minLength?: number; maxLength?: number; autoComplete?: string;
 }) {
-  return <input className="input" type={type} placeholder={placeholder} defaultValue={defaultValue} disabled={disabled} />;
+  return <input className="input" type={type} placeholder={placeholder} defaultValue={defaultValue} disabled={disabled}
+    name={name} required={required} minLength={minLength} maxLength={maxLength} autoComplete={autoComplete} />;
 }
 
 export function CopyField({ label, value }: { label?: string; value: string }) {

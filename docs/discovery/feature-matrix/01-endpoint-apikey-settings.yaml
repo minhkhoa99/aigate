@@ -72,7 +72,7 @@
     - { file: src/shared/utils/apiKey.js, line: 34, note: "generateApiKeyWithMachine — sk-{machineId}-{keyId}-{crc8} format" }
     - { file: src/shared/utils/apiKey.js, line: 20, note: "generateCrc — HMAC-SHA256(machineId+keyId) keyed by API_KEY_SECRET, truncated to 8 hex chars" }
   newModule: apikeys
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: apikey.list-keys
@@ -104,7 +104,7 @@
     - { file: src/app/api/keys/route.js, line: 8, note: "GET handler — calls getApiKeys(), returns full rows" }
     - { file: src/lib/db/repos/apiKeysRepo.js, line: 16, note: "getApiKeys — SELECT * ORDER BY createdAt ASC, mapped through rowToKey" }
   newModule: apikeys
-  parityStatus: traced
+  parityStatus: implemented
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "A key-management list endpoint masks or omits the secret value after initial issuance (standard practice, and consistent with GET /api/settings stripping password/oidcClientSecret)"
@@ -141,7 +141,7 @@
     - { file: "src/app/api/keys/[id]/route.js", line: 20, note: "PUT handler — only reads isActive out of body" }
     - { file: src/lib/db/repos/apiKeysRepo.js, line: 48, note: "updateApiKey — transaction: read row, merge, UPDATE all columns" }
   newModule: apikeys
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: apikey.delete-key
@@ -173,7 +173,7 @@
     - { file: "src/app/api/keys/[id]/route.js", line: 44, note: "DELETE handler — 404 when deleteApiKey returns false" }
     - { file: src/lib/db/repos/apiKeysRepo.js, line: 64, note: "deleteApiKey — DELETE ... WHERE id = ?, returns changes > 0" }
   newModule: apikeys
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: apikey.validate-lookup
@@ -208,7 +208,7 @@
     - { file: src/lib/db/repos/apiKeysRepo.js, line: 70, note: "validateApiKey — SELECT isActive FROM apiKeys WHERE key = ?, plain string equality" }
     - { file: src/sse/services/auth.js, line: 361, note: "isValidApiKey — thin wrapper: null-guard then delegate to validateApiKey" }
   newModule: apikeys
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: apikey.legacy-format-unenforced
@@ -241,7 +241,7 @@
     - { file: src/shared/utils/apiKey.js, line: 78, note: "verifyApiKeyCrc — the only caller of parseApiKey for validation purposes, itself uncalled elsewhere in src/" }
     - { file: src/lib/db/repos/apiKeysRepo.js, line: 70, note: "validateApiKey — the actual request-time auth check; does not import or call anything from apiKey.js" }
   newModule: apikeys
-  parityStatus: traced
+  parityStatus: implemented
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "Given generateCrc/parseApiKey/verifyApiKeyCrc exist specifically to bind a key to a machineId and detect tampering, the request-time auth path (validateApiKey / isValidApiKey) calls verifyApiKeyCrc (or parseApiKey) to reject a key whose embedded CRC doesn't match its machineId+keyId before or in addition to the DB lookup"
@@ -275,7 +275,7 @@
   evidence:
     - { file: src/sse/services/auth.js, line: 342, note: "extractApiKey — Authorization Bearer checked first, then x-api-key" }
   newModule: apikeys
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: endpoint.enforce-require-api-key
@@ -311,7 +311,7 @@
     - { file: src/sse/handlers/chat.js, line: 70, note: "settings = await getSettings(); enforcement gated on settings.requireApiKey" }
     - { file: src/sse/handlers/chat.js, line: 76, note: "await isValidApiKey(apiKey) — the actual DB-backed check" }
   newModule: apikeys
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: endpoint.rewrite-lanes
@@ -510,7 +510,7 @@
     - { file: src/app/api/settings/route.js, line: 62, note: "first-time branch: currentPassword compared against the hardcoded literal '123456'" }
     - { file: src/app/api/auth/login/route.js, line: 58, note: "the equivalent login-time check correctly reads process.env.INITIAL_PASSWORD before falling back to '123456'" }
   newModule: settings
-  parityStatus: traced
+  parityStatus: implemented
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "The first-time password-change gate in PATCH /api/settings checks currentPassword against the operator's actual configured initial password, i.e. `process.env.INITIAL_PASSWORD || \"123456\"`, mirroring the check already implemented in src/app/api/auth/login/route.js line 58 for the same purpose"
@@ -615,7 +615,46 @@
     - { file: src/dashboardGuard.js, line: 185, note: "isAuthenticated — second branch: settings.requireLogin === false also passes, independent of any token" }
     - { file: src/app/api/auth/logout/route.js, line: 7, note: "clearDashboardAuthCookie(cookieStore) plus manual delete of the three OIDC transient cookies" }
   newModule: identity
-  parityStatus: traced
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: identity.password-login-lockout
+  group: Endpoint & API Key
+  feature: Dashboard authentication
+  subFeature: POST /api/auth/login password check with progressive per-client lockout
+  trigger: POST /api/auth/login with { password }
+  input: "JSON body { password }, the client's bucket key from getClientIp(), the stored bcrypt hash (or INITIAL_PASSWORD/'123456' when none is stored)"
+  output: "200 { success: true } plus the auth_token cookie; 401 with remainingBeforeLock; or 429 with Retry-After while locked"
+  businessRules:
+    - "A locked bucket is refused with 429 and a Retry-After header before the password is even compared"
+    - "Every failed comparison counts against the bucket; the 5th consecutive failure locks it, for 30s, then 2m, 10m, and 30m on each later lock (the last step repeats)"
+    - "The failure count resets 1h after the last failure when the bucket is not locked, and immediately on a successful login"
+    - "A failed attempt that does not yet lock answers 401 and tells the client how many attempts remain before lockout"
+    - "The bucket key is a proxy-stamped real IP only when the custom server proves it set the header, X-Forwarded-For only when TRUST_PROXY=true, and otherwise the single bucket 'unknown', so a client cannot rotate a spoofed header to escape its lockout"
+  state:
+    reads: ["settings.password (bcrypt hash)", "process.env.INITIAL_PASSWORD", "process.env.TRUST_PROXY"]
+    writes: ["auth_token cookie on success"]
+    runtimeOnly: ["in-process Map ip -> { fails, lockUntil, lockLevel, lastFailAt }, lost on restart"]
+  dependencies: ["identity.session-cookie-lifecycle"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "the password does not match (401)", partial: false }
+    - { code: RATE_LIMIT, when: "the client's bucket is locked (429 with Retry-After)", partial: false }
+  sideEffects: ["Mutates the in-memory lockout map"]
+  persistence: []
+  performanceConcerns:
+    - "The lockout map has no size bound; entries are removed only when the same bucket is read again after its window expires, so many distinct buckets grow it without limit"
+  behavior: { streaming: false, cancellation: null, concurrency: "Single-process map; restart clears all lockouts" }
+  edgeCases:
+    - "Without the custom server or TRUST_PROXY, every client shares the 'unknown' bucket, so one attacker's failures lock out every other client too"
+  evidence:
+    - { file: src/app/api/auth/login/route.js, line: 24, note: "checkLock before the password comparison; 429 with Retry-After at line 28" }
+    - { file: src/app/api/auth/login/route.js, line: 96, note: "recordFail after a mismatch, then 429 if now locked or 401 with remainingBeforeLock (line 106)" }
+    - { file: src/lib/auth/loginLimiter.js, line: 4, note: "MAX_FAILS_BEFORE_LOCK = 5; LOCK_STEPS_MS 30s/2m/10m/30m (line 5); FAIL_WINDOW_MS 1h (line 6)" }
+    - { file: src/lib/auth/loginLimiter.js, line: 49, note: "getClientIp: trusted stamped header, TRUST_PROXY XFF, else the single 'unknown' bucket (line 63)" }
+  newModule: identity
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: identity.auth-status-disclosure
@@ -649,7 +688,7 @@
     - { file: src/app/api/auth/status/route.js, line: 41, note: "authenticated: !!session — false whenever the auth_token cookie is absent or invalid" }
     - { file: src/dashboardGuard.js, line: 29, note: "'/api/auth/status' listed in PUBLIC_API_PATHS — no auth required to call this route" }
   newModule: identity
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: identity.reset-password-local-only
@@ -684,7 +723,7 @@
     - { file: src/dashboardGuard.js, line: 162, note: "canAccessLocalOnlyRoute — CLI-token branch: hasValidCliToken(request) alone grants access" }
     - { file: src/dashboardGuard.js, line: 164, note: "canAccessLocalOnlyRoute — browser branch: isLocalRequest(request) && isAuthenticated(request)" }
   newModule: identity
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: identity.oidc-login-flow
@@ -1024,7 +1063,7 @@
     - { file: src/dashboardGuard.js, line: 185, note: "isAuthenticated — settings.requireLogin === false bypasses auth with no isLocalRequest check at this call site" }
     - { file: src/dashboardGuard.js, line: 227, note: "generic /api/* fallback calls isAuthenticated() alone (no locality check) for every PROTECTED_API_PATHS route" }
   newModule: settings
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: tooling.health-init-probes

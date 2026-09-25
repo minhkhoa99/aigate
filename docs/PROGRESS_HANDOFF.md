@@ -152,15 +152,59 @@ Tests:
 
 The M-1 gate test used to require every entry to stay exactly `traced`. It now accepts `traced` or later (`contracted`, `implemented`, `verified`), because SPs advance entries. The full gate passed: discovery 54/54, database 6/6, server 7/7, `lint:check` 10/10, Bun tests, build, and `git diff --check`.
 
-**Next step, M1 SP6 (`identity` + `apikeys`):** password login and API key validation, per spec §9. Start from the `identity.*`, `apikey.*`, `settings.patch-password-change` (`SUSPECTED_BUG`, hardcoded `'123456'`), and `settings.require-login-public-status` entries. Decide the new API key format (spec §13) and store keys hashed (conventions §9). Then replace the loopback-only `/api` hook with the dashboard auth guard.
+**M1 SP6 (`identity` + `apikeys`) is complete locally, and the UI is wired to it.** The contract is `docs/contracts/identity-apikeys.md`.
 
-Before starting, inspect `docs/superpowers/specs/2026-09-22-aigate-design.md` §9 and §11, `docs/governance/rules.md`, and this handoff. Do not treat `UI_READY` as working API integration or copy the 9Router implementation accidents into AIGate.
+The user decided four things on 2026-09-25:
+1. API keys are `aigate_` + 32 random bytes; only the SHA-256 and the last 4 characters are stored.
+2. There is no default password. The first password is set locally (`POST /api/auth/setup`) or from `AIGATE_INITIAL_PASSWORD`.
+3. Sessions live in the database (a random cookie token whose hash is stored, with a 24 h expiry), not in a JWT. Spec §4.4 and §13 were updated.
+4. `requireLogin=false` exempts local clients only.
 
-## Reproduce the M-1 gate (PowerShell)
+"Local" means a loopback socket plus a loopback `Host` and `Origin`, which stops DNS rebinding.
 
-```powershell
-$env:NINEROUTER_PATH = (Resolve-Path '.reference/9router').Path
-pnpm test
-pnpm discovery validate
-pnpm web:build
-```
+Matrix:
+- Added `identity.password-login-lockout`; the password lockout had no entry.
+- 13 entries are now `implemented`. `endpoint.enforce-require-api-key` is `contracted`, because the `/v1` gate lands in SP12.
+
+Server:
+- **Global guard.** A global `DashboardAuthGuard` (`APP_GUARD`) denies every route unless it is `@Public()`. It replaced the SP5 loopback-only hook.
+- **Auth routes.** `/api/auth/{status,setup,login,logout,password}`. Login lockout (5 failures, then 30 s, 2 min, 10 min, 30 min; a 1 h reset window) is capped at 10,000 clients. Password change revokes every other session.
+- **Passwords and sessions.** scrypt from `node:crypto`; verification accepts only this build's parameters. At most 20 sessions are kept, and expired ones are deleted on each login.
+- **Recovery.** `AIGATE_RESET_PASSWORD=true` at boot; there is no HTTP reset route.
+- **API keys.** `/api/keys` offers list, create (the key is shown once), enable/disable, and delete. At most 100 keys. `ApiKeysRepository.isValid` and `extractApiKey` are exported for SP12.
+- **Schema.** Migration `0001` adds `api_keys`, `dashboard_password`, and `sessions`.
+
+Security review (agent, read-only):
+- Fixed: Nest's urlencoded body parser is off (`bodyParser: false`), so cross-site HTML forms get 415. Stored scrypt parameters are checked.
+- **Open (user decision):** on a machine shared with other OS users, another user can race to set the first password before the owner. `AIGATE_INITIAL_PASSWORD` closes this today. A one-time setup code printed at boot or written to a 0600 file would close it by default.
+
+UI wiring (layouts kept; `apps/web/CLAUDE.md`):
+- **Shared.** `shared/api.ts` is a same-origin JSON client with a 10 s timeout and `{code, message}` errors. Queries retry only on errors other than 4xx.
+- **Settings feature.** `features/settings/api.ts` holds auth and settings hooks. The `Login`, `Onboarding` step 1, and `SettingsAuth` screens are wired: change password, the two toggles, and sign out. "Current password" is now a real input.
+- **Gateway feature.** `features/gateway/api.ts` backs `EndpointKeys`: the real origin base URL, the key list with loading, empty, and error states, a create modal that shows the key once, disable/enable, and revoke through type-to-confirm.
+  - Dropped the untracked "Last used" column and the "Reject legacy keys" toggle; neither has data.
+  - The pill now says "Chat API pending".
+- **Shell.** `Shell` routes to `/welcome` or `/login` from `/api/auth/status`.
+- Onboarding steps 2 and 3 are still visual; they now say so.
+
+Checks:
+- Server tests pass 22/22. 13 mutations each made a test fail:
+  - the guard
+  - the `requireLogin` locality check
+  - the Host and Origin checks
+  - lockout counting
+  - revoking on password change and on logout
+  - the session cap
+  - the active-key check
+  - the key limit
+  - local-only setup
+  - the urlencoded parser
+- Full gate passed: install frozen, lint, `lint:check` 10/10, discovery 54/54 (284 entries), database 6/6, Bun, build, catalog 1/1, `git diff --check`.
+- Browser e2e (Playwright, production build, temp data dir) walked the whole flow:
+  - `/` redirected to `/welcome`; a password mismatch was caught without calling the server; setup, then the dashboard.
+  - A key was created, shown once, then listed masked with no plaintext left on the page; disabled; revoked.
+  - A wrong current password showed a toast with the attempts left; a correct change kept the session.
+  - Sign out, the old password rejected, the new password accepted.
+  - The only console errors were a missing `favicon.ico` (404), which predates this work.
+
+**Next step, M1 SP7 (`engine`: CIP core, schema registry, capability resolution, one registry entry):** create `packages/engine` (framework-free, spec §2–§3), then implement the bounded retry helper from §4.2 and enforce provider `execute` timeouts and bounded retries (the deferred part of SP0.1). Before that, decide how first-password setup should be protected on shared machines.

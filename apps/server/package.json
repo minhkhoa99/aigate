@@ -8,7 +8,7 @@
     "dev:tsc": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "dev:node": "node --watch dist/main.js",
     "start": "node dist/main.js",
-    "test": "pnpm --filter @aigate/database build && tsc -p tsconfig.json && node --test test/app.test.mjs test/settings.test.mjs"
+    "test": "pnpm --filter @aigate/database build && tsc -p tsconfig.json && node --test test/app.test.mjs test/settings.test.mjs test/identity.test.mjs test/apikeys.test.mjs"
   },
   "dependencies": {
     "@aigate/database": "workspace:*",
@@ -17,6 +17,7 @@
     "@nestjs/core": "^12.1.0",
     "@nestjs/platform-fastify": "^12.1.0",
     "drizzle-orm": "^0.45.3",
+    "fastify": "^5.12.5",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },

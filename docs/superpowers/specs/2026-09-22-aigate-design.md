@@ -186,7 +186,7 @@ modules/<context>/
 
 | # | Context | Gánh gì |
 |---|---|---|
-| 1 | `identity` | login, JWT cookie, password, OIDC, SAML, Local Mode |
+| 1 | `identity` | login, session cookie lưu trong DB (thu hồi được; quyết 2026-09-25 thay cho JWT), password, OIDC, SAML, Local Mode |
 | 2 | `apikeys` | phát/validate/thu hồi API key |
 | 3 | `catalog` | registry provider, model, capabilities, alias, pricing |
 | 4 | `connections` | credential đa tài khoản, OAuth flow + refresh, `AccountLock` |
@@ -1089,7 +1089,7 @@ Quét tới tận đáy, không chỉ tên hiển thị:
 |---|---|
 | Ngưỡng coverage parity cụ thể để coi M2 là xong | Trước khi vào M2 |
 | Basic Chat / Media combo / PXPIPE: ship hay xoá | Phase C của feature tương ứng |
-| Format API key mới cụ thể | SP6 |
+| ~~Format API key mới cụ thể~~ | Đã quyết ở SP6 (2026-09-25): `aigate_` + 32 byte ngẫu nhiên base64url, DB chỉ lưu SHA-256 và 4 ký tự cuối, xem `docs/contracts/identity-apikeys.md` |
 | Port mặc định của AIGate | SP1 |
 | Tên package npm và CLI binary | SP1 |
 | ~~`drizzle-orm/sqlite-proxy` có gánh nổi `node:sqlite` + `sql.js` không~~ | Đã quyết 2026-09-25: đạt khi có khoá, xem §1.1 |
