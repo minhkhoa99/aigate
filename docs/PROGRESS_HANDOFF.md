@@ -65,7 +65,24 @@ Checks:
 - `pnpm@10.34.5 install --frozen-lockfile` (the CI version) passed on a clean copy of the updated lockfile, which was written by local pnpm 12.5.1.
 - GitHub Actions run `36117513362` on `142be79` passed every step: install, lint, lint checks, test, discovery validate, and build.
 
-**Next step, SP2** (spec §9 row SP2, §1.1): run SPIKE-1 first. Verify that `drizzle-orm/sqlite-proxy` works on both `node:sqlite` and `sql.js`. Only then add `packages/database` with the Drizzle schema, the 4-driver chain, and the migration runner. If the spike fails, return to the DB decision in §1.1 before writing the schema. Once `packages/database` exists, finish the deferred SP0.1 check of repository SQL enforcement against real Drizzle calls.
+**SP2 SPIKE-1 is done; it passes only with a design change.** The report is `docs/superpowers/spikes/2026-09-25-spike-1-sqlite-drivers.md`. The harness is `packages/database/spike/conformance.mjs`: a throwaway schema, a `drizzle-kit` migration, and 12 checks per driver.
+
+- **Without a lock, `sqlite-proxy` loses data under concurrency.** A write issued while an async transaction is open joins it and is rolled back with it. A second transaction's `begin` fails, and rows are lost on reopen.
+- **Native sync drivers are no better.** better-sqlite3 rejects async transaction callbacks. bun-sqlite and native sql-js accept them but silently lose atomicity.
+- **The fix works.** Put all four clients behind one per-database lock around `sqlite-proxy`, using `AsyncLocalStorage` for statements inside a transaction and `BEGIN/COMMIT` around `batch`. With it, better-sqlite3, bun-sqlite, sql-js, and node:sqlite each passed 12/12 on Node 22.19 and Bun 1.3.14. The three Node drivers also passed on Node 24.21. Removing the lock made the isolation check fail.
+- **better-sqlite3 13 needs no build tools.** It ships N-API prebuilds. `pnpm-workspace.yaml` denies its build script, because allowing it triggers an implicit `node-gyp rebuild` that fails without Visual Studio. It loads under both pnpm 12 and pnpm 10.34.5.
+- Checks run: full gate passed (install frozen, lint, lint:check, test, discovery validate, build, `git diff --check`), plus a pnpm 10.34.5 frozen install on a clean copy.
+
+**Open decision before building `packages/database`:** spec §1 locks "native driver for `bun:sqlite` and `better-sqlite3`; `node:sqlite` and `sql.js` through `sqlite-proxy`". The spike recommends routing all four through one locked `sqlite-proxy` wrapper, with one async API, one `db` type, and one migrator. This needs the user's confirmation. After that, build the driver chain from the spike code:
+
+- the lock
+- driver selection: Bun uses bun:sqlite; Node uses better-sqlite3, then node:sqlite, then sql.js
+- a sql.js persistence policy
+- the migration runner
+- the real Drizzle schema, from the 11 traced DB repos
+- a conformance test run in CI
+
+Then finish the deferred SP0.1 check of repository SQL enforcement against real Drizzle calls, and add `packages` to `pnpm lint`.
 
 Before starting, inspect `docs/superpowers/specs/2026-09-22-aigate-design.md` §9 and §11, `docs/governance/rules.md`, and this handoff. Do not treat `UI_READY` as working API integration or copy the 9Router implementation accidents into AIGate.
 

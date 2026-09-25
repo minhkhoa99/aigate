@@ -1,5 +1,10 @@
 packages:
   - "apps/*"
+  - "packages/*"
   - "tools/*"
+# better-sqlite3 ships N-API prebuilds; its implicit node-gyp rebuild needs a C++ toolchain, so deny it.
 allowBuilds:
+  better-sqlite3: false
   esbuild: true
+ignoredBuiltDependencies:
+  - better-sqlite3
