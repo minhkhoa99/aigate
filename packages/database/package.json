@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test test/conformance.test.mjs",
+    "test:bun": "tsc -p tsconfig.json && bun test test/conformance.test.mjs",
     "generate": "drizzle-kit generate"
   },
   "dependencies": {
@@ -16,5 +19,11 @@
     "@types/sql.js": "^1.4.11",
     "drizzle-kit": "^0.31.11",
     "typescript": "^5.9.3"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   }
 }

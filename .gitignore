@@ -5,3 +5,4 @@ node_modules/
 .reference/
 apps/web/dist/
 apps/server/dist/
+packages/database/dist/

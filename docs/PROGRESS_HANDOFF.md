@@ -73,16 +73,37 @@ Checks:
 - **better-sqlite3 13 needs no build tools.** It ships N-API prebuilds. `pnpm-workspace.yaml` denies its build script, because allowing it triggers an implicit `node-gyp rebuild` that fails without Visual Studio. It loads under both pnpm 12 and pnpm 10.34.5.
 - Checks run: full gate passed (install frozen, lint, lint:check, test, discovery validate, build, `git diff --check`), plus a pnpm 10.34.5 frozen install on a clean copy.
 
-**Decided 2026-09-25 (user):** route all four clients through one locked `sqlite-proxy` wrapper, with one async API, one `db` type, and one migrator. Spec §1, §1.1, and §13 were updated. GitHub Actions run `36118864061` on `fb071cd` passed. Next, build the driver chain from the spike code:
+**Decided 2026-09-25 (user):** route all four clients through one locked `sqlite-proxy` wrapper, with one async API, one `db` type, and one migrator. Spec §1, §1.1, and §13 were updated. GitHub Actions run `36118864061` on `fb071cd` passed.
 
-- the lock
-- driver selection: Bun uses bun:sqlite; Node uses better-sqlite3, then node:sqlite, then sql.js
-- a sql.js persistence policy
-- the migration runner
-- the real Drizzle schema, from the 11 traced DB repos
-- a conformance test run in CI
+**Driver chain is built** in `packages/database` (`@aigate/database`, ESM, `tsc`). `openDatabase({ file, migrationsFolder, driver? })` does the following:
 
-Then finish the deferred SP0.1 check of repository SQL enforcement against real Drizzle calls, and add `packages` to `pnpm lint`.
+- Picks a driver: Bun tries bun:sqlite, then sql.js; Node tries better-sqlite3, then node:sqlite, then sql.js. It records why each failed driver failed.
+- Wraps the client in the locked proxy.
+- Applies pragmas: WAL, `busy_timeout = 5000`, and `foreign_keys = ON`. sql.js gets foreign keys only, reapplied after each export.
+- Runs migrations atomically inside `BEGIN/COMMIT`.
+- For sql.js, persists through the lock with a 100 ms debounce and write-then-rename. Up to 100 ms of writes can be lost on a crash.
+
+One reviewed `as` has an `eslint-disable`. Drizzle types proxy rows as `any[]`, but `get` with no match must pass `undefined`; `[]` would become a row of undefined fields.
+
+Tests (`test/conformance.test.mjs`): Node runs better-sqlite3, node:sqlite, and sql.js (5/5). Bun runs bun-sqlite and sql.js (4/4). Each of these mutations made tests fail:
+
+- removing the lock
+- a non-atomic batch
+- no debounced persist
+- `get` returning `[]`
+
+The spike schema is now `test/fixture/` and is not an AIGate schema; `drizzle.config.ts` points at it until the real schema lands.
+
+Wiring changes:
+
+- `pnpm lint` now lints `packages`; the ESLint rule globs include `packages/**`.
+- `pnpm test` includes the database tests.
+- CI installs Bun 1.3.14 and runs `pnpm --filter @aigate/database test:bun`.
+- Full gate passed locally.
+
+**Next step (rest of SP2):** write the real Drizzle schema from the 11 traced 9router DB repos, following `porting-behavior-not-code`. Base it on the Feature Matrix entries, not the old tables, and label accidents, such as JSON-blob-over-SQLite storage, before designing tables. Replace the fixture in `drizzle.config.ts`, generate the first real migration, and add repositories.
+
+After that, finish the deferred SP0.1 check: point `aigate/bounded-query` at real Drizzle repository calls. It currently matches `apps/*/src/modules/*/infrastructure/**/*repo*.ts` only.
 
 Before starting, inspect `docs/superpowers/specs/2026-09-22-aigate-design.md` §9 and §11, `docs/governance/rules.md`, and this handoff. Do not treat `UI_READY` as working API integration or copy the 9Router implementation accidents into AIGate.
 

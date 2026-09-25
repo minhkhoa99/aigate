@@ -9,10 +9,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { eq, sql, sum } from "drizzle-orm";
-import { accounts, usage } from "../src/schema.ts";
+import { accounts, usage } from "../test/fixture/schema.ts";
 
 const driver = process.argv[2];
-const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
+const migrationsFolder = fileURLToPath(new URL("../test/fixture/drizzle", import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), `spike-${driver}-`));
 const file = join(dir, "aigate.db");
 

@@ -17,6 +17,9 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 10.34.5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -31,3 +34,4 @@ jobs:
         env:
           NINEROUTER_PATH: ${{ github.workspace }}/9router
       - run: pnpm build
+      - run: pnpm --filter @aigate/database test:bun

@@ -4,9 +4,9 @@ import { aigateRules } from "./tools/lint/rules.mjs";
 
 export default [
   { ignores: ["**/dist/**", "**/node_modules/**", "graphify-out/**"] },
-  ...tseslint.configs.recommended.map((config) => ({ ...config, files: ["apps/**/*.{ts,tsx}", "tools/**/*.{ts,tsx}"] })),
+  ...tseslint.configs.recommended.map((config) => ({ ...config, files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}", "tools/**/*.{ts,tsx}"] })),
   {
-    files: ["apps/**/*.{ts,tsx}", "tools/**/*.{ts,tsx}"],
+    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}", "tools/**/*.{ts,tsx}"],
     plugins: { aigate: { rules: aigateRules } },
     rules: {
       "@typescript-eslint/no-explicit-any": "error",

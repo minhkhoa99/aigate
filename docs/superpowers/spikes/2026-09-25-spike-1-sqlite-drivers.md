@@ -2,7 +2,7 @@
 
 Date: 2026-09-25. Spec §1.1 blocks M0 on one question: does `drizzle-orm/sqlite-proxy` work on `node:sqlite` and `sql.js`?
 
-Reproduce with `packages/database/spike/conformance.mjs`:
+The production driver chain now lives in `packages/database/src`. `packages/database/test/conformance.test.mjs` runs the same checks against it in `pnpm test` and in CI under Bun. Reproduce the original native-versus-proxy comparison with `packages/database/spike/conformance.mjs`:
 - `node spike/conformance.mjs <driver>`
 - `bun spike/conformance.mjs bun-sqlite[-locked]`
 
