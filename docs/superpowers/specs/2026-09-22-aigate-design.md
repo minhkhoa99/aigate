@@ -155,6 +155,20 @@ interface AIProviderPort {
 }
 ```
 
+`ExecCtx` bắt buộc có `signal: AbortSignal`. Tại request boundary, tạo signal bằng
+`AbortSignal.any([clientSignal, AbortSignal.timeout(requestBudgetMs)])`; chuyển
+cùng signal qua routing, retry, adapter, `fetch`, và việc đọc/stream body. Client
+ngắt hoặc hết ngân sách thời gian thì dừng ngay, không fallback/retry tiếp.
+`execute` và `stream` không tự tạo một timeout mới làm vượt ngân sách chung.
+
+Retry đi qua **một helper** nhận `operation(attempt, signal)`, signal trên,
+`maxAttempts` hữu hạn (> 0), `baseDelayMs`, `maxDelayMs`, và `shouldRetry(error)`.
+Helper chặn cấu hình không hợp lệ, dùng exponential backoff có trần và chờ có
+thể huỷ bằng signal; chỉ retry lỗi tạm thời của thao tác an toàn để lặp lại.
+Không retry sau khi đã gửi chunk đầu tiên cho client. Khi dựng `apps/api`, đặt
+helper ở nơi các provider adapter cùng dùng và test giới hạn attempt, abort,
+deadline, và lỗi không thể retry trước khi bật lint cấm retry tự viết.
+
 Settings / apiKey / pricing → **chỉ là Drizzle repository class**. Không interface, không use-case wrapper. Thêm `GetSettingsUseCase` cho `GET /settings` là over-engineering theo `rules.md` mục 1.
 
 ### 4.3 Cấu trúc một bounded context

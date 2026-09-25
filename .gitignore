@@ -2,4 +2,5 @@ graphify-out/cache/
 node_modules/
 .superpowers/
 .worktrees/
+.reference/
 apps/web/dist/

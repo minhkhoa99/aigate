@@ -1,9 +1,10 @@
 const isMember = (node, object, property) =>
   node?.type === "MemberExpression" && !node.computed && node.object.name === object && node.property.name === property;
 
-const hasTimeoutSignal = (node) => node?.type === "ObjectExpression" && node.properties.some((entry) =>
+const hasTimeoutSignal = (node, allowExecCtx) => node?.type === "ObjectExpression" && node.properties.some((entry) =>
   entry.type === "Property" && entry.key.name === "signal" &&
-  entry.value.type === "CallExpression" && isMember(entry.value.callee, "AbortSignal", "timeout"));
+  ((entry.value.type === "CallExpression" && isMember(entry.value.callee, "AbortSignal", "timeout")) ||
+    (allowExecCtx && isMember(entry.value, "ctx", "signal"))));
 
 export const aigateRules = {
   "bounded-promise-all": {
@@ -11,7 +12,9 @@ export const aigateRules = {
     create(context) {
       return {
         CallExpression(node) {
-          if (isMember(node.callee, "Promise", "all") && node.arguments[0]?.type !== "ArrayExpression") {
+          const argument = node.arguments[0];
+          if (isMember(node.callee, "Promise", "all") &&
+            (argument?.type !== "ArrayExpression" || argument.elements.some((element) => element?.type === "SpreadElement"))) {
             context.report({ node, messageId: "unbounded" });
           }
         },
@@ -19,11 +22,12 @@ export const aigateRules = {
     },
   },
   "fetch-timeout": {
-    meta: { type: "problem", messages: { timeout: "fetch must use AbortSignal.timeout(...) or a bounded request helper." } },
+    meta: { type: "problem", messages: { timeout: "fetch must use AbortSignal.timeout(...) or the bounded ExecCtx signal." } },
     create(context) {
+      const allowExecCtx = context.filename.replaceAll("\\", "/").includes("/apps/api/src/modules/engine/");
       return {
         CallExpression(node) {
-          if (node.callee.name === "fetch" && !hasTimeoutSignal(node.arguments[1])) {
+          if (node.callee.name === "fetch" && !hasTimeoutSignal(node.arguments[1], allowExecCtx)) {
             context.report({ node, messageId: "timeout" });
           }
         },

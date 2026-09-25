@@ -15,8 +15,10 @@ async function expectRule(source, ruleId, path = filePath) {
 
 test("unbounded fan-out and fetch without timeout fail lint", async () => {
   await expectRule("Promise.all(items.map(send));", "aigate/bounded-promise-all");
+  await expectRule("Promise.all([...items.map(send)]);", "aigate/bounded-promise-all");
   await expectRule("fetch('/api');", "aigate/fetch-timeout");
   await expectRule("fetch('/api', { signal: controller.signal });", "aigate/fetch-timeout");
+  await expectRule("fetch('/api', { signal: ctx.signal });", "aigate/fetch-timeout");
 });
 
 test("secret logging, empty catch, and any fail lint", async () => {
@@ -35,6 +37,8 @@ test("bounded operations and const assertions pass lint", async () => {
   const source = "Promise.all([a(), b()]); fetch('/api', { signal: AbortSignal.timeout(1000) }); const modes = ['a'] as const; console.log(monkey, modes);";
   const [result] = await eslint.lintText(source, { filePath });
   assert.deepEqual(result.messages, []);
+  const [api] = await eslint.lintText("fetch('/api', { signal: ctx.signal });", { filePath: "apps/api/src/modules/engine/infrastructure/provider.ts" });
+  assert.deepEqual(api.messages, []);
   const [repo] = await eslint.lintText('db.query("SELECT id FROM usage LIMIT 10");', { filePath: "apps/api/src/modules/usage/infrastructure/usage-repo.ts" });
   assert.deepEqual(repo.messages, []);
 });
