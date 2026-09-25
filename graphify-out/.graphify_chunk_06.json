@@ -1,0 +1,911 @@
+{
+  "nodes": [
+    {
+      "id": "provider_openai_contract",
+      "label": "OpenAI-compatible provider adapter contract (M1 SP9)",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "One AIProviderPort for the openai-compatible family over HttpTransportPort. No HTTP API and no UI; errors reach users through /v1 (SP12), validateCredential backs Test connection (SP11)."
+    },
+    {
+      "id": "adapter_openai_compatible",
+      "label": "OpenAICompatibleAdapter (AIProviderPort for openai-compatible)",
+      "file_type": "code",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/adapters/openai-compatible.ts",
+      "rationale": "Takes a ProviderDescriptor; no default provider config, so an unknown provider cannot inherit OpenAI settings."
+    },
+    {
+      "id": "adapter_sse_reader",
+      "label": "readSseData() — bounded SSE reader (1 Mi chars per line/event, cancels body)",
+      "file_type": "code",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/sse.ts"
+    },
+    {
+      "id": "adapter_cip_mapping",
+      "label": "CIP ↔ chat completions mapping (max_completion_tokens, tool messages, data: URLs)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "adapter_unsupported_before_io",
+      "label": "Refused before I/O: video, media by URL, assistant thinking, tool_result.isError, budgetTokens, foreign vendorExtensions",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Spec §3.1: never drop a field silently. cacheControl is the one hint left out (OpenAI caches prefixes itself)."
+    },
+    {
+      "id": "adapter_status_classification",
+      "label": "Status → ErrorCode by status + error.code/type only (never message text)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "insufficient_quota → QUOTA_EXHAUSTED, model_not_found → MODEL_UNAVAILABLE, other 4xx → INVALID_REQUEST (terminal)."
+    },
+    {
+      "id": "adapter_retry_transient",
+      "label": "In-place retry: 502/503/504 + unreachable host, ≤3 attempts via withRetry, before first chunk",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "adapter_partial_stream_error",
+      "label": "Truncated stream or error event → PROVIDER_UNAVAILABLE with details.partial",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "adapter_message_redaction",
+      "label": "Upstream message ≤300 chars, credential redacted, HTML pages dropped; bad API key → AUTH_ERROR before I/O",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "adapter_usage_normalization",
+      "label": "TokenUsage normalized: inputTokens excludes cache reads, outputTokens includes reasoning",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/cip.ts"
+    },
+    {
+      "id": "adapter_listed_model",
+      "label": "ListedModel { id, descriptor? } — getModels never invents limits (≤1000 ids)",
+      "file_type": "code",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/ports.ts"
+    },
+    {
+      "id": "adapter_validate_credential",
+      "label": "validateCredential(): one call; valid:false only for AUTH_ERROR / QUOTA_EXHAUSTED",
+      "file_type": "code",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "adapter_tests",
+      "label": "packages/engine/test/openai-adapter.test.mjs (15 tests, fake transport, SSE split every 3 bytes; 16 mutations caught)",
+      "file_type": "code",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "adapter_e2e_test",
+      "label": "transport.test.mjs: adapter streams end to end over DirectTransport",
+      "file_type": "code",
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/test/transport.test.mjs"
+    },
+    {
+      "id": "api_ui_map_row_sp9_no_ui",
+      "label": "API_UI_MAP row: SP9 OpenAICompatibleAdapter, No UI",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "validateCredential will back Test connection on /providers (SP11); chat errors reach users through /v1 (SP12)."
+    },
+    {
+      "id": "progress_handoff_next_sp10",
+      "label": "Handoff next step: SP10 protocol adapter in/out (OpenAI only)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Inbound OpenAI body → CanonicalRequest (omitted stream = non-streaming), outbound JSON/SSE with [DONE], partial-stream error visible to the client."
+    },
+    {
+      "id": "sp_sp9",
+      "label": "SP9 — engine: OpenAI-compatible provider adapter",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done-no-ui"
+    },
+    {
+      "id": "sp_sp10",
+      "label": "SP10 — engine: protocol adapter in/out (OpenAI only)",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next"
+    },
+    {
+      "id": "05_request_routing_fallback_fallback_upstream_error_result",
+      "label": "fallback.upstream-error-result",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_fallback_executor_retry_budget",
+      "label": "fallback.executor-retry-budget",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_fallback_error_classification",
+      "label": "fallback.error-classification",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "SUSPECTED_BUG"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_fallback_partial_stream_failure",
+      "label": "fallback.partial-stream-failure",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "SUSPECTED_BUG"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_routing_default_executor_openai_fallback",
+      "label": "routing.default-executor-openai-fallback",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "SUSPECTED_BUG"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_routing_non_streaming_response",
+      "label": "routing.non-streaming-response",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    },
+    {
+      "id": "05_request_routing_fallback_routing_streaming_pipeline",
+      "label": "routing.streaming-pipeline",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "contracted",
+      "labels": [
+        "REFERENCE_BEHAVIOR"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "provider_openai_contract",
+      "target": "sp_sp9",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp9",
+      "target": "provider_openai_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp9",
+      "target": "port_ai_provider",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "port_ai_provider",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "port_http_transport",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "engine_with_retry",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "transport_read_bounded_text",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "adapter_sse_reader",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "engine_unsupported_feature_error",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "concept_cip",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_openai_contract",
+      "target": "adapter_openai_compatible",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "adapter_cip_mapping",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "adapter_unsupported_before_io",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "adapter_status_classification",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "adapter_retry_transient",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "adapter_partial_stream_error",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "adapter_message_redaction",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "adapter_usage_normalization",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "adapter_listed_model",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "adapter_validate_credential",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_unsupported_before_io",
+      "target": "engine_unsupported_feature_error",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_status_classification",
+      "target": "concept_error_taxonomy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_status_classification",
+      "target": "engine_fallback_policy_data",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_status_classification",
+      "target": "concept_error_codes",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_retry_transient",
+      "target": "engine_with_retry",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_retry_transient",
+      "target": "transport_fail_network",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_retry_transient",
+      "target": "transport_fail_redirect",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_partial_stream_error",
+      "target": "gs_partial_stream_failure",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_message_redaction",
+      "target": "transport_rule_host_only_errors",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_sse_reader",
+      "target": "transport_read_bounded_text",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_validate_credential",
+      "target": "screen_llm_providers",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_validate_credential",
+      "target": "api_ui_map_screen_providers",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_validate_credential",
+      "target": "sp_sp11",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_listed_model",
+      "target": "engine_define_registry",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_tests",
+      "target": "adapter_openai_compatible",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_e2e_test",
+      "target": "transport_direct_transport",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_e2e_test",
+      "target": "adapter_openai_compatible",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp9_no_ui",
+      "target": "sp_sp9",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_rule_no_ui_row",
+      "target": "sp_sp9",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp9_no_ui",
+      "target": "api_ui_map_v1_chat_completions",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp9",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp10",
+      "target": "sp_sp10",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_task_board",
+      "target": "sp_sp10",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_openai_contract",
+      "target": "05_request_routing_fallback_fallback_upstream_error_result",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_message_redaction",
+      "target": "05_request_routing_fallback_fallback_upstream_error_result",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_openai_contract",
+      "target": "05_request_routing_fallback_fallback_executor_retry_budget",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_retry_transient",
+      "target": "05_request_routing_fallback_fallback_executor_retry_budget",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_openai_contract",
+      "target": "05_request_routing_fallback_fallback_error_classification",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_status_classification",
+      "target": "05_request_routing_fallback_fallback_error_classification",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_openai_contract",
+      "target": "05_request_routing_fallback_fallback_partial_stream_failure",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_partial_stream_error",
+      "target": "05_request_routing_fallback_fallback_partial_stream_failure",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_openai_contract",
+      "target": "05_request_routing_fallback_routing_default_executor_openai_fallback",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "05_request_routing_fallback_routing_default_executor_openai_fallback",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_openai_contract",
+      "target": "05_request_routing_fallback_routing_non_streaming_response",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_cip_mapping",
+      "target": "05_request_routing_fallback_routing_non_streaming_response",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_openai_contract",
+      "target": "05_request_routing_fallback_routing_streaming_pipeline",
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_sse_reader",
+      "target": "05_request_routing_fallback_routing_streaming_pipeline",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md",
+      "source_location": null,
+      "weight": 1
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "sp9_adapter_failure_path",
+      "label": "SP9 adapter failure path: classify, retry transient, fail partial streams",
+      "nodes": [
+        "adapter_status_classification",
+        "adapter_retry_transient",
+        "adapter_partial_stream_error",
+        "engine_fallback_policy_data",
+        "engine_with_retry"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-openai.md"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}
