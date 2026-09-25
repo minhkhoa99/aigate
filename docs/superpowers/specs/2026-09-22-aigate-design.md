@@ -335,6 +335,8 @@ client ──> 9router :20128 ──> recording proxy ──> vendor thật
 
 AIGate chạy **port khác** → hai hệ sống song song, so trực tiếp được.
 
+> **Ghi chú triển khai SP3 (2026-09-26):** upstream là HTTPS nên forward proxy qua `outboundProxyUrl` chỉ thấy tunnel mã hoá (cần MITM CA). SP3 ghi tape bằng cách tạo tạm một provider node OpenAI-compatible có `baseUrl` trỏ vào vendor giả trên máy — cùng request, không CA, không đổi cài đặt 9router. Chi tiết: `docs/contracts/parity.md`.
+
 Mỗi kịch bản sinh ra 1 tape 4 phần:
 
 ```jsonc

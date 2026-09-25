@@ -1,0 +1,60 @@
+{
+  "id": "upstream-429-rate",
+  "title": "Upstream rate limit",
+  "gateway": "9router@0.5.55",
+  "recordedAt": "2026-09-25T18:25:21.970Z",
+  "covers": [
+    "fallback.error-classification",
+    "fallback.executor-retry-budget",
+    "fallback.accounts-exhausted-response"
+  ],
+  "clientRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "body": {
+      "model": "aigateparity/parity-upstream-429-rate",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "stream": false
+    }
+  },
+  "upstreamRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "*/*",
+      "accept-language": "*",
+      "authorization": "Bearer ***",
+      "content-type": "application/json"
+    },
+    "body": {
+      "model": "parity-upstream-429-rate",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "stream": false
+    }
+  },
+  "upstreamCalls": 1,
+  "upstreamResponse": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json",
+      "retry-after": "1"
+    },
+    "body": "{\"error\":{\"message\":\"Rate limit reached for requests\",\"type\":\"requests\",\"param\":null,\"code\":\"rate_limit_exceeded\"}}",
+    "cut": false
+  },
+  "clientResponse": {
+    "status": 429,
+    "contentType": "application/json",
+    "body": "{\"error\":{\"message\":\"[openai-compatible-chat-20285e06-2ae9-4993-b3d6-b5b0bcc46c95/parity-upstream-429-rate] [429]: {\\\"error\\\":{\\\"message\\\":\\\"Rate limit reached for requests\\\",\\\"type\\\":\\\"requests\\\",\\\"param\\\":null,\\\"code\\\":\\\"rate_limit_exceeded\\\"}} (reset after 2s)\"}}"
+  }
+}

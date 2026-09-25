@@ -1,0 +1,13 @@
+{
+  "name": "@aigate/parity",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only parity harness (spec §8): record tapes from 9router, replay them against AIGate, report coverage.",
+  "scripts": {
+    "test": "pnpm --filter @aigate/server build && node --test --test-timeout=60000 test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@aigate/engine": "workspace:*",
+    "@aigate/server": "workspace:*"
+  }
+}

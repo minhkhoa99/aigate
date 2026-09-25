@@ -12,7 +12,7 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M0 SP0 Lint, CI, and the two skills | Done | SP0.1–SP0.6 below |
 | M0 SP1 Monorepo skeleton | Done | SP1 below |
 | M0 SP2 SPIKE-1 and database driver chain | Done | SP2 below, `packages/database` |
-| M0 SP3 Parity harness | **Not started** | Needed before the parity gates |
+| M0 SP3 Parity harness | Done, no UI | `docs/contracts/parity.md` |
 | M0 SP4 `tools/extract` registry extraction | **Not started** | Needed before SP13 |
 | M1 SP5 `settings` | Done, UI wired | `docs/contracts/settings.md` |
 | M1 SP6 `identity` + `apikeys` | Done, UI wired | `docs/contracts/identity-apikeys.md` |
@@ -23,7 +23,8 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M1 SP10 `engine`: protocol adapter in/out (OpenAI only) | Done, no UI | `docs/contracts/protocol-openai.md` |
 | M1 SP11 `connections` (one API-key account) | Done, UI wired | `docs/contracts/connections.md` |
 | M1 SP12 routing + `/v1` streaming | Done, UI wired | `docs/contracts/chat-lane.md` |
-| M1 acceptance gate (parity tiers 1+2, 13 golden scenarios) | **Next**: needs M0 SP3 | SP12 below |
+| M1 acceptance gate (parity tiers 1+2, 13 golden scenarios) | **Passed** (tier 1 11/11, golden 10/10 + 3 deferred); tier 2 waits for an OpenAI key | `docs/parity/m1-gate-report.md` |
+| M0 SP4 `tools/extract` registry extraction | **Next** | SP3 below |
 
 ## Completed and verified
 
@@ -400,4 +401,37 @@ Checks and status:
   - `implemented`: `endpoint.enforce-require-api-key`, `routing.request-preflight`, `routing.client-disconnect-propagation`, `routing.streaming-pipeline`, and `fallback.partial-stream-failure`.
   - `contracted`: `routing.lane-entry-routes`, `routing.model-resolution`, `fallback.accounts-exhausted-response`, and `catalog.model-listing-live-override`.
 
-**Next step: the M1 acceptance gate (spec §9: parity tiers 1+2 clean, 13 golden scenarios green).** This needs **M0 SP3, the parity harness**: a recording proxy, tapes, a normalizer, and a semantic SSE diff. It then runs the golden scenarios in `.agents/skills/porting-behavior-not-code/golden-scenarios.md` against `/v1`. After the gate come M2 (SP13 catalog and the rest) and M0 SP4 (`tools/extract`).
+**M0 SP3 (the parity harness) is complete, and the M1 gate passed.** The contract is `docs/contracts/parity.md`; the report is `docs/parity/m1-gate-report.md`.
+
+- **Harness.** `tools/parity/` is dev-only. `pnpm parity record | replay | live | gate`.
+  - `vendor.mjs`: a scripted OpenAI-compatible vendor that records upstream requests, with secrets masked.
+  - `record.mjs`: tapes from a running 9router.
+  - `normalize.mjs`: the semantic view; SSE is compared by meaning, not by chunk.
+  - `replay.mjs`: tier 1 `judge` and tier 3 drift.
+  - `live.mjs`: tier 2 against OpenAI with `OPENAI_API_KEY`.
+  - `coverage.mjs`.
+  - `pnpm test` runs `tools/parity/test/parity.test.mjs`, so CI replays the committed tapes.
+- **Recording.** Done from the user's running 9router **0.5.55** at `localhost:20128`. The matrix was traced at 0.5.86.
+  - A temporary OpenAI-compatible node, a connection, and a client key, all named `AIGate parity (temporary)`, are created and then deleted by `cleanup()` before and after each run. 9router's code and settings are untouched.
+  - Recording uses a per-scenario model id, because 9router locks accounts per model.
+  - Each request sends `x-9router-token-saver: off`, because that instance had Token Saver on, which injects a system prompt.
+  - This deviates from spec §8.2 (`outboundProxyUrl`): a forward proxy cannot read HTTPS without a MITM CA, so the node's `baseUrl` points at the local vendor instead.
+- **Findings, declared as labeled deviations and written into the matrix.**
+  - 9router adds **2000 tokens** to the prompt and total usage it reports (`addBufferToUsage`). `routing.non-streaming-response` is now `SUSPECTED_BUG`.
+  - It invents usage for streams that did not ask for it.
+  - With no `stream` flag, it sends the JSON answer as `text/event-stream` plus a bare `[DONE]`, which cannot be parsed.
+  - A cut stream ends silently.
+  - Error bodies have no `type`/`code`, and the message leaks the node id and the raw upstream body.
+  - An upstream 401 is passed through as 401.
+  - `stream-text` matches exactly.
+- **Golden scenarios.** `apps/server/test/golden.test.mjs` has 13, at M1 scope: 10 pass, and 3 are skipped with reasons (token refresh SP16, account failover SP17, provider fallback SP17/19). Shared lane fakes moved to `apps/server/test/lane-helpers.mjs`.
+- **Gate result.**
+  - Tier 1: 11/11 PASS.
+  - Tier 3: 3 expected warnings (`stream_options`, an explicit `stream: false`).
+  - Tier 2: not run yet; it needs `OPENAI_API_KEY` and `pnpm parity live`.
+  - Coverage: 11/284 capabilities by tape.
+- **Checks.** The harness tests pass 5/5. Three mutations were caught: AIGate buffering usage like 9router, a 401 passed through, and the normalizer ignoring the terminal. The full gate is green.
+
+**Next step: M0 SP4 (`tools/extract`).** Generate the provider registry (123 providers, models, capabilities) from 9router, then delete the tool (spec §2). SP13 (the 123-provider registry, and connecting providers beyond OpenAI on `/providers`) depends on it.
+- **Before M2 closes:** run `pnpm parity live` with a real OpenAI key to close tier 2.
+- **From SP15 on:** re-record tapes per protocol adapter.

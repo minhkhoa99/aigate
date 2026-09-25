@@ -1,62 +1,10 @@
 // Contract: docs/contracts/chat-lane.md — /v1/chat/completions and /v1/models end to end, with a fake upstream.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { request as httpRequest } from "node:http";
-import { boot, setUp, withTempDb } from "./helpers.mjs";
+import { withTempDb } from "./helpers.mjs";
+import { chunk, completion, errorOf, fakeUpstream, frames, hello, json, listening, openStream, ready, SECRET, sse } from "./lane-helpers.mjs";
 
-const SECRET = "sk-upstream-secret-4242";
 const encoder = new TextEncoder();
-const hello = { model: "gpt-4.1", messages: [{ role: "user", content: "hi" }] };
-const completion = { id: "chatcmpl-up", model: "gpt-4.1", choices: [{ message: { content: "Hello!" }, finish_reason: "stop" }], usage: { prompt_tokens: 3, completion_tokens: 2 } };
-const chunk = (delta, extra = {}) => ({ id: "chatcmpl-s", model: "gpt-4.1", choices: [{ delta, ...extra }] });
-const events = (list) => list.map((e) => `data: ${typeof e === "string" ? e : JSON.stringify(e)}\n\n`).join("");
-
-// An upstream body that honours the shared signal, like the direct transport: an abort errors the read.
-function body(text, ctx, { hang = false } = {}) {
-  const bytes = encoder.encode(text);
-  let sent = false;
-  return new ReadableStream({
-    start(controller) {
-      ctx.signal.addEventListener("abort", () => { try { controller.error(ctx.signal.reason); } catch { /* already closed */ } }, { once: true });
-    },
-    pull(controller) {
-      if (!sent) { sent = true; controller.enqueue(bytes); return; }
-      if (hang) return new Promise(() => {});
-      controller.close();
-    },
-  });
-}
-
-// One planned answer per upstream call: (request, ctx) => HttpResponse.
-function fakeUpstream(...answers) {
-  const calls = [];
-  return {
-    calls,
-    async send(request, ctx) {
-      calls.push({ request, ctx });
-      const next = answers.shift();
-      if (!next) throw new Error("unexpected upstream call");
-      return next(request, ctx);
-    },
-  };
-}
-const json = (status, value) => (_request, ctx) => ({ status, headers: { "content-type": "application/json" }, body: body(JSON.stringify(value), ctx) });
-const sse = (list, options) => (_request, ctx) => ({ status: 200, headers: { "content-type": "text/event-stream" }, body: body(events(list), ctx, options) });
-
-// A server with a dashboard session, one AIGate key, and an OpenAI connection.
-async function ready(file, transport, options = {}) {
-  const { app, call } = await boot(file, { transport, ...options });
-  const cookie = await setUp(call);
-  const dash = (request) => call({ ...request, cookie });
-  const { key } = (await dash({ method: "POST", url: "/api/keys", body: { name: "client" } })).json();
-  const connection = (await dash({ method: "POST", url: "/api/connections", body: { provider: "openai", apiKey: SECRET } })).json();
-  const chat = (payload, headers = {}) => call({ method: "POST", url: "/v1/chat/completions", body: payload, headers: { authorization: `Bearer ${key}`, ...headers } });
-  // A raw body and headers, for what the JSON helper cannot send.
-  const raw = (payload, headers) => app.getHttpAdapter().getInstance().inject({ method: "POST", url: "/v1/chat/completions", payload, headers });
-  return { app, call, dash, key, connection, chat, raw };
-}
-const errorOf = (res) => ({ status: res.statusCode, code: res.json().error.code, type: res.json().error.type });
-const frames = (text) => text.split("\n\n").filter(Boolean).map((f) => (f === "data: [DONE]" ? "[DONE]" : JSON.parse(f.slice(6))));
 
 test("the key gate runs before the body is read; a valid key gets an OpenAI completion", () =>
   withTempDb(async (file) => {
@@ -195,20 +143,6 @@ test("an upstream that goes silent is cut by the idle timeout and cancelled", ()
     await app.close();
   }));
 
-// Real sockets: inject cannot model a slow reader or a client that leaves.
-async function listening(file, transport) {
-  const session = await ready(file, transport);
-  await session.app.listen(0, "127.0.0.1");
-  return { ...session, port: session.app.getHttpServer().address().port };
-}
-
-function openStream(port, key) {
-  return new Promise((resolve, reject) => {
-    const req = httpRequest({ host: "127.0.0.1", port, method: "POST", path: "/v1/chat/completions", headers: { "content-type": "application/json", authorization: `Bearer ${key}` } }, resolve);
-    req.on("error", reject);
-    req.end(JSON.stringify({ ...hello, stream: true }));
-  });
-}
 
 test("a client that leaves mid-stream cancels the upstream at once", () =>
   withTempDb(async (file) => {

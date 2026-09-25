@@ -1,0 +1,58 @@
+{
+  "id": "upstream-500",
+  "title": "Upstream 500 (not retried in place)",
+  "gateway": "9router@0.5.55",
+  "recordedAt": "2026-09-25T18:25:21.992Z",
+  "covers": [
+    "fallback.error-classification",
+    "fallback.executor-retry-budget"
+  ],
+  "clientRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "body": {
+      "model": "aigateparity/parity-upstream-500",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "stream": false
+    }
+  },
+  "upstreamRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "*/*",
+      "accept-language": "*",
+      "authorization": "Bearer ***",
+      "content-type": "application/json"
+    },
+    "body": {
+      "model": "parity-upstream-500",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "stream": false
+    }
+  },
+  "upstreamCalls": 1,
+  "upstreamResponse": {
+    "status": 500,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"error\":{\"message\":\"The server had an error while processing your request.\",\"type\":\"server_error\",\"param\":null,\"code\":null}}",
+    "cut": false
+  },
+  "clientResponse": {
+    "status": 500,
+    "contentType": "application/json",
+    "body": "{\"error\":{\"message\":\"[openai-compatible-chat-20285e06-2ae9-4993-b3d6-b5b0bcc46c95/parity-upstream-500] [500]: {\\\"error\\\":{\\\"message\\\":\\\"The server had an error while processing your request.\\\",\\\"type\\\":\\\"server_error\\\",\\\"param\\\":null,\\\"code\\\":null}} (reset after 2s)\"}}"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "id": "omitted-stream",
+  "title": "No stream flag (OpenAI default: JSON)",
+  "gateway": "9router@0.5.55",
+  "recordedAt": "2026-09-25T18:25:18.864Z",
+  "covers": [
+    "routing.stream-mode-decision"
+  ],
+  "clientRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "body": {
+      "model": "aigateparity/parity-omitted-stream",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Say hello"
+        }
+      ]
+    }
+  },
+  "upstreamRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "text/event-stream",
+      "accept-language": "*",
+      "authorization": "Bearer ***",
+      "content-type": "application/json"
+    },
+    "body": {
+      "model": "parity-omitted-stream",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Say hello"
+        }
+      ]
+    }
+  },
+  "upstreamCalls": 1,
+  "upstreamResponse": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"id\":\"chatcmpl-vendor-1\",\"object\":\"chat.completion\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Hello!\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":5,\"total_tokens\":17}}",
+    "cut": false
+  },
+  "clientResponse": {
+    "status": 200,
+    "contentType": "text/event-stream",
+    "body": "{\"id\":\"chatcmpl-vendor-1\",\"object\":\"chat.completion\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Hello!\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":5,\"total_tokens\":17}}data: [DONE]\n\n"
+  }
+}

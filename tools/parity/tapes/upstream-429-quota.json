@@ -1,0 +1,57 @@
+{
+  "id": "upstream-429-quota",
+  "title": "Upstream quota exhausted",
+  "gateway": "9router@0.5.55",
+  "recordedAt": "2026-09-25T18:25:21.982Z",
+  "covers": [
+    "fallback.error-classification"
+  ],
+  "clientRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "body": {
+      "model": "aigateparity/parity-upstream-429-quota",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "stream": false
+    }
+  },
+  "upstreamRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "*/*",
+      "accept-language": "*",
+      "authorization": "Bearer ***",
+      "content-type": "application/json"
+    },
+    "body": {
+      "model": "parity-upstream-429-quota",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "stream": false
+    }
+  },
+  "upstreamCalls": 1,
+  "upstreamResponse": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"error\":{\"message\":\"You exceeded your current quota.\",\"type\":\"insufficient_quota\",\"param\":null,\"code\":\"insufficient_quota\"}}",
+    "cut": false
+  },
+  "clientResponse": {
+    "status": 429,
+    "contentType": "application/json",
+    "body": "{\"error\":{\"message\":\"[openai-compatible-chat-20285e06-2ae9-4993-b3d6-b5b0bcc46c95/parity-upstream-429-quota] [429]: {\\\"error\\\":{\\\"message\\\":\\\"You exceeded your current quota.\\\",\\\"type\\\":\\\"insufficient_quota\\\",\\\"param\\\":null,\\\"code\\\":\\\"insufficient_quota\\\"}} (reset after 2s)\"}}"
+  }
+}

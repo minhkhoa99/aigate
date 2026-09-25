@@ -1,0 +1,64 @@
+{
+  "id": "stream-text",
+  "title": "Streaming text with usage",
+  "gateway": "9router@0.5.55",
+  "recordedAt": "2026-09-25T18:25:18.753Z",
+  "covers": [
+    "routing.streaming-pipeline",
+    "routing.stream-mode-decision"
+  ],
+  "clientRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "body": {
+      "model": "aigateparity/parity-stream-text",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Say hello"
+        }
+      ],
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    }
+  },
+  "upstreamRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "text/event-stream",
+      "accept-language": "*",
+      "authorization": "Bearer ***",
+      "content-type": "application/json"
+    },
+    "body": {
+      "model": "parity-stream-text",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Say hello"
+        }
+      ],
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    }
+  },
+  "upstreamCalls": 1,
+  "upstreamResponse": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream"
+    },
+    "body": "data: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hel\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"lo!\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[],\"usage\":{\"prompt_tokens\":9,\"completion_tokens\":3,\"total_tokens\":12}}\n\ndata: [DONE]\n\n",
+    "cut": false
+  },
+  "clientResponse": {
+    "status": 200,
+    "contentType": "text/event-stream",
+    "body": "data: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hel\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"lo!\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2034,\"completion_tokens\":1,\"total_tokens\":2035,\"estimated\":true}}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[],\"usage\":{\"prompt_tokens\":9,\"completion_tokens\":3,\"total_tokens\":12}}\n\ndata: [DONE]\n\ndata: [DONE]\n\n"
+  }
+}

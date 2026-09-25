@@ -1,0 +1,99 @@
+{
+  "id": "json-tool-call",
+  "title": "Non-streaming tool call",
+  "gateway": "9router@0.5.55",
+  "recordedAt": "2026-09-25T18:25:18.819Z",
+  "covers": [
+    "routing.non-streaming-response"
+  ],
+  "clientRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "body": {
+      "model": "aigateparity/parity-json-tool-call",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Weather in Hanoi?"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "description": "Weather for a city",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "city"
+              ]
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "stream": false
+    }
+  },
+  "upstreamRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "*/*",
+      "accept-language": "*",
+      "authorization": "Bearer ***",
+      "content-type": "application/json"
+    },
+    "body": {
+      "model": "parity-json-tool-call",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Weather in Hanoi?"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "description": "Weather for a city",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "city"
+              ]
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "stream": false
+    }
+  },
+  "upstreamCalls": 1,
+  "upstreamResponse": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"id\":\"chatcmpl-vendor-1\",\"object\":\"chat.completion\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"call_abc123\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Hanoi\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":5,\"total_tokens\":17}}",
+    "cut": false
+  },
+  "clientResponse": {
+    "status": 200,
+    "contentType": "application/json",
+    "body": "{\"id\":\"chatcmpl-vendor-1\",\"object\":\"chat.completion\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"call_abc123\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Hanoi\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":2012,\"completion_tokens\":5,\"total_tokens\":2017}}"
+  }
+}

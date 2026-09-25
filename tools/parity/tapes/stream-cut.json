@@ -1,0 +1,58 @@
+{
+  "id": "stream-cut",
+  "title": "Stream cut after the first chunk",
+  "gateway": "9router@0.5.55",
+  "recordedAt": "2026-09-25T18:25:22.061Z",
+  "covers": [
+    "fallback.partial-stream-failure",
+    "routing.streaming-pipeline"
+  ],
+  "clientRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "body": {
+      "model": "aigateparity/parity-stream-cut",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Tell a story"
+        }
+      ],
+      "stream": true
+    }
+  },
+  "upstreamRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "text/event-stream",
+      "accept-language": "*",
+      "authorization": "Bearer ***",
+      "content-type": "application/json"
+    },
+    "body": {
+      "model": "parity-stream-cut",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Tell a story"
+        }
+      ],
+      "stream": true
+    }
+  },
+  "upstreamCalls": 1,
+  "upstreamResponse": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream"
+    },
+    "body": "data: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Once upon\"},\"finish_reason\":null}]}\n\n",
+    "cut": true
+  },
+  "clientResponse": {
+    "status": 200,
+    "contentType": "text/event-stream",
+    "body": "data: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Once upon\"},\"finish_reason\":null}]}\n\n"
+  }
+}

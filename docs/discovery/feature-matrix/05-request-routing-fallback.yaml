@@ -449,6 +449,7 @@
   behavior: { streaming: true, cancellation: null, concurrency: null }
   edgeCases:
     - "A client that omits stream and sends Accept */* (curl, many HTTP libraries) receives an SSE body although OpenAI Chat Completions and Anthropic Messages both default to non-streaming"
+    - "Recorded (tools/parity/tapes/omitted-stream.json, 9router 0.5.55, OpenAI-compatible node): the upstream request carried no stream field, the vendor answered JSON, and the client got that JSON body under Content-Type text/event-stream followed by a bare data: [DONE], readable as neither SSE nor JSON"
   evidence:
     - { file: open-sse/handlers/chatCore.js, line: 118, note: "clientRequestedStreaming only for stream === true or gemini-family sources" }
     - { file: open-sse/handlers/chatCore.js, line: 120, note: "stream = providerRequiresStreaming ? true : (body.stream !== false)" }
@@ -1138,16 +1139,22 @@
   performanceConcerns:
     - "The whole upstream body is buffered; there is no body-read timeout on this path (the connect timer is cleared at headers and the stall watchdog only exists on the streaming path)"
   behavior: { streaming: false, cancellation: "None — no signal observes the client while the body is being read", concurrency: null }
-  edgeCases: []
+  edgeCases:
+    - "Recorded (tools/parity/tapes/normal-json.json, 9router 0.5.55): the vendor reported prompt_tokens 12 and total_tokens 17; the client received 2012 and 2017. 'Usage buffered' means addBufferToUsage adds 2000 BUFFER_TOKENS to the prompt and total counts the client sees"
   evidence:
+    - { file: open-sse/utils/usageTracking.js, line: 21, note: "BUFFER_TOKENS = 2000; addBufferToUsage adds it to input/prompt/total tokens" }
     - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 292, note: "invalid SSE -> 502" }
     - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 303, note: "invalid JSON -> 502" }
     - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 324, note: "translateNonStreamingResponse when formats differ" }
     - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 338, note: "finish_reason forced to tool_calls" }
     - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 392, note: "success result with JSON Response" }
   newModule: routing
-  parityStatus: contracted
-  labels: [REFERENCE_BEHAVIOR]
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "The usage a client receives is the usage the vendor reported"
+    actual: "2000 buffer tokens are added to prompt_tokens and total_tokens before the response reaches the client"
+    impact: "Cost tracking, context budgeting, and billing built on the returned usage overcount every request by 2000 prompt tokens"
 
 - id: fallback.partial-stream-failure
   group: Auto fallback

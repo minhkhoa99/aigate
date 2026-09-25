@@ -1,0 +1,98 @@
+{
+  "id": "stream-tool-call",
+  "title": "Streaming tool call",
+  "gateway": "9router@0.5.55",
+  "recordedAt": "2026-09-25T18:25:18.783Z",
+  "covers": [
+    "routing.streaming-pipeline",
+    "translator.tool-id-normalization"
+  ],
+  "clientRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "body": {
+      "model": "aigateparity/parity-stream-tool-call",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Weather in Hanoi?"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "description": "Weather for a city",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "city"
+              ]
+            }
+          }
+        }
+      ],
+      "stream": true
+    }
+  },
+  "upstreamRequest": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "text/event-stream",
+      "accept-language": "*",
+      "authorization": "Bearer ***",
+      "content-type": "application/json"
+    },
+    "body": {
+      "model": "parity-stream-tool-call",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Weather in Hanoi?"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "description": "Weather for a city",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "city"
+              ]
+            }
+          }
+        }
+      ],
+      "stream": true
+    }
+  },
+  "upstreamCalls": 1,
+  "upstreamResponse": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream"
+    },
+    "body": "data: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"index\":0,\"id\":\"call_abc123\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\"}}]},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"Hanoi\\\"}\"}}]},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n",
+    "cut": false
+  },
+  "clientResponse": {
+    "status": 200,
+    "contentType": "text/event-stream",
+    "body": "data: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"index\":0,\"id\":\"call_abc123\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\"}}]},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"Hanoi\\\"}\"}}]},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-vendor-s\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":2075,\"completion_tokens\":0,\"total_tokens\":2075,\"estimated\":true}}\n\ndata: [DONE]\n\ndata: [DONE]\n\n"
+  }
+}
