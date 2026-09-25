@@ -1213,7 +1213,7 @@
     },
     {
       "id": "sp_sp13",
-      "label": "SP13 — Registry of 123 providers",
+      "label": "SP13 — catalog → runtime registry (41 connectable providers, /api/providers, /providers wired)",
       "file_type": "document",
       "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
       "source_location": null,
@@ -6412,7 +6412,7 @@
     },
     {
       "id": "api_ui_map_get_api_connections",
-      "label": "GET /api/connections (+ /providers)",
+      "label": "GET /api/connections",
       "file_type": "document",
       "source_file": "docs/design/API_UI_MAP.md",
       "source_location": null,
@@ -6477,7 +6477,7 @@
     },
     {
       "id": "api_ui_map_screen_connections_wired",
-      "label": "/providers/connections → Connections (real table, Add / Replace key / Test / Disable / Delete)",
+      "label": "/providers/connections → Connections (Add modal lists the 41 connectable providers; ?provider= shows the reason)",
       "file_type": "document",
       "source_file": "docs/design/API_UI_MAP.md",
       "source_location": null,
@@ -6489,7 +6489,7 @@
     },
     {
       "id": "api_ui_map_screen_provider_detail_wired",
-      "label": "/providers/detail → ProviderDetail (live Connection panel or Not supported yet)",
+      "label": "/providers/detail → ProviderDetail (Connection panel or reason; Models table)",
       "file_type": "document",
       "source_file": "docs/design/API_UI_MAP.md",
       "source_location": null,
@@ -6501,7 +6501,7 @@
     },
     {
       "id": "api_ui_map_screen_llm_providers_wired",
-      "label": "/providers → LlmProviders (Connected pill)",
+      "label": "/providers → LlmProviders (catalog from GET /api/providers; Connected / Coming later pills)",
       "file_type": "document",
       "source_file": "docs/design/API_UI_MAP.md",
       "source_location": null,
@@ -7240,6 +7240,170 @@
       "labels": [
         "REFERENCE_BEHAVIOR"
       ]
+    },
+    {
+      "id": "catalog_providers_contract",
+      "label": "Catalog providers contract (M2 SP13)",
+      "file_type": "document",
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "CATALOG becomes the runtime registry: 41 of 121 providers connectable through the SP9 adapter; every other provider carries a reason the UI shows."
+    },
+    {
+      "id": "sp_sp13b",
+      "label": "SP13b — custom OpenAI-compatible providers (provider_nodes), then delete tools/extract",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "builtin_registry_catalog",
+      "label": "builtinRegistry built from CATALOG (41 connectable providers)",
+      "file_type": "code",
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/builtin-registry.ts"
+    },
+    {
+      "id": "unsupported_reason",
+      "label": "unsupportedReason() — why a catalog provider cannot be connected yet (adapter SP14, OAuth SP16, per-account URL, forceStream, clineEnvelope, hidden, services)",
+      "file_type": "code",
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/builtin-registry.ts",
+      "rationale": "One rule gives both the connectable set and the UI reason; OpenAI is the forceStream exception (IMPLEMENTATION_ACCIDENT)."
+    },
+    {
+      "id": "provider_descriptor_catalog",
+      "label": "ProviderDescriptor { chatUrl, modelsUrl, headers, aliases, auth{header, scheme} }; nullable limits",
+      "file_type": "code",
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/registry.ts"
+    },
+    {
+      "id": "registry_alias_status",
+      "label": "registry.provider(idOrAlias) and registry.status(id)",
+      "file_type": "code",
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/registry.ts"
+    },
+    {
+      "id": "adapter_catalog_headers",
+      "label": "Adapter: catalog headers first, key last; raw or Bearer scheme; chatUrl/modelsUrl called directly",
+      "file_type": "code",
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/adapters/openai-compatible.ts"
+    },
+    {
+      "id": "chat_lane_resolution_by_connection",
+      "label": "/v1 resolution: provider-or-alias/model; non-connectable prefix → provider_not_supported; bare id → first declaring provider with an active connection",
+      "file_type": "code",
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/src/modules/routing/infrastructure/chat-lane.ts"
+    },
+    {
+      "id": "catalog_controller",
+      "label": "CatalogController — GET /api/providers, GET /api/providers/:id",
+      "file_type": "code",
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/src/modules/catalog/infrastructure/catalog.controller.ts"
+    },
+    {
+      "id": "api_get_providers",
+      "label": "GET /api/providers (all 121, connectable + reason)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_get_provider_detail",
+      "label": "GET /api/providers/:id (chatUrl + models; 404 NOT_FOUND)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "hook_use_providers",
+      "label": "useProviders (features/providers/api.ts)",
+      "file_type": "code",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "hook_use_provider",
+      "label": "useProvider(id) (features/providers/api.ts)",
+      "file_type": "code",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "catalog_api_tests",
+      "label": "apps/server/test/catalog.test.mjs (catalog API) + chat-lane resolution tests",
+      "file_type": "code",
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/test/catalog.test.mjs"
     }
   ],
   "edges": [
@@ -24342,6 +24506,356 @@
       "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
       "source_location": null,
       "weight": 1
+    },
+    {
+      "source": "catalog_providers_contract",
+      "target": "sp_sp13",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp13",
+      "target": "catalog_providers_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp13",
+      "target": "sp_sp13b",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp13",
+      "target": "sp_sp4",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp13",
+      "target": "builtin_registry_catalog",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp13",
+      "target": "unsupported_reason",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp13",
+      "target": "provider_descriptor_catalog",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp13",
+      "target": "registry_alias_status",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp13",
+      "target": "adapter_catalog_headers",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp13",
+      "target": "chat_lane_resolution_by_connection",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp13",
+      "target": "catalog_controller",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp13",
+      "target": "catalog_api_tests",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "builtin_registry_catalog",
+      "target": "catalog_generated",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "builtin_registry_catalog",
+      "target": "engine_define_registry",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "builtin_registry_catalog",
+      "target": "unsupported_reason",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "builtin_registry_catalog",
+      "target": "provider_descriptor_catalog",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "adapter_catalog_headers",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "adapter_catalog_headers",
+      "target": "provider_descriptor_catalog",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "chat_lane_resolution_by_connection",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "chat_lane_resolution_by_connection",
+      "target": "registry_alias_status",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "chat_lane_model_resolution",
+      "target": "chat_lane_resolution_by_connection",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "catalog_controller",
+      "target": "api_get_providers",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "catalog_controller",
+      "target": "api_get_provider_detail",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "catalog_controller",
+      "target": "builtin_registry_catalog",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "connections_controller",
+      "target": "unsupported_reason",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_err_provider_not_supported",
+      "target": "unsupported_reason",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "hook_use_providers",
+      "target": "api_get_providers",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "hook_use_provider",
+      "target": "api_get_provider_detail",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_screen_llm_providers_wired",
+      "target": "hook_use_providers",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_screen_connections_wired",
+      "target": "hook_use_providers",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_screen_provider_detail_wired",
+      "target": "hook_use_provider",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screen_llm_providers",
+      "target": "api_ui_map_screen_llm_providers_wired",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "02_providers_auth_catalog_registry_build",
+      "target": "builtin_registry_catalog",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "02_providers_auth_catalog_registry_entry_shape",
+      "target": "provider_descriptor_catalog",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "catalog_api_tests",
+      "target": "catalog_controller",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/server/test/catalog.test.mjs",
+      "source_location": null,
+      "weight": 1.0
     }
   ],
   "hyperedges": [
@@ -24690,6 +25204,22 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1,
       "source_file": "docs/contracts/registry-extract.md"
+    },
+    {
+      "id": "sp13_catalog_to_screen",
+      "label": "Catalog → registry → /api/providers → /providers screens",
+      "nodes": [
+        "catalog_generated",
+        "builtin_registry_catalog",
+        "catalog_controller",
+        "hook_use_providers",
+        "api_ui_map_screen_llm_providers_wired",
+        "api_ui_map_screen_provider_detail_wired"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/catalog-providers.md"
     }
   ],
   "input_tokens": 574916,
