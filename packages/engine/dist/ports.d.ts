@@ -5,6 +5,21 @@ export interface ExecCtx {
     readonly signal: AbortSignal;
     readonly requestId: string;
 }
+export interface HttpRequest {
+    readonly method: "GET" | "POST";
+    readonly url: string;
+    readonly headers: Readonly<Record<string, string>>;
+    readonly body?: string;
+    readonly timeoutMs: number;
+}
+export interface HttpResponse {
+    readonly status: number;
+    readonly headers: Readonly<Record<string, string>>;
+    readonly body: ReadableStream<Uint8Array> | null;
+}
+export interface HttpTransportPort {
+    send(request: HttpRequest, ctx: ExecCtx): Promise<HttpResponse>;
+}
 export interface Credential {
     readonly kind: "api-key";
     readonly apiKey: string;

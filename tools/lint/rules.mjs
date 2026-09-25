@@ -1,9 +1,27 @@
 const isMember = (node, object, property) =>
   node?.type === "MemberExpression" && !node.computed && node.object.name === object && node.property.name === property;
 
+const isTimeoutCall = (node) => node?.type === "CallExpression" && isMember(node.callee, "AbortSignal", "timeout");
+// signal: AbortSignal.timeout(n), or AbortSignal.any([...]) that includes one (the shared request signal plus a deadline).
+const isBoundedSignal = (node) => isTimeoutCall(node) || (node?.type === "CallExpression" && isMember(node.callee, "AbortSignal", "any") &&
+  node.arguments[0]?.type === "ArrayExpression" && node.arguments[0].elements.some(isTimeoutCall));
 const hasTimeoutSignal = (node) => node?.type === "ObjectExpression" && node.properties.some((entry) =>
-  entry.type === "Property" && entry.key.name === "signal" &&
-  entry.value.type === "CallExpression" && isMember(entry.value.callee, "AbortSignal", "timeout"));
+  entry.type === "Property" && entry.key.name === "signal" && isBoundedSignal(entry.value));
+const isFetch = (callee) => callee.name === "fetch" || isMember(callee, "globalThis", "fetch");
+const FUNCTION_TYPES = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"]);
+// Walks a subtree without entering nested functions, which run on their own schedule.
+function findInScope(node, predicate) {
+  if (!node || typeof node.type !== "string") return false;
+  if (predicate(node)) return true;
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "parent") continue;
+    for (const child of Array.isArray(value) ? value : [value]) {
+      if (child && typeof child.type === "string" && !FUNCTION_TYPES.has(child.type) && findInScope(child, predicate)) return true;
+    }
+  }
+  return false;
+}
+const isRetryShapedTry = (node) => node.type === "TryStatement" && node.handler !== null && findInScope(node.block, (n) => n.type === "AwaitExpression");
 
 export const aigateRules = {
   "bounded-promise-all": {
@@ -25,11 +43,27 @@ export const aigateRules = {
     create(context) {
       return {
         CallExpression(node) {
-          if (node.callee.name === "fetch" && !hasTimeoutSignal(node.arguments[1])) {
+          if (isFetch(node.callee) && !hasTimeoutSignal(node.arguments[1])) {
             context.report({ node, messageId: "timeout" });
           }
         },
       };
+    },
+  },
+  // Spec §2/§4.2: outbound HTTP from the server and engine goes through HttpTransportPort only.
+  "fetch-through-transport": {
+    meta: { type: "problem", messages: { transport: "Send outbound HTTP through HttpTransportPort (modules/transport), not fetch directly." } },
+    create(context) {
+      return { CallExpression(node) { if (isFetch(node.callee)) context.report({ node, messageId: "transport" }); } };
+    },
+  },
+  // Spec §11.2 "Retry không trần — chỉ cho phép qua helper duy nhất": a loop around an awaited try/catch is a
+  // hand-written retry. Use withRetry() from @aigate/engine, which bounds attempts, backoff, and cancellation.
+  "retry-through-helper": {
+    meta: { type: "problem", messages: { retry: "Retry through withRetry() from @aigate/engine instead of a loop around try/await/catch." } },
+    create(context) {
+      const check = (node) => { if (findInScope(node.body, isRetryShapedTry)) context.report({ node, messageId: "retry" }); };
+      return { ForStatement: check, ForInStatement: check, ForOfStatement: check, WhileStatement: check, DoWhileStatement: check };
     },
   },
   "no-secret-logging": {

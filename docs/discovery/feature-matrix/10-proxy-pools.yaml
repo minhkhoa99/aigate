@@ -61,7 +61,7 @@
     - { file: open-sse/utils/proxyFetch.js, line: 337, note: "generic if (proxyUrl) branch runs again after the MITM block, even on the second attempt path" }
     - { file: open-sse/utils/proxyFetch.js, line: 353, note: "final direct originalFetch(url, options) when nothing else applied" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: contracted
   labels: [REFERENCE_BEHAVIOR]
 
 - id: transport.strict-proxy-fallback

@@ -39,6 +39,16 @@ export default [
     rules: { "max-lines": ["error", { max: 200, skipBlankLines: true, skipComments: true }] },
   },
   {
+    files: ["apps/server/src/**/*.ts", "packages/*/src/**/*.ts"],
+    ignores: ["apps/server/src/modules/transport/infrastructure/**"],
+    rules: { "aigate/fetch-through-transport": "error" },
+  },
+  {
+    files: ["apps/server/src/**/*.ts", "packages/engine/src/**/*.ts"],
+    ignores: ["packages/engine/src/retry.ts"],
+    rules: { "aigate/retry-through-helper": "error" },
+  },
+  {
     files: ["apps/*/src/modules/*/infrastructure/**/*repo*.ts"],
     rules: { "aigate/bounded-query": "error" },
   },

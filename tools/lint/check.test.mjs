@@ -44,6 +44,29 @@ test("Drizzle repository selects need explicit columns and a row bound", async (
   }
 });
 
+test("server and engine code fetch only through the transport, with a timeout", async () => {
+  await expectRule("await fetch(url, { signal: AbortSignal.timeout(1000) });", "aigate/fetch-through-transport", "apps/server/src/modules/routing/infrastructure/chat.ts");
+  await expectRule("await fetch(url, { signal: AbortSignal.timeout(1000) });", "aigate/fetch-through-transport", "packages/engine/src/adapters/openai.ts");
+  const transport = "apps/server/src/modules/transport/infrastructure/direct-transport.ts";
+  const [ok] = await eslint.lintText("await fetch(url, { signal: AbortSignal.any([ctx.signal, AbortSignal.timeout(ms)]) });", { filePath: transport });
+  assert.deepEqual(ok.messages, [], "the transport may fetch with a combined deadline");
+  await expectRule("await fetch(url, { signal: AbortSignal.any([ctx.signal]) });", "aigate/fetch-timeout", transport);
+});
+
+test("retry loops must go through withRetry", async () => {
+  const loop = "for (let i = 0; i < 3; i++) { try { return await call(); } catch (error) { last = error; } }";
+  await expectRule(loop, "aigate/retry-through-helper", "apps/server/src/modules/connections/infrastructure/refresh.ts");
+  await expectRule("while (true) { try { await send(); break; } catch { await sleep(10); } }", "aigate/retry-through-helper", "packages/engine/src/adapters/openai.ts");
+  for (const [source, path] of [
+    [loop, "packages/engine/src/retry.ts"],
+    ["for (const item of items) total += item;", "apps/server/src/modules/usage/infrastructure/sum.ts"],
+    ["try { await call(); } catch (error) { log(error); }", "apps/server/src/modules/usage/infrastructure/once.ts"],
+  ]) {
+    const [result] = await eslint.lintText(source, { filePath: path });
+    assert.deepEqual(result.messages.filter((m) => m.ruleId === "aigate/retry-through-helper"), [], path);
+  }
+});
+
 test("bounded operations pass and opaque fetch signals fail lint", async () => {
   const source = "Promise.all([a(), b()]); fetch('/api', { signal: AbortSignal.timeout(1000) }); const modes = ['a'] as const; console.log(monkey, modes);";
   const [result] = await eslint.lintText(source, { filePath });

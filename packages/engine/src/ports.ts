@@ -9,6 +9,32 @@ export interface ExecCtx {
   readonly requestId: string;
 }
 
+// Outbound HTTP (spec §4.2 HttpTransportPort). SP8 implements the direct branch; relay, proxy, and
+// MITM-bypass DNS are later branches behind the same port (SP18).
+export interface HttpRequest {
+  readonly method: "GET" | "POST";
+  readonly url: string;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body?: string;
+  // Bounds the whole exchange (headers and body), inside the ctx deadline. Required, so every call
+  // site states its budget; 1..600000 ms.
+  readonly timeoutMs: number;
+}
+
+export interface HttpResponse {
+  readonly status: number;
+  // Lower-case names.
+  readonly headers: Readonly<Record<string, string>>;
+  // Aborts with the same signal as the request; read it with readBoundedText() unless streaming.
+  readonly body: ReadableStream<Uint8Array> | null;
+}
+
+// Rejects with EngineError TIMEOUT, PROVIDER_UNAVAILABLE (network failure or redirect), or
+// INVALID_REQUEST (URL not allowed). A ctx abort rejects with ctx.signal.reason unchanged.
+export interface HttpTransportPort {
+  send(request: HttpRequest, ctx: ExecCtx): Promise<HttpResponse>;
+}
+
 // M1 credentials are API keys only (SP11: one api-key account). OAuth arrives in SP16.
 export interface Credential {
   readonly kind: "api-key";

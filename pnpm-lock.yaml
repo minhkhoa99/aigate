@@ -26,6 +26,9 @@ importers:
       '@aigate/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@aigate/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@fastify/static':
         specifier: ^10.1.4
         version: 10.1.4

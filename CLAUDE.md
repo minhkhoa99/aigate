@@ -1,6 +1,6 @@
 # AIGate
 
-Read `docs/PROGRESS_HANDOFF.md` before resuming work. M-1 discovery is complete against the read-only 9Router reference at `.reference/9router` commit `39e36d3d`. M0 SP0–SP2 and M1 SP5–SP7 are done (M0 SP3/SP4 are not built yet); the handoff has the current step.
+Read `docs/PROGRESS_HANDOFF.md` before resuming work. M-1 discovery is complete against the read-only 9Router reference at `.reference/9router` commit `39e36d3d`. M0 SP0–SP2 and M1 SP5–SP8 are done (M0 SP3/SP4 are not built yet); the handoff has the current step.
 
 **REQUIRED SKILL:** `porting-behavior-not-code` — before any feature taken from 9router. Read `.agents/skills/porting-behavior-not-code/SKILL.md`.
 **REQUIRED SKILL:** `writing-lean-bounded-code` — before writing any product code. Read `.agents/skills/writing-lean-bounded-code/SKILL.md`.
@@ -8,7 +8,7 @@ Read `docs/PROGRESS_HANDOFF.md` before resuming work. M-1 discovery is complete 
 
 ## Repository map
 
-- `apps/server` is the NestJS 12 + Fastify backend (ESM, built with `tsc`). Bounded contexts live in `src/modules/<context>/{domain,infrastructure}`: `settings`, `identity`, and `apikeys`. Every route needs a dashboard session unless marked `@Public()`; see `docs/contracts/`. Only JSON bodies are parsed. In production the server serves `apps/web/dist` on the same port (default `20200`, bound to `127.0.0.1`).
+- `apps/server` is the NestJS 12 + Fastify backend (ESM, built with `tsc`). Bounded contexts live in `src/modules/<context>/{domain,infrastructure}`: `settings`, `identity`, `apikeys`, and `transport` (the only place allowed to call `fetch`). Every route needs a dashboard session unless marked `@Public()`; see `docs/contracts/`. Only JSON bodies are parsed. In production the server serves `apps/web/dist` on the same port (default `20200`, bound to `127.0.0.1`).
 - `packages/engine` is the framework-free provider engine: CIP types, error taxonomy, registry schema plus the `openai` entry, capability resolution, `withRetry`, and `AIProviderPort`. No npm imports are allowed (dependency-cruiser `engine-framework-free`). See `docs/contracts/engine.md`.
 - `packages/database` is the SQLite driver chain. All four drivers (bun:sqlite, better-sqlite3, node:sqlite, sql.js) go through one locked `sqlite-proxy` (see SPIKE-1). Tables are added per bounded context in the SP that implements it, following `packages/database/SCHEMA_CONVENTIONS.md`. Tables so far: `settings`, `dashboard_password`, `sessions`, `api_keys`. `test/fixture` holds the separate conformance schema. Never await network I/O inside a transaction, because the lock serializes all access. The server opens `$AIGATE_DATA_DIR/aigate.db` (default `~/.aigate`).
 - `apps/web` is the Vite/React dashboard. Login, onboarding step 1, auth settings, and API keys are wired to the server through `shared/api.ts` and per-feature `api.ts` hooks. Every other screen, including the provider catalog and combo form, is still a visual preview with fixture data. Read `docs/design/UI_HANDOFF.md` before frontend work.

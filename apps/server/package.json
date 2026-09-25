@@ -3,15 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @aigate/database build && tsc -p tsconfig.json",
-    "dev": "pnpm --filter @aigate/database build && tsc -p tsconfig.json && pnpm run \"/dev:/\"",
+    "build": "pnpm --filter @aigate/database --filter @aigate/engine build && tsc -p tsconfig.json",
+    "dev": "pnpm --filter @aigate/database --filter @aigate/engine build && tsc -p tsconfig.json && pnpm run \"/dev:/\"",
     "dev:tsc": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "dev:node": "node --watch dist/main.js",
     "start": "node dist/main.js",
-    "test": "pnpm --filter @aigate/database build && tsc -p tsconfig.json && node --test test/app.test.mjs test/settings.test.mjs test/identity.test.mjs test/apikeys.test.mjs"
+    "test": "pnpm --filter @aigate/database --filter @aigate/engine build && tsc -p tsconfig.json && node --test --test-timeout=30000 test/app.test.mjs test/settings.test.mjs test/identity.test.mjs test/apikeys.test.mjs test/transport.test.mjs"
   },
   "dependencies": {
     "@aigate/database": "workspace:*",
+    "@aigate/engine": "workspace:*",
     "@fastify/static": "^10.1.4",
     "@nestjs/common": "^12.1.0",
     "@nestjs/core": "^12.1.0",

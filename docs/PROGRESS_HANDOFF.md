@@ -2,6 +2,26 @@
 
 Updated: 2026-09-25. Read this before continuing the project plan.
 
+## Task board
+
+Update this table, and the section of the SP you touched, every time an SP or subtask finishes (user rule, 2026-09-25).
+
+| Step | Status | Where to look |
+|---|---|---|
+| M-1 Discovery (Tasks 1–19) | Done | "Completed and verified" |
+| M0 SP0 Lint, CI, and the two skills | Done | SP0.1–SP0.6 below |
+| M0 SP1 Monorepo skeleton | Done | SP1 below |
+| M0 SP2 SPIKE-1 and database driver chain | Done | SP2 below, `packages/database` |
+| M0 SP3 Parity harness | **Not started** | Needed before the parity gates |
+| M0 SP4 `tools/extract` registry extraction | **Not started** | Needed before SP13 |
+| M1 SP5 `settings` | Done, UI wired | `docs/contracts/settings.md` |
+| M1 SP6 `identity` + `apikeys` | Done, UI wired | `docs/contracts/identity-apikeys.md` |
+| Error handling and the API↔UI map | Done | `docs/design/API_UI_MAP.md` |
+| M1 SP7 `engine` core | Done, no UI | `docs/contracts/engine.md` |
+| M1 SP8 `transport` (direct branch + timeout) | Done, no UI | `docs/contracts/transport.md` |
+| M1 SP9 `engine`: OpenAI-compatible adapter | **Next** | SP8 below |
+| M1 SP10–SP12 | Pending | Spec §9 |
+
 ## Completed and verified
 
 - Branch: `feat/m1-discovery`. The starting commit for this audit was `c75d632`; UI preview and its provider/combo handoff were already committed. Read `docs/design/UI_HANDOFF.md` before frontend work. There is still no AIGate backend, live provider connection, or persistent combo API.
@@ -226,7 +246,7 @@ Checks and status:
 - Engine tests pass 15/15, and 10 mutations each made a test fail.
 - Matrix: 3 capability entries are `implemented`, and 2 registry entries are `contracted`.
 - **No UI:** SP7 has no HTTP API.
-- **Open (user decision):** 9router scans only the trailing user turn for required capabilities. AIGate scans every message and the system prompt, labeled `SUSPECTED_BUG` in the contract.
+- **Decided (user, 2026-09-25):** capability detection scans every message and the system prompt, not only the trailing user turn as 9router did (`SUSPECTED_BUG` in the contract).
 - **Gap:** M0 SP3 (the parity harness) and SP4 (`tools/extract`) were never built; SP13 and the parity gates need them.
 
 **Knowledge graph refreshed (2026-09-25).** `graphify-out/graph.json` now has 466 nodes, 1272 edges, and 17 communities. `docs/PROJECT_MAP.md` was regenerated.
@@ -236,9 +256,29 @@ Checks and status:
 - **Not re-extracted:** the Stitch HTML and PNGs and the Feature Matrix YAML. Together they would need about 30 agents; run a full `/graphify docs` when needed.
 - **Python:** use `C:UsersPCAppDataLocalProgramsPythonPython312python.exe`. The `python` on PATH is a venv without graphify.
 
-**Next step, M1 SP8 (`transport`: `HttpTransportPort`, direct branch plus timeout only):**
-1. Put the port in `packages/engine` and the direct implementation where spec §4.2 places it.
-2. Use the single `ExecCtx.signal`, and use `withRetry` only for safe calls.
-3. Then decide how lint enforces "fetch only through the transport, retry only through `withRetry`" against the real code (the deferred SP0.1 rule).
-4. SP8 adds no HTTP API, so it has no UI.
-5. The first UI wiring after SP6 comes with SP11 (connections: the Providers screens) and SP12 (`/v1`: the endpoint pill and Overview).
+**M1 SP8 (`transport`) is complete locally.** The contract is `docs/contracts/transport.md`.
+
+- **Port.** `HttpTransportPort` (`HttpRequest`, which requires `timeoutMs`, and `HttpResponse`) plus `readBoundedText` (default 4 MiB) are in `packages/engine`.
+- **`DirectTransport`.** It lives in `apps/server/src/modules/transport` and is injected under `HTTP_TRANSPORT`. It enforces:
+  - https only, or http to loopback
+  - `timeoutMs` from 1 to 600000, inside `ctx.signal`, covering the headers and the body
+  - redirects are never followed
+  - a caller abort keeps its reason; the timeout becomes `TIMEOUT`; network failures and redirects become `PROVIDER_UNAVAILABLE`
+  - body read errors are mapped the same way
+  - errors name the host only
+- **The rest of the deferred SP0.1 rule is now enforced in lint.**
+  - `aigate/fetch-through-transport` rejects `fetch` in the server and packages outside `modules/transport/infrastructure`.
+  - `aigate/retry-through-helper` rejects a loop around an awaited `try/catch` in the server and engine (except `retry.ts`).
+  - `aigate/fetch-timeout` accepts `AbortSignal.any([..., AbortSignal.timeout(n)])`.
+  - `lint:check` is 13/13.
+- **Checks.** Transport tests pass 10/10 against a real local HTTP server, with 6 mutations caught. The mutation that dropped the timeout hung the run instead of failing it, so the server, engine, and database test scripts now pass `--test-timeout=30000`.
+- **Matrix.** `transport.proxy-priority-chain` is `contracted`; its relay and proxy branches come in SP18.
+- **UI.** No UI, as recorded in `API_UI_MAP.md`.
+
+**Next step, M1 SP9 (`engine`: OpenAI-compatible provider adapter):** implement `AIProviderPort` for the `openai-compatible` family over `HttpTransportPort`.
+- **Mapping.** CIP to and from OpenAI chat completions, with `UnsupportedFeatureError` for anything the format cannot carry.
+- **Status classification into `ErrorCode`:** 401/403 → `AUTH_ERROR`, 429 → `RATE_LIMIT` or `QUOTA_EXHAUSTED`, 5xx → `PROVIDER_UNAVAILABLE`, 400 → `INVALID_REQUEST`, 404 → `MODEL_UNAVAILABLE`.
+- **Retries.** Only through `withRetry`, and only before a stream starts.
+- **Streaming.** Parse SSE into `StreamChunk` with bounded buffers.
+- **Tests.** Test against a local fake upstream.
+- **UI.** SP9 has no UI; the first wiring comes with SP11 and SP12.
