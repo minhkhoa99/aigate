@@ -52,5 +52,7 @@ export function usePatchSettings() {
       client.setQueryData(settingsKey, settings);
       void client.invalidateQueries({ queryKey: authStatusKey });
     },
+    // A failed toggle re-reads the server so the checkbox never shows a value that was not saved.
+    onError: () => client.invalidateQueries({ queryKey: settingsKey }),
   });
 }

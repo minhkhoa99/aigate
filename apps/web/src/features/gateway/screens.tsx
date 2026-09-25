@@ -3,12 +3,10 @@ import { Link } from "@tanstack/react-router";
 import { type FormEvent } from "react";
 import { Button, ConfirmDialog, CopyField, Dot, Field, Input, Metric, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
-import { ApiError } from "../../shared/api";
+import { toProblem } from "../../shared/errors";
 import { useApiKeys, useCreateKey, useDeleteKey, useRequireApiKey, useSetKeyActive, useSetRequireApiKey, type ApiKey, type CreatedApiKey } from "./api";
 
-const problem = (error: unknown) => error instanceof ApiError
-  ? { code: error.code, message: error.message }
-  : { code: "ERR_GATEWAY_UNAVAILABLE", message: "Could not reach the gateway. Check that AIGate is running." };
+
 
 export function EndpointKeys() {
   const [showCreate, setShowCreate] = useState(false);
@@ -21,7 +19,7 @@ export function EndpointKeys() {
   const requireApiKey = useRequireApiKey();
   const setRequireApiKey = useSetRequireApiKey();
   const showToast = useToast();
-  const fail = (error: unknown) => showToast({ tone: "error", ...problem(error) });
+  const fail = (error: unknown) => showToast({ tone: "error", ...toProblem(error) });
   // The chat API (/v1) lands in SP12; this is the URL clients will use on this origin.
   const baseUrl = `${window.location.origin}/v1`;
   const closeCreate = () => { setShowCreate(false); setCreated(null); createKey.reset(); };
@@ -41,7 +39,7 @@ export function EndpointKeys() {
     </Panel>
     <Panel title="API keys" detail="Manage scoped gateway tokens for upstream client authentication." className="section-gap panel-flush" action={<Button variant="primary" onClick={() => setShowCreate(true)}>+ Create key</Button>}>
       {keys.isPending ? <StateBlock state="loading" />
-        : keys.isError ? <StateBlock state="error" code={problem(keys.error).code} action={<Button onClick={() => void keys.refetch()}>Retry</Button>} />
+        : keys.isError ? <StateBlock state="error" code={toProblem(keys.error).code} action={<Button onClick={() => void keys.refetch()}>Retry</Button>} />
         : <Table empty="No API keys yet. Create one for each client." columns={["Name", "Masked key", "Created", "Status", "Actions"]} rows={keys.data.map((key) => [
           key.name, <code>{key.maskedKey}</code>, new Date(key.createdAt).toLocaleDateString(),
           <Pill tone={key.isActive ? "healthy" : "muted"}>{key.isActive ? "Active" : "Disabled"}</Pill>,

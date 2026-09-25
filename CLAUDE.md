@@ -4,6 +4,7 @@ Read `docs/PROGRESS_HANDOFF.md` before resuming work. M-1 discovery is complete 
 
 **REQUIRED SKILL:** `porting-behavior-not-code` — before any feature taken from 9router. Read `.agents/skills/porting-behavior-not-code/SKILL.md`.
 **REQUIRED SKILL:** `writing-lean-bounded-code` — before writing any product code. Read `.agents/skills/writing-lean-bounded-code/SKILL.md`.
+**REQUIRED:** an API is not done until its UI screen is wired in the same SP. Every error code it returns must reach the user as a precise message through `apps/web/src/shared/errors.ts`. Follow and update `docs/design/API_UI_MAP.md`, then refresh the graph (`/graphify docs --update`).
 
 ## Repository map
 

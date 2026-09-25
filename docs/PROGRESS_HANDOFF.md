@@ -176,7 +176,7 @@ Server:
 
 Security review (agent, read-only):
 - Fixed: Nest's urlencoded body parser is off (`bodyParser: false`), so cross-site HTML forms get 415. Stored scrypt parameters are checked.
-- **Open (user decision):** on a machine shared with other OS users, another user can race to set the first password before the owner. `AIGATE_INITIAL_PASSWORD` closes this today. A one-time setup code printed at boot or written to a 0600 file would close it by default.
+- **Decided (option A):** on a machine shared with other OS users, another user could race to set the first password. The user chose to rely on `AIGATE_INITIAL_PASSWORD`; set it before the first start on shared machines. A one-time setup code is deferred until `apps/cli` or server deployments need it (contract, "Shared machines").
 
 UI wiring (layouts kept; `apps/web/CLAUDE.md`):
 - **Shared.** `shared/api.ts` is a same-origin JSON client with a 10 s timeout and `{code, message}` errors. Queries retry only on errors other than 4xx.
@@ -207,4 +207,4 @@ Checks:
   - Sign out, the old password rejected, the new password accepted.
   - The only console errors were a missing `favicon.ico` (404), which predates this work.
 
-**Next step, M1 SP7 (`engine`: CIP core, schema registry, capability resolution, one registry entry):** create `packages/engine` (framework-free, spec §2–§3), then implement the bounded retry helper from §4.2 and enforce provider `execute` timeouts and bounded retries (the deferred part of SP0.1). Before that, decide how first-password setup should be protected on shared machines.
+**Next step, M1 SP7 (`engine`: CIP core, schema registry, capability resolution, one registry entry):** create `packages/engine` (framework-free, spec §2–§3), then implement the bounded retry helper from §4.2 and enforce provider `execute` timeouts and bounded retries (the deferred part of SP0.1).

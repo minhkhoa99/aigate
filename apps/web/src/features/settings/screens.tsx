@@ -2,29 +2,16 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Button, CopyField, Field, Input, PageHeading, Panel, Pill, SecretField, StateBlock, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
-import { ApiError, isApiError } from "../../shared/api";
+import { isApiError } from "../../shared/api";
+import { toProblem, type Problem } from "../../shared/errors";
 import { useAuthStatus, useChangePassword, useLogin, useLogout, usePatchSettings, useSettings, useSetup } from "./api";
 
 const MIN_PASSWORD = 8;
 const MAX_PASSWORD = 256;
 
-type Problem = { code: string; message: string };
-
 function formValue(event: FormEvent<HTMLFormElement>, name: string): string {
   const value = new FormData(event.currentTarget).get(name);
   return typeof value === "string" ? value : "";
-}
-
-// Turns contract error codes (docs/contracts/identity-apikeys.md) into what the user can do next.
-function describe(error: unknown): Problem {
-  if (!(error instanceof ApiError)) return { code: "ERR_GATEWAY_UNAVAILABLE", message: "Could not reach the gateway. Check that AIGate is running." };
-  const { remainingBeforeLock, retryAfter } = error.body;
-  if (error.code === "INVALID_CREDENTIALS" && typeof remainingBeforeLock === "number") {
-    return { code: error.code, message: `The password did not match. ${remainingBeforeLock} attempt(s) left before a temporary lock.` };
-  }
-  if (error.code === "RATE_LIMITED" && typeof retryAfter === "number") return { code: error.code, message: `Too many failed attempts. Try again in ${retryAfter}s.` };
-  if (error.code === "NOT_LOCAL") return { code: error.code, message: "Set the first password on the machine running AIGate, or start AIGate with AIGATE_INITIAL_PASSWORD." };
-  return { code: error.code, message: error.message };
 }
 
 export function SettingsGeneral() {
@@ -41,7 +28,7 @@ export function SettingsAuth() {
   const logout = useLogout();
   const navigate = useNavigate();
   const showToast = useToast();
-  const fail = (error: unknown) => showToast({ tone: "error", ...describe(error) });
+  const fail = (error: unknown) => showToast({ tone: "error", ...toProblem(error) });
   const busy = !settings.data || patch.isPending;
 
   const submitPassword = (event: FormEvent<HTMLFormElement>) => {
@@ -60,7 +47,7 @@ export function SettingsAuth() {
 
   return <><PageHeading eyebrow="Settings / Auth & Access" title="Auth & access" description="Protect the dashboard and the gateway with separate access controls." />
     <Tabs items={["Dashboard login", "OIDC", "SAML", "API access"]} active={tab} onChange={setTab} />
-    {settings.isError && <Warning tone="danger"><code>{describe(settings.error).code}</code> · Could not load the current settings.</Warning>}
+    {settings.isError && <Warning tone="danger"><code>{toProblem(settings.error).code}</code> · Could not load the current settings.</Warning>}
     {tab === "Dashboard login" && <div className="split section-gap"><Panel title="Password login"><form className="stack" onSubmit={submitPassword}>
       <Field label="Current password"><Input type="password" name="currentPassword" required maxLength={MAX_PASSWORD} autoComplete="current-password" placeholder="Enter your current password" /></Field>
       <Field label="New password" hint={`At least ${MIN_PASSWORD} characters.`}><Input type="password" name="newPassword" required minLength={MIN_PASSWORD} maxLength={MAX_PASSWORD} autoComplete="new-password" placeholder="Enter a new password" /></Field>
@@ -100,7 +87,7 @@ export function Login() {
       onSuccess: () => void navigate({ to: "/" }),
       onError: (err) => {
         if (isApiError(err, "SETUP_REQUIRED")) { void navigate({ to: "/welcome" }); return; }
-        const problem = describe(err);
+        const problem = toProblem(err);
         setError(problem);
         showToast({ tone: "error", ...problem });
       },
@@ -139,7 +126,7 @@ export function Onboarding() {
       onSuccess: () => void navigate({ to: "/" }),
       onError: (err) => {
         if (isApiError(err, "ALREADY_SET_UP")) { void navigate({ to: "/login" }); return; }
-        const problem = describe(err);
+        const problem = toProblem(err);
         setError(problem);
         showToast({ tone: "error", ...problem });
       },

@@ -47,6 +47,12 @@ A request is local only when all of these hold:
 
 The host and origin checks stop DNS rebinding, where a malicious web page resolves its own domain to 127.0.0.1.
 
+## Shared machines (decided 2026-09-25: option A)
+
+On a fresh install, whichever local client calls `POST /api/auth/setup` first sets the password. On a machine with other OS accounts, another user can win that race, because loopback is shared by every account on the host.
+
+The user chose to rely on `AIGATE_INITIAL_PASSWORD`. On a shared machine, set it before the first start, so a password exists before the server accepts requests. A one-time setup code (a 0600 file plus a link printed at boot) was considered and deferred until `apps/cli` or server deployments need it.
+
 ## Access to `/api/*`
 
 - **Public:**

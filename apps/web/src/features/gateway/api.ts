@@ -23,7 +23,8 @@ export const useApiKeys = () => useQuery({ queryKey: keysKey, queryFn: () => api
 
 function useKeyMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
   const client = useQueryClient();
-  return useMutation({ mutationFn, onSuccess: () => client.invalidateQueries({ queryKey: keysKey }) });
+  // Settled, not just success: a 404 from another tab's delete must refresh the list too.
+  return useMutation({ mutationFn, onSettled: () => client.invalidateQueries({ queryKey: keysKey }) });
 }
 
 export const useCreateKey = () => useKeyMutation((name: string) => api<CreatedApiKey>("/api/keys", { method: "POST", body: { name } }));
@@ -44,5 +45,7 @@ export function useSetRequireApiKey() {
   return useMutation({
     mutationFn: (requireApiKey: boolean) => api<RequireApiKey>("/api/settings", { method: "PATCH", body: { requireApiKey } }),
     onSuccess: (settings) => client.setQueryData(settingsKey, settings),
+    // A failed toggle re-reads the server so the checkbox never shows a value that was not saved.
+    onError: () => client.invalidateQueries({ queryKey: settingsKey }),
   });
 }

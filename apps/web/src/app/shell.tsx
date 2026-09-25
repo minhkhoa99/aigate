@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useRouterState } from "@tanstack/react-router";
 import { navigation } from "./navigation";
 import { ScreenView } from "./screens";
 import { Dot, StateBlock } from "../shared/ui";
-import { useAuthStatus } from "../features/settings/api";
+import { authStatusKey, useAuthStatus } from "../features/settings/api";
+import { toProblem } from "../shared/errors";
+import { ApiError, SESSION_ENDED_EVENT } from "../shared/api";
+import { useToast } from "../shared/toast";
 
 function currentLabel(path: string): string {
   for (const group of navigation) for (const item of group.items) if (item.href === path) return item.label;
@@ -18,6 +22,17 @@ function currentLabel(path: string): string {
 export function Shell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const auth = useAuthStatus();
+  const queryClient = useQueryClient();
+  const showToast = useToast();
+  // Logout in another tab, a password change, or the 24 h expiry: tell the user, then re-check status.
+  useEffect(() => {
+    const onSessionEnded = () => {
+      showToast({ tone: "error", ...toProblem(new ApiError(401, "UNAUTHENTICATED", "")) });
+      void queryClient.invalidateQueries({ queryKey: authStatusKey });
+    };
+    window.addEventListener(SESSION_ENDED_EVENT, onSessionEnded);
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded);
+  }, [queryClient, showToast]);
   const [theme, setTheme] = useState(() => localStorage.getItem("aigate-theme") ?? "dark");
   const [developerMode, setDeveloperMode] = useState(() => localStorage.getItem("aigate-developer") === "true");
   const [collapsed, setCollapsed] = useState(false);
@@ -30,7 +45,7 @@ export function Shell() {
   if (standalone) return <ScreenView path={path} developerMode={developerMode} onDeveloperMode={setDeveloperMode} />;
   // Console pages need a session (docs/contracts/identity-apikeys.md); the server enforces it, this only routes.
   if (auth.isPending) return <div className="standalone"><div className="auth-card"><StateBlock state="loading" /></div></div>;
-  if (auth.isError) return <div className="standalone"><div className="auth-card"><StateBlock state="error" code="ERR_GATEWAY_UNAVAILABLE"
+  if (auth.isError) return <div className="standalone"><div className="auth-card"><StateBlock state="error" code={toProblem(auth.error).code}
     action={<button type="button" className="button button-primary" onClick={() => void auth.refetch()}>Retry</button>} /></div></div>;
   if (auth.data.setupRequired) return <Navigate to="/welcome" />;
   if (!auth.data.authenticated) return <Navigate to="/login" />;
