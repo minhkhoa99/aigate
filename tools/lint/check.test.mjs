@@ -60,6 +60,25 @@ test("oversized route component fails lint", async () => {
   await expectRule("export const x = 1;\n".repeat(201), "max-lines", "apps/web/src/features/lint_sample/routes/page.tsx");
 });
 
+test("the lint command itself exits nonzero on a violating file in the tree", async () => {
+  const featuresDir = resolve("apps/web/src/features");
+  const fixtureDir = await mkdtemp(join(featuresDir, "lint_sample_"));
+  try {
+    await writeFile(join(fixtureDir, "entry.ts"), "Promise.all([...items.map(send)]);\n");
+    assert.throws(
+      () => execFileSync(process.execPath, ["node_modules/eslint/bin/eslint.js", "apps", "tools"], { stdio: "pipe" }),
+      (error) => error.status === 1 && error.stdout.toString().includes("aigate/bounded-promise-all"),
+    );
+  } finally {
+    assert.ok(fixtureDir.startsWith(featuresDir + sep));
+    await rm(fixtureDir, { recursive: true });
+  }
+});
+
+test("the lint command passes once the violating file is gone", () => {
+  execFileSync(process.execPath, ["node_modules/eslint/bin/eslint.js", "apps", "tools"], { stdio: "pipe" });
+});
+
 test("domain import of vendor package fails dependency check", () => {
   assert.throws(
     () => execFileSync(process.execPath, ["node_modules/dependency-cruiser/bin/dependency-cruiser.mjs", "--config", ".dependency-cruiser.cjs", "--output-type", "err", "tools/lint/fixtures/domain"], { stdio: "pipe" }),

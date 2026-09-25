@@ -100,9 +100,10 @@ async function getAccountModels(accountId: string): Promise<Model[]> {
 
 > Caching the promise also coalesces concurrent requests; failed fetches are retried.
 
-Result: cache growth is bounded and entries expire. The `!` assertion would
-fail AIGate's mechanical type-assertion rule; the skill need not repeat that
-lint rule.
+Result: cache growth is bounded and entries expire. Correction (later lint
+run): the `!` non-null assertion passes AIGate lint, because
+`aigate/no-type-assertion` covers `as` casts only. The skill advises the
+`undefined` check instead.
 
 ## Skill target
 
