@@ -4,8 +4,9 @@ import { Button, ConfirmDialog, Field, Input, Metric, Modal, PageHeading, Panel,
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
 import { mediaGroups } from "./catalog";
+import { CustomProviderForm, CustomProviders } from "./custom";
 import {
-  useConnections, useCreateConnection, useDeleteConnection, useProvider, useProviders, useTestConnection, useUpdateConnection, type Connection,
+  useConnections, useCreateConnection, useDeleteConnection, useProvider, useProviderNodes, useProviders, useTestConnection, useUpdateConnection, type Connection,
   type ProviderDetailView,
 } from "./api";
 import { describeTest, needsAttention, statusPill } from "./test-result";
@@ -40,7 +41,7 @@ export function LlmProviders() {
   const connectable = llm.filter((p) => p.connectable).length;
   return <><PageHeading eyebrow="Providers / Catalog" title="LLM providers" description={`Browse built-in providers by connection method. ${connectable} of ${llm.length} can be connected with an API key today.`} />
     <div className="provider-catalog-toolbar"><input className="input" aria-label="Search providers" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={`Search ${llm.length} providers…`} /><span className="muted mono">{matches.length} / {llm.length} built-in</span></div>
-    {!query && <section className="catalog-section"><div className="catalog-section-head"><div><h2>Custom providers</h2><p>OpenAI or Anthropic compatible endpoints you define.</p></div><div className="row"><a className="button" href="/providers/new?protocol=anthropic">+ Anthropic compatible</a><a className="button button-primary" href="/providers/new?protocol=openai">+ OpenAI compatible</a></div></div><div className="catalog-empty">Custom providers are not available yet.</div></section>}
+    {!query && <CustomProviders />}
     {catalog.isPending ? <StateBlock state="loading" />
       : catalog.isError ? <StateBlock state="error" code={toProblem(catalog.error).code} action={<Button onClick={() => void catalog.refetch()}>Retry</Button>} />
       : <>{[...GROUPS, OTHER].map((group) => {
@@ -93,10 +94,7 @@ function CatalogProvider({ providerId }: { providerId: string }) {
 }
 
 export function ProviderDetail({ isNew = false, providerId }: { isNew?: boolean; providerId?: string }) {
-  const protocol = new URLSearchParams(window.location.search).get("protocol");
-  if (isNew) return <><PageHeading eyebrow="Providers / Custom" title="Add custom provider" description="Define an OpenAI or Anthropic compatible endpoint." />
-    <Warning>Custom providers are not available yet. This form is a preview and saves nothing.</Warning>
-    <div className="split section-gap"><Panel title="Provider details"><div className="stack"><Field label="Provider name"><Input placeholder="Provider name" /></Field><Field label="Protocol"><select className="input" defaultValue={protocol === "anthropic" ? "anthropic" : "openai"}><option value="openai">OpenAI compatible</option><option value="anthropic">Anthropic compatible</option></select></Field><Field label="Base URL"><Input placeholder="https://api.example.com/v1" /></Field><Button variant="primary" disabled>Not available yet</Button></div></Panel><Panel title="Connection checklist"><div className="flow-steps">{["Enter provider details", "Validate endpoint", "Add credentials", "Select models"].map((x, i) => <div key={x}><span>{String(i + 1).padStart(2, "0")}</span><strong>{x}</strong></div>)}</div></Panel></div></>;
+  if (isNew) return <CustomProviderForm />;
   if (!providerId) return <><PageHeading eyebrow="Providers / Catalog" title="Provider not found" description="No provider was named in the link." /><Link className="button" to="/providers">Back to providers</Link></>;
   return <CatalogProvider providerId={providerId} />;
 }
@@ -105,13 +103,19 @@ function AddConnection({ requested, connected, onClose, onCreated }: {
   requested: string | null; connected: ReadonlySet<string>; onClose: () => void; onCreated: (connection: Connection) => void;
 }) {
   const catalog = useProviders();
+  const nodes = useProviderNodes();
   const create = useCreateConnection();
   const showToast = useToast();
-  if (catalog.isPending) return <Modal title="Add connection" onClose={onClose}><StateBlock state="loading" /></Modal>;
-  if (catalog.isError) return <Modal title="Add connection" onClose={onClose}><StateBlock state="error" code={toProblem(catalog.error).code} action={<Button onClick={() => void catalog.refetch()}>Retry</Button>} /></Modal>;
-  const available = catalog.data.filter((p) => p.connectable && !connected.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
+  if (catalog.isPending || nodes.isPending) return <Modal title="Add connection" onClose={onClose}><StateBlock state="loading" /></Modal>;
+  if (catalog.isError || nodes.isError) {
+    return <Modal title="Add connection" onClose={onClose}><StateBlock state="error" code={toProblem(catalog.error ?? nodes.error).code} action={<Button onClick={() => { void catalog.refetch(); void nodes.refetch(); }}>Retry</Button>} /></Modal>;
+  }
+  // Built-in providers that can be connected, then custom providers (docs/contracts/custom-providers.md).
+  const builtins = catalog.data.filter((p) => p.connectable && !connected.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
+  const available = [...builtins, ...nodes.data.filter((n) => !connected.has(n.id)).map((n) => ({ id: n.id, name: `${n.name} (custom)` }))];
   const asked = requested ? catalog.data.find((p) => p.id === requested) : undefined;
-  const blocked = !requested ? null : !asked ? `${requested} is not in the provider catalog.` : asked.connectable ? null : `${asked.name} cannot be connected yet: ${asked.reason}.`;
+  const custom = requested ? nodes.data.some((n) => n.id === requested) : false;
+  const blocked = !requested || custom ? null : !asked ? `${requested} is not in the provider catalog or a custom provider.` : asked.connectable ? null : `${asked.name} cannot be connected yet: ${asked.reason}.`;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const name = formText(event.currentTarget, "name");

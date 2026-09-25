@@ -57,4 +57,3 @@ Spec rules applied directly:
 ## Deferred
 
 - Enforcing "retry only through `withRetry`" in lint waits for real adapter code (SP8/SP9). The SP0.1 fetch rule already rejects `fetch` without `AbortSignal.timeout` in `packages/`.
-- M0 SP3 (the parity harness) and SP4 (`tools/extract`) have not been built. SP13's full registry needs SP4, and parity gates need SP3.

@@ -1359,7 +1359,7 @@
     - { file: "src/app/api/provider-nodes/[id]/route.js", line: 64, note: "PUT fans the update out to every connection under this provider id" }
     - { file: "src/app/api/provider-nodes/[id]/route.js", line: 93, note: "DELETE cascades: connections removed before the node itself" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: connection.provider-node-validate-partial-ssrf
@@ -1446,8 +1446,56 @@
     - { file: src/lib/db/repos/nodesRepo.js, line: 72, note: "updateProviderNode: transactional read-merge-write" }
     - { file: src/app/api/provider-nodes/route.js, line: 54, note: "node id is assigned its type prefix once, at creation, by the route — not by nodesRepo" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
+
+- id: connection.provider-node-create-list
+  group: Providers
+  feature: Custom provider nodes
+  subFeature: "GET/POST /api/provider-nodes — list and create custom compatible provider nodes, and how /v1 reaches them by prefix"
+  trigger: "Dashboard Add custom provider form (POST); the provider page listing custom nodes (GET); a /v1 request naming <prefix>/<model>"
+  input: "POST { name, prefix, type?: openai-compatible|anthropic-compatible|custom-embedding, apiType?: chat|responses, baseUrl? }"
+  output: "GET { nodes: Node[] }. POST 201 { node } where node = { id, type, name, prefix, apiType?, baseUrl, createdAt, updatedAt }"
+  businessRules:
+    - "name and prefix are required after trim (400 Name is required / Prefix is required); type defaults to openai-compatible; an openai-compatible node needs apiType chat or responses"
+    - "The node id is the type prefix plus a generated id (openai-compatible-<apiType>-<id>); connections under the node store that id as their provider"
+    - "An omitted baseUrl defaults to https://api.openai.com/v1 for openai-compatible and custom-embedding nodes"
+    - "openai-compatible create keeps a pasted /chat/completions suffix, while anthropic-compatible and custom-embedding create strip their pasted /messages and /embeddings suffixes"
+    - "Nothing checks that a prefix is unique among nodes, or that it is a usable provider token (a prefix containing / can never match, since <prefix>/<model> splits on the first /)"
+    - "At /v1, <prefix>/<model> reaches the node whose prefix matches, with the model passed as given; built-in provider ids and aliases are reserved and always win, so a node whose prefix equals one is silently unreachable"
+  state:
+    reads: ["providerNodes"]
+    writes: ["providerNodes (POST)"]
+    runtimeOnly: []
+  dependencies: ["connection.provider-node-repo-storage", "routing.build-url"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "name or prefix missing, apiType invalid for openai-compatible, or an unknown type", partial: false }
+    - { code: INTERNAL_ERROR, when: "storage fails (500 Failed to create provider node)", partial: false }
+  sideEffects: []
+  persistence: ["providerNodes rows (connection.provider-node-repo-storage)"]
+  performanceConcerns:
+    - "getModelInfo lists every node of each type on each /v1 request with a non-reserved prefix, then scans them in JS"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Two nodes with the same prefix: /v1 always reaches the first one returned by the list; the second is unreachable with no warning"
+  evidence:
+    - { file: src/app/api/provider-nodes/route.js, line: 21, note: "GET lists every node" }
+    - { file: src/app/api/provider-nodes/route.js, line: 38, note: "Name is required" }
+    - { file: src/app/api/provider-nodes/route.js, line: 42, note: "Prefix is required — trim only, no format or uniqueness check" }
+    - { file: src/app/api/provider-nodes/route.js, line: 49, note: "apiType must be chat or responses" }
+    - { file: src/app/api/provider-nodes/route.js, line: 54, note: "id = openai-compatible-<apiType>-<generated>" }
+    - { file: src/app/api/provider-nodes/route.js, line: 58, note: "baseUrl defaults to OPENAI_COMPATIBLE_DEFAULTS (https://api.openai.com/v1); no suffix stripping" }
+    - { file: src/sse/services/model.js, line: 44, note: "built-in ids and aliases are reserved prefixes" }
+    - { file: src/sse/services/model.js, line: 46, note: "first openai-compatible node whose prefix matches wins" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A custom provider without a base URL is refused, a pasted /chat/completions suffix is normalized like the sibling node types, and a prefix that is reserved, duplicated, or unusable is refused when the node is saved"
+    actual: "A missing baseUrl silently becomes https://api.openai.com/v1; a pasted /chat/completions yields .../chat/completions/chat/completions at request time; a reserved, duplicate, or slash-containing prefix is stored and then silently unreachable"
+    impact: "The custom provider's key is sent to OpenAI (a 401 and a leaked credential) or requests fail with a 404 from a doubled path; a shadowed prefix routes nowhere with no error at save time"
 # 2026-09-24 delta against 9Router v0.5.86: Xiaomi MiMo import and login routes.
 - id: connection.xiaomi-mimo-key-import
   group: Provider authentication

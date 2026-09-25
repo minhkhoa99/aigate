@@ -12,11 +12,10 @@
     "web": "pnpm --filter @aigate/web dev",
     "web:build": "pnpm --filter @aigate/web build",
     "discovery": "pnpm --filter @aigate/discovery exec tsx src/cli.ts",
-    "test": "pnpm --filter @aigate/discovery --filter @aigate/database --filter @aigate/engine --filter @aigate/server --filter @aigate/web --filter @aigate/parity --filter @aigate/extract test",
+    "test": "pnpm --filter @aigate/discovery --filter @aigate/database --filter @aigate/engine --filter @aigate/server --filter @aigate/web --filter @aigate/parity test",
     "lint": "eslint apps packages tools && depcruise --config .dependency-cruiser.cjs --output-type err apps packages",
     "lint:check": "node --test tools/lint/check.test.mjs",
-    "parity": "node tools/parity/src/cli.mjs",
-    "extract": "node --no-warnings tools/extract/src/cli.mjs"
+    "parity": "node tools/parity/src/cli.mjs"
   },
   "devDependencies": {
     "dependency-cruiser": "^18.4.0",

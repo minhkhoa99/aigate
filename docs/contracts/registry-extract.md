@@ -13,7 +13,7 @@ Scope, per spec §9 ("SP4 | `tools/extract`: extract 9router registry data into 
 | Output | `packages/engine/src/catalog/providers.generated.ts`: `CATALOG`, one `CatalogProvider` per registry entry. Never hand-edited; the header names the source commit. |
 | Schema | `packages/engine/src/catalog/schema.ts`, with `validateCatalog` |
 
-Spec §2 says to run `tools/extract` once and then delete it. It stays **until SP13 is done**, because SP13 may need fields added to the catalog, and regenerating is safer than hand edits. It is deleted in SP13, and git history keeps it.
+Spec §2 says to run `tools/extract` once and then delete it. It stayed through SP13, which added `headers`, `forceStream`, and `quirks` by regenerating, and was **deleted in SP13b**. To regenerate, restore it with `git checkout d2783c1 -- tools/extract`, add it back to the root `test` script and an `extract` script (`node --no-warnings tools/extract/src/cli.mjs`), then run `pnpm install`, `pnpm extract`, and `pnpm extract verify`.
 
 ## Mapping (labels per `porting-behavior-not-code`)
 
@@ -77,7 +77,7 @@ The unmodelled fields that appear most often, which are work for later SPs:
 
 ## Tests
 
-- `tools/extract/test/extract.test.mjs`:
+- `tools/extract/test/extract.test.mjs` (until SP13b, when the tool was deleted):
   - the diff is 0
   - the committed file equals a fresh extraction, so nothing is hand-edited or stale
   - 9router's defaults are restored after the sentinel

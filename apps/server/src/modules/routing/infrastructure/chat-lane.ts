@@ -12,6 +12,7 @@ import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { extractApiKey } from "../../apikeys/domain/api-key.js";
 import { ApiKeysRepository } from "../../apikeys/infrastructure/api-keys.repo.js";
 import { ConnectionsRepository } from "../../connections/infrastructure/connections.repo.js";
+import { nodeDescriptor, ProviderNodesRepository } from "../../connections/infrastructure/provider-nodes.repo.js";
 import { isLocalRequest } from "../../identity/domain/local-request.js";
 import { SettingsRepository } from "../../settings/infrastructure/settings.repo.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
@@ -85,6 +86,7 @@ export class ChatLane {
     private readonly settings: SettingsRepository,
     private readonly keys: ApiKeysRepository,
     private readonly connections: ConnectionsRepository,
+    private readonly nodes: ProviderNodesRepository,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
     @Inject(CHAT_LIMITS) private readonly limits: ChatLimits,
   ) {}
@@ -178,12 +180,15 @@ export class ChatLane {
     const ref = request.model;
     const slash = ref.indexOf("/");
     const prefix = slash > 0 ? ref.slice(0, slash) : undefined;
-    const prefixed = prefix === undefined ? undefined : builtinRegistry.provider(prefix);
+    let prefixed = prefix === undefined ? undefined : builtinRegistry.provider(prefix);
     if (prefix !== undefined && !prefixed) {
       const status = builtinRegistry.status(prefix);
       if (status && !status.connectable) {
         throw new GatewayError(400, "invalid_request_error", "provider_not_supported", `${prefix} cannot be connected yet: ${status.reason}.`);
       }
+      // A custom provider prefix (docs/contracts/custom-providers.md); otherwise the "/" is part of a model id.
+      const node = await this.nodes.byPrefix(prefix);
+      if (node) prefixed = nodeDescriptor(node);
     }
     const modelId = prefixed ? ref.slice(slash + 1) : ref;
     if (modelId === "") throw this.modelNotFound(ref);

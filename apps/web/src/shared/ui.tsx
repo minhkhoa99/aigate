@@ -101,10 +101,10 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
   </Dialog.Portal></Dialog.Root>;
 }
 
-export function ConfirmDialog({ name, onClose, onConfirm }: { name: string; onClose: () => void; onConfirm: () => void }) {
+export function ConfirmDialog({ name, detail, onClose, onConfirm }: { name: string; detail?: ReactNode; onClose: () => void; onConfirm: () => void }) {
   const [typed, setTyped] = useState("");
   return <Modal title="Confirm removal" onClose={onClose}>
-    <p>Type <code>{name}</code> to confirm this action.</p>
+    {detail && <p>{detail}</p>}<p>Type <code>{name}</code> to confirm this action.</p>
     <input className="input confirm-input" aria-label={`Type ${name} to confirm`} placeholder={name} value={typed} onChange={(e) => setTyped(e.target.value)} />
     <div className="modal-actions"><Button onClick={onClose}>Cancel</Button><Button variant="danger" disabled={typed !== name} onClick={onConfirm}>Remove {name}</Button></div>
   </Modal>;

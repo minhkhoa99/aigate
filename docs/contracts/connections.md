@@ -5,7 +5,7 @@ Scope, per spec §9: the `connections` context with **one API-key account per pr
 - **UI:** the `/providers` screens, wired in this SP: `Connections`, `ProviderDetail`, and connected pills in `LlmProviders`.
 - **Decisions (user, 2026-09-25):**
   - Keys are encrypted with AES-256-GCM, using a key file, with an env override.
-  - SP11 connected OpenAI only; since SP13 any connectable catalog provider (`catalog-providers.md`).
+  - SP11 connected OpenAI only; since SP13 any connectable catalog provider (`catalog-providers.md`), and since SP13b any custom provider (`custom-providers.md`), whose connection test calls `GET <baseUrl>/models`.
 
 ## Rules from the reference
 

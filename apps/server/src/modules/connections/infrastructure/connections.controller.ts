@@ -7,6 +7,7 @@ import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
 import { parseChanges, parseNewConnection } from "../domain/connection.js";
 import { ConnectionsRepository, type ConnectionView, type TestOutcome } from "./connections.repo.js";
+import { nodeDescriptor, ProviderNodesRepository } from "./provider-nodes.repo.js";
 
 // Above the adapter's own 15 s /models budget, so its TIMEOUT is what normally fires.
 const TEST_BUDGET_MS = 20_000;
@@ -18,10 +19,12 @@ const notFound = () => new NotFoundException({ code: "NOT_FOUND", message: "No c
 // The catalog says why a provider cannot be connected yet (docs/contracts/catalog-providers.md).
 const notSupported = (id: string) => {
   const status = builtinRegistry.status(id);
-  const message = status === undefined ? `${id} is not in the catalog.` : `${id} cannot be connected yet: ${status.connectable ? "unknown reason" : status.reason}.`;
+  const message = status === undefined ? `${id} is not in the catalog or a custom provider.` : `${id} cannot be connected yet: ${status.connectable ? "unknown reason" : status.reason}.`;
   return new BadRequestException({ code: "PROVIDER_NOT_SUPPORTED", message });
 };
-const named = (view: ConnectionView): Named => ({ ...view, providerName: builtinRegistry.provider(view.provider)?.name ?? view.provider });
+// Built-in names from the registry, custom ones from their node (docs/contracts/custom-providers.md).
+const named = (view: ConnectionView, nodeNames: ReadonlyMap<string, string>): Named =>
+  ({ ...view, providerName: builtinRegistry.provider(view.provider)?.name ?? nodeNames.get(view.provider) ?? view.provider });
 
 // Only an answer about the key is invalid or no_quota; anything else means "not checked" (connection.test-single-connection).
 async function runTest(provider: ProviderDescriptor, transport: HttpTransportPort, apiKey: string): Promise<TestOutcome> {
@@ -44,13 +47,31 @@ async function runTest(provider: ProviderDescriptor, transport: HttpTransportPor
 export class ConnectionsController {
   constructor(
     private readonly connections: ConnectionsRepository,
+    private readonly nodes: ProviderNodesRepository,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
   ) {}
 
   @Get()
   @Header("Cache-Control", "no-store")
   async list(): Promise<Named[]> {
-    return (await this.connections.list()).map(named);
+    const names = await this.nodeNames();
+    return (await this.connections.list()).map((view) => named(view, names));
+  }
+
+  // A built-in provider by id or alias, or a custom provider by id.
+  private async provider(id: string): Promise<ProviderDescriptor | undefined> {
+    const builtin = builtinRegistry.provider(id);
+    if (builtin) return builtin;
+    const node = await this.nodes.get(id);
+    return node ? nodeDescriptor(node) : undefined;
+  }
+
+  private async nodeNames(): Promise<Map<string, string>> {
+    return new Map((await this.nodes.list()).map((node) => [node.id, node.name]));
+  }
+
+  private async withName(view: ConnectionView): Promise<Named> {
+    return named(view, await this.nodeNames());
   }
 
   @Post()
@@ -59,11 +80,11 @@ export class ConnectionsController {
   async create(@Body() body: unknown): Promise<Named> {
     const parsed = parseNewConnection(body);
     if (!parsed.ok) throw invalid(parsed.message);
-    const provider = builtinRegistry.provider(parsed.value.provider);
+    const provider = await this.provider(parsed.value.provider);
     if (!provider) throw notSupported(parsed.value.provider);
     const created = await this.connections.create({ provider: provider.id, name: parsed.value.name ?? provider.name, apiKey: parsed.value.apiKey });
     if (!created) throw new ConflictException({ code: "ALREADY_CONNECTED", message: `${provider.name} is already connected. Replace its key instead.` });
-    return named(created);
+    return this.withName(created);
   }
 
   @Patch(":id")
@@ -73,7 +94,7 @@ export class ConnectionsController {
     if (!parsed.ok) throw invalid(parsed.message);
     const view = await this.connections.update(id, parsed.value);
     if (!view) throw notFound();
-    return named(view);
+    return this.withName(view);
   }
 
   @Delete(":id")
@@ -97,11 +118,11 @@ export class ConnectionsController {
       });
     }
     if (!stored) throw notFound();
-    const provider = builtinRegistry.provider(stored.provider);
+    const provider = await this.provider(stored.provider);
     if (!provider) throw notSupported(stored.provider);
     const outcome = await runTest(provider, this.transport, stored.apiKey);
     const view = await this.connections.recordTest(id, stored.sealed, outcome);
     if (!view) throw notFound();
-    return named(view);
+    return this.withName(view);
   }
 }

@@ -72,3 +72,32 @@ export const useUpdateConnection = () =>
 export const useDeleteConnection = () => useConnectionMutation((id: string) => apiVoid(path(id), "DELETE"));
 export const useTestConnection = () =>
   useConnectionMutation((id: string) => api<Connection>(`${path(id)}/test`, { method: "POST", timeoutMs: TEST_TIMEOUT_MS }));
+
+// docs/contracts/custom-providers.md
+export interface ProviderNode {
+  id: string;
+  name: string;
+  prefix: string;
+  baseUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const nodesKey = ["provider-nodes"] as const;
+const nodePath = (id: string) => `/api/provider-nodes/${encodeURIComponent(id)}`;
+
+export const useProviderNodes = () => useQuery({ queryKey: nodesKey, queryFn: () => api<ProviderNode[]>("/api/provider-nodes") });
+
+function useNodeMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
+  const client = useQueryClient();
+  // A delete also removes the node's connection, so both lists are refreshed.
+  return useMutation({
+    mutationFn,
+    onSettled: () => Promise.all([client.invalidateQueries({ queryKey: nodesKey }), client.invalidateQueries({ queryKey: connectionsKey, exact: true })]),
+  });
+}
+
+type NodeFields = { name: string; prefix: string; baseUrl: string };
+export const useCreateNode = () => useNodeMutation((body: NodeFields) => api<ProviderNode>("/api/provider-nodes", { method: "POST", body }));
+export const useUpdateNode = () => useNodeMutation(({ id, ...body }: NodeFields & { id: string }) => api<ProviderNode>(nodePath(id), { method: "PATCH", body }));
+export const useDeleteNode = () => useNodeMutation((id: string) => apiVoid(nodePath(id), "DELETE"));

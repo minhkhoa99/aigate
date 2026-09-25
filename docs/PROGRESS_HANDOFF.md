@@ -25,7 +25,8 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M1 acceptance gate (parity tiers 1+2, 13 golden scenarios) | **Passed** (tier 1 11/11, golden 10/10 + 3 deferred); tier 2 waits for an OpenAI key | `docs/parity/m1-gate-report.md` |
 | M0 SP4 `tools/extract` registry extraction | Done, no UI | `docs/contracts/registry-extract.md` |
 | M2 SP13 catalog → runtime registry (41 connectable providers) | Done, UI wired | `docs/contracts/catalog-providers.md` |
-| M2 SP13b custom OpenAI-compatible providers, then delete `tools/extract` | **Next** | SP13 below |
+| M2 SP13b custom OpenAI-compatible providers; `tools/extract` deleted | Done, UI wired | `docs/contracts/custom-providers.md` |
+| M2 SP14 provider adapters by protocol family | **Next** | SP13b below |
 
 ## Completed and verified
 
@@ -469,8 +470,22 @@ Checks and status:
 - **Checks.** Engine 47/47, server 65/65 (new `test/catalog.test.mjs`, new resolution tests), web 7/7, parity 5/5, extract 3/3, discovery 54/54; `pnpm lint`, `pnpm build`, `pnpm discovery validate` (284) all pass. 13 mutations were caught, 0 survived: bare id ignoring connections, unknown prefix rejected, blocked prefix falling through, empty model, aliases off, the not-supported message, the catalog reason, the kind mapping, catalog headers dropped, headers overriding the key, raw scheme as bearer, the OpenAI stream exception, the tencent sanitizer.
 - **Matrix.** `catalog.registry-build` and `catalog.registry-entry-shape` are `implemented` (`catalog.connection-listing` already was). `routing.model-resolution` stays `contracted` until combos (SP19).
 
-**Next step, M2 SP13b (custom OpenAI-compatible providers):**
-1. Contract first: `docs/contracts/custom-providers.md`, from the 9router `provider_nodes` matrix entries.
-2. A `provider_nodes` table (migration `0003`), a custom-providers module with CRUD, and a registry that merges built-in and custom descriptors per request.
-3. Wire `/providers/new` (the form is a preview today) and the "Custom providers" section on `/providers`.
-4. Then delete `tools/extract` (spec §2) and its CI step, keeping `providers.generated.ts`.
+**M2 SP13b (custom OpenAI-compatible providers) is complete.** The contract is `docs/contracts/custom-providers.md`.
+
+- **Matrix first.** New entry `connection.provider-node-create-list` (GET/POST `/api/provider-nodes` and the `<prefix>/<model>` rule). Three `SUSPECTED_BUG` rules there were **not ported**:
+  - a missing `baseUrl` defaulting to api.openai.com (the custom key would go to OpenAI): `baseUrl` is required
+  - a pasted `/chat/completions` doubling the path: it is stripped, like the sibling node types do
+  - reserved, duplicate, or slash-containing prefixes stored and then unreachable: refused at save
+  - `connection.provider-node-update-delete`'s copy of node fields onto connections is an `IMPLEMENTATION_ACCIDENT`; connections store only the node id.
+- **Storage.** Table `provider_nodes` (migration `0003`: id, name, unique prefix, base_url, timestamps), at most 100 (count + insert in one transaction). Delete removes the node's connection and sealed key in the same transaction.
+- **API.** `GET/POST /api/provider-nodes`, `PATCH/DELETE /api/provider-nodes/:id` in the `connections` module. Errors: 400 `INVALID_REQUEST` naming the field, 409 `PREFIX_RESERVED` (any catalog id or alias), `PREFIX_TAKEN`, `NODE_LIMIT`, 404 `NOT_FOUND`. The base URL must be https, or http to this machine, with no credentials, query, or fragment.
+- **Connections and `/v1`.** Connections accept a custom provider id; its test calls `GET <baseUrl>/models`. `/v1` resolves `<prefix>/<model>` after built-in ids, aliases, and catalog prefixes, with one indexed lookup. Custom providers declare no models, so they serve no bare id and are not in `/v1/models`.
+- **UI, wired.** `/providers` Custom providers section (`features/providers/custom.tsx`): cards with Connect, Edit, Delete (the confirm says the connection and key go too). `/providers/new` is a real form (edit with `?id=`); save goes to the Add connection modal with the new provider preselected. The Anthropic compatible option is disabled until SP14. Browser smoke test on the production build: PREFIX_RESERVED toast, create, the preselected modal (42 providers), delete.
+- **`tools/extract` deleted** (spec §2) with its test filter, script, and lockfile entry. `providers.generated.ts` stays; `docs/contracts/registry-extract.md` says how to restore the tool from git (`d2783c1`).
+- **Checks.** Server 71/71 (5 new in `test/provider-nodes.test.mjs`), web 7/7, engine 47/47, parity 5/5, database 6/6, discovery 54/54; `pnpm lint`, `pnpm build`, `pnpm install --frozen-lockfile`, `pnpm discovery validate` (285). 15 mutations were caught, 0 survived.
+- **Matrix.** `connection.provider-node-create-list`, `-update-delete`, and `-repo-storage` are `implemented`; `connection.provider-node-validate-partial-ssrf` stays `traced` (no validate route).
+
+**Next step, M2 SP14 (provider adapters by protocol family).** The catalog reasons show where the providers are blocked: the Anthropic adapter 6, stream-only providers 3, openai-responses 3, non-standard endpoints 5, ollama 2, and one each for gemini, gemini-cli, vertex, kiro, cursor, commandcode, antigravity, and the Cline envelope.
+1. Start with the **Anthropic Messages adapter** (`AIProviderPort`, CIP ↔ `/v1/messages`, SSE events). It unblocks 6 catalog providers and the Anthropic-compatible custom providers (the disabled option on `/providers/new`).
+2. Then **stream-only providers**: call with `stream: true` and aggregate for a non-streaming client.
+3. Matrix entries first for each family (`porting-behavior-not-code`), then a contract per adapter; `unsupportedReason` must drop each reason as its adapter lands, and `/providers` pills update by themselves.

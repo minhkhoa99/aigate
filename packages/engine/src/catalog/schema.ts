@@ -1,8 +1,8 @@
 import type { ModelCapabilities } from "../registry.js";
 
 // The provider catalog extracted from 9router (docs/contracts/registry-extract.md). Static data:
-// providers.generated.ts is written by tools/extract and never edited by hand. SP4 only carries it;
-// SP13 turns it into the runtime registry.
+// providers.generated.ts was written by tools/extract (SP4; removed in SP13b, restorable from git d2783c1)
+// and is never edited by hand. SP13 turned it into the runtime registry.
 
 export const CATALOG_PROTOCOLS = [
   "openai-compatible", "anthropic", "openai-responses", "gemini", "gemini-cli", "vertex", "antigravity",

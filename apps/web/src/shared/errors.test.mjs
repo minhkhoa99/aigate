@@ -29,6 +29,9 @@ test("validation messages pass through and unknown failures stay honest", () => 
 test("connection codes tell the user what to do next", () => {
   assert.equal(toProblem(new ApiError(400, "PROVIDER_NOT_SUPPORTED", "x", { message: "deepseek cannot be connected yet. Supported: OpenAI." })).message, "deepseek cannot be connected yet. Supported: OpenAI.");
   assert.match(toProblem(new ApiError(409, "ALREADY_CONNECTED", "x")).message, /Replace key/);
+  assert.equal(toProblem(new ApiError(409, "PREFIX_TAKEN", "x", { message: "Another custom provider already uses the prefix \"local\"." })).message, "Another custom provider already uses the prefix \"local\".");
+  assert.match(toProblem(new ApiError(409, "PREFIX_RESERVED", "x", {})).message, /built-in provider/);
+  assert.match(toProblem(new ApiError(409, "NODE_LIMIT", "x")).message, /100 custom providers/);
   assert.match(toProblem(new ApiError(409, "CREDENTIAL_UNREADABLE", "x")).message, /secret key file changed/);
   assert.match(toProblem(new ApiError(0, "TIMEOUT", "x", { timeoutSeconds: 25 })).message, /within 25 seconds/);
 });

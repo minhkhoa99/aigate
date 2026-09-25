@@ -99,7 +99,7 @@ test("AIGate's own migrations create each context's tables", async () => {
   const handle = await openDatabase({ file });
   try {
     const tables = await handle.db.all(sql`select name from sqlite_master where type = 'table' and name not like 'sqlite_%' order by name`);
-    assert.deepEqual(tables.map((t) => t.name ?? t[0]), ["__drizzle_migrations", "api_keys", "dashboard_password", "provider_connections", "sessions", "settings"]);
+    assert.deepEqual(tables.map((t) => t.name ?? t[0]), ["__drizzle_migrations", "api_keys", "dashboard_password", "provider_connections", "provider_nodes", "sessions", "settings"]);
     await assert.rejects(() => handle.db.run(sql`insert into settings (id) values (2)`), "settings is a single row");
   } finally {
     await handle.close();

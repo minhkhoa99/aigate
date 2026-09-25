@@ -24,3 +24,14 @@ export const providerConnections = sqliteTable(
   },
   () => [check("provider_connections_test_status", sql.raw(`test_status IN (${TEST_STATUSES.map((s) => `'${s}'`).join(", ")})`))],
 );
+
+// docs/contracts/custom-providers.md (SP13b). OpenAI-compatible endpoints the user defines; a connection
+// under one stores this id as its provider. The prefix is how /v1 names it, so it is unique.
+export const providerNodes = sqliteTable("provider_nodes", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  prefix: text("prefix").notNull().unique(),
+  baseUrl: text("base_url").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});

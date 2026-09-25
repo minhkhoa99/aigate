@@ -54,7 +54,8 @@ SP13 rules (`catalog-providers.md`):
 1. `provider/model`, where `provider` is a registry id **or alias** (`ds/deepseek-chat`), calls that provider with `model` as given. It may be a model the registry does not declare; such a model gets the default capabilities.
 2. `provider/model`, where `provider` is a catalog provider that cannot be connected yet, is 400 `provider_not_supported` with the catalog reason.
 3. Any other string is a bare model id; a `/` inside it is part of the id (`zai-org/GLM-5.2`). Among the registry providers that declare it, the first in catalog order **with an active connection** serves it. When none has one: 404 `no_active_connection`, naming up to three of them. When none declares it: 404 `model_not_found`.
-4. The provider needs an **active** connection (`isActive`). Its test status is not checked: a key that was never tested still works.
+4. `provider/model`, where `provider` is none of the above but a custom provider's prefix (SP13b, `custom-providers.md`), calls that custom provider with `model` as given.
+5. The provider needs an **active** connection (`isActive`). Its test status is not checked: a key that was never tested still works.
 
 Example: `gpt-4.1` and `openai/gpt-4.1` are the same request. `openai/gpt-5-mini` works although the catalog does not declare it. `glm-5` is declared by six providers and goes to the first one you connected.
 
