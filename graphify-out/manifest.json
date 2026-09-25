@@ -1,8 +1,8 @@
 {
   "docs/superpowers/specs/2026-09-22-aigate-design.md": {
-    "mtime": 1790334146.656176,
-    "ast_hash": "936cba8a0e60094b17a00e9897d3b9a2",
-    "semantic_hash": "936cba8a0e60094b17a00e9897d3b9a2"
+    "mtime": 1790361550.646515,
+    "ast_hash": "1d685a7536b7ad0e571eb05c09d0402f",
+    "semantic_hash": "1d685a7536b7ad0e571eb05c09d0402f"
   },
   "docs/superpowers/plans/2026-09-22-m1-discovery.md": {
     "mtime": 1790304403.9357767,
@@ -35,9 +35,9 @@
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1790351312.0762496,
-    "ast_hash": "77dcf8ed641bd86560da031284a95cdf",
-    "semantic_hash": "77dcf8ed641bd86560da031284a95cdf"
+    "mtime": 1790361550.6445043,
+    "ast_hash": "cd239947ce2eda22d22415217422eab6",
+    "semantic_hash": "cd239947ce2eda22d22415217422eab6"
   },
   "docs/design/UI_HANDOFF.md": {
     "mtime": 1790304403.8708513,
@@ -60,9 +60,9 @@
     "semantic_hash": "ef80360f5033624ddcafa1814f1f576e"
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1790351312.0782683,
-    "ast_hash": "a9391c9fff06a3fcf22152c6613fa217",
-    "semantic_hash": "a9391c9fff06a3fcf22152c6613fa217"
+    "mtime": 1790361550.640489,
+    "ast_hash": "95fc1513bbaa1fd294026875eff980b7",
+    "semantic_hash": "95fc1513bbaa1fd294026875eff980b7"
   },
   "docs/contracts/transport.md": {
     "mtime": 1790343138.4076855,
@@ -88,5 +88,10 @@
     "mtime": 1790351254.2902431,
     "ast_hash": "a92669cdc80317f4530da9686e0ca4ca",
     "semantic_hash": "a92669cdc80317f4530da9686e0ca4ca"
+  },
+  "docs/contracts/parity.md": {
+    "mtime": 1790361488.8968892,
+    "ast_hash": "af0d11902d0344dc23da137d91ef1b04",
+    "semantic_hash": "af0d11902d0344dc23da137d91ef1b04"
   }
 }

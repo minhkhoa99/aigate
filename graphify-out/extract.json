@@ -1011,12 +1011,13 @@
       "label": "Milestone M1 · Walking skeleton (thin end-to-end slice)",
       "file_type": "document",
       "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
-      "source_location": "§9",
+      "source_location": null,
       "source_url": null,
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "rationale": "Single goal: one streaming POST /v1/chat/completions with a valid API key through ONE provider, passing all 13 golden scenarios. Acceptance gate: parity tiers 1+2 clean."
+      "rationale": "Single goal: one streaming POST /v1/chat/completions with a valid API key through ONE provider, passing all 13 golden scenarios. Acceptance gate: parity tiers 1+2 clean.",
+      "status": "gate-passed"
     },
     {
       "id": "ms_m2",
@@ -1099,19 +1100,19 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "status": "next"
+      "status": "done-no-ui"
     },
     {
       "id": "sp_sp4",
       "label": "SP4 — tools/extract: 9router registry data → AIGate schema",
       "file_type": "document",
       "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
-      "source_location": "§9",
+      "source_location": null,
       "source_url": null,
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "status": "not-started"
+      "status": "next"
     },
     {
       "id": "sp_sp5",
@@ -6807,17 +6808,6 @@
       "location": "apps/web/src/features/gateway/api.ts"
     },
     {
-      "id": "progress_handoff_next_m1_gate",
-      "label": "Handoff next step: M1 acceptance gate (parity tiers 1+2, 13 golden scenarios) — needs M0 SP3 parity harness",
-      "file_type": "document",
-      "source_file": "docs/PROGRESS_HANDOFF.md",
-      "source_location": null,
-      "source_url": null,
-      "captured_at": null,
-      "author": null,
-      "contributor": null
-    },
-    {
       "id": "05_request_routing_fallback_routing_lane_entry_routes",
       "label": "routing.lane-entry-routes",
       "file_type": "document",
@@ -6906,6 +6896,203 @@
       "labels": [
         "REFERENCE_BEHAVIOR"
       ]
+    },
+    {
+      "id": "parity_contract",
+      "label": "Parity harness contract (M0 SP3) and the M1 acceptance gate",
+      "file_type": "document",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "tools/parity: tapes recorded from a running 9router against a scripted vendor, replayed against AIGate; tier 1 fails on any undeclared difference."
+    },
+    {
+      "id": "parity_vendor",
+      "label": "tools/parity/src/vendor.mjs — scripted OpenAI-compatible vendor; records upstream requests, secrets masked",
+      "file_type": "code",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "tools/parity/src/vendor.mjs"
+    },
+    {
+      "id": "parity_recorder",
+      "label": "tools/parity/src/record.mjs — records tapes from 9router via a temporary node (cleanup by name)",
+      "file_type": "code",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "tools/parity/src/record.mjs"
+    },
+    {
+      "id": "parity_normalizer",
+      "label": "tools/parity/src/normalize.mjs — semantic response view (text, tool calls, finish, usage, terminal, error)",
+      "file_type": "code",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "tools/parity/src/normalize.mjs"
+    },
+    {
+      "id": "parity_judge",
+      "label": "tools/parity/src/replay.mjs judge — every difference must be a labeled deviation with AIGate's value",
+      "file_type": "code",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "tools/parity/src/replay.mjs"
+    },
+    {
+      "id": "parity_deviations",
+      "label": "tools/parity/src/scenarios.mjs DEVIATIONS — intentional differences from 9router, each with entry, label, reason",
+      "file_type": "code",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "tools/parity/src/scenarios.mjs"
+    },
+    {
+      "id": "parity_live",
+      "label": "tools/parity/src/live.mjs — tier 2 against OpenAI (OPENAI_API_KEY, ≤16 tokens per tape)",
+      "file_type": "code",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "tools/parity/src/live.mjs"
+    },
+    {
+      "id": "parity_cli",
+      "label": "pnpm parity record | replay | live | gate",
+      "file_type": "code",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "tools/parity/src/cli.mjs"
+    },
+    {
+      "id": "parity_tapes",
+      "label": "tools/parity/tapes — 11 tapes from 9router 0.5.55 (JSON, stream, tool calls, omitted stream, 400/401/429/500, cut stream)",
+      "file_type": "document",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "parity_recording_via_node",
+      "label": "Decision: record through an OpenAI-compatible node baseUrl, not outboundProxyUrl (a forward proxy cannot read HTTPS without a MITM CA)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "finding_usage_buffer",
+      "label": "Finding: 9router adds 2000 tokens to reported prompt/total usage (addBufferToUsage) — SUSPECTED_BUG",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "finding_omitted_stream_corrupt",
+      "label": "Finding: omitted stream on 9router 0.5.55 → JSON body sent as text/event-stream + bare [DONE] (unparsable)",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "finding_error_shape",
+      "label": "Finding: 9router 0.5.55 errors carry only { message } with its node id and the raw upstream body",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "m1_gate_report",
+      "label": "docs/parity/m1-gate-report.md — M1 gate: tier 1 11/11, golden 10 pass + 3 deferred, tier 2 waits for a key, coverage 11/284",
+      "file_type": "document",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "passed"
+    },
+    {
+      "id": "golden_tests",
+      "label": "apps/server/test/golden.test.mjs — 13 golden scenarios at M1 scope (3 deferred: SP16, SP17, SP19)",
+      "file_type": "code",
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "apps/server/test/golden.test.mjs"
+    },
+    {
+      "id": "api_ui_map_row_sp3_no_ui",
+      "label": "API_UI_MAP row: M0 SP3 parity harness, No UI",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "progress_handoff_next_sp4",
+      "label": "Handoff next step: M0 SP4 tools/extract (registry from 9router), then SP13; run pnpm parity live to close tier 2",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
     }
   ],
   "edges": [
@@ -22980,36 +23167,6 @@
       "weight": 1
     },
     {
-      "source": "progress_handoff_next_m1_gate",
-      "target": "sp_sp3",
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1,
-      "source_file": "docs/PROGRESS_HANDOFF.md",
-      "source_location": null,
-      "weight": 1
-    },
-    {
-      "source": "progress_handoff_next_m1_gate",
-      "target": "parity_tier1_client_contract",
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1,
-      "source_file": "docs/PROGRESS_HANDOFF.md",
-      "source_location": null,
-      "weight": 1
-    },
-    {
-      "source": "progress_handoff_next_m1_gate",
-      "target": "parity_tier2_vendor_acceptance",
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1,
-      "source_file": "docs/PROGRESS_HANDOFF.md",
-      "source_location": null,
-      "weight": 1
-    },
-    {
       "source": "chat_lane_contract",
       "target": "01_endpoint_apikey_settings_endpoint_enforce_require_api_key",
       "relation": "cites",
@@ -23186,6 +23343,586 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1,
       "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_contract",
+      "target": "sp_sp3",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp3",
+      "target": "parity_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp3",
+      "target": "parity_vendor",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp3",
+      "target": "parity_recorder",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp3",
+      "target": "parity_normalizer",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp3",
+      "target": "parity_judge",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp3",
+      "target": "parity_live",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp3",
+      "target": "parity_cli",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp3",
+      "target": "parity_tapes",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_recorder",
+      "target": "concept_recording_proxy_tape",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_recorder",
+      "target": "parity_vendor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_recording_via_node",
+      "target": "parity_recorder",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_normalizer",
+      "target": "concept_sse_semantic_diff",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_judge",
+      "target": "parity_tier1_client_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_judge",
+      "target": "parity_normalizer",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_judge",
+      "target": "parity_deviations",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_judge",
+      "target": "parity_tier3_upstream_shape_drift",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_live",
+      "target": "parity_tier2_vendor_acceptance",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_cli",
+      "target": "parity_recorder",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_cli",
+      "target": "parity_judge",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_cli",
+      "target": "parity_live",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_cli",
+      "target": "golden_tests",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_cli",
+      "target": "concept_capabilities_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_judge",
+      "target": "chat_lane_service",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_normal_completion",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_stream_completion",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_provider_timeout",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_rate_limit",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_quota_exhausted",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_invalid_credentials",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_client_cancellation",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_partial_stream_failure",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_model_unavailable",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_all_providers_unavailable",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_token_refresh",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_account_failover",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "golden_tests",
+      "target": "gs_provider_fallback",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gs_token_refresh",
+      "target": "sp_sp16",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gs_account_failover",
+      "target": "sp_sp17",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gs_provider_fallback",
+      "target": "sp_sp17",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "finding_usage_buffer",
+      "target": "05_request_routing_fallback_routing_non_streaming_response",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "finding_omitted_stream_corrupt",
+      "target": "05_request_routing_fallback_routing_stream_mode_decision",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "finding_error_shape",
+      "target": "05_request_routing_fallback_fallback_upstream_error_result",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_tapes",
+      "target": "finding_usage_buffer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_deviations",
+      "target": "finding_usage_buffer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_tapes",
+      "target": "finding_omitted_stream_corrupt",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_deviations",
+      "target": "finding_omitted_stream_corrupt",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_tapes",
+      "target": "finding_error_shape",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_deviations",
+      "target": "finding_error_shape",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_deviations",
+      "target": "05_request_routing_fallback_fallback_partial_stream_failure",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "parity_deviations",
+      "target": "protocol_upstream_auth_502",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "m1_gate_report",
+      "target": "parity_judge",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "m1_gate_report",
+      "target": "golden_tests",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "ms_m1",
+      "target": "m1_gate_report",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp3_no_ui",
+      "target": "sp_sp3",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_rule_no_ui_row",
+      "target": "sp_sp3",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp4",
+      "target": "sp_sp4",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "progress_handoff_next_sp4",
+      "target": "parity_live",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
       "source_location": null,
       "weight": 1
     }
@@ -23506,6 +24243,21 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1,
       "source_file": "docs/contracts/chat-lane.md"
+    },
+    {
+      "id": "sp3_replay_loop",
+      "label": "SP3 replay loop: tape → AIGate (stubbed vendor) → normalizer → judge against 9router with declared deviations",
+      "nodes": [
+        "parity_tapes",
+        "chat_lane_service",
+        "parity_normalizer",
+        "parity_judge",
+        "parity_deviations"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/parity.md"
     }
   ],
   "input_tokens": 574916,
