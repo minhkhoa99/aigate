@@ -117,8 +117,9 @@ export function Callback() {
   return <div className="standalone"><div className="auth-card"><div className="auth-brand"><span>⌘</span><strong>AIGate</strong></div><h1>Completing sign-in</h1><p>Waiting for the identity provider to return a valid response.</p><StateBlock state="loading" /><Link className="button button-secondary" to="/login">Back to login</Link></div></div>;
 }
 
+// First run is a single step: set the dashboard password, then open the dashboard. Providers are
+// connected later from the Providers screens (user decision, 2026-09-25).
 export function Onboarding() {
-  const [step, setStep] = useState(1);
   const navigate = useNavigate();
   const status = useAuthStatus();
   const setup = useSetup();
@@ -127,15 +128,15 @@ export function Onboarding() {
 
   // Nothing to set up on an install that already has a password; this setup call is excluded.
   useEffect(() => {
-    if (step === 1 && status.data && !status.data.setupRequired && setup.isIdle) void navigate({ to: status.data.authenticated ? "/" : "/login" });
-  }, [step, status.data, setup.isIdle, navigate]);
+    if (status.data && !status.data.setupRequired && setup.isIdle) void navigate({ to: status.data.authenticated ? "/" : "/login" });
+  }, [status.data, setup.isIdle, navigate]);
 
   const submitPassword = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const password = formValue(event, "password");
     if (password !== formValue(event, "confirm")) { setError({ code: "INVALID_REQUEST", message: "The passwords do not match." }); return; }
     setup.mutate({ password }, {
-      onSuccess: () => { setError(null); setStep(2); },
+      onSuccess: () => void navigate({ to: "/" }),
       onError: (err) => {
         if (isApiError(err, "ALREADY_SET_UP")) { void navigate({ to: "/login" }); return; }
         const problem = describe(err);
@@ -145,13 +146,10 @@ export function Onboarding() {
     });
   };
 
-  return <div className="standalone"><div className="onboarding-card"><div className="auth-brand"><span>⌘</span><strong>AIGate</strong></div><div className="wizard-steps">{["Secure", "Connect", "Verify"].map((s, i) => <div className={step === i + 1 ? "active" : ""} key={s}><span>{i + 1}</span>{s}</div>)}</div>
-    <h1>{step === 1 ? "Secure your gateway" : step === 2 ? "Connect a provider" : "Verify your route"}</h1><p>{step === 1 ? "Set a dashboard password and require an API key before accepting traffic." : step === 2 ? "Add one account to send your first request." : "Run a safe test to confirm your gateway is ready."}</p>
-    {step === 1 && <form onSubmit={submitPassword}><div className="stack"><Field label="Dashboard password" hint={`At least ${MIN_PASSWORD} characters.`}><Input type="password" name="password" required minLength={MIN_PASSWORD} maxLength={MAX_PASSWORD} autoComplete="new-password" placeholder="Create a strong password" /></Field><Field label="Confirm password"><Input type="password" name="confirm" required minLength={MIN_PASSWORD} maxLength={MAX_PASSWORD} autoComplete="new-password" placeholder="Repeat password" /></Field></div>
+  return <div className="standalone"><div className="onboarding-card"><div className="auth-brand"><span>⌘</span><strong>AIGate</strong></div>
+    <h1>Secure your gateway</h1><p>Set a dashboard password before accepting traffic. You can connect providers after signing in.</p>
+    <form onSubmit={submitPassword}><div className="stack"><Field label="Dashboard password" hint={`At least ${MIN_PASSWORD} characters.`}><Input type="password" name="password" required minLength={MIN_PASSWORD} maxLength={MAX_PASSWORD} autoComplete="new-password" placeholder="Create a strong password" /></Field><Field label="Confirm password"><Input type="password" name="confirm" required minLength={MIN_PASSWORD} maxLength={MAX_PASSWORD} autoComplete="new-password" placeholder="Repeat password" /></Field></div>
       {error && <Warning tone="danger"><code>{error.code}</code> · {error.message}</Warning>}
-      <div className="modal-actions"><Button disabled>Back</Button><Button type="submit" variant="primary" disabled={setup.isPending}>{setup.isPending ? "Saving…" : "Continue"}</Button></div></form>}
-    {step === 2 && <div className="stack"><Field label="Provider"><select className="input"><option>Anthropic</option><option>OpenAI</option></select></Field><Field label="API key"><Input type="password" placeholder="Paste provider credential" /></Field><Warning>Provider connections arrive in a later milestone. Continue to finish setup; nothing here is saved yet.</Warning></div>}
-    {step === 3 && <div className="stack"><StateBlock state="empty" action={<Button>Run a test request</Button>} /></div>}
-    {step > 1 && <div className="modal-actions"><Button onClick={() => setStep(step - 1)} disabled={step === 2}>Back</Button><Button variant="primary" onClick={() => (step === 3 ? void navigate({ to: "/" }) : setStep(step + 1))}>{step === 3 ? "Open dashboard" : "Continue"}</Button></div>}
+      <div className="modal-actions"><Button type="submit" variant="primary" disabled={setup.isPending}>{setup.isPending ? "Saving…" : "Open dashboard"}</Button></div></form>
   </div></div>;
 }

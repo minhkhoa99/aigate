@@ -185,7 +185,7 @@ UI wiring (layouts kept; `apps/web/CLAUDE.md`):
   - Dropped the untracked "Last used" column and the "Reject legacy keys" toggle; neither has data.
   - The pill now says "Chat API pending".
 - **Shell.** `Shell` routes to `/welcome` or `/login` from `/api/auth/status`.
-- Onboarding steps 2 and 3 are still visual; they now say so.
+- **Onboarding is one step (user decision, 2026-09-25).** Set the dashboard password, then open the dashboard. The Stitch Connect and Verify steps were removed because a provider is not required at first run; providers are connected later from the Providers screens. A browser check on a fresh data dir went from `/welcome` straight to the dashboard.
 
 Checks:
 - Server tests pass 22/22. 13 mutations each made a test fail:
