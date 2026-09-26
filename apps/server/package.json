@@ -8,7 +8,7 @@
     "dev:tsc": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "dev:node": "node --watch dist/main.js",
     "start": "node dist/main.js",
-    "test": "pnpm --filter @aigate/database --filter @aigate/engine build && tsc -p tsconfig.json && node --test --test-timeout=30000 test/app.test.mjs test/settings.test.mjs test/identity.test.mjs test/apikeys.test.mjs test/transport.test.mjs test/connections.test.mjs test/catalog.test.mjs test/provider-nodes.test.mjs test/secret-cipher.test.mjs test/chat-lane.test.mjs test/anthropic-lane.test.mjs test/stream-only.test.mjs test/responses-lane.test.mjs test/golden.test.mjs"
+    "test": "pnpm --filter @aigate/database --filter @aigate/engine build && tsc -p tsconfig.json && node --test --test-timeout=30000 test/app.test.mjs test/settings.test.mjs test/identity.test.mjs test/apikeys.test.mjs test/transport.test.mjs test/connections.test.mjs test/catalog.test.mjs test/provider-nodes.test.mjs test/secret-cipher.test.mjs test/chat-lane.test.mjs test/anthropic-lane.test.mjs test/stream-only.test.mjs test/responses-lane.test.mjs test/ollama-lane.test.mjs test/golden.test.mjs"
   },
   "dependencies": {
     "@aigate/database": "workspace:*",

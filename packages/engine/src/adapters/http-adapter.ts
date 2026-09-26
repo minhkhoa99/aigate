@@ -50,6 +50,8 @@ export abstract class HttpProviderAdapter {
 
   // Catalog headers first, the key last: a static header can never replace the credential.
   protected request(method: HttpRequest["method"], url: string, credential: Credential, timeoutMs: number): HttpRequest {
+    // connection.ollama-local-host: a keyless connection sends no auth header at all.
+    if (credential.apiKey === "" && this.provider.auth.optional) return { method, url, headers: { ...this.provider.headers }, timeoutMs };
     if (!API_KEY.test(credential.apiKey)) {
       throw new EngineError("AUTH_ERROR", `The ${this.provider.name} API key is empty, too long, or has spaces or control characters`, { provider: this.provider.id });
     }
@@ -96,7 +98,9 @@ export abstract class HttpProviderAdapter {
 
   // Upstream text is shown to users: bounded, and never the credential, even if a provider echoes it.
   protected clean(message: string | undefined, credential: Credential): string {
-    return (message ?? "").split(credential.apiKey).join("***").slice(0, MAX_MESSAGE_CHARS);
+    // A keyless connection (ollama-local) has nothing to redact; splitting on "" would break every character apart.
+    const clean = credential.apiKey === "" ? (message ?? "") : (message ?? "").split(credential.apiKey).join("***");
+    return clean.slice(0, MAX_MESSAGE_CHARS);
   }
 
   protected invalid(what: string, partial = false): EngineError {

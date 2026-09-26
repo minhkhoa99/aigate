@@ -36,7 +36,10 @@ export interface ProviderDescriptor {
   // Static request headers from the catalog; the auth header is always set after them.
   readonly headers: Readonly<Record<string, string>>;
   readonly aliases: readonly string[];
-  readonly auth: { readonly kind: "api-key"; readonly header: string; readonly scheme: "bearer" | "raw" };
+  // optional: the connection may have no key, and then no auth header is sent (connection.ollama-local-host).
+  readonly auth: { readonly kind: "api-key"; readonly header: string; readonly scheme: "bearer" | "raw"; readonly optional?: boolean };
+  // The connection may carry its own base URL (ollama-local's host); these paths are appended to it.
+  readonly connectionBaseUrl?: { readonly chatPath: string; readonly modelsPath: string };
   readonly models: readonly ModelDescriptor[];
   // Catalog quirks an adapter reads (docs/contracts/provider-anthropic.md: requireClaudeToolType;
   // docs/contracts/stream-only-providers.md: reasoningSummary, neutralAgentPrompt).
@@ -47,8 +50,16 @@ export interface ProviderDescriptor {
   readonly anthropicNode?: { readonly official: boolean };
 }
 
-export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic", "openai-responses"] as const;
+export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic", "openai-responses", "ollama"] as const;
 export type ProviderProtocol = (typeof PROVIDER_PROTOCOLS)[number];
+
+// The descriptor a connection with its own base URL talks to; one trailing "/" is removed (resolveOllamaLocalHost).
+export function withConnectionBaseUrl(provider: ProviderDescriptor, baseUrl: string | null | undefined): ProviderDescriptor {
+  const paths = provider.connectionBaseUrl;
+  if (!paths || !baseUrl) return provider;
+  const base = baseUrl.replace(/\/$/, "");
+  return { ...provider, chatUrl: `${base}${paths.chatPath}`, modelsUrl: `${base}${paths.modelsPath}` };
+}
 
 // Why a catalog provider can or cannot be connected (the UI shows the reason).
 export type ProviderStatus = { readonly connectable: true } | { readonly connectable: false; readonly reason: string };

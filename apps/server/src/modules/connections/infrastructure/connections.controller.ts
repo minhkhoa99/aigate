@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   BadRequestException, Body, ConflictException, Controller, Delete, Get, Header, HttpCode, HttpStatus, Inject, NotFoundException, Param, Patch, Post,
 } from "@nestjs/common";
-import { builtinRegistry, createAdapter, EngineError, type HttpTransportPort, type ProviderDescriptor } from "@aigate/engine";
+import { builtinRegistry, createAdapter, EngineError, withConnectionBaseUrl, type HttpTransportPort, type ProviderDescriptor } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
 import { parseChanges, parseNewConnection } from "../domain/connection.js";
@@ -25,6 +25,13 @@ const notSupported = (id: string) => {
 // Built-in names from the registry, custom ones from their node (docs/contracts/custom-providers.md).
 const named = (view: ConnectionView, nodeNames: ReadonlyMap<string, string>): Named =>
   ({ ...view, providerName: builtinRegistry.provider(view.provider)?.name ?? nodeNames.get(view.provider) ?? view.provider });
+
+// connection.ollama-local-host: only a provider with optional auth may have no key, and only one that declares
+// connectionBaseUrl takes a host.
+function checkForProvider(provider: ProviderDescriptor, fields: { apiKey?: string; baseUrl?: string | null }): void {
+  if (fields.apiKey === "" && !provider.auth.optional) throw invalid("apiKey must be 8-4096 printable characters without spaces");
+  if (fields.baseUrl && !provider.connectionBaseUrl) throw invalid(`baseUrl cannot be set on a ${provider.name} connection`);
+}
 
 // Only an answer about the key is invalid or no_quota; anything else means "not checked" (connection.test-single-connection).
 async function runTest(provider: ProviderDescriptor, transport: HttpTransportPort, apiKey: string): Promise<TestOutcome> {
@@ -82,7 +89,9 @@ export class ConnectionsController {
     if (!parsed.ok) throw invalid(parsed.message);
     const provider = await this.provider(parsed.value.provider);
     if (!provider) throw notSupported(parsed.value.provider);
-    const created = await this.connections.create({ provider: provider.id, name: parsed.value.name ?? provider.name, apiKey: parsed.value.apiKey });
+    checkForProvider(provider, parsed.value);
+    const { apiKey, baseUrl } = parsed.value;
+    const created = await this.connections.create({ provider: provider.id, name: parsed.value.name ?? provider.name, apiKey, ...(baseUrl ? { baseUrl } : {}) });
     if (!created) throw new ConflictException({ code: "ALREADY_CONNECTED", message: `${provider.name} is already connected. Replace its key instead.` });
     return this.withName(created);
   }
@@ -92,6 +101,13 @@ export class ConnectionsController {
   async update(@Param("id") id: string, @Body() body: unknown): Promise<Named> {
     const parsed = parseChanges(body);
     if (!parsed.ok) throw invalid(parsed.message);
+    if (parsed.value.apiKey !== undefined || parsed.value.baseUrl !== undefined) {
+      const current = await this.connections.get(id);
+      if (!current) throw notFound();
+      const provider = await this.provider(current.provider);
+      if (!provider) throw notSupported(current.provider);
+      checkForProvider(provider, parsed.value);
+    }
     const view = await this.connections.update(id, parsed.value);
     if (!view) throw notFound();
     return this.withName(view);
@@ -120,7 +136,7 @@ export class ConnectionsController {
     if (!stored) throw notFound();
     const provider = await this.provider(stored.provider);
     if (!provider) throw notSupported(stored.provider);
-    const outcome = await runTest(provider, this.transport, stored.apiKey);
+    const outcome = await runTest(withConnectionBaseUrl(provider, stored.baseUrl), this.transport, stored.apiKey);
     const view = await this.connections.recordTest(id, stored.sealed, outcome);
     if (!view) throw notFound();
     return this.withName(view);

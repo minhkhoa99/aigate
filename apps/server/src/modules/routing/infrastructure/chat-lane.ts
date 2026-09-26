@@ -5,7 +5,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import {
   assertModelSupports, builtinRegistry, createAdapter, EngineError, OpenAIChatStreamEncoder, parseOpenAIChatRequest, toOpenAIChatCompletion,
-  toOpenAIError, UnsupportedFeatureError, type AIProviderPort, type CanonicalRequest, type Credential, type ExecCtx, type HttpTransportPort, type ProviderDescriptor,
+  toOpenAIError, UnsupportedFeatureError, withConnectionBaseUrl, type AIProviderPort, type CanonicalRequest, type Credential, type ExecCtx, type HttpTransportPort, type ProviderDescriptor,
   type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
@@ -205,13 +205,14 @@ export class ChatLane {
           `No active connection serves "${ref}". Add or enable one for ${names}${declaring.length > 3 ? ", …" : ""} in AIGate: Providers → Connections.`);
       }
     }
-    const apiKey = await this.connections.activeKey(provider.id);
-    if (apiKey === undefined) {
+    const stored = await this.connections.activeCredential(provider.id);
+    if (stored === undefined) {
       throw new GatewayError(404, "not_found_error", "no_active_connection", `${provider.name} has no active connection. Add or enable one in AIGate: Providers → Connections.`);
     }
     const upstream: CanonicalRequest = { ...request, model: modelId };
     assertModelSupports(upstream, provider.id, builtinRegistry.model(provider.id, modelId), modelId);
-    return { provider, request: upstream, credential: { kind: "api-key", apiKey } };
+    // connection.ollama-local-host: a connection may point the provider at its own host.
+    return { provider: withConnectionBaseUrl(provider, stored.baseUrl), request: upstream, credential: { kind: "api-key", apiKey: stored.apiKey } };
   }
 
   private modelNotFound(ref: string): GatewayError {

@@ -1968,6 +1968,21 @@ Every item below is a capability AIGate must have. Derived from tracing
   - maskName partially masks a long (over 16 char) name that also matches a 32+ char alnum/underscore/hyphen token pattern (e.g. an email-like or token-like display name) down to its first 8 characters — a defense against a raw credential accidentally landing in the display name field
   - pageSize is clamped to MAX_PAGE_SIZE (500); an out-of-range page number is clamped down to the last valid page rather than returning an empty page
 
+### ollama-local: an optional API key, a host per connection, and its connection test
+
+- **id:** `connection.ollama-local-host` · **module:** `connections`
+- **Trigger:** POST /api/providers for ollama-local; a /v1 request to ollama-local; a connection test
+- **Input:** { provider: ollama-local, apiKey?, baseUrl? (ollamaHostUrl in the form) }
+- **Output:** A connection whose providerSpecificData.baseUrl holds the host
+- **Rules:**
+  - ollama-local is the only provider whose connection may be saved without an API key
+  - The host comes from providerSpecificData.baseUrl (also accepted as baseURL or ollamaHostUrl), trimmed; empty means http://localhost:11434; one trailing / is removed
+  - Chat requests go to <host>/api/chat; the Authorization Bearer header is sent only when a key is set
+  - The connection test is GET <host>/api/tags without credentials; any 2xx is valid, anything else is Ollama not reachable at <host>
+  - The model list is GET <host>/api/tags
+- **Streaming:** yes
+- **Errors:** `PROVIDER_UNAVAILABLE` (the host does not answer /api/tags with 2xx)
+
 ### apiType chat or responses on an OpenAI-compatible node: create, update, id, and the request URL
 
 - **id:** `connection.provider-node-api-type` · **module:** `connections`
@@ -3314,6 +3329,23 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Errors:** `PROVIDER_UNAVAILABLE` (upstream 5xx or 529 overloaded), `RATE_LIMIT` (upstream 429), `AUTH_ERROR` (upstream 401 or 403)
 - **AIGate required behavior:** A mid-stream error reaches the client as an error; non-streaming and streaming map stop reasons and usage the same way; reasoning goes only to reasoning_content; text is returned as the model wrote it
 
+### Ollama NDJSON stream and JSON body to OpenAI chat completion chunks and body
+
+- **id:** `translator.ollama-to-openai-response` · **module:** `routing`
+- **Trigger:** An answer from an ollama-format provider
+- **Input:** NDJSON lines ({ message, done, done_reason, prompt_eval_count, eval_count }) or one JSON body
+- **Output:** chat.completion.chunk events, or a chat.completion body
+- **Rules:**
+  - The stream is NDJSON: each line that starts with { is parsed; others are skipped
+  - message.content becomes a content delta, message.thinking a reasoning_content delta; empty chunks are skipped
+  - message.tool_calls arrive whole: each becomes an OpenAI tool call with index function.index or its position, id tc.id or call_<i>_<ms>, and arguments stringified
+  - The line with done true ends the answer: finish_reason from done_reason (length or max_tokens → length, tool_calls → tool_calls, else stop), tool_calls when any tool call came; usage prompt_tokens = prompt_eval_count, completion_tokens = eval_count
+  - A non-streaming body maps the same way into one chat.completion with a new chatcmpl id
+  - A line without message and without done (such as { error }) yields nothing
+  - A stream that ends without a done line gets no finish chunk and no error
+- **Streaming:** yes
+- **AIGate required behavior:** An error line fails the answer, and a stream without its done line is a failure (fallback.partial-stream-failure)
+
 ### OpenAI chat completions request to Anthropic Messages request
 
 - **id:** `translator.openai-to-claude-request` · **module:** `routing`
@@ -3335,6 +3367,24 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Client cache_control markers are stripped and 9router places its own (1h on the last system block and tool, 5m on the last assistant turn)
   - thinking is deleted silently when the last message is not from the user
 - **AIGate required behavior:** Every OpenAI field is either mapped (stop to stop_sequences, top_p, max_completion_tokens, tool_choice none to none) or refused with a clear error; the client's own system prompt and cache markers are kept, and requested reasoning is never removed silently
+
+### OpenAI chat completions request to an Ollama /api/chat request (openaiToOllamaRequest)
+
+- **id:** `translator.openai-to-ollama-request` · **module:** `routing`
+- **Trigger:** A chat request routed to a provider whose format is ollama
+- **Input:** An OpenAI chat completions body
+- **Output:** An Ollama body: model, messages, stream, options, tools, tool_choice
+- **Rules:**
+  - stream is the upstream stream flag, always sent as a boolean
+  - options.temperature, options.top_p, and options.num_predict (from max_tokens only) are set when present
+  - tools are passed in the OpenAI shape; tool_choice is passed through
+  - Content is flattened to a string: text parts joined with newlines; data-URI images go to message.images as raw base64
+  - A tool message becomes { role: tool, tool_name, content }, tool_name found from the assistant tool_calls by id, else msg.name, else unknown_tool
+  - An assistant message with tool_calls keeps its text and sends tool_calls as { type: function, function: { index, name, arguments (object; unparsable JSON becomes {}) } }
+  - stop, seed, response_format, reasoning_effort, presence_penalty, frequency_penalty and any other field are dropped silently
+  - An image given by an http(s) URL is dropped; a non-assistant message without text is dropped with its images; a tool message with empty content is dropped
+- **Streaming:** yes
+- **AIGate required behavior:** stop, seed, JSON mode (format), and reasoning (think) reach Ollama, max_completion_tokens limits output, and an image-only turn or empty tool result is kept; an image Ollama cannot take is refused
 
 ### OpenAI chat completions request to an OpenAI Responses API request (openaiToOpenAIResponsesRequest)
 
@@ -3859,6 +3909,8 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `provider.codebuddy-request-quirks` | The system prompt reaches the model as the client sent it; a content-filter refusal is reported | codebuddy-cn silently replaces long or agent-like system prompts with a one-line neutral prompt | Coding agents lose their tool and behavior instructions without any error |
 | `translator.openai-to-responses-request` | Every client field is carried or refused: tool_choice, response_format, parallel_tool_calls, and user map to Responses; every system message reaches instructions; a part or argument that cannot be carried is an error naming it | tool_choice, stop, response_format and more are dropped; only the first system message is kept; audio and files become JSON text; bad arguments become {}; long names are cut | Forced tools, JSON mode, stop sequences, and later instructions silently stop working on Responses providers |
 | `translator.responses-to-openai-stream` | An upstream error is an error, a cut-off stream is a failure (fallback.partial-stream-failure), an incomplete answer ends with length, and a refusal is reported | Errors become assistant text with finish stop, a cut-off stream looks complete, incomplete answers end with stop, and refusals vanish | Clients take failures and truncated answers for finished ones |
+| `translator.openai-to-ollama-request` | stop, seed, JSON mode (format), and reasoning (think) reach Ollama, max_completion_tokens limits output, and an image-only turn or empty tool result is kept; an image Ollama cannot take is refused | Those fields are dropped, max_completion_tokens is ignored, URL images vanish, and image-only turns and empty tool results are removed | Clients silently lose stop sequences, JSON mode, reasoning control, output limits, and attachments |
+| `translator.ollama-to-openai-response` | An error line fails the answer, and a stream without its done line is a failure (fallback.partial-stream-failure) | Error lines are dropped and a cut-off stream ends as if complete | Clients take a failed or truncated answer for a finished one |
 | `clitools.write-not-atomic` | Given every one of these writes targets the user's own IDE/CLI configuration file (not 9router's own data), and one of the affected routes' own comment explicitly promises 'Backup old fields and write new settings', a crash mid-write should not be able to corrupt or truncate that file — either via a temp-file-then-rename swap (the exact pattern already implemented in this codebase at src/lib/mitmAliasCache.js:15-21 for 9router's own alias cache) or an actual on-disk backup copy. | All 13 write-capable cli-tools routes call fs.writeFile(path, content) directly on the final path with no temp file, no rename, and no backup copy anywhere on disk. The 'backup' language in the claude-settings POST comment refers only to merging the previously-read JSON object in memory before the single overwrite call — nothing is preserved outside process memory. | A crash, OOM kill, disk-full error, or power loss during any of these writes can truncate or corrupt the user's real tool config (e.g. ~/.claude/settings.json, ~/.codex/config.toml, ~/.openclaw/openclaw.json). Because every route's read path treats an unparseable file as simply 'no config', the damage is silent: the next status check reports the tool as unconfigured, and the next Apply starts from empty, permanently discarding whatever unrelated settings that file held before 9router wrote to it. |
 | `clitools.copilot-settings-array-upsert` | Like every other cli-tools GET handler (claude, codex, cline, droid, kilo, etc.), Copilot's GET should reflect a real detection check — a `where`/`which` lookup or a marker-file probe — before reporting installed: true, so the dashboard only shows Copilot as available on a machine that actually has it. | copilot-settings/route.js's GET performs no detection at all: it reads chatLanguageModels.json (which may not exist, in which case config is null) and always returns installed: true regardless. | The dashboard's Copilot integration card (and any 'all installed tools' summary the UI derives from installed flags) will show Copilot as installed on any machine, even one with no VS Code and no Copilot extension, inviting the user to Apply — which just writes a file nobody will ever read. |
 | `clitools.deepseek-tui-full-overwrite` | Like every other tool's Apply/Reset in this set (codex, droid, opencode, openclaw, grok-build, hermes, jcode, kilo, cline, cowork all read-merge-write or perform a targeted key removal), DeepSeek TUI's POST should merge 9router's fields into whatever config.toml already contains, and DELETE should remove only what 9router added — preserving any other DeepSeek TUI settings the user configured. | Both POST and DELETE build a fixed, hand-written TOML string from scratch and write it directly, completely replacing the file's prior contents regardless of what else was in it (POST never even calls the file's own readConfigToml() result; DELETE writes a hardcoded 2-line default). | The first time a user clicks Apply or Reset for DeepSeek TUI in the 9router dashboard, any other settings they had configured directly in ~/.deepseek/config.toml (other providers, TUI preferences, anything not related to 9router) are silently and irrecoverably destroyed. |

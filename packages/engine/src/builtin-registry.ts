@@ -10,11 +10,14 @@ const PATHS: Readonly<Record<ProviderProtocol, { chat: RegExp; models: string }>
   "openai-compatible": { chat: /\/chat\/completions$/, models: "/models" },
   anthropic: { chat: /\/messages$/, models: "/models" },
   "openai-responses": { chat: /\/responses$/, models: "/models" },
+  ollama: { chat: /\/api\/chat$/, models: "/api/tags" },
 };
 // 9router forces streaming for these although the vendor answers non-streaming requests too
 // (IMPLEMENTATION_ACCIDENT for OpenAI: the API accepts stream:false; SP3 tapes replay that way).
 const STREAM_OPTIONAL = new Set(["openai"]);
 // provider.codebuddy-request-quirks: what the 9router CodeBuddy executors change in the body.
+// connection.ollama-local-host: the key is optional and each connection may name its own host.
+const OLLAMA_LOCAL = { connectionBaseUrl: { chatPath: "/api/chat", modelsPath: "/api/tags" } } as const;
 const EXECUTOR_QUIRKS: Readonly<Record<string, readonly string[]>> = {
   "codebuddy-cn": ["reasoningSummary", "neutralAgentPrompt"],
   "codebuddy-intl": ["reasoningSummary"],
@@ -30,6 +33,9 @@ const isProtocol = (value: string): value is ProviderProtocol => PROVIDER_PROTOC
 
 // A reason why the provider cannot be connected yet, or undefined when it can.
 export function unsupportedReason(provider: CatalogProvider): string | undefined {
+  // assemblyai and deepgram have no transport format, so the catalog calls them openai-compatible; they only transcribe.
+  // ponytail: speech-to-text only; nanobanana (image-only, connectable since SP13) is left for SP22 to decide.
+  if (provider.serviceKinds.length > 0 && provider.serviceKinds.every((kind) => kind === "stt")) return PROTOCOL_REASONS.service;
   if (!isProtocol(provider.protocol)) return PROTOCOL_REASONS[provider.protocol] ?? `Needs the ${provider.protocol} adapter (SP14)`;
   if (!provider.auth.kinds.includes("api-key")) {
     if (provider.auth.kinds.includes("oauth")) return "Needs OAuth sign-in (SP16)";
@@ -52,7 +58,7 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
   // 9router authenticates every API key of the Anthropic family with a raw x-api-key, whatever the entry says.
   const auth: ProviderDescriptor["auth"] = protocol === "anthropic"
     ? { kind: "api-key", header: "x-api-key", scheme: "raw" }
-    : { kind: "api-key", header: provider.auth.header ?? "authorization", scheme: provider.auth.scheme === "raw" ? "raw" : "bearer" };
+    : { kind: "api-key", header: provider.auth.header ?? "authorization", scheme: provider.auth.scheme === "raw" ? "raw" : "bearer", ...(provider.id === "ollama-local" ? { optional: true } : {}) };
   return {
     id: provider.id,
     name: provider.name,
@@ -70,6 +76,7 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
       maxOutputTokens: m.contextWindow !== null && m.maxOutputTokens !== null && m.maxOutputTokens > m.contextWindow ? null : m.maxOutputTokens,
     })),
     quirks: [...provider.quirks, ...(EXECUTOR_QUIRKS[provider.id] ?? [])],
+    ...(provider.id === "ollama-local" ? OLLAMA_LOCAL : {}),
     ...(provider.forceStream && !STREAM_OPTIONAL.has(provider.id) ? { streamOnly: true } : {}),
   };
 }

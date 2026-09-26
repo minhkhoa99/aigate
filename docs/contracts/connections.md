@@ -48,18 +48,19 @@ Scope, per spec §9: the `connections` context with **one API-key account per pr
 
 ## API (dashboard session required)
 
-Every response is `Cache-Control: no-store`. The view is `{ id, provider, providerName, name, keyHint, isActive, testStatus, lastError, lastErrorCode, lastTestedAt, createdAt, updatedAt }`, where `keyHint` looks like `••••abcd`. It never contains the key.
+Every response is `Cache-Control: no-store`. The view is `{ id, provider, providerName, name, keyHint, baseUrl, isActive, testStatus, lastError, lastErrorCode, lastTestedAt, createdAt, updatedAt }`, where `keyHint` looks like `••••abcd` (`no key` for a keyless ollama-local connection) and `baseUrl` is the connection's own host or `null` (SP14d, `provider-ollama.md`). It never contains the key.
 
 | Method and path | Body | Success | Errors |
 |---|---|---|---|
 | `GET /api/connections` | — | 200 `View[]` | — |
-| `POST /api/connections` | `{ provider, apiKey, name? }` | 201 `View` | 400 `INVALID_REQUEST` (names the field); 400 `PROVIDER_NOT_SUPPORTED` (the catalog reason, or "is not in the catalog"); 409 `ALREADY_CONNECTED` |
-| `PATCH /api/connections/:id` | any of `{ name, apiKey, isActive }` | 200 `View` | 400 `INVALID_REQUEST`; 404 `NOT_FOUND` |
+| `POST /api/connections` | `{ provider, apiKey, name?, baseUrl? }` (`apiKey` optional for ollama-local) | 201 `View` | 400 `INVALID_REQUEST` (names the field); 400 `PROVIDER_NOT_SUPPORTED` (the catalog reason, or "is not in the catalog"); 409 `ALREADY_CONNECTED` |
+| `PATCH /api/connections/:id` | any of `{ name, apiKey, isActive, baseUrl }` (`baseUrl: ""` clears it) | 200 `View` | 400 `INVALID_REQUEST`; 404 `NOT_FOUND` |
 | `DELETE /api/connections/:id` | — | 204 | 404 `NOT_FOUND` |
 | `POST /api/connections/:id/test` | — | 200 `View`, with the new `testStatus` | 404 `NOT_FOUND`; 409 `CREDENTIAL_UNREADABLE` |
 
 Validation:
-- `apiKey` is trimmed, then must be 8–4096 printable ASCII characters with no spaces.
+- `apiKey` is trimmed, then must be 8–4096 printable ASCII characters with no spaces. It may be left out (or `""`) only for a provider whose auth is optional (ollama-local, SP14d); elsewhere that is 400 naming `apiKey`.
+- `baseUrl` (SP14d): only for a provider that declares a connection host (ollama-local); elsewhere 400 "baseUrl cannot be set on a <provider> connection". It must be https, or http to this machine, without credentials, query, or fragment (the custom-provider rule).
 - `name` is trimmed to 1–64 characters, and defaults to the provider's name.
 - Unknown body keys are 400.
 
@@ -71,7 +72,7 @@ The test:
 
 | Screen | What is wired |
 |---|---|
-| `/providers/connections` → `Connections` | Table of real connections: provider, name, key hint, status, last tested, and actions (Test, Replace key, Disable/Enable, Delete). "Needs attention" filters to `invalid`, `no_quota`, `unreachable`, `untested`, and disabled rows. Add connection: provider select (the connectable providers from `GET /api/providers`, SP13), name, API key. Save, then test automatically. |
+| `/providers/connections` → `Connections` | Table of real connections: provider, name, key hint, status, last tested, and actions (Test, Replace key, Disable/Enable, Delete). "Needs attention" filters to `invalid`, `no_quota`, `unreachable`, `untested`, and disabled rows. Add connection: provider select (the connectable providers from `GET /api/providers`, SP13), name, API key; for Ollama Local a Host field and an optional key (SP14d). Save, then test automatically. An Ollama Local row shows its host, and its Replace key button is Edit (host and an optional new key). |
 | `/providers/detail?provider=…` → `ProviderDetail` | Connection status for the provider, with Add or Manage. Providers that are not supported show "Not supported yet; the full catalog comes with SP13". |
 | `/providers` → `LlmProviders` | A "Connected" pill on connected cards. |
 | Removed, because nothing backs them | Sample account rows, the "Strategies" tab, and the Quota column. Strategies return with SP17 and quota with SP24. |

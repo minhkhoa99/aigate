@@ -14,6 +14,8 @@ export interface ConnectionView {
   provider: string;
   name: string;
   keyHint: string;
+  // The connection's own host (ollama-local), or null for the catalog URL.
+  baseUrl: string | null;
   isActive: boolean;
   testStatus: TestStatus;
   lastError: string | null;
@@ -32,7 +34,7 @@ export interface TestOutcome {
 // A positive allowlist: the sealed key is not in it, so no read can return it (catalog.connection-listing).
 const t = providerConnections;
 const columns = {
-  id: t.id, provider: t.provider, name: t.name, keyHint: t.keyHint, isActive: t.isActive, testStatus: t.testStatus,
+  id: t.id, provider: t.provider, name: t.name, keyHint: t.keyHint, baseUrl: t.baseUrl, isActive: t.isActive, testStatus: t.testStatus,
   lastError: t.lastError, lastErrorCode: t.lastErrorCode, lastTestedAt: t.lastTestedAt, createdAt: t.createdAt, updatedAt: t.updatedAt,
 };
 type Row = Omit<ConnectionView, "lastTestedAt" | "createdAt" | "updatedAt"> & { lastTestedAt: Date | null; createdAt: Date; updatedAt: Date };
@@ -63,12 +65,12 @@ export class ConnectionsRepository {
   }
 
   // Undefined when the provider already has a connection: the unique index decides, never a prior SELECT.
-  async create(input: { provider: string; name: string; apiKey: string }): Promise<ConnectionView | undefined> {
+  async create(input: { provider: string; name: string; apiKey: string; baseUrl?: string }): Promise<ConnectionView | undefined> {
     const id = randomUUID();
     const now = new Date();
     const [row] = await this.database.db.insert(t).values({
       id, provider: input.provider, name: input.name, apiKeySealed: this.cipher.seal(input.apiKey, sealContext(id)),
-      keyHint: keyHint(input.apiKey), createdAt: now, updatedAt: now,
+      keyHint: keyHint(input.apiKey), baseUrl: input.baseUrl ?? null, createdAt: now, updatedAt: now,
     }).onConflictDoNothing({ target: t.provider }).returning(columns);
     return row ? toView(row) : undefined;
   }
@@ -90,17 +92,17 @@ export class ConnectionsRepository {
   }
 
   // Throws SecretUnreadableError when the secret key changed since the key was saved.
-  async readKey(id: string): Promise<{ provider: string; apiKey: string; sealed: string } | undefined> {
-    const row = await this.database.db.select({ provider: t.provider, sealed: t.apiKeySealed }).from(t).where(eq(t.id, id)).get();
+  async readKey(id: string): Promise<{ provider: string; apiKey: string; sealed: string; baseUrl: string | null } | undefined> {
+    const row = await this.database.db.select({ provider: t.provider, sealed: t.apiKeySealed, baseUrl: t.baseUrl }).from(t).where(eq(t.id, id)).get();
     return row ? { ...row, apiKey: this.cipher.open(row.sealed, sealContext(id)) } : undefined;
   }
 
-  // The key routing uses (SP12): only an active connection counts; its test status does not.
+  // The key (and host) routing uses (SP12): only an active connection counts; its test status does not.
   // Throws SecretUnreadableError when the secret key changed since the key was saved.
-  async activeKey(provider: string): Promise<string | undefined> {
-    const row = await this.database.db.select({ id: t.id, sealed: t.apiKeySealed }).from(t)
+  async activeCredential(provider: string): Promise<{ apiKey: string; baseUrl: string | null } | undefined> {
+    const row = await this.database.db.select({ id: t.id, sealed: t.apiKeySealed, baseUrl: t.baseUrl }).from(t)
       .where(and(eq(t.provider, provider), eq(t.isActive, true))).get();
-    return row ? this.cipher.open(row.sealed, sealContext(row.id)) : undefined;
+    return row ? { apiKey: this.cipher.open(row.sealed, sealContext(row.id)), baseUrl: row.baseUrl } : undefined;
   }
 
   async activeProviders(): Promise<Set<string>> {

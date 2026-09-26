@@ -1699,3 +1699,43 @@
   newModule: connections
   parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
+
+# 2026-09-26 SP14d: ollama-local connections (host per connection, key optional).
+- id: connection.ollama-local-host
+  group: Providers
+  feature: Provider connections
+  subFeature: "ollama-local: an optional API key, a host per connection, and its connection test"
+  trigger: "POST /api/providers for ollama-local; a /v1 request to ollama-local; a connection test"
+  input: "{ provider: ollama-local, apiKey?, baseUrl? (ollamaHostUrl in the form) }"
+  output: "A connection whose providerSpecificData.baseUrl holds the host"
+  businessRules:
+    - "ollama-local is the only provider whose connection may be saved without an API key"
+    - "The host comes from providerSpecificData.baseUrl (also accepted as baseURL or ollamaHostUrl), trimmed; empty means http://localhost:11434; one trailing / is removed"
+    - "Chat requests go to <host>/api/chat; the Authorization Bearer header is sent only when a key is set"
+    - "The connection test is GET <host>/api/tags without credentials; any 2xx is valid, anything else is Ollama not reachable at <host>"
+    - "The model list is GET <host>/api/tags"
+  state:
+    reads: ["providerConnections (providerSpecificData.baseUrl)"]
+    writes: ["providerConnections"]
+    runtimeOnly: []
+  dependencies: ["translator.openai-to-ollama-request"]
+  providerInteraction: "POST <host>/api/chat; GET <host>/api/tags"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "the host does not answer /api/tags with 2xx", partial: false }
+  sideEffects: []
+  persistence: ["providerSpecificData.baseUrl on the connection"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The host may be any URL, including http to another machine"
+  evidence:
+    - { file: src/app/api/providers/route.js, line: 119, note: "API key required except for ollama-local" }
+    - { file: src/lib/providerNormalization.js, line: 32, note: "host from baseUrl / baseURL / ollamaHostUrl" }
+    - { file: open-sse/config/providers.js, line: 7, note: "resolveOllamaLocalHost: default http://localhost:11434, trailing / removed" }
+    - { file: open-sse/executors/ollama-local.js, line: 9, note: "<host>/api/chat" }
+    - { file: open-sse/executors/default.js, line: 34, note: "auth header only when a key is set" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 703, note: "test: GET <host>/api/tags without credentials" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]

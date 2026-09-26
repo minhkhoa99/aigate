@@ -14,6 +14,8 @@ export const providerConnections = sqliteTable(
     // SecretCipherPort output (v1.<base64url>); the plaintext key is never stored.
     apiKeySealed: text("api_key_sealed").notNull(),
     keyHint: text("key_hint").notNull(),
+    // SP14d: the connection's own host for providers that take one (ollama-local); null means the catalog URL.
+    baseUrl: text("base_url"),
     isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
     testStatus: text("test_status", { enum: TEST_STATUSES }).notNull().default("untested"),
     lastError: text("last_error"),

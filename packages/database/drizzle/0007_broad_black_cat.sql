@@ -1,0 +1,1 @@
+ALTER TABLE `provider_connections` ADD `base_url` text;

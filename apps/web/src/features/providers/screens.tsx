@@ -99,12 +99,25 @@ export function ProviderDetail({ isNew = false, providerId }: { isNew?: boolean;
   return <CatalogProvider providerId={providerId} />;
 }
 
+// connection.ollama-local-host: providers whose connection takes its own host and may have no key.
+// ponytail: one provider today; expose the descriptor flags in GET /api/providers when a second one arrives.
+const HOSTED = new Set(["ollama-local"]);
+
+function HostAndKey({ hosted, host, keyLabel = "API key" }: { hosted: boolean; host?: string | null; keyLabel?: string }) {
+  if (!hosted) return <Field label={keyLabel}><Input name="apiKey" type="password" required minLength={8} maxLength={4096} autoComplete="off" placeholder="sk-…" /></Field>;
+  return <>
+    <Field label="Host" hint="Empty means http://localhost:11434. https, or http to this machine only."><Input name="baseUrl" maxLength={2048} defaultValue={host ?? ""} placeholder="http://localhost:11434" /></Field>
+    <Field label={keyLabel} hint="Optional: a local Ollama needs no key."><Input name="apiKey" type="password" minLength={8} maxLength={4096} autoComplete="off" /></Field>
+  </>;
+}
+
 function AddConnection({ requested, connected, onClose, onCreated }: {
   requested: string | null; connected: ReadonlySet<string>; onClose: () => void; onCreated: (connection: Connection) => void;
 }) {
   const catalog = useProviders();
   const nodes = useProviderNodes();
   const create = useCreateConnection();
+  const [chosen, setChosen] = useState("");
   const showToast = useToast();
   if (catalog.isPending || nodes.isPending) return <Modal title="Add connection" onClose={onClose}><StateBlock state="loading" /></Modal>;
   if (catalog.isError || nodes.isError) {
@@ -118,18 +131,21 @@ function AddConnection({ requested, connected, onClose, onCreated }: {
   const blocked = !requested || custom ? null : !asked ? `${requested} is not in the provider catalog or a custom provider.` : asked.connectable ? null : `${asked.name} cannot be connected yet: ${asked.reason}.`;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const name = formText(event.currentTarget, "name");
-    const body = { provider: formText(event.currentTarget, "provider"), apiKey: formText(event.currentTarget, "apiKey"), ...(name ? { name } : {}) };
+    const form = event.currentTarget;
+    const [name, apiKey, baseUrl] = [formText(form, "name"), formText(form, "apiKey"), formText(form, "baseUrl")];
+    const body = { provider: formText(form, "provider"), ...(apiKey ? { apiKey } : {}), ...(name ? { name } : {}), ...(baseUrl ? { baseUrl } : {}) };
     create.mutate(body, { onSuccess: onCreated, onError: (error) => showToast({ tone: "error", ...toProblem(error) }) });
   };
+  const provider = available.some((p) => p.id === chosen) ? chosen : available.some((p) => p.id === requested) ? requested ?? "" : available[0]?.id ?? "";
   return <Modal title="Add connection" onClose={onClose}>
     {blocked && <Warning>{blocked}</Warning>}
     {available.length === 0 ? <><p>Every connectable provider is already connected. Use Replace key on its row to change a key.</p><div className="modal-actions"><Button onClick={onClose}>Close</Button></div></>
       : <form onSubmit={submit}><p>The key is encrypted before it is saved and is never shown again. AIGate tests it right after saving.</p>
         <div className="stack">
-          <Field label="Provider" hint={`${available.length} providers can be connected with an API key.`}><select className="input" name="provider" defaultValue={available.some((p) => p.id === requested) ? requested ?? undefined : available[0].id}>{available.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+          <Field label="Provider" hint={`${available.length} providers can be connected with an API key.`}><select className="input" name="provider" value={provider} onChange={(event) => setChosen(event.target.value)}>{available.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
           <Field label="Name" hint="Optional. Defaults to the provider name."><Input name="name" maxLength={64} placeholder="e.g. Work account" /></Field>
-          <Field label="API key"><Input name="apiKey" type="password" required minLength={8} maxLength={4096} autoComplete="off" placeholder="sk-…" /></Field>
+          <HostAndKey hosted={HOSTED.has(provider)} />
+
         </div>
         <div className="modal-actions"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" disabled={create.isPending}>{create.isPending ? "Saving…" : "Save and test"}</Button></div></form>}
   </Modal>;
@@ -138,13 +154,17 @@ function AddConnection({ requested, connected, onClose, onCreated }: {
 function ReplaceKey({ connection, onClose, onSaved }: { connection: Connection; onClose: () => void; onSaved: (connection: Connection) => void }) {
   const update = useUpdateConnection();
   const showToast = useToast();
+  const hosted = HOSTED.has(connection.provider);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    update.mutate({ id: connection.id, apiKey: formText(event.currentTarget, "apiKey") }, { onSuccess: onSaved, onError: (error) => showToast({ tone: "error", ...toProblem(error) }) });
+    const apiKey = formText(event.currentTarget, "apiKey");
+    // A hosted connection sends its host (empty clears it) and keeps its key unless a new one is typed.
+    const changes = hosted ? { baseUrl: formText(event.currentTarget, "baseUrl"), ...(apiKey ? { apiKey } : {}) } : { apiKey };
+    update.mutate({ id: connection.id, ...changes }, { onSuccess: onSaved, onError: (error) => showToast({ tone: "error", ...toProblem(error) }) });
   };
-  return <Modal title={`Replace key · ${connection.name}`} onClose={onClose}><form onSubmit={submit}>
-    <p>The current key ends in <code>{connection.keyHint}</code>. The new key replaces it and is tested right away.</p>
-    <Field label="New API key"><Input name="apiKey" type="password" required minLength={8} maxLength={4096} autoComplete="off" placeholder="sk-…" /></Field>
+  return <Modal title={`${hosted ? "Edit connection" : "Replace key"} · ${connection.name}`} onClose={onClose}><form onSubmit={submit}>
+    <p>The current key is <code>{connection.keyHint}</code>. The change is saved and tested right away.</p>
+    <HostAndKey hosted={hosted} host={connection.baseUrl} keyLabel="New API key" />
     <div className="modal-actions"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" disabled={update.isPending}>{update.isPending ? "Saving…" : "Save and test"}</Button></div>
   </form></Modal>;
 }
@@ -175,12 +195,12 @@ export function Connections() {
           columns={["Account", "Key", "Status", "Last tested", "Actions"]} rows={rows.map((c) => {
             const pill = statusPill(c);
             return [
-              <div><strong>{c.name}</strong>{c.name !== c.providerName && <small className="muted"> · {c.providerName}</small>}</div>,
+              <div><strong>{c.name}</strong>{c.name !== c.providerName && <small className="muted"> · {c.providerName}</small>}{c.baseUrl && <small className="muted"> · {c.baseUrl}</small>}</div>,
               <code>{c.keyHint}</code>,
               <div><Pill tone={pill.tone}>{pill.label}</Pill>{c.isActive && c.testStatus !== "active" && c.lastError && <small className="muted"> {c.lastError}</small>}</div>,
               c.lastTestedAt ? new Date(c.lastTestedAt).toLocaleString() : "Never",
               <><Button variant="ghost" disabled={testConnection.isPending} onClick={() => runTest(c.id)}>{testing(c.id) ? "Testing…" : "Test"}</Button>
-                <Button variant="ghost" onClick={() => setReplacing(c)}>Replace key</Button>
+                <Button variant="ghost" onClick={() => setReplacing(c)}>{HOSTED.has(c.provider) ? "Edit" : "Replace key"}</Button>
                 <Button variant="ghost" disabled={update.isPending} onClick={() => update.mutate({ id: c.id, isActive: !c.isActive }, { onError: fail })}>{c.isActive ? "Disable" : "Enable"}</Button>
                 <Button variant="ghost" onClick={() => setRemoving(c)}>Delete</Button></>,
             ];

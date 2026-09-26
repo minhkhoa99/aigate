@@ -977,3 +977,92 @@
     expected: "An upstream error is an error, a cut-off stream is a failure (fallback.partial-stream-failure), an incomplete answer ends with length, and a refusal is reported"
     actual: "Errors become assistant text with finish stop, a cut-off stream looks complete, incomplete answers end with stop, and refusals vanish"
     impact: "Clients take failures and truncated answers for finished ones"
+
+# 2026-09-26 SP14d: the ollama provider family (ollama cloud, ollama-local).
+- id: translator.openai-to-ollama-request
+  group: Translation
+  feature: Request translation
+  subFeature: "OpenAI chat completions request to an Ollama /api/chat request (openaiToOllamaRequest)"
+  trigger: "A chat request routed to a provider whose format is ollama"
+  input: "An OpenAI chat completions body"
+  output: "An Ollama body: model, messages, stream, options, tools, tool_choice"
+  businessRules:
+    - "stream is the upstream stream flag, always sent as a boolean"
+    - "options.temperature, options.top_p, and options.num_predict (from max_tokens only) are set when present"
+    - "tools are passed in the OpenAI shape; tool_choice is passed through"
+    - "Content is flattened to a string: text parts joined with newlines; data-URI images go to message.images as raw base64"
+    - "A tool message becomes { role: tool, tool_name, content }, tool_name found from the assistant tool_calls by id, else msg.name, else unknown_tool"
+    - "An assistant message with tool_calls keeps its text and sends tool_calls as { type: function, function: { index, name, arguments (object; unparsable JSON becomes {}) } }"
+    - "stop, seed, response_format, reasoning_effort, presence_penalty, frequency_penalty and any other field are dropped silently"
+    - "An image given by an http(s) URL is dropped; a non-assistant message without text is dropped with its images; a tool message with empty content is dropped"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.request-translation"]
+  providerInteraction: "POST <host>/api/chat"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "max_completion_tokens is ignored, so a client using it gets no output limit"
+    - "A user turn that only attaches a screenshot never reaches the model"
+  evidence:
+    - { file: open-sse/translator/request/openai-to-ollama.js, line: 21, note: "openaiToOllamaRequest" }
+    - { file: open-sse/translator/request/openai-to-ollama.js, line: 35, note: "num_predict from max_tokens only" }
+    - { file: open-sse/translator/request/openai-to-ollama.js, line: 47, note: "tools and tool_choice passed through (52)" }
+    - { file: open-sse/translator/request/openai-to-ollama.js, line: 73, note: "tool_call_id → tool_name map" }
+    - { file: open-sse/translator/request/openai-to-ollama.js, line: 87, note: "empty tool result dropped" }
+    - { file: open-sse/translator/request/openai-to-ollama.js, line: 111, note: "arguments parsed, unparsable → {}" }
+    - { file: open-sse/translator/request/openai-to-ollama.js, line: 130, note: "non-assistant message without text dropped" }
+    - { file: open-sse/translator/request/openai-to-ollama.js, line: 185, note: "only data-URI images kept" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "stop, seed, JSON mode (format), and reasoning (think) reach Ollama, max_completion_tokens limits output, and an image-only turn or empty tool result is kept; an image Ollama cannot take is refused"
+    actual: "Those fields are dropped, max_completion_tokens is ignored, URL images vanish, and image-only turns and empty tool results are removed"
+    impact: "Clients silently lose stop sequences, JSON mode, reasoning control, output limits, and attachments"
+
+- id: translator.ollama-to-openai-response
+  group: Translation
+  feature: Response translation
+  subFeature: "Ollama NDJSON stream and JSON body to OpenAI chat completion chunks and body"
+  trigger: "An answer from an ollama-format provider"
+  input: "NDJSON lines ({ message, done, done_reason, prompt_eval_count, eval_count }) or one JSON body"
+  output: "chat.completion.chunk events, or a chat.completion body"
+  businessRules:
+    - "The stream is NDJSON: each line that starts with { is parsed; others are skipped"
+    - "message.content becomes a content delta, message.thinking a reasoning_content delta; empty chunks are skipped"
+    - "message.tool_calls arrive whole: each becomes an OpenAI tool call with index function.index or its position, id tc.id or call_<i>_<ms>, and arguments stringified"
+    - "The line with done true ends the answer: finish_reason from done_reason (length or max_tokens → length, tool_calls → tool_calls, else stop), tool_calls when any tool call came; usage prompt_tokens = prompt_eval_count, completion_tokens = eval_count"
+    - "A non-streaming body maps the same way into one chat.completion with a new chatcmpl id"
+    - "A line without message and without done (such as { error }) yields nothing"
+    - "A stream that ends without a done line gets no finish chunk and no error"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["translator.openai-to-ollama-request"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A model that fails mid-answer (out of memory, unloaded) looks like a short, finished answer"
+  evidence:
+    - { file: open-sse/translator/response/ollama-to-openai.js, line: 35, note: "done line: finish_reason and usage" }
+    - { file: open-sse/translator/response/ollama-to-openai.js, line: 51, note: "a line without message yields nothing (error lines)" }
+    - { file: open-sse/translator/response/ollama-to-openai.js, line: 91, note: "tool calls converted whole" }
+    - { file: open-sse/translator/response/ollama-to-openai.js, line: 108, note: "non-streaming body" }
+    - { file: open-sse/translator/concerns/finishReason.js, line: 41, note: "ollama done_reason mapping" }
+    - { file: open-sse/translator/concerns/usage.js, line: 53, note: "prompt_eval_count / eval_count" }
+    - { file: open-sse/utils/streamHelpers.js, line: 12, note: "NDJSON lines parsed for ollama" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 276, note: "non-streaming ollama body translated" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "An error line fails the answer, and a stream without its done line is a failure (fallback.partial-stream-failure)"
+    actual: "Error lines are dropped and a cut-off stream ends as if complete"
+    impact: "Clients take a failed or truncated answer for a finished one"

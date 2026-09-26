@@ -8,6 +8,31 @@ function tooLarge(maxChars: number): EngineError {
   return new EngineError("PROVIDER_UNAVAILABLE", `Upstream stream event exceeded ${maxChars} characters`, { maxChars });
 }
 
+// Yields each non-blank line of a newline-delimited JSON stream (Ollama), with the same bound per line.
+// Stopping the iteration early, or any failure, cancels the body.
+export async function* readJsonLines(body: ReadableStream<Uint8Array>, maxChars = MAX_SSE_EVENT_CHARS): AsyncGenerator<string> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      const lines = (done ? decoder.decode() : decoder.decode(value, { stream: true })).split("\n");
+      lines[0] = buffer + lines[0];
+      buffer = done ? "" : (lines.pop() ?? "");
+      if (buffer.length > maxChars) throw tooLarge(maxChars);
+      for (const line of lines) {
+        if (line.length > maxChars) throw tooLarge(maxChars);
+        const trimmed = line.trim();
+        if (trimmed !== "") yield trimmed;
+      }
+      if (done) return;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+}
+
 // Yields the data of each server-sent event. Comments and fields other than `data` are ignored.
 // Stopping the iteration early, or any failure, cancels the body.
 // ponytail: lines split on "\n" only (a trailing "\r" is dropped); bare-"\r" endings are not seen in provider APIs.
