@@ -12,3 +12,21 @@ caught   api version default
 caught   azure 404 invalid
 caught   cloudflare 404 valid
 caught   azure probe model
+caught   azure probe body
+caught   cloudflare probe without model
+caught   account id optional
+caught   per-connection providers blocked
+caught   image dropped
+caught   flatten separator
+caught   envelope kept
+SURVIVED failure envelope unwrapped
+SURVIVED every provider unwraps
+caught   no chat probe
+caught   probe status rule
+caught   probe detail not redacted
+caught   missing token sent
+caught   model not encoded
+caught   probe model ignored
+caught   deployment unchecked
+caught   account id unchecked
+caught   not trimmed

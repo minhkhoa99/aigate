@@ -62,7 +62,7 @@ function parseApiKey(value: unknown): Parsed<string> {
 // "" or absent is no value; anything else must follow the field's rule.
 function parseField(field: DataField, value: unknown): Parsed<string | undefined> {
   if (value === undefined || value === null || value === "") return { ok: true, value: undefined };
-  const trimmed = typeof value === "string" ? value : "";
+  const trimmed = typeof value === "string" ? value.trim() : "";
   return DATA_FIELDS[field].pattern.test(trimmed) ? { ok: true, value: trimmed } : fail(`${field} must be ${DATA_FIELDS[field].rule}`);
 }
 
@@ -126,7 +126,7 @@ export function parseChanges(input: unknown): Parsed<ConnectionChanges> {
     if (body.value[field] === undefined) continue;
     const parsed = parseField(field, body.value[field]);
     if (!parsed.ok) return parsed;
-    changes[field] = parsed.value ?? null;
+    changes[field] = parsed.value;
   }
   return Object.keys(changes).length > 0 ? { ok: true, value: changes } : fail(`Send at least one of name, apiKey, isActive, baseUrl, ${DATA_FIELD_NAMES.join(", ")}`);
 }
