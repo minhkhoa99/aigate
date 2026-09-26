@@ -16,7 +16,7 @@ test("the provider catalog lists every provider with its connectable status, beh
     assert.equal(list.length, CATALOG.length);
     const openai = list.find((p) => p.id === "openai");
     assert.deepEqual({ ...openai, modelCount: openai.modelCount > 0 }, {
-      id: "openai", name: "OpenAI", category: openai.category, protocol: "openai-compatible", authKinds: openai.authKinds, hidden: false,
+      id: "openai", name: "OpenAI", aliases: openai.aliases, category: openai.category, protocol: "openai-compatible", authKinds: openai.authKinds, hidden: false,
       connectable: true, reason: null, modelCount: true,
     });
     const claude = list.find((p) => p.id === "claude");

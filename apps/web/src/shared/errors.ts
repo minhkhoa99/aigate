@@ -24,9 +24,7 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   PROVIDER_NOT_SUPPORTED: (body) => typeof body.message === "string" ? body.message : "This provider cannot be connected yet.",
   ALREADY_CONNECTED: "This provider is already connected. Use Replace key on its row instead.",
   CREDENTIAL_UNREADABLE: "The saved key can no longer be decrypted, because the secret key file changed. Use Replace key to enter it again.",
-  // docs/contracts/custom-providers.md. The server message names the prefix.
-  PREFIX_RESERVED: (body) => typeof body.message === "string" ? body.message : "That prefix belongs to a built-in provider. Choose another prefix.",
-  PREFIX_TAKEN: (body) => typeof body.message === "string" ? body.message : "Another custom provider already uses that prefix.",
+  // docs/contracts/custom-providers.md.
   NODE_LIMIT: "You have reached the maximum of 100 custom providers. Delete one you no longer use.",
 };
 

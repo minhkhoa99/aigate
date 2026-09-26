@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const TEST_STATUSES = ["untested", "active", "invalid", "no_quota", "unreachable"] as const;
 export type TestStatus = (typeof TEST_STATUSES)[number];
@@ -26,12 +26,13 @@ export const providerConnections = sqliteTable(
 );
 
 // docs/contracts/custom-providers.md (SP13b). OpenAI-compatible endpoints the user defines; a connection
-// under one stores this id as its provider. The prefix is how /v1 names it, so it is unique.
+// under one stores this id as its provider. The prefix is how /v1 names it. Like 9router it may repeat
+// (the oldest node wins), so it is indexed for the lookup but not unique.
 export const providerNodes = sqliteTable("provider_nodes", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  prefix: text("prefix").notNull().unique(),
+  prefix: text("prefix").notNull(),
   baseUrl: text("base_url").notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
-});
+}, (t) => [index("provider_nodes_prefix_idx").on(t.prefix, t.createdAt)]);

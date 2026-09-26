@@ -4,10 +4,10 @@ import type { Parsed } from "./connection.js";
 export const MAX_NODES = 100;
 const MAX_NAME = 64;
 const MAX_URL = 2048;
-// A provider token: /v1 splits "<prefix>/<model>" on the first "/", so a prefix can never hold one.
-const PREFIX = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const MAX_PREFIX = 200;
+// The 9router default when a custom provider names no base URL (user decision 2026-09-26: keep 9router behavior).
+export const DEFAULT_BASE_URL = "https://api.openai.com/v1";
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
-const CHAT_SUFFIX = /\/chat\/completions$/i;
 
 export interface NodeFields {
   name: string;
@@ -22,16 +22,17 @@ function parseName(value: unknown): Parsed<string> {
   return name.length > 0 && name.length <= MAX_NAME ? { ok: true, value: name } : fail(`name must be 1-${MAX_NAME} characters`);
 }
 
+// 9router only trims the prefix (connection.provider-node-create-list). A reserved, duplicate, or "/"-containing
+// prefix is stored as given; /v1 then never reaches it, and the dashboard marks the card Unreachable.
 function parsePrefix(value: unknown): Parsed<string> {
   const prefix = typeof value === "string" ? value.trim() : "";
-  return PREFIX.test(prefix) ? { ok: true, value: prefix } : fail("prefix must be 1-32 lowercase letters, digits, or dashes, starting with a letter or digit");
+  return prefix.length > 0 && prefix.length <= MAX_PREFIX ? { ok: true, value: prefix } : fail(`prefix must be 1-${MAX_PREFIX} characters`);
 }
 
-// Trailing "/" and a pasted "/chat/completions" go, so the request path never doubles (connection.provider-node-create-list).
+// Stored trimmed, as 9router does: a pasted "/chat/completions" is kept, and one trailing "/" is dropped when the URL is built.
 export function parseBaseUrl(value: unknown): Parsed<string> {
-  const raw = typeof value === "string" ? value.trim() : "";
-  if (raw === "" || raw.length > MAX_URL || /\s/.test(raw)) return fail(`baseUrl must be a URL of at most ${MAX_URL} characters, without spaces`);
-  const base = raw.replace(/\/+$/, "").replace(CHAT_SUFFIX, "").replace(/\/+$/, "");
+  const base = typeof value === "string" ? value.trim() : "";
+  if (base === "" || base.length > MAX_URL || /\s/.test(base)) return fail(`baseUrl must be a URL of at most ${MAX_URL} characters, without spaces`);
   let url: URL;
   try {
     url = new URL(base);
@@ -74,6 +75,5 @@ export function parseNewNode(input: unknown): Parsed<NodeFields> {
   const { name, prefix, baseUrl } = parsed.value;
   if (name === undefined) return fail("name must be 1-64 characters");
   if (prefix === undefined) return fail("prefix is required");
-  if (baseUrl === undefined) return fail("baseUrl is required, e.g. https://api.example.com/v1");
-  return { ok: true, value: { name, prefix, baseUrl } };
+  return { ok: true, value: { name, prefix, baseUrl: baseUrl ?? DEFAULT_BASE_URL } };
 }

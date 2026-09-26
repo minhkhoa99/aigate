@@ -36,7 +36,7 @@ If an SP adds no HTTP API (for example `packages/engine`), write "no UI" in its 
 | `DELETE /api/connections/:id` | same | `Connections` → Delete (type-to-confirm) | `useDeleteConnection` | Wired |
 | `POST /api/connections/:id/test` | same | `Connections` → Test; runs after every save | `useTestConnection` (25 s client timeout) | Wired: one toast per result (`features/providers/test-result.ts`) |
 | `POST /v1/chat/completions`, `GET /v1/models` | `contracts/chat-lane.md` | API clients (SDKs, IDEs), not the dashboard. `/gateway/endpoint` → `EndpointKeys` shows readiness: "Ready", "Connect a provider", or "Check connection" | `features/gateway/api.ts` `useChatReadiness` (the `["connections"]` query) | Wired: readiness pill, a curl test request, and a note that keyless mode is local-only |
-| `GET /api/provider-nodes` | `contracts/custom-providers.md` | `/providers` → `LlmProviders`, Custom providers section (cards with Connect, Edit, Delete); `/providers/new?id=` edit form; `Connections` → Add connection modal (custom providers listed after the built-in ones) | `features/providers/api.ts` `useProviderNodes` | Wired: loading, error with Retry, empty state |
+| `GET /api/provider-nodes` | `contracts/custom-providers.md` | `/providers` → `LlmProviders`, Custom providers section (cards with Connect, Edit, Delete); `/providers/new?id=` edit form; `Connections` → Add connection modal (custom providers listed after the built-in ones) | `features/providers/api.ts` `useProviderNodes` | Wired: loading, error with Retry, empty state; an Unreachable pill names why `/v1` cannot reach a card (reserved, duplicate, or `/` prefix, kept as in 9router) |
 | `POST /api/provider-nodes` | same | `/providers/new` → `ProviderDetail isNew` (`features/providers/custom.tsx` `CustomProviderForm`) | `useCreateNode` | Wired: save, then go to `/providers/connections?provider=<id>` to add the key |
 | `PATCH /api/provider-nodes/:id` | same | `/providers/new?id=<id>` edit form | `useUpdateNode` | Wired |
 | `DELETE /api/provider-nodes/:id` | same | Custom provider card → Delete (type-to-confirm; says the connection and key go too) | `useDeleteNode` | Wired: refreshes custom providers and connections |
@@ -96,8 +96,6 @@ When you add a server code, add its row here and in `errors.ts`.
 | `PROVIDER_NOT_SUPPORTED` (400) | connecting a catalog provider that is not connectable yet, or an id not in the catalog | Toast with the server message, which gives the catalog reason (for example "Needs OAuth sign-in (SP16)") |
 | `ALREADY_CONNECTED` (409) | a second connection for the same provider | Toast: use Replace key on its row |
 | `CREDENTIAL_UNREADABLE` (409) | a test after `secret.key` or `AIGATE_SECRET_KEY` changed | Toast: enter the key again with Replace key |
-| `PREFIX_RESERVED` (409) | a custom provider prefix that is a catalog id or alias | Toast with the server message, which names the prefix |
-| `PREFIX_TAKEN` (409) | a prefix another custom provider uses | Toast with the server message, which names the prefix |
 | `NODE_LIMIT` (409) | a 101st custom provider | Toast: delete one you no longer use |
 | Test result `invalid` / `no_quota` / `unreachable` (200, not an error) | `POST /api/connections/:id/test` | Status pill plus a toast: "rejected the key", "no quota or credit", or "could not check the key … not judged" with the provider's message and `lastErrorCode` |
 | `INVALID_REQUEST` (400) | a validation failure | The server message is shown as it is, because it names the field |

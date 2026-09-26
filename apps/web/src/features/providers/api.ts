@@ -23,6 +23,7 @@ export interface Connection {
 export interface ProviderSummary {
   id: string;
   name: string;
+  aliases: string[];
   category: string;
   protocol: string;
   authKinds: string[];
@@ -97,7 +98,7 @@ function useNodeMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
   });
 }
 
-type NodeFields = { name: string; prefix: string; baseUrl: string };
+type NodeFields = { name: string; prefix: string; baseUrl?: string };
 export const useCreateNode = () => useNodeMutation((body: NodeFields) => api<ProviderNode>("/api/provider-nodes", { method: "POST", body }));
 export const useUpdateNode = () => useNodeMutation(({ id, ...body }: NodeFields & { id: string }) => api<ProviderNode>(nodePath(id), { method: "PATCH", body }));
 export const useDeleteNode = () => useNodeMutation((id: string) => apiVoid(nodePath(id), "DELETE"));

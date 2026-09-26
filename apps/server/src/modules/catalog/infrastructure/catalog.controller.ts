@@ -7,6 +7,7 @@ import { builtinRegistry, CATALOG, type CatalogProvider } from "@aigate/engine";
 interface ProviderSummary {
   id: string;
   name: string;
+  aliases: readonly string[];
   category: string;
   protocol: string;
   authKinds: readonly string[];
@@ -21,6 +22,7 @@ function summary(provider: CatalogProvider): ProviderSummary {
   return {
     id: provider.id,
     name: provider.name,
+    aliases: provider.aliases,
     category: provider.category,
     protocol: provider.protocol,
     authKinds: provider.auth.kinds,
