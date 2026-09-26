@@ -4,7 +4,7 @@ Scope, per spec §9 (SP14): three OpenAI-compatible providers that need more tha
 - **Served:** `azure` (Azure OpenAI), `cloudflare-ai` (Cloudflare Workers AI), `clinepass` (ClinePass, API key). The catalog now has **58** connectable providers. `cline` (OAuth only) still needs SP16.
 - **UI:** the Connections Add modal shows each provider's fields (`CONNECTION_FIELDS` in `features/providers/screens.tsx`); the Edit modal changes them and keeps the key unless a new one is typed; the row shows the endpoint, deployment, or account.
 
-**User decisions (2026-09-26).** Azure: keep 9router (the test passes every status but 401/403; the form requires Organization). Cloudflare: correct (refuse images instead of dropping them). ClinePass: correct (a real connection test; the client headers name AIGate). Security, not a choice: an Azure connection must have an endpoint (9router falls back to api.openai.com), and every field is validated and URL-encoded.
+**User decisions (2026-09-26).** Azure: keep 9router (the test passes every status but 401/403; the form requires Organization). Cloudflare: correct (refuse images instead of dropping them). ClinePass: correct (a real connection test; the client headers name AIGate); a second ask, after the browser check showed `GET /api/v1/models` answering 200 to a fake key, made that test a one-token chat. Security, not a choice: an Azure connection must have an endpoint (9router falls back to api.openai.com), and every field is validated and URL-encoded.
 
 ## Matrix entries
 
@@ -16,7 +16,7 @@ Scope, per spec §9 (SP14): three OpenAI-compatible providers that need more tha
 | `translator.cloudflare-content-flatten` | `REFERENCE_BEHAVIOR` | Text parts joined into one string. |
 | same: images, audio, files silently dropped | `SUSPECTED_BUG`, corrected | `UnsupportedFeatureError` (`unsupported_feature` on `/v1`). |
 | `provider.clinepass-headers-envelope` | `REFERENCE_BEHAVIOR` | See "clinepass". |
-| same: Test "not supported" | `SUSPECTED_BUG`, corrected | `GET /api/v1/models`. |
+| same: Test "not supported"; validate's `GET /models` answers 200 without a key | `SUSPECTED_BUG`, corrected | A one-token chat. |
 | same: the client names itself 9router | `IMPLEMENTATION_ACCIDENT` | It names AIGate. |
 
 ## Connection fields
@@ -51,7 +51,7 @@ Scope, per spec §9 (SP14): three OpenAI-compatible providers that need more tha
 
 - Headers: `HTTP-Referer: https://cline.bot`, `X-Title: Cline`, `User-Agent: AIGate/0.1.0`, `X-PLATFORM: <process.platform>`, `X-PLATFORM-VERSION: <process.version>`, `X-CLIENT-TYPE: aigate`, `X-CLIENT-VERSION` / `X-CORE-VERSION: 0.1.0`, `X-IS-MULTIROOT: false`, `Authorization: Bearer <key>` (9router names itself `9Router/<version>` and `9router`).
 - A non-streaming `{ success: true, data: {...} }` answer is read as `data`; `{ success: false, … }` and streams are read as they are (a failure envelope has no choices → `PROVIDER_UNAVAILABLE`).
-- Connection test (corrected): `GET https://api.cline.bot/api/v1/models`; 401/403 → `invalid`, 2xx → `active`, otherwise `unreachable`.
+- Connection test (corrected): `POST` the chat URL with `{ model: <first catalog model>, messages: [{ role: "user", content: "test" }], max_tokens: 1 }`; 401/403 → `invalid` with Cline's message (`{ error: "Unauthorized: …" }`), anything else `active`. Checked live on 2026-09-26: `GET /api/v1/models` answers 200 with no key (so 9router's validate passes any key), and the chat answers 401 to a fake key.
 
 ## Matrix
 

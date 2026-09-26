@@ -2024,6 +2024,7 @@
   behavior: { streaming: true, cancellation: null, concurrency: null }
   edgeCases:
     - "The client identifies itself as 9router"
+    - "Checked live 2026-09-26: GET /api/v1/models answers 200 without any key, so validate passes a wrong key; a one-token chat answers 401 to a fake key"
   evidence:
     - { file: open-sse/shared/clineAuth.js, line: 25, note: "buildClineHeaders" }
     - { file: open-sse/shared/clineEnvelope.js, line: 14, note: "unwrapClineEnvelope" }
@@ -2034,6 +2035,6 @@
   parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG, IMPLEMENTATION_ACCIDENT]
   suspicion:
-    expected: "The Test button checks the key like validate does"
-    actual: "It always fails with 'Provider test not supported'"
-    impact: "Working ClinePass connections look broken"
+    expected: "The Test button checks the key"
+    actual: "It always fails with 'Provider test not supported', and validate's GET /models passes any key"
+    impact: "Working ClinePass connections look broken, and wrong keys look valid when added"

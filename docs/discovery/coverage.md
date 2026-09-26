@@ -1,14 +1,14 @@
 # Discovery coverage
 
-Entries: 305
+Entries: 309
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
 | routes | 166/166 |  |
 | pages | 5/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +15 |
-| providers | 18/124 | alicode, alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu … +98 |
-| executors | 14/31 | azure, devin-cli, gemini-cli, github, grok-cli, grok-web, iflow, kimchi … +9 |
-| translators | 43/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js |
+| providers | 20/124 | alicode, alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu … +96 |
+| executors | 15/31 | devin-cli, gemini-cli, github, grok-cli, grok-web, iflow, kimchi, mimo-free … +8 |
+| translators | 44/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js |
 | repos | 11/11 |  |
 | settingsKeys | 47/52 | cloudEnabled, dnsToolEnabled, oidcLoginLabel, samlLoginLabel, tunnelProvider |
 
@@ -16,10 +16,10 @@ Entries: 305
 
 - apikeys: 9
 - catalog: 29
-- connections: 52
+- connections: 54
 - identity: 11
 - media: 15
-- routing: 97
+- routing: 99
 - settings: 10
 - tooling: 45
 - transport: 14
@@ -27,9 +27,9 @@ Entries: 305
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 14
-- REFERENCE_BEHAVIOR: 258
-- SUSPECTED_BUG: 53
+- IMPLEMENTATION_ACCIDENT: 15
+- REFERENCE_BEHAVIOR: 262
+- SUSPECTED_BUG: 56
 
 ## Missing — pages
 
@@ -77,8 +77,6 @@ Entries: 305
 - cerebras
 - chutes
 - cline
-- clinepass
-- cloudflare-ai
 - codebuddy-intl
 - cohere
 - comfyui
@@ -168,7 +166,6 @@ Entries: 305
 
 ## Missing — executors
 
-- azure
 - devin-cli
 - gemini-cli
 - github
@@ -192,7 +189,6 @@ Entries: 305
 - open-sse/translator/concerns/kiroConversation.js
 - open-sse/translator/concerns/message.js
 - open-sse/translator/concerns/modality.js
-- open-sse/translator/concerns/paramSupport.js
 
 ## Missing — settingsKeys
 

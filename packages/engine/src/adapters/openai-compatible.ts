@@ -329,8 +329,9 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
       if (ctx.signal.aborted) throw error;
       return "";
     });
-    const error = record(record(parseJson(raw)).error);
-    const detail = this.clean(text(error.message), credential);
+    // { error: { message } } (OpenAI, Azure) or { error: "..." } (Cline).
+    const root = record(parseJson(raw));
+    const detail = this.clean(text(record(root.error).message) ?? text(root.error), credential);
     return { valid: false, code: "AUTH_ERROR", message: `${this.provider.name} answered ${response.status}${detail ? `: ${detail}` : ""}` };
   }
 

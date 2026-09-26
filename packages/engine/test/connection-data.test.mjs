@@ -84,14 +84,15 @@ test("clinepass: Cline headers naming AIGate, the { success, data } envelope unw
   assert.equal(clinepass.headers["x-platform"], process.platform);
   assert.deepEqual([clinepass.headers["http-referer"], clinepass.headers["x-title"], clinepass.headers["x-is-multiroot"]], ["https://cline.bot", "Cline", "false"]);
   const wrapped = json(200, { success: true, data: { id: "c9", model: "cline-pass/glm-5.2", choices: [{ index: 0, message: { role: "assistant", content: "inside" }, finish_reason: "stop" }] } });
-  const transport = fakeTransport(wrapped, json(200, { success: false, error: "quota" }), json(401, { error: { message: "no" } }));
+  const transport = fakeTransport(wrapped, json(200, { success: false, error: "quota", data: { choices: [{ index: 0, message: { role: "assistant", content: "stale" } }] } }),
+    json(401, { error: "Unauthorized: re-authenticate your Cline account." }));
   const adapter = new OpenAICompatibleAdapter(clinepass, transport);
   assert.deepEqual((await adapter.execute(hello("cline-pass/glm-5.2"), credential, ctx())).content, [{ type: "text", text: "inside" }]);
   assert.equal(transport.calls[0].headers["x-client-version"], "0.1.0");
   await assert.rejects(adapter.execute(hello("cline-pass/glm-5.2"), credential, ctx()), (e) => e.code === "PROVIDER_UNAVAILABLE", "a failure envelope is left as it is");
-  const status = await adapter.validateCredential(credential, ctx());
-  assert.deepEqual([status.valid, status.code], [false, "AUTH_ERROR"]);
-  assert.equal(transport.calls[2].url, "https://api.cline.bot/api/v1/models");
-  const plain = fakeTransport(json(200, { success: true, data: { choices: [] } }));
+  assert.deepEqual(await adapter.validateCredential(credential, ctx()), { valid: false, code: "AUTH_ERROR", message: "ClinePass answered 401: Unauthorized: re-authenticate your Cline account." });
+  assert.equal(transport.calls[2].url, "https://api.cline.bot/api/v1/chat/completions", "GET /models answers 200 without a key, so the test is a chat");
+  assert.deepEqual(JSON.parse(transport.calls[2].body), { model: clinepass.models[0].id, messages: [{ role: "user", content: "test" }], max_tokens: 1 });
+  const plain = fakeTransport(json(200, { success: true, data: { choices: [{ index: 0, message: { role: "assistant", content: "wrapped" } }] } }));
   await assert.rejects(new OpenAICompatibleAdapter(builtinRegistry.provider("groq"), plain).execute(hello("x"), credential, ctx()), (e) => e.code === "PROVIDER_UNAVAILABLE", "only clinepass unwraps");
 });

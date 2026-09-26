@@ -126,7 +126,7 @@ export function parseChanges(input: unknown): Parsed<ConnectionChanges> {
     if (body.value[field] === undefined) continue;
     const parsed = parseField(field, body.value[field]);
     if (!parsed.ok) return parsed;
-    changes[field] = parsed.value;
+    changes[field] = parsed.value ?? null;
   }
   return Object.keys(changes).length > 0 ? { ok: true, value: changes } : fail(`Send at least one of name, apiKey, isActive, baseUrl, ${DATA_FIELD_NAMES.join(", ")}`);
 }

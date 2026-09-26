@@ -1956,6 +1956,23 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **AIGate required behavior:** An API-key request carries only the betas it needs; the official host is decided by hostname; the connection test calls <baseUrl>/messages and reports 404 or 5xx as not verified
 - **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
+### azure: an Azure OpenAI resource per connection (endpoint, deployment, api-version, organization) and its test
+
+- **id:** `connection.azure-openai-deployment` · **module:** `connections`
+- **Trigger:** POST /api/providers for azure; a /v1 request to azure/<model>; the connection Test button
+- **Input:** { provider: azure, apiKey, providerSpecificData: { azureEndpoint, deployment, apiVersion, organization } }
+- **Output:** A connection whose requests go to the Azure deployment
+- **Rules:**
+  - Chat URL: <azureEndpoint without one trailing />/openai/deployments/<deployment>/chat/completions?api-version=<apiVersion>, nothing URL-encoded
+  - azureEndpoint defaults to AZURE_ENDPOINT, then https://api.openai.com; apiVersion to AZURE_API_VERSION, then 2024-10-01-preview; deployment to the request model, then AZURE_DEPLOYMENT, then gpt-4
+  - The key goes in an api-key header (not Authorization); OpenAI-Organization is sent when an organization is set; the body is sent unchanged
+  - The Test button POSTs { messages: [{ role: user, content: test }], max_completion_tokens: 1 } to the URL with deployment or gpt-4; the connection is valid unless the status is 401 or 403
+  - The Add form keeps Save disabled until endpoint, deployment and organization are filled; the Edit form calls Organization 'Required for billing'
+  - No model listing; the catalog has no Azure models, so any azure/<model> is sent as the deployment when none is stored
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (the test or a request answers 401/403)
+- **AIGate required behavior:** A wrong deployment (404) or api-version (400) fails the test, Organization is optional, and a missing endpoint is refused
+
 ### GET /api/providers/client — paginated, field-allowlisted connection listing for browser-side consumers
 
 - **id:** `connection.client-listing-sanitized` · **module:** `connections`
@@ -1967,6 +1984,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Each connection is passed through sanitize(): only SAFE_FIELDS and SAFE_PSD_FIELDS keys survive — apiKey, accessToken, refreshToken, idToken and any other credential field are never included, by allowlist rather than by blocklist
   - maskName partially masks a long (over 16 char) name that also matches a 32+ char alnum/underscore/hyphen token pattern (e.g. an email-like or token-like display name) down to its first 8 characters — a defense against a raw credential accidentally landing in the display name field
   - pageSize is clamped to MAX_PAGE_SIZE (500); an out-of-range page number is clamped down to the last valid page rather than returning an empty page
+
+### cloudflare-ai: the Cloudflare account id per connection, filled into the Workers AI URL, and its test
+
+- **id:** `connection.cloudflare-account-id` · **module:** `connections`
+- **Trigger:** POST /api/providers for cloudflare-ai; a /v1 request to cloudflare-ai; the connection Test button
+- **Input:** { provider: cloudflare-ai, apiKey, providerSpecificData: { accountId } }
+- **Output:** Requests to https://api.cloudflare.com/client/v4/accounts/<accountId>/ai/v1/chat/completions
+- **Rules:**
+  - {accountId} in the catalog URL is replaced by providerSpecificData.accountId, not trimmed or encoded; a missing one throws '<provider> requires accountId in providerSpecificData'
+  - Auth is Authorization: Bearer <key>
+  - The Test button POSTs { model: the first catalog model, messages: [{ role: user, content: test }], max_tokens: 1 }; valid unless 401, 403 or 404 ('Invalid API token or Account ID'); no account id → 'Missing Account ID'
+  - The Add form keeps Save disabled without an account id
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (the test answers 401/403/404)
 
 ### ollama-local: an optional API key, a host per connection, and its connection test
 
@@ -2070,6 +2101,23 @@ Every item below is a capability AIGate must have. Derived from tracing
   - The model list is GET https://api.anthropic.com/v1/models with x-api-key and Anthropic-Version, reading data[]
 - **Errors:** `AUTH_ERROR` (upstream 401 (anthropic) or 401/403 (glm, kimi, minimax))
 - **AIGate required behavior:** An Anthropic key that is refused with 403 is reported as invalid, as the sibling claude-format providers do
+
+### clinepass with an API key: Cline client headers, the non-stream { success, data } envelope, and the test
+
+- **id:** `provider.clinepass-headers-envelope` · **module:** `routing`
+- **Trigger:** A /v1 request routed to clinepass; the connection Test button
+- **Input:** An OpenAI chat request and a ClinePass API key
+- **Output:** An OpenAI chat answer
+- **Rules:**
+  - Headers: HTTP-Referer https://cline.bot, X-Title Cline, User-Agent 9Router/<version>, X-PLATFORM <process.platform>, X-PLATFORM-VERSION <process.version>, X-CLIENT-TYPE 9router, X-CLIENT-VERSION and X-CORE-VERSION <version>, X-IS-MULTIROOT false, Authorization Bearer <key>
+  - The request body is the normal OpenAI chat body
+  - A non-streaming answer { success: true, data: { ... } } is unwrapped to data; { success: false, ... } and streams pass through unchanged
+  - Validate (before save): GET https://api.cline.bot/api/v1/models; 401/403 invalid, 2xx valid
+  - The Test button has no clinepass case: 'Provider test not supported', stored as testStatus error
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (the model list answers 401/403)
+- **AIGate required behavior:** The Test button checks the key
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
 ### What the CodeBuddy executors change in an OpenAI chat request (codebuddy-cn, codebuddy-intl)
 
@@ -3396,6 +3444,17 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Errors:** `PROVIDER_UNAVAILABLE` (upstream 5xx or 529 overloaded), `RATE_LIMIT` (upstream 429), `AUTH_ERROR` (upstream 401 or 403)
 - **AIGate required behavior:** A mid-stream error reaches the client as an error; non-streaming and streaming map stop reasons and usage the same way; reasoning goes only to reasoning_content; text is returned as the model wrote it
 
+### cloudflare-ai: every message content array is flattened to a string
+
+- **id:** `translator.cloudflare-content-flatten` · **module:** `routing`
+- **Trigger:** A chat request routed to cloudflare-ai
+- **Input:** An OpenAI chat body whose messages may carry content-part arrays
+- **Output:** The same body with each content array joined into one string
+- **Rules:**
+  - For provider cloudflare-ai, each message whose content is an array becomes the text parts joined with no separator
+  - Any part that is not text becomes an empty string, so images, audio and files are dropped without an error
+- **AIGate required behavior:** A part the endpoint cannot take is refused with a clear error
+
 ### Gemini SSE chunks and generateContent JSON to OpenAI chat completion chunks and body
 
 - **id:** `translator.gemini-to-openai-response` · **module:** `routing`
@@ -3999,6 +4058,8 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `provider.vertex-google-auth` | A 401 forces a new token, the cache follows the credential itself, ADC tokens are cached until they expire, and the key never goes in the URL | The retry reuses the cached token, a replaced key under the same client_email keeps the old token, ADC refreshes on every request, and the raw key is an unencoded query parameter | A revoked token keeps failing for up to 55 minutes, extra token round-trips, and the key leaks into logs |
 | `connection.vertex-credential-test` | The Test button works, a service account is checked by minting a token, and a bad key (400 API_KEY_INVALID) is invalid | Test always fails, a service account is valid on field presence, and any status but 401/403 is valid | Working connections look broken and broken ones look healthy |
 | `routing.vertex-endpoints` | A token request reaches every catalog model, including the global-only Gemini 3 previews | The token path defaults to locations/us-central1 on the global host, with no way to change it | Gemini 3 preview models may answer 404 for service-account connections |
+| `connection.azure-openai-deployment` | A wrong deployment (404) or api-version (400) fails the test, Organization is optional, and a missing endpoint is refused | Only 401/403 fail, the form forces an Organization that is then sent on every request, and a missing endpoint sends the key to api.openai.com | Broken connections look healthy, and an Azure key can leak to another vendor |
+| `provider.clinepass-headers-envelope` | The Test button checks the key | It always fails with 'Provider test not supported', and validate's GET /models passes any key | Working ClinePass connections look broken, and wrong keys look valid when added |
 | `account.concurrent-refresh-race` | Two concurrent requests hitting an expired/rejected token on the same connection should converge on one valid refreshed token — either serialized so the second reuses the first's fresh token, or each refresh is independently idempotent regardless of which refreshToken value it started from | No per-connection lock exists around either the proactive (checkAndRefreshToken) or reactive (chatCore.js 401/403) refresh call; each concurrent request refreshes using its own in-memory refreshToken snapshot with no coordination with other in-flight requests for the same connection | For providers with single-use rotating refresh tokens (the code names xAI and grok-cli explicitly), a burst of concurrent requests around token-expiry time causes all but the first refresh to fail with invalid_grant, which can further trigger markAccountUnavailable and lock the connection out even though it was just successfully refreshed by a sibling request |
 | `catalog.alias-disabled-model-bypass` | A model marked disabled in the dashboard should be rejected if a request targets it — directly or via an alias — mirroring how it disappears from every model-listing endpoint ("disable" implies block, not just hide) | The chat/routing path never reads the disabledModels table at all; only the discovery endpoints (/api/models, /v1/models) filter by it, so a disabled model keeps working for any client that already knows its id, or that reaches it through an alias or combo | The 'disable' control only removes discoverability, not access — a compliance or cost-control use case ('stop routing to this expensive/broken model') is not actually enforced, silently, with no error surfaced to the operator who disabled it |
 | `catalog.alias-dual-convention-collision` | Both endpoints described as setting 'the alias for a model' should write the same KV shape so a value set through either surface is visible to the other, and to actual chat routing | The two routes call the same setModelAlias(alias, model) primitive with swapped argument order, so /api/models/alias produces routable aliases (key=alias) while /api/models produces display-only rows (key=modelId) in the same table — each is invisible to the other's reader | An alias set via the main /api/models list page's inline rename never actually works as a callable alias in a chat request (resolveModelAliasFromMap won't find it), while a routable alias created via the dedicated alias-management endpoint never appears as that model's display label in the main list — two silently disconnected features sharing one KV namespace |
@@ -4037,6 +4098,7 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `translator.openai-to-gemini-request` | Every system message reaches the model, stop/JSON mode/tool_choice/seed/penalties map to Gemini, tool names round-trip, only real signatures are replayed, and the schema cleaner removes keywords without removing parameters or adding one | Earlier system messages vanish, those fields are dropped, renamed tools come back renamed, a signature from another product is replayed, parameters named like keywords are deleted, and a required reason parameter is invented | Silent loss of instructions and controls, tool calls the client cannot match, and tools called with wrong arguments |
 | `translator.gemini-to-openai-response` | Errors and blocked prompts are reported, a cut-off stream fails, both paths share one finish table and one usage count, and generated images use one form | They are dropped, cut-offs look complete, the non-stream path reports raw reasons and counts thoughts as prompt tokens, and images come as a non-standard field or markdown | Clients misread failures and token spend, and handle the same answer differently by stream mode |
 | `translator.openai-to-vertex-request` | Only a borrowed signature is replaced; a real one from the cache is sent back unchanged | Every thoughtSignature is overwritten with the Vertex constant | Multi-turn tool calls on Gemini 3 via Vertex may be refused or lose their thinking context |
+| `translator.cloudflare-content-flatten` | A part the endpoint cannot take is refused with a clear error | Images, audio and files are silently replaced by empty strings | Vision requests get answers about text the user did not send alone |
 | `clitools.write-not-atomic` | Given every one of these writes targets the user's own IDE/CLI configuration file (not 9router's own data), and one of the affected routes' own comment explicitly promises 'Backup old fields and write new settings', a crash mid-write should not be able to corrupt or truncate that file — either via a temp-file-then-rename swap (the exact pattern already implemented in this codebase at src/lib/mitmAliasCache.js:15-21 for 9router's own alias cache) or an actual on-disk backup copy. | All 13 write-capable cli-tools routes call fs.writeFile(path, content) directly on the final path with no temp file, no rename, and no backup copy anywhere on disk. The 'backup' language in the claude-settings POST comment refers only to merging the previously-read JSON object in memory before the single overwrite call — nothing is preserved outside process memory. | A crash, OOM kill, disk-full error, or power loss during any of these writes can truncate or corrupt the user's real tool config (e.g. ~/.claude/settings.json, ~/.codex/config.toml, ~/.openclaw/openclaw.json). Because every route's read path treats an unparseable file as simply 'no config', the damage is silent: the next status check reports the tool as unconfigured, and the next Apply starts from empty, permanently discarding whatever unrelated settings that file held before 9router wrote to it. |
 | `clitools.copilot-settings-array-upsert` | Like every other cli-tools GET handler (claude, codex, cline, droid, kilo, etc.), Copilot's GET should reflect a real detection check — a `where`/`which` lookup or a marker-file probe — before reporting installed: true, so the dashboard only shows Copilot as available on a machine that actually has it. | copilot-settings/route.js's GET performs no detection at all: it reads chatLanguageModels.json (which may not exist, in which case config is null) and always returns installed: true regardless. | The dashboard's Copilot integration card (and any 'all installed tools' summary the UI derives from installed flags) will show Copilot as installed on any machine, even one with no VS Code and no Copilot extension, inviting the user to Apply — which just writes a file nobody will ever read. |
 | `clitools.deepseek-tui-full-overwrite` | Like every other tool's Apply/Reset in this set (codex, droid, opencode, openclaw, grok-build, hermes, jcode, kilo, cline, cowork all read-merge-write or perform a targeted key removal), DeepSeek TUI's POST should merge 9router's fields into whatever config.toml already contains, and DELETE should remove only what 9router added — preserving any other DeepSeek TUI settings the user configured. | Both POST and DELETE build a fixed, hand-written TOML string from scratch and write it directly, completely replacing the file's prior contents regardless of what else was in it (POST never even calls the file's own readConfigToml() result; DELETE writes a hardcoded 2-line default). | The first time a user clicks Apply or Reset for DeepSeek TUI in the 9router dashboard, any other settings they had configured directly in ~/.deepseek/config.toml (other providers, TUI preferences, anything not related to 9router) are silently and irrecoverably destroyed. |

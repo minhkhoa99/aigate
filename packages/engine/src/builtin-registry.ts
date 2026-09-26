@@ -45,8 +45,13 @@ const EXTRA_HEADERS: Readonly<Record<string, Readonly<Record<string, string>>>> 
   },
 };
 // connection.azure-openai-deployment (kept as 9router, user decision 2026-09-26) and connection.cloudflare-account-id:
-// each connection fills the URL, and the connection test posts a one-token chat.
+// each connection fills the URL, and the connection test posts a one-token chat. provider.clinepass-headers-envelope:
+// Cline answers GET /models with 200 even without a key, so its test is a one-token chat too (user decision 2026-09-26).
 const PROBE_MESSAGES = [{ role: "user", content: "test" }];
+const firstModelProbe = (provider: CatalogProvider, invalidStatuses: readonly number[]): ProviderDescriptor["chatProbe"] => {
+  const model = provider.models[0]?.id ?? "";
+  return { model, body: { model, messages: PROBE_MESSAGES, max_tokens: 1 }, invalidStatuses };
+};
 const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Partial<ProviderDescriptor>>> = {
   azure: () => ({
     chatUrl: "{baseUrl}/openai/deployments/{deployment}/chat/completions?api-version={apiVersion}",
@@ -56,13 +61,8 @@ const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Par
     connectionFields: { required: ["baseUrl"], optional: ["deployment", "apiVersion", "organization"], defaults: { deployment: "{model}", apiVersion: "2024-10-01-preview" } },
     chatProbe: { model: "gpt-4", body: { messages: PROBE_MESSAGES, max_completion_tokens: 1 }, invalidStatuses: [401, 403] },
   }),
-  "cloudflare-ai": (provider) => {
-    const model = provider.models[0]?.id ?? "";
-    return {
-      connectionFields: { required: ["accountId"], optional: [] },
-      chatProbe: { model, body: { model, messages: PROBE_MESSAGES, max_tokens: 1 }, invalidStatuses: [401, 403, 404] },
-    };
-  },
+  "cloudflare-ai": (provider) => ({ connectionFields: { required: ["accountId"], optional: [] }, chatProbe: firstModelProbe(provider, [401, 403, 404]) }),
+  clinepass: (provider) => ({ chatProbe: firstModelProbe(provider, [401, 403]) }),
 };
 const PROTOCOL_REASONS: Readonly<Record<string, string>> = {
   service: "Media and search services come with SP22/SP23",
