@@ -7643,6 +7643,155 @@
       "author": null,
       "contributor": null,
       "location": "apps/server/test/provider-nodes.test.mjs"
+    },
+    {
+      "id": "provider_anthropic_contract",
+      "label": "Anthropic Messages provider contract (M2 SP14a)",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "CIP <-> /v1/messages, JSON and SSE. User decision 2026-09-26: 9router suspected bugs not ported (correct behavior like SP9/SP10)."
+    },
+    {
+      "id": "sp_sp14a",
+      "label": "SP14a — Anthropic Messages adapter; anthropic, glm, kimi, minimax, minimax-cn connectable (46 total)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sp_sp14b",
+      "label": "SP14b — Anthropic-compatible custom providers, stream-only providers",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "11_translation_i18n_provider_anthropic_auth_and_headers",
+      "label": "provider.anthropic-auth-and-headers",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "11_translation_i18n_translator_openai_to_claude_request",
+      "label": "translator.openai-to-claude-request",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "11_translation_i18n_translator_claude_to_openai_response",
+      "label": "translator.claude-to-openai-response",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "anthropic_adapter",
+      "label": "AnthropicAdapter — CIP <-> Messages (max_tokens rules, thinking budgets, tool_use, SSE events)",
+      "file_type": "code",
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/adapters/anthropic.ts"
+    },
+    {
+      "id": "http_provider_adapter",
+      "label": "HttpProviderAdapter — shared auth headers, retry before first byte, error classification, redaction",
+      "file_type": "code",
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/adapters/http-adapter.ts"
+    },
+    {
+      "id": "create_adapter",
+      "label": "createAdapter(provider, transport) — adapter chosen by protocol family",
+      "file_type": "code",
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/adapters/index.ts"
+    },
+    {
+      "id": "provider_protocols",
+      "label": "PROVIDER_PROTOCOLS: openai-compatible | anthropic; descriptor quirks",
+      "file_type": "code",
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/src/registry.ts"
+    },
+    {
+      "id": "anthropic_deviations",
+      "label": "Deviations not ported: stop/top_p kept, none stays none, no Claude Code line, stream errors fail, same stop/usage mapping, 403 invalid",
+      "file_type": "rationale",
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "anthropic_adapter_tests",
+      "label": "packages/engine/test/anthropic-adapter.test.mjs (10) + apps/server/test/anthropic-lane.test.mjs (4); 23 mutations caught",
+      "file_type": "code",
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "location": "packages/engine/test/anthropic-adapter.test.mjs"
+    },
+    {
+      "id": "api_ui_map_row_sp14a",
+      "label": "API_UI_MAP row: SP14a AnthropicAdapter — no new screen; /providers pills follow connectable",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
     }
   ],
   "edges": [
@@ -25555,6 +25704,296 @@
       "source_file": "docs/contracts/registry-extract.md",
       "source_location": null,
       "weight": 1.0
+    },
+    {
+      "source": "provider_anthropic_contract",
+      "target": "sp_sp14a",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp14a",
+      "target": "provider_anthropic_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp14",
+      "target": "sp_sp14a",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp14a",
+      "target": "sp_sp14b",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp14a",
+      "target": "anthropic_adapter",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp14a",
+      "target": "http_provider_adapter",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp14a",
+      "target": "create_adapter",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp14a",
+      "target": "provider_protocols",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sp_sp14a",
+      "target": "anthropic_adapter_tests",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "provider_anthropic_contract",
+      "target": "11_translation_i18n_provider_anthropic_auth_and_headers",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "provider_anthropic_contract",
+      "target": "11_translation_i18n_translator_openai_to_claude_request",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "provider_anthropic_contract",
+      "target": "11_translation_i18n_translator_claude_to_openai_response",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "provider_anthropic_contract",
+      "target": "anthropic_deviations",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "anthropic_adapter",
+      "target": "11_translation_i18n_translator_openai_to_claude_request",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "anthropic_adapter",
+      "target": "11_translation_i18n_translator_claude_to_openai_response",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "builtin_registry_catalog",
+      "target": "11_translation_i18n_provider_anthropic_auth_and_headers",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "anthropic_deviations",
+      "target": "anthropic_adapter",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "anthropic_adapter",
+      "target": "http_provider_adapter",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "http_provider_adapter",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "create_adapter",
+      "target": "anthropic_adapter",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "create_adapter",
+      "target": "adapter_openai_compatible",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "chat_lane_service",
+      "target": "create_adapter",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "connections_controller",
+      "target": "create_adapter",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "builtin_registry_catalog",
+      "target": "provider_protocols",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "anthropic_adapter",
+      "target": "provider_descriptor_catalog",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "anthropic_adapter",
+      "target": "adapter_partial_stream_error",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/contracts/provider-anthropic.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_row_sp14a",
+      "target": "anthropic_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_ui_map_row_sp14a",
+      "target": "api_ui_map_screen_llm_providers_wired",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "anthropic_adapter_tests",
+      "target": "anthropic_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "packages/engine/test/anthropic-adapter.test.mjs",
+      "source_location": null,
+      "weight": 1.0
     }
   ],
   "hyperedges": [
@@ -25935,6 +26374,21 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/contracts/custom-providers.md"
+    },
+    {
+      "id": "sp14a_adapter_family",
+      "label": "Adapters chosen by protocol family behind AIProviderPort",
+      "nodes": [
+        "create_adapter",
+        "adapter_openai_compatible",
+        "anthropic_adapter",
+        "http_provider_adapter",
+        "provider_protocols"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/contracts/provider-anthropic.md"
     }
   ],
   "input_tokens": 574916,

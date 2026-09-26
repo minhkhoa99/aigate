@@ -75,6 +75,13 @@
       "output_tokens": 0,
       "files": 4,
       "mode": "SP13b custom providers chunk"
+    },
+    {
+      "date": "2026-09-26T04:04:17.901877+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "SP14a anthropic adapter chunk"
     }
   ],
   "total_input_tokens": 574916,
