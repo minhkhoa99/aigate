@@ -1,0 +1,566 @@
+{
+  "nodes": [
+    {
+      "id": "provider_vertex_contract",
+      "label": "Vertex AI provider contract (M2 SP14f)",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": "vertex + vertex-partner with Google Cloud credentials. User decision 2026-09-26: correct signatures, token handling, test, location global; keep the partner key project probe (bounded)."
+    },
+    {
+      "id": "sp_sp14f",
+      "label": "SP14f — Vertex AI and Vertex partner (Google Cloud credentials); qoder not ported (55 connectable)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "sp_sp14g",
+      "label": "SP14g — per-account URLs (azure, cloudflare-ai), clinepass envelope, then commandcode NDJSON",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next"
+    },
+    {
+      "id": "decision_sp14f_vertex",
+      "label": "User decision 2026-09-26: SP14f scope vertex only; qoder not ported; correct signatures, tokens, test, location; keep bounded project probe",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "02_providers_auth_provider_vertex_google_auth",
+      "label": "provider.vertex-google-auth",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "02_providers_auth_connection_vertex_credential_test",
+      "label": "connection.vertex-credential-test",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "02_providers_auth_routing_vertex_endpoints",
+      "label": "routing.vertex-endpoints",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "02_providers_auth_provider_qoder_agent_transport",
+      "label": "provider.qoder-agent-transport (traced, not ported)",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "traced"
+    },
+    {
+      "id": "11_translation_i18n_translator_openai_to_vertex_request",
+      "label": "translator.openai-to-vertex-request",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "google_auth",
+      "label": "google-auth.ts — parseGoogleCredential, RS256 JWT via WebCrypto, token cache per credential (1 h, 256), fresh mint after 401",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "vertex_adapter",
+      "label": "VertexAdapter — Gemini adapter on Vertex (project global location with Bearer, express endpoint with x-goog-api-key, no call ids, Vertex borrowed signature)",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "vertex_partner_adapter",
+      "label": "VertexPartnerAdapter — OpenAI adapter on Vertex openapi chat/completions; key project from the probe (bounded cache)",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "json_credential_connections",
+      "label": "Connections accept a complete Google Cloud JSON credential for googleCloud providers; keyHint = client_email",
+      "file_type": "document",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "screen_connections_google_key",
+      "label": "Connections: service-account JSON or API key field for Vertex (16384 chars)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired"
+    },
+    {
+      "id": "sp14f_tests",
+      "label": "SP14f tests: engine vertex-adapter.test.mjs (9), server vertex-lane.test.mjs; 52 mutations, 1 equivalent removed",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "api_ui_map_row_sp14f",
+      "label": "API_UI_MAP row: SP14f Vertex adapters and the JSON credential field",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    }
+  ],
+  "edges": [
+    {
+      "source": "sp_sp14e",
+      "target": "sp_sp14f",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14f",
+      "target": "sp_sp14g",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14",
+      "target": "sp_sp14g",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14f",
+      "target": "provider_vertex_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14f",
+      "target": "decision_sp14f_vertex",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14f_vertex",
+      "target": "02_providers_auth_provider_vertex_google_auth",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14f_vertex",
+      "target": "02_providers_auth_connection_vertex_credential_test",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14f_vertex",
+      "target": "02_providers_auth_routing_vertex_endpoints",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14f_vertex",
+      "target": "11_translation_i18n_translator_openai_to_vertex_request",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14f_vertex",
+      "target": "02_providers_auth_provider_qoder_agent_transport",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_vertex_contract",
+      "target": "google_auth",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_vertex_contract",
+      "target": "vertex_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_vertex_contract",
+      "target": "vertex_partner_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "vertex_adapter",
+      "target": "gemini_adapter",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "vertex_partner_adapter",
+      "target": "adapter_openai_compatible",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "vertex_adapter",
+      "target": "google_auth",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "vertex_partner_adapter",
+      "target": "google_auth",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "vertex_adapter",
+      "target": "gemini_signature_cache",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "create_adapter",
+      "target": "vertex_adapter",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "create_adapter",
+      "target": "vertex_partner_adapter",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_protocols",
+      "target": "vertex_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "builtin_registry_catalog",
+      "target": "vertex_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "google_auth",
+      "target": "02_providers_auth_provider_vertex_google_auth",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "vertex_adapter",
+      "target": "02_providers_auth_routing_vertex_endpoints",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "vertex_adapter",
+      "target": "02_providers_auth_connection_vertex_credential_test",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "vertex_adapter",
+      "target": "11_translation_i18n_translator_openai_to_vertex_request",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "json_credential_connections",
+      "target": "google_auth",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_contract",
+      "target": "json_credential_connections",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "screen_connections",
+      "target": "screen_connections_google_key",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "screen_connections_google_key",
+      "target": "json_credential_connections",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp14f_tests",
+      "target": "vertex_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14f",
+      "target": "sp14f_tests",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_doc",
+      "target": "api_ui_map_row_sp14f",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp14f",
+      "target": "screen_connections_google_key",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14f",
+      "target": "api_ui_map_row_sp14f",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "sp14f_vertex_family",
+      "label": "Vertex family: Google Cloud auth, Vertex and partner adapters, JSON credential connections and field",
+      "nodes": [
+        "google_auth",
+        "vertex_adapter",
+        "vertex_partner_adapter",
+        "json_credential_connections",
+        "screen_connections_google_key"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-vertex.md"
+    }
+  ]
+}
