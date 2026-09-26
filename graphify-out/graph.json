@@ -395,6 +395,22 @@
         "confidence": "EXTRACTED",
         "confidence_score": 1.0,
         "source_file": "docs/contracts/provider-anthropic.md"
+      },
+      {
+        "id": "sp14b_custom_anthropic_nodes",
+        "label": "Anthropic-compatible custom providers: storage, descriptor, adapter headers, connection test, UI",
+        "nodes": [
+          "provider_nodes_type_column",
+          "anthropic_node_descriptor",
+          "anthropic_node_betas",
+          "anthropic_node_connection_test",
+          "node_rules_unreachable",
+          "anthropic_adapter"
+        ],
+        "relation": "implement",
+        "confidence": "EXTRACTED",
+        "confidence_score": 1,
+        "source_file": "docs/contracts/custom-providers.md"
       }
     ]
   },
@@ -410,7 +426,7 @@
       "contributor": null,
       "rationale": "AIGate is a new independent AI gateway with 9router's full capability but zero 9router code; 9router is behavioral source of truth only at development time.",
       "id": "doc_aigate_design_spec",
-      "community": 15,
+      "community": 14,
       "norm_label": "aigate design spec (2026-09-22)"
     },
     {
@@ -424,7 +440,7 @@
       "contributor": null,
       "rationale": "behavioral.md \u00a7FINAL: 'Do not port the old code. Extract its knowledge. Then engineer the new system.' Shipped product must contain zero 9router code, architecture or technical debt.",
       "id": "concept_behavioral_source_of_truth",
-      "community": 6,
+      "community": 14,
       "norm_label": "9router as behavioral source of truth (not a template to port)"
     },
     {
@@ -438,7 +454,7 @@
       "contributor": null,
       "rationale": "Granularity is bounded context, not per-endpoint \u2014 154 endpoints collapse to 10 contexts and only 6 ports.",
       "id": "concept_hexagonal_bounded_context",
-      "community": 15,
+      "community": 14,
       "norm_label": "hexagonal architecture, granularity = bounded context"
     },
     {
@@ -452,7 +468,7 @@
       "contributor": null,
       "rationale": "packages/engine sits OUTSIDE NestJS \u2014 the provider-protocol domain must not know the framework exists; also lets the engine be tested without booting the server.",
       "id": "concept_monorepo_layout",
-      "community": 15,
+      "community": 14,
       "norm_label": "monorepo layout (apps/server, apps/web, apps/cli, packages/engine, contracts, database, tools)"
     },
     {
@@ -466,7 +482,7 @@
       "contributor": null,
       "rationale": "Replaces 9router's OpenAI-pivot. Vendor-neutral intermediate format: ~13 protocol adapters in + N provider adapters out grows linearly, vs 48 translators growing N\u00b2. Two iron rules: Canonical is a true superset with typed vendorExtensions, and never silently drop \u2014 unrepresentable fields throw UnsupportedFeature. These two rules are why AIGate needs no 'direct route' escape hatch.",
       "id": "concept_cip",
-      "community": 5,
+      "community": 7,
       "norm_label": "canonical internal protocol (cip)"
     },
     {
@@ -480,7 +496,7 @@
       "contributor": null,
       "rationale": "OpenAI-pivot lost thinking blocks, tool-id mapping and cache_control. If Canonical is not a real superset, AIGate repeats the same defect under a new name.",
       "id": "concept_vendor_extensions",
-      "community": 5,
+      "community": 7,
       "norm_label": "vendorextensions \u2014 typed carry-through field"
     },
     {
@@ -494,7 +510,7 @@
       "contributor": null,
       "rationale": "behavioral.md \u00a79 forbids concepts living as string/object/if-else/magic constant. Example: 9router's modelLock_{model} key string inside a JSON blob becomes the AccountLock entity.",
       "id": "concept_domain_model",
-      "community": 6,
+      "community": 2,
       "norm_label": "aigate domain model (provider, credential, routingpolicy, accountlock, ...)"
     },
     {
@@ -508,7 +524,7 @@
       "contributor": null,
       "rationale": "Replaces the string key modelLock_{model}: accountId, modelId|null (null = whole account), reason: ErrorCode, until: Date.",
       "id": "entity_account_lock",
-      "community": 6,
+      "community": 2,
       "norm_label": "accountlock entity"
     },
     {
@@ -536,7 +552,7 @@
       "contributor": null,
       "rationale": "Implemented per protocol FAMILY, not per vendor. OpenAI-compatible carries most; kiro/cursor/commandcode/vertex/azure get their own adapters. Interface: execute, stream, getModels, validateCredential.",
       "id": "port_ai_provider",
-      "community": 5,
+      "community": 7,
       "norm_label": "aiproviderport"
     },
     {
@@ -551,7 +567,7 @@
       "rationale": "Implementations: relay / proxy / direct / MITM-bypass DNS.",
       "location": "packages/engine/src/ports.ts",
       "id": "port_http_transport",
-      "community": 9,
+      "community": 1,
       "norm_label": "httptransportport"
     },
     {
@@ -579,7 +595,7 @@
       "contributor": null,
       "rationale": "Encrypts OAuth tokens and sudo secrets at rest.",
       "id": "port_secret_cipher",
-      "community": 7,
+      "community": 4,
       "norm_label": "secretcipherport"
     },
     {
@@ -649,7 +665,7 @@
       "contributor": null,
       "rationale": "provider registry, model, capabilities, alias, pricing.",
       "id": "ctx_catalog",
-      "community": 3,
+      "community": 2,
       "norm_label": "bounded context: catalog"
     },
     {
@@ -663,7 +679,7 @@
       "contributor": null,
       "rationale": "multi-account credentials, OAuth flow + refresh, AccountLock.",
       "id": "ctx_connections",
-      "community": 3,
+      "community": 2,
       "norm_label": "bounded context: connections"
     },
     {
@@ -677,7 +693,7 @@
       "contributor": null,
       "rationale": "The core context: 8 lanes, CIP, combo, capacity adapter, token saver.",
       "id": "ctx_routing",
-      "community": 5,
+      "community": 2,
       "norm_label": "bounded context: routing (core)"
     },
     {
@@ -719,7 +735,7 @@
       "contributor": null,
       "rationale": "9 media kinds, voice list.",
       "id": "ctx_media",
-      "community": 3,
+      "community": 2,
       "norm_label": "bounded context: media"
     },
     {
@@ -733,7 +749,7 @@
       "contributor": null,
       "rationale": "CLI tools writer, skills, console log, tunnel, MITM control, MCP.",
       "id": "ctx_tooling",
-      "community": 3,
+      "community": 1,
       "norm_label": "bounded context: tooling"
     },
     {
@@ -813,7 +829,7 @@
       "author": null,
       "contributor": null,
       "id": "err_provider_unavailable",
-      "community": 10,
+      "community": 11,
       "norm_label": "errorcode: provider_unavailable"
     },
     {
@@ -894,7 +910,7 @@
       "contributor": null,
       "rationale": "behavioral.md \u00a727: 'old code using a global mutable map does not make a global mutable map a business requirement.' Replacements: global._* \u2192 NestJS DI singleton; global mutex \u2192 provider-keyed mutex; modelLock string \u2192 AccountLock entity; sync usage write \u2192 buffered writer with cap and drop-oldest counter; parallel token refresh \u2192 single-flight per connectionId; magic numbers \u2192 named config; proxy LRU \u2192 LRU+TTL; bare Promise.all \u2192 explicit concurrency limit.",
       "id": "concept_impl_accident",
-      "community": 6,
+      "community": 2,
       "norm_label": "implementation_accident \u2014 debt not inherited from 9router"
     },
     {
@@ -908,7 +924,7 @@
       "contributor": null,
       "rationale": "9router chatCore.js:287 checks only pxpipeEnabled, so a client sending the token-saver opt-out header is still processed by pxpipe. Expected: opt-out must disable the whole pipeline. Suspected bug \u2014 do not reproduce, label and ask.",
       "id": "sb_1",
-      "community": 5,
+      "community": 2,
       "norm_label": "sb-1 \u2014 pxpipe ignores token-saver master opt-out header"
     },
     {
@@ -936,7 +952,7 @@
       "contributor": null,
       "rationale": "behavioral.md \u00a74 forbids jumping straight to code. A Discovery, B Behavior extraction (20 questions \u00a73 + 12 questions \u00a730), C Contract with REFERENCE_BEHAVIOR/SUSPECTED_BUG/IMPLEMENTATION_ACCIDENT labels, D Design, E Implementation, F Parity verification.",
       "id": "concept_six_phase_process",
-      "community": 6,
+      "community": 2,
       "norm_label": "mandatory 6-phase feature process (a discovery \u2192 f parity)"
     },
     {
@@ -950,7 +966,7 @@
       "contributor": null,
       "rationale": "Must cover all 23 feature groups of \u00a75. No feature counts as understood until its full flow is traced.",
       "id": "concept_feature_matrix",
-      "community": 3,
+      "community": 2,
       "norm_label": "feature matrix \u2014 mandatory 17-column artifact"
     },
     {
@@ -964,7 +980,7 @@
       "contributor": null,
       "rationale": "Missing one item \u2192 status != DONE.",
       "id": "concept_dod_13",
-      "community": 6,
+      "community": 2,
       "norm_label": "definition of done \u2014 13 items, not self-awarded"
     },
     {
@@ -977,7 +993,7 @@
       "author": null,
       "contributor": null,
       "id": "group_endpoint_apikey",
-      "community": 0,
+      "community": 1,
       "norm_label": "feature group: endpoint & api key"
     },
     {
@@ -990,7 +1006,7 @@
       "author": null,
       "contributor": null,
       "id": "group_providers",
-      "community": 3,
+      "community": 2,
       "norm_label": "feature group: providers"
     },
     {
@@ -1003,7 +1019,7 @@
       "author": null,
       "contributor": null,
       "id": "group_provider_authentication",
-      "community": 3,
+      "community": 2,
       "norm_label": "feature group: provider authentication"
     },
     {
@@ -1016,7 +1032,7 @@
       "author": null,
       "contributor": null,
       "id": "group_oauth_providers",
-      "community": 3,
+      "community": 2,
       "norm_label": "feature group: oauth providers"
     },
     {
@@ -1029,7 +1045,7 @@
       "author": null,
       "contributor": null,
       "id": "group_apikey_providers",
-      "community": 3,
+      "community": 2,
       "norm_label": "feature group: api-key providers"
     },
     {
@@ -1042,7 +1058,7 @@
       "author": null,
       "contributor": null,
       "id": "group_provider_account_management",
-      "community": 3,
+      "community": 2,
       "norm_label": "feature group: provider account management"
     },
     {
@@ -1055,7 +1071,7 @@
       "author": null,
       "contributor": null,
       "id": "group_multi_account",
-      "community": 3,
+      "community": 2,
       "norm_label": "feature group: multi-account"
     },
     {
@@ -1068,7 +1084,7 @@
       "author": null,
       "contributor": null,
       "id": "group_model_registry",
-      "community": 3,
+      "community": 2,
       "norm_label": "feature group: model registry"
     },
     {
@@ -1081,7 +1097,7 @@
       "author": null,
       "contributor": null,
       "id": "group_model_mapping",
-      "community": 3,
+      "community": 2,
       "norm_label": "feature group: model mapping"
     },
     {
@@ -1094,7 +1110,7 @@
       "author": null,
       "contributor": null,
       "id": "group_request_routing",
-      "community": 5,
+      "community": 2,
       "norm_label": "feature group: request routing"
     },
     {
@@ -1107,7 +1123,7 @@
       "author": null,
       "contributor": null,
       "id": "group_auto_fallback",
-      "community": 5,
+      "community": 2,
       "norm_label": "feature group: auto fallback"
     },
     {
@@ -1120,7 +1136,7 @@
       "author": null,
       "contributor": null,
       "id": "group_combo_vision_adapter",
-      "community": 5,
+      "community": 2,
       "norm_label": "feature group: combo / vision adapter"
     },
     {
@@ -1159,7 +1175,7 @@
       "author": null,
       "contributor": null,
       "id": "group_token_saver",
-      "community": 5,
+      "community": 2,
       "norm_label": "feature group: token saver"
     },
     {
@@ -1172,7 +1188,7 @@
       "author": null,
       "contributor": null,
       "id": "group_cli_tools",
-      "community": 3,
+      "community": 1,
       "norm_label": "feature group: cli tools"
     },
     {
@@ -1185,7 +1201,7 @@
       "author": null,
       "contributor": null,
       "id": "group_media_providers",
-      "community": 3,
+      "community": 2,
       "norm_label": "feature group: media providers"
     },
     {
@@ -1211,7 +1227,7 @@
       "author": null,
       "contributor": null,
       "id": "group_skills",
-      "community": 3,
+      "community": 1,
       "norm_label": "feature group: skills"
     },
     {
@@ -1224,7 +1240,7 @@
       "author": null,
       "contributor": null,
       "id": "group_console_log",
-      "community": 3,
+      "community": 1,
       "norm_label": "feature group: console log"
     },
     {
@@ -1252,7 +1268,7 @@
       "contributor": null,
       "rationale": "Ambiguous name \u2014 in 9router this is TWO things: the format translation engine (/api/translator/*, 6 routes) and UI i18n (/api/locale, 1 route). Trace both.",
       "id": "group_translation_language",
-      "community": 5,
+      "community": 2,
       "norm_label": "feature group: translation / language functionality"
     },
     {
@@ -1307,7 +1323,7 @@
       "contributor": null,
       "rationale": "Does the vendor accept AIGate's upstream request and return the right CLASS of response.",
       "id": "parity_tier2_vendor_acceptance",
-      "community": 14,
+      "community": 6,
       "norm_label": "parity tier 2 \u2014 vendor acceptance (pass/fail)"
     },
     {
@@ -1335,7 +1351,7 @@
       "contributor": null,
       "rationale": "Exploits 9router's own outboundProxyUrl feature so not one line of 9router is modified. Each tape holds clientRequest / upstreamRequest / upstreamResponse / clientResponse; replay feeds clientRequest to AIGate and stubs the vendor \u2014 no network, no credits, CI-runnable. AIGate runs on a different port so both systems live side by side.",
       "id": "concept_recording_proxy_tape",
-      "community": 14,
+      "community": 6,
       "norm_label": "recording proxy + 4-part tape"
     },
     {
@@ -1363,7 +1379,7 @@
       "contributor": null,
       "rationale": "Generated from discovery; each tape marks which items it covers (provider adapters, protocol adapters, routes, providers).",
       "id": "concept_capabilities_md",
-      "community": 14,
+      "community": 6,
       "norm_label": "capabilities.md \u2014 parity coverage denominator"
     },
     {
@@ -1377,7 +1393,7 @@
       "contributor": null,
       "rationale": "Providers needing real credentials can only be taped on a machine holding the key. Tapes freeze vendor behaviour at capture time \u2014 a vendor format change leaves old tapes green while production breaks, so periodic recapture is required.",
       "id": "concept_parity_limits",
-      "community": 14,
+      "community": 6,
       "norm_label": "stated limits of tape-based parity"
     },
     {
@@ -1508,7 +1524,7 @@
       "contributor": null,
       "rationale": "Barely tested in 9router \u2014 a place AIGate must be BETTER, not merely equal.",
       "id": "gs_client_cancellation",
-      "community": 6,
+      "community": 17,
       "norm_label": "golden scenario: client cancellation"
     },
     {
@@ -1563,7 +1579,7 @@
       "rationale": "Phase A+B for all 23 feature groups, producing the full Feature Matrix and capabilities.md. Not one line of product code. A+B done once system-wide because only a whole-system view reveals overlapping features; C\u2192F is decision-and-build and belongs inside each SP, since doing it early makes it stale before use.",
       "status": "done",
       "id": "ms_m_minus_1",
-      "community": 4,
+      "community": 3,
       "norm_label": "milestone m-1 \u00b7 discovery"
     },
     {
@@ -1576,7 +1592,7 @@
       "author": null,
       "contributor": null,
       "id": "ms_m0",
-      "community": 16,
+      "community": 12,
       "norm_label": "milestone m0 \u00b7 foundation"
     },
     {
@@ -1591,7 +1607,7 @@
       "rationale": "Single goal: one streaming POST /v1/chat/completions with a valid API key through ONE provider, passing all 13 golden scenarios. Acceptance gate: parity tiers 1+2 clean.",
       "status": "gate-passed",
       "id": "ms_m1",
-      "community": 0,
+      "community": 6,
       "norm_label": "milestone m1 \u00b7 walking skeleton (thin end-to-end slice)"
     },
     {
@@ -1605,7 +1621,7 @@
       "contributor": null,
       "rationale": "Acceptance gate: parity coverage reaches the agreed threshold across all of capabilities.md.",
       "id": "ms_m2",
-      "community": 5,
+      "community": 2,
       "norm_label": "milestone m2 \u00b7 scale-out (parallel branches)"
     },
     {
@@ -1632,7 +1648,7 @@
       "contributor": null,
       "rationale": "Blocks M0. If it fails, the DB fork must be revisited: hand-written raw repositories, or drop sql.js and lose the 'installs without build tools' guarantee.",
       "id": "spike_1",
-      "community": 16,
+      "community": 12,
       "norm_label": "spike-1 \u2014 drizzle-orm/sqlite-proxy on node:sqlite + sql.js"
     },
     {
@@ -1646,7 +1662,7 @@
       "contributor": null,
       "status": "done",
       "id": "sp_sp0",
-      "community": 16,
+      "community": 12,
       "norm_label": "sp0 \u2014 2 skills + mechanical lint suite"
     },
     {
@@ -1660,7 +1676,7 @@
       "contributor": null,
       "status": "done",
       "id": "sp_sp1",
-      "community": 15,
+      "community": 14,
       "norm_label": "sp1 \u2014 monorepo skeleton (pnpm, ts strict, nestjs+fastify, vite, /health)"
     },
     {
@@ -1674,7 +1690,7 @@
       "contributor": null,
       "status": "done",
       "id": "sp_sp2",
-      "community": 16,
+      "community": 12,
       "norm_label": "sp2 \u2014 spike-1 + drizzle schema + 4-tier driver chain + migration runner"
     },
     {
@@ -1688,7 +1704,7 @@
       "contributor": null,
       "status": "done-no-ui",
       "id": "sp_sp3",
-      "community": 14,
+      "community": 6,
       "norm_label": "sp3 \u2014 parity harness 3 tiers + recording proxy + normalizer"
     },
     {
@@ -1702,7 +1718,7 @@
       "contributor": null,
       "status": "done-no-ui",
       "id": "sp_sp4",
-      "community": 9,
+      "community": 12,
       "norm_label": "sp4 \u2014 tools/extract: 9router registry data \u2192 aigate schema"
     },
     {
@@ -1744,7 +1760,7 @@
       "contributor": null,
       "status": "done-no-ui",
       "id": "sp_sp7",
-      "community": 9,
+      "community": 8,
       "norm_label": "sp7 \u2014 engine: cip core, schema registry, capability resolution"
     },
     {
@@ -1758,7 +1774,7 @@
       "contributor": null,
       "status": "done-no-ui",
       "id": "sp_sp8",
-      "community": 9,
+      "community": 1,
       "norm_label": "sp8 \u2014 transport: httptransportport (direct + timeout only)"
     },
     {
@@ -1786,7 +1802,7 @@
       "contributor": null,
       "status": "done-no-ui",
       "id": "sp_sp10",
-      "community": 13,
+      "community": 7,
       "norm_label": "sp10 \u2014 engine: protocol adapter in/out (openai only)"
     },
     {
@@ -1800,7 +1816,7 @@
       "contributor": null,
       "status": "done-ui-wired",
       "id": "sp_sp11",
-      "community": 3,
+      "community": 2,
       "norm_label": "sp11 \u2014 connections (single apikey account)"
     },
     {
@@ -1829,7 +1845,7 @@
       "contributor": null,
       "status": "next",
       "id": "sp_sp13",
-      "community": 2,
+      "community": 13,
       "norm_label": "sp13 \u2014 catalog \u2192 runtime registry (41 connectable providers, /api/providers, /providers wired)"
     },
     {
@@ -1842,7 +1858,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp14",
-      "community": 5,
+      "community": 2,
       "norm_label": "sp14 \u2014 provider adapters by protocol family (kiro, cursor, commandcode, vertex, azure...)"
     },
     {
@@ -1855,7 +1871,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp15",
-      "community": 5,
+      "community": 2,
       "norm_label": "sp15 \u2014 protocol adapters, all 13 formats"
     },
     {
@@ -1868,7 +1884,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp16",
-      "community": 3,
+      "community": 2,
       "norm_label": "sp16 \u2014 oauth for 20 providers: flow + single-flight refresh + reactive/proactive"
     },
     {
@@ -1881,7 +1897,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp17",
-      "community": 6,
+      "community": 2,
       "norm_label": "sp17 \u2014 multi-account fallback: fill-first/round-robin/sticky, accountlock, provider-keyed mutex"
     },
     {
@@ -1907,7 +1923,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp19",
-      "community": 5,
+      "community": 2,
       "norm_label": "sp19 \u2014 combo: fallback / round-robin / fusion (panel + judge + quorum-grace) + concurrency limit"
     },
     {
@@ -1920,7 +1936,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp20",
-      "community": 5,
+      "community": 2,
       "norm_label": "sp20 \u2014 capacity adapter: capability pools, reorder, history trimming"
     },
     {
@@ -1933,7 +1949,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp21",
-      "community": 5,
+      "community": 2,
       "norm_label": "sp21 \u2014 token saver 5 tiers, fail-open end to end, fixes sb-1"
     },
     {
@@ -1946,7 +1962,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp22",
-      "community": 5,
+      "community": 2,
       "norm_label": "sp22 \u2014 remaining 7 lanes: embeddings, image, tts, stt, video, search, fetch"
     },
     {
@@ -1959,7 +1975,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp23",
-      "community": 3,
+      "community": 2,
       "norm_label": "sp23 \u2014 media: 9 kinds, voice list"
     },
     {
@@ -1985,7 +2001,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp25",
-      "community": 3,
+      "community": 1,
       "norm_label": "sp25 \u2014 tooling: cli-tools, skills, console log, tunnel, mitm, mcp, provider-nodes"
     },
     {
@@ -2040,7 +2056,7 @@
       "contributor": null,
       "rationale": "The frontend edition of hexagonal: a feature may not import a feature (lift to shared/ or compose at the route layer, enforced by eslint-plugin-boundaries); a component only rises to shared/ui when \u22652 features genuinely use it. Route components capped at ~200 lines.",
       "id": "concept_fe_feature_boundaries",
-      "community": 15,
+      "community": 14,
       "norm_label": "feature-based frontend structure with import boundaries"
     },
     {
@@ -2068,7 +2084,7 @@
       "contributor": null,
       "rationale": "Virtualize any list that can exceed ~50 rows; every query must carry limit + cursor with no unbounded endpoint; client ring buffer with a hard node cap for SSE; route code-splitting with lazy Recharts/Monaco; 200ms debounce + keepPreviousData; ONE combined request for all 13 CLI tool statuses, not 13.",
       "id": "concept_ui_perf_constraints",
-      "community": 16,
+      "community": 12,
       "norm_label": "ui performance constraints"
     },
     {
@@ -2096,7 +2112,7 @@
       "contributor": null,
       "rationale": "9router has 12 hand-written auth modals (CursorAuthModal, KiroAuthModal, GitLabAuthModal, IFlowCookieModal, OAuthModal, ManualConfigModal\u2026) \u2014 the deepest niche in the whole UI. AIGate collapses them to 7 declarative step kinds (text, oauth-popup, device-code, paste-cookie, import-file, choose-social, confirm); a new provider only declares a step array. This is \u00a714 in its truest form: identical behaviour, far less code.",
       "id": "concept_authflow",
-      "community": 3,
+      "community": 2,
       "norm_label": "authflow \u2014 declarative, data-driven auth step framework"
     },
     {
@@ -2110,7 +2126,7 @@
       "contributor": null,
       "rationale": "The most valuable thing on the Routing screen: 9router offers no way to preview routing. Paste a real request, see the model \u2192 candidate \u2192 account tree with select/reject reasons. Dry-run, never calls the vendor.",
       "id": "concept_routing_simulator",
-      "community": 5,
+      "community": 2,
       "norm_label": "routing simulator (decision-tree dry run)"
     },
     {
@@ -2166,7 +2182,7 @@
       "contributor": null,
       "rationale": "Writing to ~/.claude/settings.json is writing into someone's home. 9router backs up but never lets the user preview \u2014 AIGate must show the diff and back up before writing.",
       "id": "concept_cli_config_diff_backup",
-      "community": 3,
+      "community": 1,
       "norm_label": "cli-tool config writes require diff preview + backup"
     },
     {
@@ -2194,7 +2210,7 @@
       "contributor": null,
       "rationale": "Endpoint variant tabs (OpenAI/Anthropic/Gemini/Codex): 9router has 5 rewrite paths but shows only one, and client double-prefixing is a frequent support cause. Key shown in full exactly once; masked by default with a 10s reveal.",
       "id": "screen_endpoint_keys",
-      "community": 0,
+      "community": 1,
       "norm_label": "endpoint & keys \u2014 /gateway/endpoint"
     },
     {
@@ -2208,7 +2224,7 @@
       "contributor": null,
       "rationale": "The ONLY place that decides where a request goes: combo + fallback + capacity adapter merged, because 9router separates them so nobody can see overall priority order. AccountLock shows a real countdown instead of a bare 'unavailable'.",
       "id": "screen_routing_fallback",
-      "community": 5,
+      "community": 2,
       "norm_label": "routing & fallback \u2014 /gateway/routing"
     },
     {
@@ -2222,7 +2238,7 @@
       "contributor": null,
       "rationale": "Pipeline drawn in execution order RTK \u25b8 Headroom \u25b8 Caveman \u25b8 Ponytail \u25b8 PXPIPE. Each tier reports how often it failed and was skipped \u2014 silent fail-open means nobody notices breakage. PXPIPE 'running' means the module is loaded, not that a port is listening.",
       "id": "screen_token_saver",
-      "community": 5,
+      "community": 2,
       "norm_label": "token saver \u2014 /gateway/token-saver"
     },
     {
@@ -2236,7 +2252,7 @@
       "contributor": null,
       "rationale": "123 virtualized cards with lazy logos and client-side filtering, 200ms debounce. getEffectiveStatus niche: a connection marked unavailable whose lock expired must display active again with an explanatory tooltip.",
       "id": "screen_llm_providers",
-      "community": 3,
+      "community": 2,
       "norm_label": "llm providers \u2014 /providers, /:id, /new"
     },
     {
@@ -2250,7 +2266,7 @@
       "contributor": null,
       "rationale": "All 9 kinds as tabs; kinds with no configured provider are dimmed and labelled, not hidden. TTS adds a voice browser with region names via Intl.DisplayNames.",
       "id": "screen_media_providers",
-      "community": 3,
+      "community": 2,
       "norm_label": "media providers \u2014 /providers/media/:kind, /:kind/:id"
     },
     {
@@ -2264,7 +2280,7 @@
       "contributor": null,
       "rationale": "Bulk 'test all' must carry an explicit concurrency limit \u2014 never Promise.all over the whole table.",
       "id": "screen_connections",
-      "community": 3,
+      "community": 2,
       "norm_label": "connections & authflow \u2014 /providers/connections"
     },
     {
@@ -2373,7 +2389,7 @@
       "author": null,
       "contributor": null,
       "id": "screen_cli_tools",
-      "community": 3,
+      "community": 1,
       "norm_label": "cli tools \u2014 /integrations/cli-tools, /:toolid"
     },
     {
@@ -2387,7 +2403,7 @@
       "contributor": null,
       "rationale": "Static page, no server state.",
       "id": "screen_skills",
-      "community": 3,
+      "community": 1,
       "norm_label": "skills \u2014 /integrations/skills"
     },
     {
@@ -2401,7 +2417,7 @@
       "contributor": null,
       "rationale": "New screen \u2014 9router has /api/mcp but no UI. Writes must state which tool's file will be modified, with a diff.",
       "id": "screen_mcp",
-      "community": 3,
+      "community": 1,
       "norm_label": "mcp \u2014 /integrations/mcp"
     },
     {
@@ -2495,7 +2511,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_u3",
-      "community": 0,
+      "community": 1,
       "norm_label": "u3 \u2014 endpoint & keys"
     },
     {
@@ -2508,7 +2524,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_u4",
-      "community": 3,
+      "community": 2,
       "norm_label": "u4 \u2014 providers + authflow + connections (heaviest sp)"
     },
     {
@@ -2534,7 +2550,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_u6",
-      "community": 5,
+      "community": 2,
       "norm_label": "u6 \u2014 routing & fallback + simulator"
     },
     {
@@ -2587,7 +2603,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_u10",
-      "community": 3,
+      "community": 1,
       "norm_label": "u10 \u2014 integrations: cli tools + skills + mcp"
     },
     {
@@ -2614,7 +2630,7 @@
       "contributor": null,
       "rationale": "Targets the 'breaks the rule under pressure' failure mode, so the form is prohibition + rationalization table + red flags. Description deliberately does NOT summarise the workflow \u2014 writing-skills warns that agents then follow the description and skip the body. Target <450 words with reference files bounded-patterns.md, review-gate.md, db-checklist.md.",
       "id": "skill_writing_lean_bounded_code",
-      "community": 16,
+      "community": 12,
       "norm_label": "skill: writing-lean-bounded-code"
     },
     {
@@ -2628,7 +2644,7 @@
       "contributor": null,
       "rationale": "Named after the core insight, not the project \u2014 writing-skills forbids skills for project-local conventions. Iron law: no product code before that feature's Feature Matrix is done, 'No exceptions'. Most valuable section is distinguishing business rule from implementation accident. Reference files: feature-matrix.md, golden-scenarios.md, error-taxonomy.md.",
       "id": "skill_porting_behavior_not_code",
-      "community": 6,
+      "community": 2,
       "norm_label": "skill: porting-behavior-not-code"
     },
     {
@@ -2642,7 +2658,7 @@
       "contributor": null,
       "rationale": "Anything lint can block (unbounded Promise.all, missing timeout, feature\u2192feature imports, domain importing a framework, queries without LIMIT, route files >200 lines, empty catch, secrets in logs, any/as casts, unbounded retry) is pushed to eslint/dependency-cruiser/CI where it cannot be rationalized away. Skills keep only judgement questions.",
       "id": "concept_machine_blocks_vs_skill_teaches",
-      "community": 16,
+      "community": 12,
       "norm_label": "split: machines block mechanics, skills teach judgement"
     },
     {
@@ -2656,7 +2672,7 @@
       "contributor": null,
       "rationale": "SP0 is not 'write two markdown files'. RED: run 3+ pressure scenarios against a subagent WITHOUT the skill and record the rationalizations verbatim. GREEN: write only against recorded rationalizations, nothing for imagined cases. REFACTOR: rerun and close new loopholes. Micro-test the wording 5+ times per variant with a no-guidance control; if 5 runs give 5 different results the wording is too loose \u2014 tighten the form, don't add words.",
       "id": "concept_skill_iron_law_red_first",
-      "community": 16,
+      "community": 12,
       "norm_label": "iron law: no skill without a failing test first (red \u2192 green \u2192 refactor)"
     },
     {
@@ -2670,7 +2686,7 @@
       "contributor": null,
       "rationale": "Not just display names: npm package, CLI binary, tray, service name, User-Agent sent to vendors, the MITM root CA's CN, cookie name, schema version marker, config dir ~/.aigate, default port (different from 20128 so it can run beside 9router during tape capture). API key keeps the sk- prefix because clients expect it; the remainder is AIGate's own design.",
       "id": "concept_branding_sweep",
-      "community": 14,
+      "community": 6,
       "norm_label": "branding sweep to the bottom of the stack"
     },
     {
@@ -2684,7 +2700,7 @@
       "contributor": null,
       "rationale": "Parity coverage threshold for M2 (before M2); Basic Chat / Media combo / PXPIPE ship-or-delete (Phase C of each feature); new API key format (SP6); default port and npm/CLI names (SP1); whether drizzle-orm/sqlite-proxy carries node:sqlite + sql.js (SPIKE-1, blocks M0).",
       "id": "concept_open_decisions",
-      "community": 15,
+      "community": 14,
       "norm_label": "open decisions not settled by this spec"
     },
     {
@@ -2697,7 +2713,7 @@
       "author": null,
       "contributor": null,
       "id": "task_01_workspace",
-      "community": 4,
+      "community": 3,
       "norm_label": "task 1 \u2014 discovery tooling workspace"
     },
     {
@@ -2710,7 +2726,7 @@
       "author": null,
       "contributor": null,
       "id": "task_02_schema_validator",
-      "community": 4,
+      "community": 3,
       "norm_label": "task 2 \u2014 feature matrix schema and validator"
     },
     {
@@ -2723,7 +2739,7 @@
       "author": null,
       "contributor": null,
       "id": "task_03_inventory_extractor",
-      "community": 4,
+      "community": 3,
       "norm_label": "task 3 \u2014 inventory extractor"
     },
     {
@@ -2736,7 +2752,7 @@
       "author": null,
       "contributor": null,
       "id": "task_04_coverage_checker",
-      "community": 4,
+      "community": 3,
       "norm_label": "task 4 \u2014 coverage checker"
     },
     {
@@ -2749,7 +2765,7 @@
       "author": null,
       "contributor": null,
       "id": "task_05_capabilities_cli",
-      "community": 4,
+      "community": 3,
       "norm_label": "task 5 \u2014 capabilities.md generator and cli"
     },
     {
@@ -2775,7 +2791,7 @@
       "author": null,
       "contributor": null,
       "id": "task_07_trace_providers_auth",
-      "community": 3,
+      "community": 2,
       "norm_label": "task 7 \u2014 trace providers, provider authentication, oauth providers, api-key providers"
     },
     {
@@ -2788,7 +2804,7 @@
       "author": null,
       "contributor": null,
       "id": "task_08_trace_accounts_multiaccount",
-      "community": 3,
+      "community": 2,
       "norm_label": "task 8 \u2014 trace provider account management, multi-account"
     },
     {
@@ -2801,7 +2817,7 @@
       "author": null,
       "contributor": null,
       "id": "task_09_trace_model_registry_mapping",
-      "community": 3,
+      "community": 2,
       "norm_label": "task 9 \u2014 trace model registry, model mapping"
     },
     {
@@ -2814,7 +2830,7 @@
       "author": null,
       "contributor": null,
       "id": "task_10_trace_routing_fallback",
-      "community": 5,
+      "community": 2,
       "norm_label": "task 10 \u2014 trace request routing, auto fallback"
     },
     {
@@ -2827,7 +2843,7 @@
       "author": null,
       "contributor": null,
       "id": "task_11_trace_combo_capacity_adapter",
-      "community": 5,
+      "community": 2,
       "norm_label": "task 11 \u2014 trace combo / vision adapter"
     },
     {
@@ -2840,7 +2856,7 @@
       "author": null,
       "contributor": null,
       "id": "task_12_trace_token_saver",
-      "community": 4,
+      "community": 3,
       "norm_label": "task 12 \u2014 trace token saver"
     },
     {
@@ -2853,7 +2869,7 @@
       "author": null,
       "contributor": null,
       "id": "task_13_trace_usage_quota",
-      "community": 4,
+      "community": 1,
       "norm_label": "task 13 \u2014 trace usage, quota tracker"
     },
     {
@@ -2866,7 +2882,7 @@
       "author": null,
       "contributor": null,
       "id": "task_14_trace_media_providers",
-      "community": 3,
+      "community": 2,
       "norm_label": "task 14 \u2014 trace media providers"
     },
     {
@@ -2879,7 +2895,7 @@
       "author": null,
       "contributor": null,
       "id": "task_15_trace_proxy_pools",
-      "community": 1,
+      "community": 3,
       "norm_label": "task 15 \u2014 trace proxy pools"
     },
     {
@@ -2892,7 +2908,7 @@
       "author": null,
       "contributor": null,
       "id": "task_16_trace_translation_i18n",
-      "community": 5,
+      "community": 2,
       "norm_label": "task 16 \u2014 trace translation engine and interface language"
     },
     {
@@ -2905,7 +2921,7 @@
       "author": null,
       "contributor": null,
       "id": "task_17_trace_integrations",
-      "community": 3,
+      "community": 1,
       "norm_label": "task 17 \u2014 trace cli tools, skills, mcp"
     },
     {
@@ -2918,7 +2934,7 @@
       "author": null,
       "contributor": null,
       "id": "task_18_trace_console_remote",
-      "community": 4,
+      "community": 3,
       "norm_label": "task 18 \u2014 trace console log, remote functionality"
     },
     {
@@ -2931,7 +2947,7 @@
       "author": null,
       "contributor": null,
       "id": "task_19_exit_gate",
-      "community": 4,
+      "community": 3,
       "norm_label": "task 19 \u2014 m-1 exit gate"
     },
     {
@@ -2944,7 +2960,7 @@
       "author": null,
       "contributor": null,
       "id": "tool_paths",
-      "community": 4,
+      "community": 3,
       "norm_label": "paths.ts \u2014 9router/repo root resolution"
     },
     {
@@ -2957,7 +2973,7 @@
       "author": null,
       "contributor": null,
       "id": "tool_schema",
-      "community": 4,
+      "community": 3,
       "norm_label": "schema.ts \u2014 zod feature matrix entry schema"
     },
     {
@@ -2970,7 +2986,7 @@
       "author": null,
       "contributor": null,
       "id": "tool_validate",
-      "community": 4,
+      "community": 3,
       "norm_label": "validate.ts \u2014 matrix + evidence validator"
     },
     {
@@ -2983,7 +2999,7 @@
       "author": null,
       "contributor": null,
       "id": "tool_inventory",
-      "community": 4,
+      "community": 3,
       "norm_label": "inventory.ts \u2014 9router surface scanner"
     },
     {
@@ -2996,7 +3012,7 @@
       "author": null,
       "contributor": null,
       "id": "tool_coverage",
-      "community": 4,
+      "community": 3,
       "norm_label": "coverage.ts \u2014 matrix vs inventory coverage report"
     },
     {
@@ -3009,7 +3025,7 @@
       "author": null,
       "contributor": null,
       "id": "tool_capabilities",
-      "community": 4,
+      "community": 3,
       "norm_label": "capabilities.ts \u2014 capabilities.md renderer"
     },
     {
@@ -3022,7 +3038,7 @@
       "author": null,
       "contributor": null,
       "id": "tool_cli",
-      "community": 4,
+      "community": 3,
       "norm_label": "cli.ts \u2014 validate | inventory | coverage | capabilities"
     },
     {
@@ -3035,7 +3051,7 @@
       "author": null,
       "contributor": null,
       "id": "tool_gate_test",
-      "community": 4,
+      "community": 3,
       "norm_label": "gate.test.ts \u2014 m-1 exit gate test"
     },
     {
@@ -3061,7 +3077,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_02_providers_auth",
-      "community": 3,
+      "community": 2,
       "norm_label": "02-providers-auth.yaml"
     },
     {
@@ -3074,7 +3090,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_03_accounts_multiaccount",
-      "community": 3,
+      "community": 2,
       "norm_label": "03-accounts-multiaccount.yaml"
     },
     {
@@ -3087,7 +3103,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_04_model_registry_mapping",
-      "community": 12,
+      "community": 8,
       "norm_label": "04-model-registry-mapping.yaml"
     },
     {
@@ -3100,7 +3116,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_05_request_routing_fallback",
-      "community": 5,
+      "community": 2,
       "norm_label": "05-request-routing-fallback.yaml"
     },
     {
@@ -3113,7 +3129,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_06_combo_capacity_adapter",
-      "community": 12,
+      "community": 8,
       "norm_label": "06-combo-capacity-adapter.yaml"
     },
     {
@@ -3126,7 +3142,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_07_token_saver",
-      "community": 4,
+      "community": 3,
       "norm_label": "07-token-saver.yaml"
     },
     {
@@ -3139,7 +3155,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_08_usage_quota",
-      "community": 15,
+      "community": 1,
       "norm_label": "08-usage-quota.yaml"
     },
     {
@@ -3152,7 +3168,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_09_media_providers",
-      "community": 3,
+      "community": 2,
       "norm_label": "09-media-providers.yaml"
     },
     {
@@ -3165,7 +3181,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_10_proxy_pools",
-      "community": 1,
+      "community": 3,
       "norm_label": "10-proxy-pools.yaml"
     },
     {
@@ -3178,7 +3194,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_11_translation_i18n",
-      "community": 5,
+      "community": 2,
       "norm_label": "11-translation-i18n.yaml"
     },
     {
@@ -3191,7 +3207,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_12_integrations",
-      "community": 3,
+      "community": 1,
       "norm_label": "12-integrations.yaml"
     },
     {
@@ -3204,7 +3220,7 @@
       "author": null,
       "contributor": null,
       "id": "matrix_13_console_remote",
-      "community": 4,
+      "community": 3,
       "norm_label": "13-console-remote.yaml"
     },
     {
@@ -3217,7 +3233,7 @@
       "author": null,
       "contributor": null,
       "id": "artifact_inventory_json",
-      "community": 4,
+      "community": 3,
       "norm_label": "docs/discovery/inventory.json"
     },
     {
@@ -3230,7 +3246,7 @@
       "author": null,
       "contributor": null,
       "id": "artifact_coverage_md",
-      "community": 4,
+      "community": 3,
       "norm_label": "docs/discovery/coverage.md"
     },
     {
@@ -3243,7 +3259,7 @@
       "author": null,
       "contributor": null,
       "id": "artifact_capabilities_md",
-      "community": 4,
+      "community": 3,
       "norm_label": "docs/capabilities.md (generated capability specification)"
     },
     {
@@ -3256,7 +3272,7 @@
       "author": null,
       "contributor": null,
       "id": "artifact_gaps_md",
-      "community": 4,
+      "community": 2,
       "norm_label": "docs/discovery/gaps.md (gap register)"
     },
     {
@@ -3282,7 +3298,7 @@
       "author": null,
       "contributor": null,
       "id": "concept_entry_template",
-      "community": 4,
+      "community": 3,
       "norm_label": "feature matrix entry template (null never \"\" or \"n/a\")"
     },
     {
@@ -3295,7 +3311,7 @@
       "author": null,
       "contributor": null,
       "id": "concept_evidence_file_line",
-      "community": 4,
+      "community": 3,
       "norm_label": "evidence with file:line \u2014 traced is a test, not a self-declaration"
     },
     {
@@ -3308,7 +3324,7 @@
       "author": null,
       "contributor": null,
       "id": "concept_suspicion_block",
-      "community": 4,
+      "community": 3,
       "norm_label": "suspicion block \u2014 expected / actual / impact"
     },
     {
@@ -3321,7 +3337,7 @@
       "author": null,
       "contributor": null,
       "id": "concept_parity_status",
-      "community": 4,
+      "community": 3,
       "norm_label": "paritystatus lifecycle (not-started \u2192 traced \u2192 contracted \u2192 implemented \u2192 verified)"
     },
     {
@@ -3334,7 +3350,7 @@
       "author": null,
       "contributor": null,
       "id": "concept_error_codes",
-      "community": 4,
+      "community": 3,
       "norm_label": "canonical error classification codes (8 values)"
     },
     {
@@ -3347,7 +3363,7 @@
       "author": null,
       "contributor": null,
       "id": "concept_23_feature_groups",
-      "community": 3,
+      "community": 2,
       "norm_label": "the 23 feature groups required by behavioral.md \u00a75"
     },
     {
@@ -3360,7 +3376,7 @@
       "author": null,
       "contributor": null,
       "id": "concept_fixed_inventory_counts",
-      "community": 4,
+      "community": 3,
       "norm_label": "fixed inventory counts (154 routes, 28 pages, 123 providers, 29 executors, 48 translators, 11 repos, 14 oauth routes)"
     },
     {
@@ -3373,7 +3389,7 @@
       "author": null,
       "contributor": null,
       "id": "concept_canonical_internal_protocol",
-      "community": 5,
+      "community": 2,
       "norm_label": "canonical internal protocol"
     },
     {
@@ -3386,7 +3402,7 @@
       "author": null,
       "contributor": null,
       "id": "constraint_no_product_code",
-      "community": 4,
+      "community": 3,
       "norm_label": "constraint \u2014 no aigate product code in m-1 (only tools/discovery and docs)"
     },
     {
@@ -3399,7 +3415,7 @@
       "author": null,
       "contributor": null,
       "id": "constraint_bounded_fs_scan",
-      "community": 5,
+      "community": 3,
       "norm_label": "constraint \u2014 every filesystem scan uses fast-glob with an explicit ignore list"
     },
     {
@@ -3412,7 +3428,7 @@
       "author": null,
       "contributor": null,
       "id": "constraint_no_contracts_in_m1",
-      "community": 4,
+      "community": 3,
       "norm_label": "constraint \u2014 no phase c contracts during discovery"
     },
     {
@@ -3425,7 +3441,7 @@
       "author": null,
       "contributor": null,
       "id": "ref_9router",
-      "community": 4,
+      "community": 3,
       "norm_label": "9router checkout (read-only behavioral reference at e:/9router)"
     },
     {
@@ -3464,7 +3480,7 @@
       "author": null,
       "contributor": null,
       "id": "label_implementation_accident",
-      "community": 4,
+      "community": 0,
       "norm_label": "implementation_accident label"
     },
     {
@@ -3477,7 +3493,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_phase_model",
-      "community": 4,
+      "community": 3,
       "norm_label": "phase model a\u2192f (discovery, behavior extraction, contract, design, implementation, parity verification)"
     },
     {
@@ -3490,7 +3506,7 @@
       "author": null,
       "contributor": null,
       "id": "phase_a_discovery",
-      "community": 4,
+      "community": 3,
       "norm_label": "phase a \u2014 discovery"
     },
     {
@@ -3503,7 +3519,7 @@
       "author": null,
       "contributor": null,
       "id": "phase_b_behavior_extraction",
-      "community": 4,
+      "community": 3,
       "norm_label": "phase b \u2014 behavior extraction"
     },
     {
@@ -3516,7 +3532,7 @@
       "author": null,
       "contributor": null,
       "id": "phase_c_contract_definition",
-      "community": 4,
+      "community": 3,
       "norm_label": "phase c \u2014 contract definition"
     },
     {
@@ -3529,7 +3545,7 @@
       "author": null,
       "contributor": null,
       "id": "phase_d_new_design",
-      "community": 4,
+      "community": 3,
       "norm_label": "phase d \u2014 new design"
     },
     {
@@ -3542,7 +3558,7 @@
       "author": null,
       "contributor": null,
       "id": "phase_e_implementation",
-      "community": 4,
+      "community": 3,
       "norm_label": "phase e \u2014 implementation"
     },
     {
@@ -3555,7 +3571,7 @@
       "author": null,
       "contributor": null,
       "id": "phase_f_parity_verification",
-      "community": 4,
+      "community": 3,
       "norm_label": "phase f \u2014 parity verification"
     },
     {
@@ -3568,7 +3584,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_goal",
-      "community": 4,
+      "community": 3,
       "norm_label": "\u00a71 goal \u2014 build a new ai gateway, 9router is reference only"
     },
     {
@@ -3581,7 +3597,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_core_principles",
-      "community": 4,
+      "community": 3,
       "norm_label": "\u00a72 core principles \u2014 never port, rename, or translate 9router line by line"
     },
     {
@@ -3594,7 +3610,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_20_questions",
-      "community": 4,
+      "community": 3,
       "norm_label": "\u00a73 the 20 behavioral questions (trigger...edge cases)"
     },
     {
@@ -3607,7 +3623,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_feature_discovery",
-      "community": 3,
+      "community": 2,
       "norm_label": "\u00a75 feature discovery \u2014 inventory every group, do not trust the ui menu"
     },
     {
@@ -3620,7 +3636,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_feature_matrix",
-      "community": 3,
+      "community": 2,
       "norm_label": "\u00a76 feature matrix requirement \u2014 nothing is understood until fully traced"
     },
     {
@@ -3646,7 +3662,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_business_rule_over_impl",
-      "community": 4,
+      "community": 3,
       "norm_label": "\u00a78 business rule beats old implementation"
     },
     {
@@ -3659,7 +3675,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_domain_model",
-      "community": 3,
+      "community": 2,
       "norm_label": "\u00a79 build an explicit domain model (provider, quota, routingpolicy...)"
     },
     {
@@ -3672,7 +3688,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_architecture_independent",
-      "community": 3,
+      "community": 2,
       "norm_label": "\u00a710 new architecture independent of 9router (api/application/domain/ports/infra)"
     },
     {
@@ -3685,7 +3701,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_provider_port",
-      "community": 3,
+      "community": 2,
       "norm_label": "\u00a711 providers reached only through a port (aiproviderport)"
     },
     {
@@ -3698,7 +3714,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_routing_engine",
-      "community": 5,
+      "community": 2,
       "norm_label": "\u00a712 router is its own business engine, not controller logic"
     },
     {
@@ -3711,7 +3727,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_translator_protocol",
-      "community": 5,
+      "community": 2,
       "norm_label": "\u00a713 translator/protocol separation \u2014 canonical vs vendor formats"
     },
     {
@@ -3724,7 +3740,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_feature_parity",
-      "community": 4,
+      "community": 3,
       "norm_label": "\u00a714 feature parity is not code parity"
     },
     {
@@ -3737,7 +3753,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_code_quality",
-      "community": 23,
+      "community": 22,
       "norm_label": "\u00a715 code quality \u2014 shortest clear implementation, not shortest possible"
     },
     {
@@ -3750,7 +3766,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_performance",
-      "community": 5,
+      "community": 3,
       "norm_label": "\u00a716 do not inherit performance issues; all large workloads bounded"
     },
     {
@@ -3763,7 +3779,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_latency",
-      "community": 5,
+      "community": 3,
       "norm_label": "\u00a717 latency \u2014 clean architecture must not add hot-path i/o"
     },
     {
@@ -3776,7 +3792,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_streaming",
-      "community": 8,
+      "community": 17,
       "norm_label": "\u00a718 streaming is first-class (ttft, cancellation, backpressure)"
     },
     {
@@ -3789,7 +3805,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_fallback_engine",
-      "community": 4,
+      "community": 3,
       "norm_label": "\u00a719 fallback as explicit policy with classified errors"
     },
     {
@@ -3802,7 +3818,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_no_blind_fallback",
-      "community": 5,
+      "community": 2,
       "norm_label": "\u00a720 no blind fallback \u2014 fallback follows error semantics"
     },
     {
@@ -3815,7 +3831,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_quota",
-      "community": 4,
+      "community": 1,
       "norm_label": "\u00a721 quota must be understood fully, not copied from the ui tracker"
     },
     {
@@ -3828,7 +3844,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_usage",
-      "community": 4,
+      "community": 1,
       "norm_label": "\u00a722 usage fields to trace per request (tokens, cost, latency, fallback attempts)"
     },
     {
@@ -3854,7 +3870,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_testing_strategy",
-      "community": 4,
+      "community": 3,
       "norm_label": "\u00a724 characterization/contract tests prove old \u2248 new at contract level"
     },
     {
@@ -3867,7 +3883,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_golden_scenarios",
-      "community": 4,
+      "community": 3,
       "norm_label": "\u00a725 golden scenarios (13 critical flows)"
     },
     {
@@ -3893,7 +3909,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_technical_debt",
-      "community": 4,
+      "community": 0,
       "norm_label": "\u00a727 separate business requirement from implementation accident"
     },
     {
@@ -3906,7 +3922,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_feature_process",
-      "community": 4,
+      "community": 3,
       "norm_label": "\u00a728 per-feature process: discover\u2192trace\u2192document\u2192...\u2192review"
     },
     {
@@ -3919,7 +3935,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_definition_of_done",
-      "community": 4,
+      "community": 3,
       "norm_label": "\u00a729 definition of done \u2014 13 checklist items, no self-declared done"
     },
     {
@@ -3932,7 +3948,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_12_questions",
-      "community": 4,
+      "community": 3,
       "norm_label": "\u00a730 the 12 pre-implementation questions"
     },
     {
@@ -3945,7 +3961,7 @@
       "author": null,
       "contributor": null,
       "id": "behavioral_final_principle",
-      "community": 4,
+      "community": 3,
       "norm_label": "final principle \u2014 9router says what, never how"
     },
     {
@@ -3958,7 +3974,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_lean_code",
-      "community": 23,
+      "community": 22,
       "norm_label": "rule 1 \u2014 write lean code, no over-engineering"
     },
     {
@@ -3971,7 +3987,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_maintainability",
-      "community": 23,
+      "community": 22,
       "norm_label": "rule 2 \u2014 code must be maintainable, no magic values or hidden side effects"
     },
     {
@@ -3984,7 +4000,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_performance_by_design",
-      "community": 5,
+      "community": 3,
       "norm_label": "rule 3 \u2014 optimize performance at design time, not micro-optimization"
     },
     {
@@ -3997,7 +4013,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_bounded_workloads",
-      "community": 5,
+      "community": 3,
       "norm_label": "rule 4 \u2014 every workload must be bounded"
     },
     {
@@ -4010,7 +4026,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_low_latency",
-      "community": 5,
+      "community": 3,
       "norm_label": "rule 5 \u2014 low latency: parallelize independent awaits, only when bounded"
     },
     {
@@ -4023,7 +4039,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_database",
-      "community": 4,
+      "community": 1,
       "norm_label": "rule 6 \u2014 database discipline (n+1, pagination, no query in loop)"
     },
     {
@@ -4036,7 +4052,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_error_handling",
-      "community": 4,
+      "community": 3,
       "norm_label": "rule 7 \u2014 error handling: never swallow, keep context and stack, bounded retry"
     },
     {
@@ -4049,7 +4065,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_resource_management",
-      "community": 4,
+      "community": 3,
       "norm_label": "rule 8 \u2014 every resource has an explicit lifecycle"
     },
     {
@@ -4062,7 +4078,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_concurrency_safety",
-      "community": 3,
+      "community": 2,
       "norm_label": "rule 9 \u2014 concurrency safety (race, double write, idempotency, lock last)"
     },
     {
@@ -4075,7 +4091,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_cache",
-      "community": 1,
+      "community": 3,
       "norm_label": "rule 10 \u2014 cache only with a reason: key, ttl, invalidation, max size"
     },
     {
@@ -4088,7 +4104,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_code_review_questions",
-      "community": 5,
+      "community": 3,
       "norm_label": "rule 11 \u2014 review questions beyond \"does it run?\" (10x/100x traffic, unbounded work)"
     },
     {
@@ -4101,7 +4117,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_priority_order",
-      "community": 23,
+      "community": 22,
       "norm_label": "rule 12 \u2014 priority order: correctness \u2192 simplicity \u2192 maintainability \u2192 predictable resources \u2192 latency \u2192 throughput \u2192 optimization"
     },
     {
@@ -4114,7 +4130,7 @@
       "author": null,
       "contributor": null,
       "id": "group_mcp",
-      "community": 3,
+      "community": 1,
       "norm_label": "feature group \u2014 mcp (api with no ui, found during spec work)"
     },
     {
@@ -4128,7 +4144,7 @@
       "contributor": null,
       "rationale": "Four tabs (Accounts, Models, Config, Activity) keep per-provider concerns separated instead of one long form.",
       "id": "screen_provider_detail",
-      "community": 3,
+      "community": 2,
       "norm_label": "provider detail (/providers/:id)"
     },
     {
@@ -4142,7 +4158,7 @@
       "contributor": null,
       "rationale": "One shell with seven interchangeable step bodies replaces twelve hand-written per-provider dialogs. Scheduled third \u2014 the hardest interaction \u2014 while the list/detail pattern is fresh. Step failure returns to the same step rather than restarting the flow.",
       "id": "screen_authflow",
-      "community": 3,
+      "community": 2,
       "norm_label": "authflow modal (7 step bodies)"
     },
     {
@@ -4184,7 +4200,7 @@
       "contributor": null,
       "rationale": "Establishes the config-diff pattern: AIGate never writes a user's config file until a before/after diff has been shown and explicitly applied; a manual-instructions block exists for users who would rather it not touch their files.",
       "id": "screen_cli_tool_detail",
-      "community": 3,
+      "community": 1,
       "norm_label": "cli tool detail (/integrations/cli-tools/:toolid)"
     },
     {
@@ -4212,7 +4228,7 @@
       "contributor": null,
       "rationale": "OIDC and SAML secret fields never render a value \u2014 they show a 'configured' pill and a Replace button, enforcing the no-credential hard rule inside a form that inherently holds secrets.",
       "id": "screen_settings_auth",
-      "community": 1,
+      "community": 0,
       "norm_label": "settings \u00b7 auth & access (/settings/auth)"
     },
     {
@@ -4226,7 +4242,7 @@
       "contributor": null,
       "rationale": "The developer-mode toggle is the single gate that reveals Console, Translator and raw request tabs; 'Reset all data' sits in a red danger zone behind a type-to-confirm modal.",
       "id": "screen_settings_developer",
-      "community": 1,
+      "community": 0,
       "norm_label": "settings \u00b7 developer (/settings/developer)"
     },
     {
@@ -4296,7 +4312,7 @@
       "contributor": null,
       "rationale": "Mono value plus ghost copy button, showing 'Copied' for 2s \u2014 identifiers exist to be pasted elsewhere, so copying must be one click with visible acknowledgement.",
       "id": "ds_copy_field",
-      "community": 3,
+      "community": 1,
       "norm_label": "copy field component"
     },
     {
@@ -4394,7 +4410,7 @@
       "contributor": null,
       "rationale": "Compact throughout; prefer a table over a card grid whenever the list can exceed ~20 items, because card grids stop scanning well past that count.",
       "id": "ds_density_rules",
-      "community": 3,
+      "community": 1,
       "norm_label": "density rules (36px rows, 16px card padding, 24px section gap)"
     },
     {
@@ -4490,7 +4506,7 @@
       "author": null,
       "contributor": null,
       "id": "nav_group_gateway",
-      "community": 5,
+      "community": 2,
       "norm_label": "nav group: gateway (endpoint & keys \u00b7 routing & fallback \u00b7 token saver)"
     },
     {
@@ -4503,7 +4519,7 @@
       "author": null,
       "contributor": null,
       "id": "nav_group_providers",
-      "community": 3,
+      "community": 2,
       "norm_label": "nav group: providers (llm providers \u00b7 media providers \u00b7 connections \u00b7 quota)"
     },
     {
@@ -4542,7 +4558,7 @@
       "author": null,
       "contributor": null,
       "id": "nav_group_integrations",
-      "community": 3,
+      "community": 1,
       "norm_label": "nav group: integrations (cli tools \u00b7 skills \u00b7 mcp)"
     },
     {
@@ -4555,7 +4571,7 @@
       "author": null,
       "contributor": null,
       "id": "nav_group_settings",
-      "community": 1,
+      "community": 0,
       "norm_label": "nav group: settings (general \u00b7 auth & access \u00b7 developer)"
     },
     {
@@ -4583,7 +4599,7 @@
       "contributor": null,
       "rationale": "Only 1 of 25 in-shell screens (overview) renders all 7 groups plus sub-items; 23 render group labels only. This breaks the shared-shell goal of U1 \u2014 using the markup as-is would spawn a separate sidebar per screen. Cheapest fix: adopt overview's sidebar as the single component in U1 and take only content from the other screens.",
       "id": "audit_sidebar_drift",
-      "community": 1,
+      "community": 0,
       "norm_label": "audit fail: sidebar not identical across screens"
     },
     {
@@ -4639,7 +4655,7 @@
       "contributor": null,
       "rationale": "The first pass rendered a completely foreign sidebar (Dashboard \u00b7 Proxies \u00b7 Models \u00b7 Settings \u00b7 Logs \u00b7 Docs \u00b7 Support) and a divergent settings shell, so regeneration was cheaper than patching. v2 has all 7 groups plus sub-items, 'Auth & Access' active, an ERR_AUTH_CREDENTIAL_MISMATCH error block with Retry, and OIDC/SAML using the configured pill plus Replace. Residual defect: brand still reads 'AIGate Node / Local Instance' instead of 'AIGate'.",
       "id": "audit_settings_auth_regen",
-      "community": 1,
+      "community": 0,
       "norm_label": "audit finding: settings-auth regenerated as settings-auth-v2"
     },
     {
@@ -4653,7 +4669,7 @@
       "contributor": null,
       "rationale": "Acceptable at the design stage as a single tall artboard, but must not be carried into code as one page \u2014 the four tabs stay separate.",
       "id": "audit_routing_tab_merge",
-      "community": 5,
+      "community": 1,
       "norm_label": "audit finding: routing-fallback merged 4 tabs into one 3886px screen"
     },
     {
@@ -4681,7 +4697,7 @@
       "contributor": null,
       "rationale": "Screen #4 sits in the Gateway group beside Routing; U6 is the likely owner but the spec never says",
       "id": "gap_token_saver_unowned",
-      "community": 5,
+      "community": 2,
       "norm_label": "gap: token saver screen missing from the u0\u2013u11 table"
     },
     {
@@ -4695,7 +4711,7 @@
       "contributor": null,
       "rationale": "Living map of what is actually wired today; PROJECT_MAP.md says which U-project owns a screen and which SP it waits for.",
       "id": "api_ui_map_doc",
-      "community": 9,
+      "community": 8,
       "norm_label": "api \u2194 ui map (docs/design/api_ui_map.md)"
     },
     {
@@ -4708,7 +4724,7 @@
       "author": null,
       "contributor": null,
       "id": "ui_handoff_doc",
-      "community": 18,
+      "community": 16,
       "norm_label": "ui ownership handoff (docs/design/ui_handoff.md)"
     },
     {
@@ -4747,7 +4763,7 @@
       "author": null,
       "contributor": null,
       "id": "engine_contract",
-      "community": 12,
+      "community": 8,
       "norm_label": "engine contract (m1 sp7)"
     },
     {
@@ -4760,7 +4776,7 @@
       "author": null,
       "contributor": null,
       "id": "progress_handoff_doc",
-      "community": 9,
+      "community": 12,
       "norm_label": "aigate progress handoff (docs/progress_handoff.md)"
     },
     {
@@ -4773,7 +4789,7 @@
       "author": null,
       "contributor": null,
       "id": "api_ui_map_project_map_md",
-      "community": 18,
+      "community": 16,
       "norm_label": "docs/project_map.md (generated u-project ownership map)"
     },
     {
@@ -4787,7 +4803,7 @@
       "contributor": null,
       "rationale": "The SP that adds or changes an API must: wire the screen in apps/web/src/features/<area>/ (api.ts TanStack Query hooks, keep screens.tsx layout, no cross-feature imports); replace fixture data and remove or label controls the API does not back; handle every contract error code with a precise toast/inline message; update API_UI_MAP and the PROGRESS_HANDOFF 'UI wiring' notes; rebuild the graph (/graphify docs --update, build_project_map.py). Prevents a visual preview from being mistaken for live backend integration.",
       "id": "api_ui_map_rule_api_done_when_screen_wired",
-      "community": 18,
+      "community": 16,
       "norm_label": "rule: an api is done only when its ui screen is wired in the same sp"
     },
     {
@@ -4801,7 +4817,7 @@
       "contributor": null,
       "rationale": "So the next agent does not look for a screen (e.g. SP7 packages/engine, SP8 transport).",
       "id": "api_ui_map_rule_no_ui_row",
-      "community": 9,
+      "community": 8,
       "norm_label": "rule: an sp with no http api records \"no ui\" in its row"
     },
     {
@@ -4815,7 +4831,7 @@
       "contributor": null,
       "rationale": "Key mutations refetch on settle, settings toggles refetch on error; the UI never shows an unsaved value and a double click cannot send twice.",
       "id": "api_ui_map_rule_failed_mutation_rereads",
-      "community": 9,
+      "community": 8,
       "norm_label": "failed mutations re-read the server; submit disabled while pending"
     },
     {
@@ -4829,7 +4845,7 @@
       "contributor": null,
       "rationale": "UI_READY does not mean API, auth, mutation, validation, SSE or business behavior exists; a demo click is never a completed mutation. Branch is visual UI complete for U0\u2013U11, not M3 functionally complete.",
       "id": "ui_handoff_ui_ready",
-      "community": 18,
+      "community": 16,
       "norm_label": "ui_ready \u2014 visual layout implemented with demo data only"
     },
     {
@@ -4843,7 +4859,7 @@
       "contributor": null,
       "rationale": "Keep app/shell.tsx, styles.css, shared/ui.tsx and features/*/screens.tsx as the UI source; do not create a second page/shell for a UI_READY route.",
       "id": "ui_handoff_integration_boundary",
-      "community": 18,
+      "community": 16,
       "norm_label": "claude's integration boundary (keep shell/screens markup, add feature api.ts hooks)"
     },
     {
@@ -4857,7 +4873,7 @@
       "contributor": null,
       "rationale": "A draft for discussion, not an agreed API contract; does not persist or dispatch requests.",
       "id": "ui_handoff_combo_draft",
-      "community": 5,
+      "community": 2,
       "norm_label": "create-combo form \u2014 ui-only local draft shape (name, strategy, models, fusion)"
     },
     {
@@ -4871,7 +4887,7 @@
       "contributor": null,
       "rationale": "Catalog is metadata, not 111 working integrations.",
       "id": "ui_handoff_provider_catalog",
-      "community": 3,
+      "community": 2,
       "norm_label": "provider catalog \u2014 111 visible 9router ids (metadata only)"
     },
     {
@@ -4884,7 +4900,7 @@
       "author": null,
       "contributor": null,
       "id": "ui_handoff_ui_state_param",
-      "community": 18,
+      "community": 16,
       "norm_label": "?uistate=loading|empty|error preview parameter"
     },
     {
@@ -4897,7 +4913,7 @@
       "author": null,
       "contributor": null,
       "id": "ui_handoff_use_toast",
-      "community": 7,
+      "community": 4,
       "norm_label": "usetoast() (shared/toast.tsx)"
     },
     {
@@ -4910,7 +4926,7 @@
       "author": null,
       "contributor": null,
       "id": "ui_handoff_decision_ui_first",
-      "community": 18,
+      "community": 16,
       "norm_label": "decision (user): build the stitch ui before connecting application logic"
     },
     {
@@ -4923,7 +4939,7 @@
       "author": null,
       "contributor": null,
       "id": "api_ui_map_shared_api_client",
-      "community": 7,
+      "community": 4,
       "norm_label": "shared/api.ts \u2014 same-origin json client, apierror with stable code, 10 s timeout"
     },
     {
@@ -4937,7 +4953,7 @@
       "contributor": null,
       "rationale": "When a server code is added, add its row to API_UI_MAP and errors.ts.",
       "id": "api_ui_map_to_problem",
-      "community": 7,
+      "community": 4,
       "norm_label": "shared/errors.ts toproblem() \u2014 the one code-to-message table"
     },
     {
@@ -4950,7 +4966,7 @@
       "author": null,
       "contributor": null,
       "id": "api_ui_map_errors_test",
-      "community": 7,
+      "community": 4,
       "norm_label": "shared/errors.test.mjs"
     },
     {
@@ -5067,7 +5083,7 @@
       "author": null,
       "contributor": null,
       "id": "api_ui_map_hook_useapikeys",
-      "community": 0,
+      "community": 4,
       "norm_label": "useapikeys (features/gateway/api.ts)"
     },
     {
@@ -5307,7 +5323,7 @@
       "status": "no UI (probe)",
       "owner_sp": "SP1",
       "id": "api_ui_map_get_health",
-      "community": 15,
+      "community": 14,
       "norm_label": "get /health"
     },
     {
@@ -5420,7 +5436,7 @@
       "contributor": null,
       "status": "waiting:M2",
       "id": "api_ui_map_screen_settings_auth_sso",
-      "community": 5,
+      "community": 0,
       "norm_label": "/settings/auth oidc and saml tabs"
     },
     {
@@ -5491,7 +5507,7 @@
       "contributor": null,
       "status": "waiting:SP16",
       "id": "api_ui_map_screen_providers",
-      "community": 3,
+      "community": 2,
       "norm_label": "/providers/quota \u2192 quota; custom provider form; multi-account"
     },
     {
@@ -5505,7 +5521,7 @@
       "contributor": null,
       "status": "waiting:SP23",
       "id": "api_ui_map_screen_media_providers",
-      "community": 3,
+      "community": 2,
       "norm_label": "/providers/media* \u2192 mediaproviders"
     },
     {
@@ -5519,7 +5535,7 @@
       "contributor": null,
       "status": "waiting:SP19",
       "id": "api_ui_map_screen_routing",
-      "community": 5,
+      "community": 2,
       "norm_label": "/gateway/routing*, /gateway/token-saver \u2192 routing, combocreate, tokensaver"
     },
     {
@@ -5575,7 +5591,7 @@
       "contributor": null,
       "status": "waiting:SP25",
       "id": "api_ui_map_screen_integrations",
-      "community": 3,
+      "community": 1,
       "norm_label": "/integrations/* \u2192 clitools, clitooldetail, skills, mcp"
     },
     {
@@ -5590,7 +5606,7 @@
       "raised_by": "fetch failed; server down or offline",
       "ui_behavior": "Toast 'Could not reach AIGate\u2026'; queries show error state with Retry",
       "id": "api_ui_map_err_network_error",
-      "community": 7,
+      "community": 4,
       "norm_label": "ui error code: network_error"
     },
     {
@@ -5605,7 +5621,7 @@
       "raised_by": "no response within 10 s",
       "ui_behavior": "Toast 'did not answer within 10 seconds'",
       "id": "api_ui_map_err_timeout",
-      "community": 7,
+      "community": 4,
       "norm_label": "ui error code: timeout"
     },
     {
@@ -5620,7 +5636,7 @@
       "raised_by": "2xx with a non-JSON body (e.g. SPA page for a mistyped path)",
       "ui_behavior": "Toast 'Refresh the page'",
       "id": "api_ui_map_err_bad_response",
-      "community": 7,
+      "community": 4,
       "norm_label": "ui error code: bad_response"
     },
     {
@@ -5725,7 +5741,7 @@
       "raised_by": "the 101st API key",
       "ui_behavior": "Toast: revoke an unused key",
       "id": "api_ui_map_err_limit_reached",
-      "community": 0,
+      "community": 4,
       "norm_label": "ui error code: limit_reached (409)"
     },
     {
@@ -5770,7 +5786,7 @@
       "raised_by": "unexpected server error or proxy page",
       "ui_behavior": "Toast with HTTP status and 'check the server log'",
       "id": "api_ui_map_err_http_5xx",
-      "community": 7,
+      "community": 4,
       "norm_label": "ui error code: http_5xx"
     },
     {
@@ -5784,7 +5800,7 @@
       "contributor": null,
       "ui_behavior": "Server message, or 'Request failed (HTTP n)'",
       "id": "api_ui_map_err_other",
-      "community": 7,
+      "community": 4,
       "norm_label": "ui error code: any other code (fallback)"
     },
     {
@@ -5947,7 +5963,7 @@
       "author": null,
       "contributor": null,
       "id": "identity_apikeys_decision_1_random_hashed_keys",
-      "community": 15,
+      "community": 14,
       "norm_label": "decision 1 (user, 2026-09-25): api keys are random and stored as a hash"
     },
     {
@@ -5973,7 +5989,7 @@
       "author": null,
       "contributor": null,
       "id": "identity_apikeys_decision_3_db_sessions",
-      "community": 15,
+      "community": 14,
       "norm_label": "decision 3 (user, 2026-09-25): sessions stored in the database, not a jwt"
     },
     {
@@ -6028,7 +6044,7 @@
       "contributor": null,
       "rationale": "SPIKE-1: without a lock sqlite-proxy loses data under concurrent async transactions.",
       "id": "progress_handoff_decision_locked_sqlite_proxy",
-      "community": 16,
+      "community": 12,
       "norm_label": "decision (user, 2026-09-25): route all four sqlite clients through one locked sqlite-proxy wrapper"
     },
     {
@@ -6054,7 +6070,7 @@
       "author": null,
       "contributor": null,
       "id": "progress_handoff_decision_port_20200",
-      "community": 15,
+      "community": 14,
       "norm_label": "port decision (spec \u00a713): default 20200, port override, binds 127.0.0.1"
     },
     {
@@ -6067,7 +6083,7 @@
       "author": null,
       "contributor": null,
       "id": "progress_handoff_decision_wire_screen_same_sp",
-      "community": 18,
+      "community": 16,
       "norm_label": "decision: claude.md requires wiring the screen in the same sp as its api"
     },
     {
@@ -6081,7 +6097,7 @@
       "contributor": null,
       "rationale": "9router scans only the trailing user turn although everything is sent upstream; labeled SUSPECTED_BUG in the contract.",
       "id": "engine_open_decision_scan_all_messages",
-      "community": 12,
+      "community": 8,
       "norm_label": "open decision (user confirmation pending): scan every message + system prompt for required capabilities"
     },
     {
@@ -6163,7 +6179,7 @@
       "contributor": null,
       "status": "no UI (no HTTP API)",
       "id": "engine_package",
-      "community": 12,
+      "community": 8,
       "norm_label": "packages/engine (pure ts, zero npm imports)"
     },
     {
@@ -6176,7 +6192,7 @@
       "author": null,
       "contributor": null,
       "id": "engine_framework_free_rule",
-      "community": 12,
+      "community": 8,
       "norm_label": "dependency-cruiser rule engine-framework-free"
     },
     {
@@ -6202,7 +6218,7 @@
       "author": null,
       "contributor": null,
       "id": "engine_assert_model_supports",
-      "community": 12,
+      "community": 8,
       "norm_label": "assertmodelsupports() \u2014 model_unavailable / invalid_request"
     },
     {
@@ -6215,7 +6231,7 @@
       "author": null,
       "contributor": null,
       "id": "engine_define_registry",
-      "community": 12,
+      "community": 15,
       "norm_label": "defineregistry() / builtinregistry (single openai entry, 4 chat models)"
     },
     {
@@ -6228,7 +6244,7 @@
       "author": null,
       "contributor": null,
       "id": "engine_detect_required_capabilities",
-      "community": 12,
+      "community": 8,
       "norm_label": "detectrequiredcapabilities()"
     },
     {
@@ -6241,7 +6257,7 @@
       "author": null,
       "contributor": null,
       "id": "engine_unsupported_feature_error",
-      "community": 11,
+      "community": 7,
       "norm_label": "unsupportedfeatureerror"
     },
     {
@@ -6267,7 +6283,7 @@
       "author": null,
       "contributor": null,
       "id": "engine_exec_ctx",
-      "community": 8,
+      "community": 17,
       "norm_label": "execctx (one shared client-cancel + deadline signal)"
     },
     {
@@ -6280,7 +6296,7 @@
       "author": null,
       "contributor": null,
       "id": "progress_handoff_locked_sqlite_proxy",
-      "community": 16,
+      "community": 12,
       "norm_label": "locked sqlite-proxy wrapper (asynclocalstorage, begin/commit around batch)"
     },
     {
@@ -6293,7 +6309,7 @@
       "author": null,
       "contributor": null,
       "id": "progress_handoff_gap_sp3_sp4",
-      "community": 9,
+      "community": 12,
       "norm_label": "gap: m0 sp3 (parity harness) and sp4 (tools/extract) never built"
     },
     {
@@ -6306,7 +6322,7 @@
       "author": null,
       "contributor": null,
       "id": "progress_handoff_next_sp8",
-      "community": 9,
+      "community": 1,
       "norm_label": "next step: m1 sp8 transport (httptransportport, direct + timeout, no ui)"
     },
     {
@@ -6414,7 +6430,7 @@
       "author": null,
       "contributor": null,
       "id": "01_endpoint_apikey_settings_settings_outbound_proxy_live_apply",
-      "community": 0,
+      "community": 1,
       "norm_label": "settings.outbound-proxy-live-apply"
     },
     {
@@ -6427,7 +6443,7 @@
       "author": null,
       "contributor": null,
       "id": "01_endpoint_apikey_settings_settings_proxy_test_outbound_probe",
-      "community": 0,
+      "community": 1,
       "norm_label": "settings.proxy-test-outbound-probe"
     },
     {
@@ -6646,7 +6662,7 @@
       "contributor": null,
       "parity_status": "out of scope (routing)",
       "id": "01_endpoint_apikey_settings_endpoint_rewrite_lanes",
-      "community": 0,
+      "community": 2,
       "norm_label": "endpoint.rewrite-lanes"
     },
     {
@@ -6660,7 +6676,7 @@
       "contributor": null,
       "parity_status": "contracted (SP13 adds the full catalog)",
       "id": "04_model_registry_mapping_catalog_model_registry_global",
-      "community": 12,
+      "community": 8,
       "norm_label": "catalog.model-registry-global"
     },
     {
@@ -6674,7 +6690,7 @@
       "contributor": null,
       "parity_status": "contracted (tiers 2\u20133 arrive with SP4/SP13)",
       "id": "04_model_registry_mapping_catalog_capability_tier_fallback",
-      "community": 12,
+      "community": 8,
       "norm_label": "catalog.capability-tier-fallback"
     },
     {
@@ -6688,7 +6704,7 @@
       "contributor": null,
       "parity_status": "implemented",
       "id": "04_model_registry_mapping_catalog_capability_refine_additive_only",
-      "community": 12,
+      "community": 8,
       "norm_label": "catalog.capability-refine-additive-only"
     },
     {
@@ -6702,7 +6718,7 @@
       "contributor": null,
       "parity_status": "implemented",
       "id": "04_model_registry_mapping_catalog_capability_vision_pattern_order",
-      "community": 12,
+      "community": 8,
       "norm_label": "catalog.capability-vision-pattern-order"
     },
     {
@@ -6716,7 +6732,7 @@
       "contributor": null,
       "parity_status": "implemented",
       "id": "06_combo_capacity_adapter_combo_detect_required_capabilities",
-      "community": 12,
+      "community": 8,
       "norm_label": "combo.detect-required-capabilities"
     },
     {
@@ -6730,7 +6746,7 @@
       "contributor": null,
       "rationale": "Spec \u00a76.1 called 9router's usage write synchronous; it is fire-and-forget with swallowed errors. The buffered writer now also counts write failures.",
       "id": "08_usage_quota_usage_write_not_synchronous",
-      "community": 15,
+      "community": 1,
       "norm_label": "usage.write-not-synchronous"
     },
     {
@@ -6744,7 +6760,7 @@
       "contributor": null,
       "rationale": "Scope per spec section 9: HttpTransportPort, direct branch and timeout only; relay, proxy pools, outbound proxy and MITM-bypass DNS sit behind the same port later (SP18). SP8 has no HTTP API and no UI.",
       "id": "transport_contract",
-      "community": 9,
+      "community": 1,
       "norm_label": "transport contract (m1 sp8)"
     },
     {
@@ -6758,7 +6774,7 @@
       "contributor": null,
       "location": "packages/engine/src/ports.ts",
       "id": "transport_http_request",
-      "community": 22,
+      "community": 18,
       "norm_label": "httprequest (requires timeoutms)"
     },
     {
@@ -6772,7 +6788,7 @@
       "contributor": null,
       "location": "packages/engine/src/ports.ts",
       "id": "transport_http_response",
-      "community": 10,
+      "community": 11,
       "norm_label": "httpresponse"
     },
     {
@@ -6802,7 +6818,7 @@
       "location": "apps/server/src/modules/transport/infrastructure/direct-transport.ts",
       "rationale": "https only (http to loopback only), timeoutMs inside ctx.signal covering headers and body, never follows redirects, caller abort keeps its reason, errors name the host only.",
       "id": "transport_direct_transport",
-      "community": 10,
+      "community": 11,
       "norm_label": "directtransport (direct branch implementation)"
     },
     {
@@ -6816,7 +6832,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/transport",
       "id": "transport_module",
-      "community": 10,
+      "community": 11,
       "norm_label": "transportmodule (injects directtransport under http_transport)"
     },
     {
@@ -6831,7 +6847,7 @@
       "status": "contracted",
       "rationale": "REFERENCE_BEHAVIOR: with no relay and no proxy, 9router sends to the unpatched global fetch. Kept as the direct branch; contracted because relay and proxy branches come in SP18.",
       "id": "10_proxy_pools_transport_proxy_priority_chain",
-      "community": 22,
+      "community": 18,
       "norm_label": "transport.proxy-priority-chain"
     },
     {
@@ -6845,7 +6861,7 @@
       "contributor": null,
       "rationale": "9router fallback.timeout: null means the direct chat fetch had no timeout, labeled IMPLEMENTATION_ACCIDENT; spec section 4.2 requires the shared ctx.signal deadline.",
       "id": "transport_timeout_ms_rule",
-      "community": 22,
+      "community": 18,
       "norm_label": "rule: every call states timeoutms (1 to 600000 ms), bounding headers and body inside ctx.signal"
     },
     {
@@ -6858,7 +6874,7 @@
       "author": null,
       "contributor": null,
       "id": "transport_rule_host_only_errors",
-      "community": 10,
+      "community": 11,
       "norm_label": "rule: error messages and details name the host only; headers (authorization) never appear"
     },
     {
@@ -6872,7 +6888,7 @@
       "contributor": null,
       "result": "EngineError INVALID_REQUEST, before any I/O",
       "id": "transport_fail_malformed_url",
-      "community": 10,
+      "community": 11,
       "norm_label": "failure: malformed url or non-https (http only to localhost/127.0.0.1/[::1])"
     },
     {
@@ -6886,7 +6902,7 @@
       "contributor": null,
       "result": "RangeError (programming error)",
       "id": "transport_fail_timeout_range",
-      "community": 10,
+      "community": 11,
       "norm_label": "failure: timeoutms not an integer from 1 to 600000"
     },
     {
@@ -6900,7 +6916,7 @@
       "contributor": null,
       "result": "Rejects with ctx.signal.reason unchanged, never relabeled as a provider failure",
       "id": "transport_fail_caller_abort",
-      "community": 8,
+      "community": 17,
       "norm_label": "failure: caller ctx.signal aborts (client left, budget spent)"
     },
     {
@@ -6928,7 +6944,7 @@
       "contributor": null,
       "result": "EngineError PROVIDER_UNAVAILABLE with { host }",
       "id": "transport_fail_network",
-      "community": 10,
+      "community": 11,
       "norm_label": "failure: connection refused, dns failure, tls failure"
     },
     {
@@ -6943,7 +6959,7 @@
       "result": "EngineError PROVIDER_UNAVAILABLE",
       "rationale": "Not following the redirect keeps the credential from going to another host.",
       "id": "transport_fail_redirect",
-      "community": 10,
+      "community": 11,
       "norm_label": "failure: upstream answers 3xx (redirect not followed)"
     },
     {
@@ -6957,7 +6973,7 @@
       "contributor": null,
       "result": "Returned as a normal HttpResponse; the adapter classifies the status (SP9)",
       "id": "transport_fail_http_status",
-      "community": 10,
+      "community": 11,
       "norm_label": "upstream answers 4xx or 5xx"
     },
     {
@@ -7039,7 +7055,7 @@
       "contributor": null,
       "rationale": "Mutations caught: following redirects, relabeling a caller abort, dropping the per-request timeout, allowing http to any host, returning the raw body without error mapping, an unbounded body read. Each test checks the credential is not in the error.",
       "id": "transport_tests",
-      "community": 10,
+      "community": 11,
       "norm_label": "apps/server/test/transport.test.mjs (10 tests, real local http server, 6 mutations caught)"
     },
     {
@@ -7053,7 +7069,7 @@
       "contributor": null,
       "rationale": "The mutation that dropped the timeout hung the test run instead of failing it.",
       "id": "transport_test_timeout_rule",
-      "community": 10,
+      "community": 11,
       "norm_label": "rule: server, engine, and database test scripts pass --test-timeout=30000"
     },
     {
@@ -7067,7 +7083,7 @@
       "contributor": null,
       "rationale": "Until SP12, timeoutMs bounds the whole stream.",
       "id": "transport_deferred_stream_idle_timeout",
-      "community": 22,
+      "community": 18,
       "norm_label": "deferred: streaming idle timeout (gap between chunks) with sp12"
     },
     {
@@ -7081,7 +7097,7 @@
       "contributor": null,
       "rationale": "Outbound HTTP only; its error codes (TIMEOUT, PROVIDER_UNAVAILABLE, INVALID_REQUEST) reach users through /v1 in SP12.",
       "id": "api_ui_map_row_sp8_no_ui",
-      "community": 9,
+      "community": 8,
       "norm_label": "api_ui_map row: sp8 transport, no ui"
     },
     {
@@ -7095,7 +7111,7 @@
       "contributor": null,
       "rationale": "No HTTP API; /v1 (SP12) is the first thing a screen can show.",
       "id": "api_ui_map_row_sp7_no_ui",
-      "community": 9,
+      "community": 8,
       "norm_label": "api_ui_map row: sp7 packages/engine, no ui"
     },
     {
@@ -7109,7 +7125,7 @@
       "contributor": null,
       "rationale": "User rule 2026-09-25: update the table and the touched SP section every time an SP or subtask finishes.",
       "id": "progress_handoff_task_board",
-      "community": 9,
+      "community": 12,
       "norm_label": "task board (progress_handoff)"
     },
     {
@@ -7123,7 +7139,7 @@
       "contributor": null,
       "rationale": "One AIProviderPort for the openai-compatible family over HttpTransportPort. No HTTP API and no UI; errors reach users through /v1 (SP12), validateCredential backs Test connection (SP11).",
       "id": "provider_openai_contract",
-      "community": 11,
+      "community": 9,
       "norm_label": "openai-compatible provider adapter contract (m1 sp9)"
     },
     {
@@ -7138,7 +7154,7 @@
       "location": "packages/engine/src/adapters/openai-compatible.ts",
       "rationale": "Takes a ProviderDescriptor; no default provider config, so an unknown provider cannot inherit OpenAI settings.",
       "id": "adapter_openai_compatible",
-      "community": 11,
+      "community": 7,
       "norm_label": "openaicompatibleadapter (aiproviderport for openai-compatible)"
     },
     {
@@ -7152,7 +7168,7 @@
       "contributor": null,
       "location": "packages/engine/src/sse.ts",
       "id": "adapter_sse_reader",
-      "community": 11,
+      "community": 18,
       "norm_label": "readssedata() \u2014 bounded sse reader (1 mi chars per line/event, cancels body)"
     },
     {
@@ -7165,7 +7181,7 @@
       "author": null,
       "contributor": null,
       "id": "adapter_cip_mapping",
-      "community": 17,
+      "community": 9,
       "norm_label": "cip \u2194 chat completions mapping (max_completion_tokens, tool messages, data: urls)"
     },
     {
@@ -7179,7 +7195,7 @@
       "contributor": null,
       "rationale": "Spec \u00a73.1: never drop a field silently. cacheControl is the one hint left out (OpenAI caches prefixes itself).",
       "id": "adapter_unsupported_before_io",
-      "community": 11,
+      "community": 7,
       "norm_label": "refused before i/o: video, media by url, assistant thinking, tool_result.iserror, budgettokens, foreign vendorextensions"
     },
     {
@@ -7206,7 +7222,7 @@
       "author": null,
       "contributor": null,
       "id": "adapter_retry_transient",
-      "community": 10,
+      "community": 11,
       "norm_label": "in-place retry: 502/503/504 + unreachable host, \u22643 attempts via withretry, before first chunk"
     },
     {
@@ -7232,7 +7248,7 @@
       "author": null,
       "contributor": null,
       "id": "adapter_message_redaction",
-      "community": 10,
+      "community": 9,
       "norm_label": "upstream message \u2264300 chars, credential redacted, html pages dropped; bad api key \u2192 auth_error before i/o"
     },
     {
@@ -7246,7 +7262,7 @@
       "contributor": null,
       "location": "packages/engine/src/cip.ts",
       "id": "adapter_usage_normalization",
-      "community": 11,
+      "community": 7,
       "norm_label": "tokenusage normalized: inputtokens excludes cache reads, outputtokens includes reasoning"
     },
     {
@@ -7260,7 +7276,7 @@
       "contributor": null,
       "location": "packages/engine/src/ports.ts",
       "id": "adapter_listed_model",
-      "community": 2,
+      "community": 15,
       "norm_label": "listedmodel { id, descriptor? } \u2014 getmodels never invents limits (\u22641000 ids)"
     },
     {
@@ -7273,7 +7289,7 @@
       "author": null,
       "contributor": null,
       "id": "adapter_validate_credential",
-      "community": 3,
+      "community": 2,
       "norm_label": "validatecredential(): one call; valid:false only for auth_error / quota_exhausted"
     },
     {
@@ -7286,7 +7302,7 @@
       "author": null,
       "contributor": null,
       "id": "adapter_tests",
-      "community": 11,
+      "community": 7,
       "norm_label": "packages/engine/test/openai-adapter.test.mjs (15 tests, fake transport, sse split every 3 bytes; 16 mutations caught)"
     },
     {
@@ -7300,7 +7316,7 @@
       "contributor": null,
       "location": "apps/server/test/transport.test.mjs",
       "id": "adapter_e2e_test",
-      "community": 10,
+      "community": 11,
       "norm_label": "transport.test.mjs: adapter streams end to end over directtransport"
     },
     {
@@ -7331,7 +7347,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "05_request_routing_fallback_fallback_upstream_error_result",
-      "community": 17,
+      "community": 9,
       "norm_label": "fallback.upstream-error-result"
     },
     {
@@ -7348,7 +7364,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "05_request_routing_fallback_fallback_executor_retry_budget",
-      "community": 10,
+      "community": 9,
       "norm_label": "fallback.executor-retry-budget"
     },
     {
@@ -7365,7 +7381,7 @@
         "SUSPECTED_BUG"
       ],
       "id": "05_request_routing_fallback_fallback_error_classification",
-      "community": 11,
+      "community": 9,
       "norm_label": "fallback.error-classification"
     },
     {
@@ -7399,7 +7415,7 @@
         "SUSPECTED_BUG"
       ],
       "id": "05_request_routing_fallback_routing_default_executor_openai_fallback",
-      "community": 11,
+      "community": 9,
       "norm_label": "routing.default-executor-openai-fallback"
     },
     {
@@ -7416,7 +7432,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "05_request_routing_fallback_routing_non_streaming_response",
-      "community": 17,
+      "community": 9,
       "norm_label": "routing.non-streaming-response"
     },
     {
@@ -7433,7 +7449,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "05_request_routing_fallback_routing_streaming_pipeline",
-      "community": 11,
+      "community": 18,
       "norm_label": "routing.streaming-pipeline"
     },
     {
@@ -7447,7 +7463,7 @@
       "contributor": null,
       "rationale": "Client-facing half of the OpenAI protocol as pure functions; no HTTP route and no UI. SP12 mounts it on /v1/chat/completions.",
       "id": "protocol_openai_contract",
-      "community": 13,
+      "community": 7,
       "norm_label": "openai chat completions protocol adapter contract (m1 sp10)"
     },
     {
@@ -7461,7 +7477,7 @@
       "contributor": null,
       "location": "packages/engine/src/protocols/openai-chat.ts",
       "id": "protocol_parse_openai_chat",
-      "community": 13,
+      "community": 7,
       "norm_label": "parseopenaichatrequest() \u2014 openai body \u2192 canonicalrequest (invalid_request names the field)"
     },
     {
@@ -7475,7 +7491,7 @@
       "contributor": null,
       "location": "packages/engine/src/protocols/openai-chat.ts",
       "id": "protocol_completion_renderer",
-      "community": 13,
+      "community": 7,
       "norm_label": "toopenaichatcompletion() \u2014 canonicalresponse \u2192 chat.completion json"
     },
     {
@@ -7517,7 +7533,7 @@
       "contributor": null,
       "rationale": "Fixes 9router SUSPECTED_BUG routing.stream-mode-decision, where curl received SSE.",
       "id": "protocol_stream_default_false",
-      "community": 13,
+      "community": 9,
       "norm_label": "rule: an omitted stream flag means non-streaming (json)"
     },
     {
@@ -7531,7 +7547,7 @@
       "contributor": null,
       "rationale": "The client's own AIGate key is checked by apikeys; an upstream credential failure is AIGate configuration, so a 401 would mislead the client.",
       "id": "protocol_upstream_auth_502",
-      "community": 17,
+      "community": 9,
       "norm_label": "rule: upstream auth_error \u2192 502 upstream_auth_error (not 401)"
     },
     {
@@ -7557,7 +7573,7 @@
       "author": null,
       "contributor": null,
       "id": "protocol_vendor_extensions_passthrough",
-      "community": 13,
+      "community": 7,
       "norm_label": "unknown top-level openai fields (\u226464) travel in vendorextensions.openai"
     },
     {
@@ -7570,7 +7586,7 @@
       "author": null,
       "contributor": null,
       "id": "protocol_unsupported_inbound",
-      "community": 13,
+      "community": 7,
       "norm_label": "refused as unsupportedfeatureerror: file_id, late system message, name, function role, refusal, custom tools, allowed_tools"
     },
     {
@@ -7597,7 +7613,7 @@
       "contributor": null,
       "location": "packages/engine/src/cip.ts",
       "id": "protocol_cip_detail_strict",
-      "community": 11,
+      "community": 7,
       "norm_label": "cip gains image detail and tool strict (openai \u2192 openai trip keeps them)"
     },
     {
@@ -7610,7 +7626,7 @@
       "author": null,
       "contributor": null,
       "id": "protocol_tool_id_not_ported",
-      "community": 13,
+      "community": 7,
       "norm_label": "not ported: tool-id normalization and empty tool answers (anthropic adapters, sp15)"
     },
     {
@@ -7624,7 +7640,7 @@
       "contributor": null,
       "location": "packages/engine/src/json.ts",
       "id": "engine_json_helpers",
-      "community": 11,
+      "community": 7,
       "norm_label": "src/json.ts \u2014 shared json narrowing (isrecord, record, text, list, parsejson)"
     },
     {
@@ -7637,7 +7653,7 @@
       "author": null,
       "contributor": null,
       "id": "protocol_tests",
-      "community": 11,
+      "community": 7,
       "norm_label": "packages/engine/test/openai-protocol.test.mjs (12 tests incl. round trips; 20 mutations caught)"
     },
     {
@@ -7668,7 +7684,7 @@
         "SUSPECTED_BUG"
       ],
       "id": "05_request_routing_fallback_routing_stream_mode_decision",
-      "community": 13,
+      "community": 9,
       "norm_label": "routing.stream-mode-decision"
     },
     {
@@ -7685,7 +7701,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "05_request_routing_fallback_routing_source_format_detection",
-      "community": 13,
+      "community": 7,
       "norm_label": "routing.source-format-detection"
     },
     {
@@ -7702,7 +7718,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "05_request_routing_fallback_routing_request_translation",
-      "community": 13,
+      "community": 7,
       "norm_label": "routing.request-translation"
     },
     {
@@ -7719,7 +7735,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "11_translation_i18n_translator_pivot_loss",
-      "community": 13,
+      "community": 7,
       "norm_label": "translator.pivot-loss"
     },
     {
@@ -7736,7 +7752,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "11_translation_i18n_translator_tool_id_normalization",
-      "community": 13,
+      "community": 7,
       "norm_label": "translator.tool-id-normalization"
     },
     {
@@ -7750,7 +7766,7 @@
       "contributor": null,
       "rationale": "One API-key account per registry provider (OpenAI). Keys sealed with SecretCipherPort. UI wired in the same SP.",
       "id": "connections_contract",
-      "community": 7,
+      "community": 4,
       "norm_label": "connections contract (m1 sp11)"
     },
     {
@@ -7765,7 +7781,7 @@
       "location": "apps/server/src/secret-cipher.ts",
       "rationale": "AES-256-GCM, v1.<iv|tag|ct>, AAD provider_connections:<id>:api_key. Key from AIGATE_SECRET_KEY or secret.key (created once via exclusive link, 0600, never overwritten).",
       "id": "secret_cipher_aes_gcm",
-      "community": 7,
+      "community": 4,
       "norm_label": "aesgcmcipher + loadsecretkey (apps/server/src/secret-cipher.ts)"
     },
     {
@@ -7778,7 +7794,7 @@
       "author": null,
       "contributor": null,
       "id": "decision_secret_key_file",
-      "community": 7,
+      "community": 4,
       "norm_label": "decision (user, 2026-09-25): aes-gcm with a key file and an env override; sp11 connects openai only"
     },
     {
@@ -7792,7 +7808,7 @@
       "contributor": null,
       "location": "packages/database/src/schema/connections.ts",
       "id": "table_provider_connections",
-      "community": 7,
+      "community": 4,
       "norm_label": "table provider_connections (migration 0002: provider unique, test_status check, sealed key + hint)"
     },
     {
@@ -7806,7 +7822,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/connections/infrastructure/connections.repo.ts",
       "id": "connections_repo",
-      "community": 7,
+      "community": 4,
       "norm_label": "connectionsrepository \u2014 allowlisted view, onconflictdonothing \u2192 409, stale-test guard on sealed key"
     },
     {
@@ -7820,7 +7836,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/connections/infrastructure/connections.controller.ts",
       "id": "connections_controller",
-      "community": 7,
+      "community": 4,
       "norm_label": "connectionscontroller \u2014 /api/connections crud + post /:id/test (validatecredential outside any transaction)"
     },
     {
@@ -7833,7 +7849,7 @@
       "author": null,
       "contributor": null,
       "id": "connections_test_outcomes",
-      "community": 7,
+      "community": 4,
       "norm_label": "test outcomes: active \u00b7 invalid (auth_error) \u00b7 no_quota (quota_exhausted) \u00b7 unreachable (not checked)"
     },
     {
@@ -7846,7 +7862,7 @@
       "author": null,
       "contributor": null,
       "id": "connections_stale_test_guard",
-      "community": 7,
+      "community": 4,
       "norm_label": "rule: a test result is written only if the sealed key is unchanged"
     },
     {
@@ -7860,7 +7876,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/transport/transport.module.ts",
       "id": "transport_module_global",
-      "community": 9,
+      "community": 10,
       "norm_label": "transportmodule.with(transport?) \u2014 global http_transport; createserver({ transport }) for tests"
     },
     {
@@ -7874,7 +7890,7 @@
       "contributor": null,
       "location": "apps/web/src/features/providers/api.ts",
       "id": "web_providers_api",
-      "community": 7,
+      "community": 4,
       "norm_label": "features/providers/api.ts \u2014 useconnections, usesupportedproviders, usecreate/update/delete/testconnection"
     },
     {
@@ -7888,7 +7904,7 @@
       "contributor": null,
       "location": "apps/web/src/features/providers/test-result.ts",
       "id": "web_test_result",
-      "community": 7,
+      "community": 4,
       "norm_label": "features/providers/test-result.ts \u2014 status pill, needs-attention filter, one toast per test result"
     },
     {
@@ -7902,7 +7918,7 @@
       "contributor": null,
       "location": "apps/web/src/shared/api.ts",
       "id": "web_api_timeout_option",
-      "community": 7,
+      "community": 4,
       "norm_label": "shared/api.ts timeoutms option (25 s connection test); timeout toast shows the real seconds"
     },
     {
@@ -7917,7 +7933,7 @@
       "status": "wired",
       "hook": "useConnections, useSupportedProviders",
       "id": "api_ui_map_get_api_connections",
-      "community": 7,
+      "community": 4,
       "norm_label": "get /api/connections"
     },
     {
@@ -7932,7 +7948,7 @@
       "status": "wired",
       "hook": "useCreateConnection",
       "id": "api_ui_map_post_api_connections",
-      "community": 7,
+      "community": 4,
       "norm_label": "post /api/connections"
     },
     {
@@ -7947,7 +7963,7 @@
       "status": "wired",
       "hook": "useUpdateConnection",
       "id": "api_ui_map_patch_api_connections_id",
-      "community": 7,
+      "community": 4,
       "norm_label": "patch /api/connections/:id"
     },
     {
@@ -7962,7 +7978,7 @@
       "status": "wired",
       "hook": "useDeleteConnection",
       "id": "api_ui_map_delete_api_connections_id",
-      "community": 7,
+      "community": 4,
       "norm_label": "delete /api/connections/:id"
     },
     {
@@ -7977,7 +7993,7 @@
       "status": "wired",
       "hook": "useTestConnection",
       "id": "api_ui_map_post_api_connections_id_test",
-      "community": 7,
+      "community": 4,
       "norm_label": "post /api/connections/:id/test"
     },
     {
@@ -7991,7 +8007,7 @@
       "contributor": null,
       "status": "wired",
       "id": "api_ui_map_screen_connections_wired",
-      "community": 7,
+      "community": 4,
       "norm_label": "/providers/connections \u2192 connections (add modal lists the 41 connectable providers; ?provider= shows the reason)"
     },
     {
@@ -8005,7 +8021,7 @@
       "contributor": null,
       "status": "wired",
       "id": "api_ui_map_screen_provider_detail_wired",
-      "community": 2,
+      "community": 4,
       "norm_label": "/providers/detail \u2192 providerdetail (connection panel or reason; models table)"
     },
     {
@@ -8019,7 +8035,7 @@
       "contributor": null,
       "status": "wired",
       "id": "api_ui_map_screen_llm_providers_wired",
-      "community": 2,
+      "community": 13,
       "norm_label": "/providers \u2192 llmproviders (catalog from get /api/providers; connected / coming later pills)"
     },
     {
@@ -8032,7 +8048,7 @@
       "author": null,
       "contributor": null,
       "id": "api_ui_map_err_provider_not_supported",
-      "community": 7,
+      "community": 4,
       "norm_label": "ui error code: provider_not_supported (400)"
     },
     {
@@ -8045,7 +8061,7 @@
       "author": null,
       "contributor": null,
       "id": "api_ui_map_err_already_connected",
-      "community": 7,
+      "community": 4,
       "norm_label": "ui error code: already_connected (409)"
     },
     {
@@ -8058,7 +8074,7 @@
       "author": null,
       "contributor": null,
       "id": "api_ui_map_err_credential_unreadable",
-      "community": 7,
+      "community": 4,
       "norm_label": "ui error code: credential_unreadable (409)"
     },
     {
@@ -8071,7 +8087,7 @@
       "author": null,
       "contributor": null,
       "id": "connections_tests",
-      "community": 7,
+      "community": 4,
       "norm_label": "apps/server/test/connections.test.mjs (7) + secret-cipher.test.mjs (3); 16 mutations caught; live openai smoke"
     },
     {
@@ -8088,7 +8104,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "03_accounts_multiaccount_connection_storage_shape_json_blob",
-      "community": 7,
+      "community": 4,
       "norm_label": "connection.storage-shape-json-blob"
     },
     {
@@ -8105,7 +8121,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "03_accounts_multiaccount_connection_create_dedup_and_priority_assignment",
-      "community": 7,
+      "community": 4,
       "norm_label": "connection.create-dedup-and-priority-assignment"
     },
     {
@@ -8122,7 +8138,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "03_accounts_multiaccount_connection_delete_and_reorder",
-      "community": 7,
+      "community": 4,
       "norm_label": "connection.delete-and-reorder"
     },
     {
@@ -8139,7 +8155,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "02_providers_auth_catalog_connection_listing",
-      "community": 7,
+      "community": 4,
       "norm_label": "catalog.connection-listing"
     },
     {
@@ -8156,7 +8172,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "02_providers_auth_catalog_connection_detail_crud",
-      "community": 7,
+      "community": 4,
       "norm_label": "catalog.connection-detail-crud"
     },
     {
@@ -8173,7 +8189,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "02_providers_auth_connection_test_single_connection",
-      "community": 7,
+      "community": 4,
       "norm_label": "connection.test-single-connection"
     },
     {
@@ -8190,7 +8206,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "02_providers_auth_connection_client_listing_sanitized",
-      "community": 7,
+      "community": 4,
       "norm_label": "connection.client-listing-sanitized"
     },
     {
@@ -8204,7 +8220,7 @@
       "contributor": null,
       "rationale": "POST /v1/chat/completions + GET /v1/models: one provider, one connection, streaming with backpressure and cancellation. Glues SP6 gate, SP10 protocol, SP11 connection, SP7 capabilities, SP9 adapter, SP8 transport.",
       "id": "chat_lane_contract",
-      "community": 8,
+      "community": 10,
       "norm_label": "chat lane contract (m1 sp12)"
     },
     {
@@ -8218,7 +8234,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/routing/infrastructure/chat-lane.ts",
       "id": "chat_lane_service",
-      "community": 8,
+      "community": 10,
       "norm_label": "chatlane (modules/routing/infrastructure/chat-lane.ts)"
     },
     {
@@ -8232,7 +8248,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/routing/infrastructure/v1-routes.ts",
       "id": "v1_routes",
-      "community": 8,
+      "community": 10,
       "norm_label": "registerv1routes \u2014 fastify routes outside the dashboard guard, 16 mib body limit"
     },
     {
@@ -8245,7 +8261,7 @@
       "author": null,
       "contributor": null,
       "id": "chat_lane_key_gate",
-      "community": 8,
+      "community": 10,
       "norm_label": "key gate in onrequest, before the body is read (401 missing_api_key / invalid_api_key)"
     },
     {
@@ -8259,7 +8275,7 @@
       "contributor": null,
       "rationale": "Fixes a SUSPECTED_BUG: 9router served every host and DNS-rebinding pages when requireApiKey was off.",
       "id": "chat_lane_keyless_local_only",
-      "community": 8,
+      "community": 10,
       "norm_label": "keyless mode serves this machine only (loopback socket, host, origin) \u2192 403 api_key_required"
     },
     {
@@ -8272,7 +8288,7 @@
       "author": null,
       "contributor": null,
       "id": "chat_lane_no_cors",
-      "community": 8,
+      "community": 10,
       "norm_label": "no cors on /v1; json content type required (415)"
     },
     {
@@ -8285,7 +8301,7 @@
       "author": null,
       "contributor": null,
       "id": "chat_lane_model_resolution",
-      "community": 8,
+      "community": 10,
       "norm_label": "model resolution: provider/model (any id) or a bare catalog id; 404 model_not_found / no_active_connection"
     },
     {
@@ -8298,7 +8314,7 @@
       "author": null,
       "contributor": null,
       "id": "chat_lane_shared_signal",
-      "community": 8,
+      "community": 17,
       "norm_label": "one execctx signal: client disconnect + 600 s budget (timeout) + idle watchdog"
     },
     {
@@ -8324,7 +8340,7 @@
       "author": null,
       "contributor": null,
       "id": "chat_lane_backpressure",
-      "community": 8,
+      "community": 17,
       "norm_label": "backpressure: a false write() waits for drain; the upstream read pauses with it"
     },
     {
@@ -8337,7 +8353,7 @@
       "author": null,
       "contributor": null,
       "id": "chat_lane_idle_timeout",
-      "community": 22,
+      "community": 18,
       "norm_label": "idle timeout between chunks (aigate_stream_idle_timeout_ms, default 300 s) \u2192 timeout error event"
     },
     {
@@ -8350,7 +8366,7 @@
       "author": null,
       "contributor": null,
       "id": "chat_lane_tests",
-      "community": 8,
+      "community": 10,
       "norm_label": "apps/server/test/chat-lane.test.mjs (10 tests; real sockets for disconnect, backpressure, idle; 11 mutations caught)"
     },
     {
@@ -8364,7 +8380,7 @@
       "contributor": null,
       "location": "apps/web/src/features/gateway/api.ts",
       "id": "web_use_chat_readiness",
-      "community": 19,
+      "community": 4,
       "norm_label": "features/gateway/api.ts usechatreadiness \u2014 shared [\"connections\"] query"
     },
     {
@@ -8381,7 +8397,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "05_request_routing_fallback_routing_lane_entry_routes",
-      "community": 8,
+      "community": 10,
       "norm_label": "routing.lane-entry-routes"
     },
     {
@@ -8398,7 +8414,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "05_request_routing_fallback_routing_request_preflight",
-      "community": 8,
+      "community": 10,
       "norm_label": "routing.request-preflight"
     },
     {
@@ -8415,7 +8431,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "05_request_routing_fallback_routing_model_resolution",
-      "community": 8,
+      "community": 10,
       "norm_label": "routing.model-resolution"
     },
     {
@@ -8432,7 +8448,7 @@
         "SUSPECTED_BUG"
       ],
       "id": "05_request_routing_fallback_routing_client_disconnect_propagation",
-      "community": 8,
+      "community": 17,
       "norm_label": "routing.client-disconnect-propagation"
     },
     {
@@ -8449,7 +8465,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "05_request_routing_fallback_fallback_accounts_exhausted_response",
-      "community": 8,
+      "community": 10,
       "norm_label": "fallback.accounts-exhausted-response"
     },
     {
@@ -8466,7 +8482,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "04_model_registry_mapping_catalog_model_listing_live_override",
-      "community": 8,
+      "community": 10,
       "norm_label": "catalog.model-listing-live-override"
     },
     {
@@ -8480,7 +8496,7 @@
       "contributor": null,
       "rationale": "tools/parity: tapes recorded from a running 9router against a scripted vendor, replayed against AIGate; tier 1 fails on any undeclared difference.",
       "id": "parity_contract",
-      "community": 14,
+      "community": 6,
       "norm_label": "parity harness contract (m0 sp3) and the m1 acceptance gate"
     },
     {
@@ -8494,7 +8510,7 @@
       "contributor": null,
       "location": "tools/parity/src/vendor.mjs",
       "id": "parity_vendor",
-      "community": 14,
+      "community": 6,
       "norm_label": "tools/parity/src/vendor.mjs \u2014 scripted openai-compatible vendor; records upstream requests, secrets masked"
     },
     {
@@ -8508,7 +8524,7 @@
       "contributor": null,
       "location": "tools/parity/src/record.mjs",
       "id": "parity_recorder",
-      "community": 14,
+      "community": 6,
       "norm_label": "tools/parity/src/record.mjs \u2014 records tapes from 9router via a temporary node (cleanup by name)"
     },
     {
@@ -8550,7 +8566,7 @@
       "contributor": null,
       "location": "tools/parity/src/scenarios.mjs",
       "id": "parity_deviations",
-      "community": 17,
+      "community": 9,
       "norm_label": "tools/parity/src/scenarios.mjs deviations \u2014 intentional differences from 9router, each with entry, label, reason"
     },
     {
@@ -8564,7 +8580,7 @@
       "contributor": null,
       "location": "tools/parity/src/live.mjs",
       "id": "parity_live",
-      "community": 14,
+      "community": 6,
       "norm_label": "tools/parity/src/live.mjs \u2014 tier 2 against openai (openai_api_key, \u226416 tokens per tape)"
     },
     {
@@ -8578,7 +8594,7 @@
       "contributor": null,
       "location": "tools/parity/src/cli.mjs",
       "id": "parity_cli",
-      "community": 14,
+      "community": 6,
       "norm_label": "pnpm parity record | replay | live | gate"
     },
     {
@@ -8591,7 +8607,7 @@
       "author": null,
       "contributor": null,
       "id": "parity_tapes",
-      "community": 17,
+      "community": 9,
       "norm_label": "tools/parity/tapes \u2014 11 tapes from 9router 0.5.55 (json, stream, tool calls, omitted stream, 400/401/429/500, cut stream)"
     },
     {
@@ -8604,7 +8620,7 @@
       "author": null,
       "contributor": null,
       "id": "parity_recording_via_node",
-      "community": 14,
+      "community": 6,
       "norm_label": "decision: record through an openai-compatible node baseurl, not outboundproxyurl (a forward proxy cannot read https without a mitm ca)"
     },
     {
@@ -8617,7 +8633,7 @@
       "author": null,
       "contributor": null,
       "id": "finding_usage_buffer",
-      "community": 17,
+      "community": 9,
       "norm_label": "finding: 9router adds 2000 tokens to reported prompt/total usage (addbuffertousage) \u2014 suspected_bug"
     },
     {
@@ -8630,7 +8646,7 @@
       "author": null,
       "contributor": null,
       "id": "finding_omitted_stream_corrupt",
-      "community": 17,
+      "community": 9,
       "norm_label": "finding: omitted stream on 9router 0.5.55 \u2192 json body sent as text/event-stream + bare [done] (unparsable)"
     },
     {
@@ -8643,7 +8659,7 @@
       "author": null,
       "contributor": null,
       "id": "finding_error_shape",
-      "community": 17,
+      "community": 9,
       "norm_label": "finding: 9router 0.5.55 errors carry only { message } with its node id and the raw upstream body"
     },
     {
@@ -8684,7 +8700,7 @@
       "author": null,
       "contributor": null,
       "id": "api_ui_map_row_sp3_no_ui",
-      "community": 14,
+      "community": 6,
       "norm_label": "api_ui_map row: m0 sp3 parity harness, no ui"
     },
     {
@@ -8698,7 +8714,7 @@
       "contributor": null,
       "rationale": "9router's registry (0.5.86) \u2192 AIGate CATALOG: 121 providers, 935 models, verified by a 0-difference diff. Runtime unchanged until SP13.",
       "id": "extract_contract",
-      "community": 2,
+      "community": 13,
       "norm_label": "registry extraction contract (m0 sp4)"
     },
     {
@@ -8712,7 +8728,7 @@
       "contributor": null,
       "location": "tools/extract/src/extract.mjs",
       "id": "extract_tool",
-      "community": 2,
+      "community": 15,
       "norm_label": "tools/extract (deleted in sp13b; restorable from git d2783c1) \u2014 wrote the catalog from 9router"
     },
     {
@@ -8726,7 +8742,7 @@
       "contributor": null,
       "location": "tools/extract/src/verify.mjs",
       "id": "extract_verify",
-      "community": 2,
+      "community": 15,
       "norm_label": "tools/extract verify (deleted in sp13b with the tool)"
     },
     {
@@ -8740,7 +8756,7 @@
       "contributor": null,
       "location": "packages/engine/src/catalog/schema.ts",
       "id": "catalog_schema",
-      "community": 2,
+      "community": 15,
       "norm_label": "catalogprovider / catalogmodel / validatecatalog (packages/engine/src/catalog/schema.ts)"
     },
     {
@@ -8754,7 +8770,7 @@
       "contributor": null,
       "location": "packages/engine/src/catalog/providers.generated.ts",
       "id": "catalog_generated",
-      "community": 2,
+      "community": 15,
       "norm_label": "catalog \u2014 providers.generated.ts (121 providers, 935 models; never hand-edited)"
     },
     {
@@ -8768,7 +8784,7 @@
       "contributor": null,
       "rationale": "IMPLEMENTATION_ACCIDENT in 9router: every undeclared model, even embeddings, got 200000/64000. 254 models have no declared limits.",
       "id": "rule_no_invented_limits",
-      "community": 2,
+      "community": 15,
       "norm_label": "rule: limits only when declared; 9router's floor 200000/64000 becomes null (sentinel probe)"
     },
     {
@@ -8781,7 +8797,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_model_key_kind_id",
-      "community": 2,
+      "community": 15,
       "norm_label": "rule: model ids unique per (kind, id) \u2014 gemini 2.5 serves both chat and stt"
     },
     {
@@ -8794,7 +8810,7 @@
       "author": null,
       "contributor": null,
       "id": "rule_unmodelled_names_only",
-      "community": 2,
+      "community": 15,
       "norm_label": "rule: unmodelled lists field names only, never values (no oauth secret copied)"
     },
     {
@@ -8807,7 +8823,7 @@
       "author": null,
       "contributor": null,
       "id": "sp13_candidates",
-      "community": 2,
+      "community": 15,
       "norm_label": "46 sp13 candidates: openai-compatible, api key, standard chat url, not hidden"
     },
     {
@@ -8820,7 +8836,7 @@
       "author": null,
       "contributor": null,
       "id": "api_ui_map_row_sp4_no_ui",
-      "community": 9,
+      "community": 12,
       "norm_label": "api_ui_map row: m0 sp4 tools/extract + catalog, no ui yet (sp13 serves /providers)"
     },
     {
@@ -8833,7 +8849,7 @@
       "author": null,
       "contributor": null,
       "id": "progress_handoff_next_sp13",
-      "community": 2,
+      "community": 13,
       "norm_label": "handoff next step: sp13 \u2014 catalog becomes the runtime registry; adapter uses chaturl; /providers from the api; custom providers; delete tools/extract"
     },
     {
@@ -8850,7 +8866,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "02_providers_auth_catalog_registry_build",
-      "community": 2,
+      "community": 13,
       "norm_label": "catalog.registry-build"
     },
     {
@@ -8867,7 +8883,7 @@
         "REFERENCE_BEHAVIOR"
       ],
       "id": "02_providers_auth_catalog_registry_entry_shape",
-      "community": 2,
+      "community": 13,
       "norm_label": "catalog.registry-entry-shape"
     },
     {
@@ -8881,7 +8897,7 @@
       "contributor": null,
       "rationale": "CATALOG becomes the runtime registry: 41 of 121 providers connectable through the SP9 adapter; every other provider carries a reason the UI shows.",
       "id": "catalog_providers_contract",
-      "community": 2,
+      "community": 5,
       "norm_label": "catalog providers contract (m2 sp13)"
     },
     {
@@ -8894,7 +8910,7 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp13b",
-      "community": 2,
+      "community": 5,
       "norm_label": "sp13b \u2014 custom openai-compatible providers (provider_nodes, /api/provider-nodes, /providers/new wired); tools/extract deleted"
     },
     {
@@ -8908,7 +8924,7 @@
       "contributor": null,
       "location": "packages/engine/src/builtin-registry.ts",
       "id": "builtin_registry_catalog",
-      "community": 2,
+      "community": 13,
       "norm_label": "builtinregistry built from catalog (41 connectable providers)"
     },
     {
@@ -8923,7 +8939,7 @@
       "location": "packages/engine/src/builtin-registry.ts",
       "rationale": "One rule gives both the connectable set and the UI reason; OpenAI is the forceStream exception (IMPLEMENTATION_ACCIDENT).",
       "id": "unsupported_reason",
-      "community": 2,
+      "community": 4,
       "norm_label": "unsupportedreason() \u2014 why a catalog provider cannot be connected yet (adapter sp14, oauth sp16, per-account url, forcestream, clineenvelope, hidden, services)"
     },
     {
@@ -8937,7 +8953,7 @@
       "contributor": null,
       "location": "packages/engine/src/registry.ts",
       "id": "provider_descriptor_catalog",
-      "community": 2,
+      "community": 13,
       "norm_label": "providerdescriptor { chaturl, modelsurl, headers, aliases, auth{header, scheme} }; nullable limits"
     },
     {
@@ -8951,7 +8967,7 @@
       "contributor": null,
       "location": "packages/engine/src/registry.ts",
       "id": "registry_alias_status",
-      "community": 2,
+      "community": 10,
       "norm_label": "registry.provider(idoralias) and registry.status(id)"
     },
     {
@@ -8965,7 +8981,7 @@
       "contributor": null,
       "location": "packages/engine/src/adapters/openai-compatible.ts",
       "id": "adapter_catalog_headers",
-      "community": 2,
+      "community": 13,
       "norm_label": "adapter: catalog headers first, key last; raw or bearer scheme; chaturl/modelsurl called directly"
     },
     {
@@ -8979,7 +8995,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/routing/infrastructure/chat-lane.ts",
       "id": "chat_lane_resolution_by_connection",
-      "community": 2,
+      "community": 10,
       "norm_label": "/v1 resolution: provider-or-alias/model; non-connectable prefix \u2192 provider_not_supported; bare id \u2192 first declaring provider with an active connection"
     },
     {
@@ -8993,7 +9009,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/catalog/infrastructure/catalog.controller.ts",
       "id": "catalog_controller",
-      "community": 2,
+      "community": 13,
       "norm_label": "catalogcontroller \u2014 get /api/providers, get /api/providers/:id"
     },
     {
@@ -9006,7 +9022,7 @@
       "author": null,
       "contributor": null,
       "id": "api_get_providers",
-      "community": 2,
+      "community": 13,
       "norm_label": "get /api/providers (all 121, connectable + reason)"
     },
     {
@@ -9019,7 +9035,7 @@
       "author": null,
       "contributor": null,
       "id": "api_get_provider_detail",
-      "community": 2,
+      "community": 4,
       "norm_label": "get /api/providers/:id (chaturl + models; 404 not_found)"
     },
     {
@@ -9032,7 +9048,7 @@
       "author": null,
       "contributor": null,
       "id": "hook_use_providers",
-      "community": 2,
+      "community": 13,
       "norm_label": "useproviders (features/providers/api.ts)"
     },
     {
@@ -9045,7 +9061,7 @@
       "author": null,
       "contributor": null,
       "id": "hook_use_provider",
-      "community": 2,
+      "community": 4,
       "norm_label": "useprovider(id) (features/providers/api.ts)"
     },
     {
@@ -9059,7 +9075,7 @@
       "contributor": null,
       "location": "apps/server/test/catalog.test.mjs",
       "id": "catalog_api_tests",
-      "community": 2,
+      "community": 13,
       "norm_label": "apps/server/test/catalog.test.mjs (catalog api) + chat-lane resolution tests"
     },
     {
@@ -9073,7 +9089,7 @@
       "contributor": null,
       "rationale": "User-defined OpenAI-compatible providers: name, prefix, base URL; one API-key connection; /v1 reaches them as <prefix>/<model>. Three 9router bugs not ported.",
       "id": "custom_providers_contract",
-      "community": 2,
+      "community": 5,
       "norm_label": "custom providers contract (m2 sp13b)"
     },
     {
@@ -9087,7 +9103,7 @@
       "contributor": null,
       "rationale": "REFERENCE_BEHAVIOR + SUSPECTED_BUG: default OpenAI base URL, doubled /chat/completions, unreachable prefixes \u2014 not ported.",
       "id": "02_providers_auth_connection_provider_node_create_list",
-      "community": 2,
+      "community": 5,
       "norm_label": "connection.provider-node-create-list"
     },
     {
@@ -9100,7 +9116,7 @@
       "author": null,
       "contributor": null,
       "id": "02_providers_auth_connection_provider_node_update_delete",
-      "community": 2,
+      "community": 5,
       "norm_label": "connection.provider-node-update-delete"
     },
     {
@@ -9113,7 +9129,7 @@
       "author": null,
       "contributor": null,
       "id": "02_providers_auth_connection_provider_node_repo_storage",
-      "community": 2,
+      "community": 5,
       "norm_label": "connection.provider-node-repo-storage"
     },
     {
@@ -9126,7 +9142,7 @@
       "author": null,
       "contributor": null,
       "id": "02_providers_auth_connection_provider_node_validate_partial_ssrf",
-      "community": 2,
+      "community": 5,
       "norm_label": "connection.provider-node-validate-partial-ssrf (stays traced: no validate route)"
     },
     {
@@ -9140,7 +9156,7 @@
       "contributor": null,
       "location": "packages/database/src/schema/connections.ts",
       "id": "provider_nodes_table",
-      "community": 2,
+      "community": 5,
       "norm_label": "provider_nodes table (migration 0003: id, name, unique prefix, base_url, timestamps; max 100)"
     },
     {
@@ -9154,7 +9170,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/connections/domain/provider-node.ts",
       "id": "provider_node_rules",
-      "community": 2,
+      "community": 5,
       "norm_label": "provider-node domain rules \u2014 prefix token, base url normalize (strip /chat/completions), https or loopback http"
     },
     {
@@ -9168,7 +9184,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/connections/infrastructure/provider-nodes.repo.ts",
       "id": "provider_nodes_repo",
-      "community": 2,
+      "community": 5,
       "norm_label": "providernodesrepository \u2014 list/get/byprefix, count+insert transaction, cascade delete of the connection; nodedescriptor()"
     },
     {
@@ -9182,7 +9198,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/connections/infrastructure/provider-nodes.controller.ts",
       "id": "provider_nodes_controller",
-      "community": 2,
+      "community": 5,
       "norm_label": "providernodescontroller \u2014 /api/provider-nodes crud; prefix_reserved / prefix_taken / node_limit"
     },
     {
@@ -9196,7 +9212,7 @@
       "contributor": null,
       "location": "apps/server/src/modules/routing/infrastructure/chat-lane.ts",
       "id": "chat_lane_custom_prefix",
-      "community": 2,
+      "community": 5,
       "norm_label": "/v1: <prefix>/<model> reaches a custom provider after built-in ids, aliases, and catalog prefixes"
     },
     {
@@ -9209,7 +9225,7 @@
       "author": null,
       "contributor": null,
       "id": "api_get_provider_nodes",
-      "community": 2,
+      "community": 5,
       "norm_label": "get /api/provider-nodes"
     },
     {
@@ -9222,7 +9238,7 @@
       "author": null,
       "contributor": null,
       "id": "api_post_provider_nodes",
-      "community": 2,
+      "community": 5,
       "norm_label": "post /api/provider-nodes"
     },
     {
@@ -9235,7 +9251,7 @@
       "author": null,
       "contributor": null,
       "id": "api_patch_provider_nodes_id",
-      "community": 2,
+      "community": 5,
       "norm_label": "patch /api/provider-nodes/:id"
     },
     {
@@ -9248,7 +9264,7 @@
       "author": null,
       "contributor": null,
       "id": "api_delete_provider_nodes_id",
-      "community": 2,
+      "community": 5,
       "norm_label": "delete /api/provider-nodes/:id (cascades the connection)"
     },
     {
@@ -9261,7 +9277,7 @@
       "author": null,
       "contributor": null,
       "id": "hook_use_provider_nodes",
-      "community": 2,
+      "community": 5,
       "norm_label": "useprovidernodes / usecreatenode / useupdatenode / usedeletenode (features/providers/api.ts)"
     },
     {
@@ -9274,7 +9290,7 @@
       "author": null,
       "contributor": null,
       "id": "screen_custom_providers_section",
-      "community": 2,
+      "community": 5,
       "norm_label": "/providers \u2192 custom providers section (features/providers/custom.tsx): connect, edit, delete"
     },
     {
@@ -9287,7 +9303,7 @@
       "author": null,
       "contributor": null,
       "id": "screen_custom_provider_form",
-      "community": 2,
+      "community": 5,
       "norm_label": "/providers/new \u2192 customproviderform (create; ?id= edit); save \u2192 add connection modal preselected"
     },
     {
@@ -9300,7 +9316,7 @@
       "author": null,
       "contributor": null,
       "id": "err_prefix_reserved",
-      "community": 2,
+      "community": 4,
       "norm_label": "ui error code: prefix_reserved (409)"
     },
     {
@@ -9313,7 +9329,7 @@
       "author": null,
       "contributor": null,
       "id": "err_prefix_taken",
-      "community": 2,
+      "community": 4,
       "norm_label": "ui error code: prefix_taken (409)"
     },
     {
@@ -9326,7 +9342,7 @@
       "author": null,
       "contributor": null,
       "id": "err_node_limit",
-      "community": 2,
+      "community": 4,
       "norm_label": "ui error code: node_limit (409)"
     },
     {
@@ -9340,7 +9356,7 @@
       "contributor": null,
       "location": "apps/server/test/provider-nodes.test.mjs",
       "id": "provider_nodes_tests",
-      "community": 2,
+      "community": 5,
       "norm_label": "apps/server/test/provider-nodes.test.mjs (5 tests; 15 mutations caught)"
     },
     {
@@ -9354,7 +9370,7 @@
       "contributor": null,
       "rationale": "CIP <-> /v1/messages, JSON and SSE. User decision 2026-09-26: 9router suspected bugs not ported (correct behavior like SP9/SP10).",
       "id": "provider_anthropic_contract",
-      "community": 2,
+      "community": 5,
       "norm_label": "anthropic messages provider contract (m2 sp14a)"
     },
     {
@@ -9367,11 +9383,11 @@
       "author": null,
       "contributor": null,
       "id": "sp_sp14a",
-      "community": 2,
+      "community": 5,
       "norm_label": "sp14a \u2014 anthropic messages adapter; anthropic, glm, kimi, minimax, minimax-cn connectable (46 total)"
     },
     {
-      "label": "SP14b \u2014 Anthropic-compatible custom providers, stream-only providers",
+      "label": "SP14b \u2014 Anthropic-compatible custom providers, stream-only providers (49 connectable)",
       "file_type": "document",
       "source_file": "docs/PROGRESS_HANDOFF.md",
       "source_location": null,
@@ -9379,9 +9395,10 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
+      "status": "done",
       "id": "sp_sp14b",
-      "community": 2,
-      "norm_label": "sp14b \u2014 anthropic-compatible custom providers, stream-only providers"
+      "community": 5,
+      "norm_label": "sp14b \u2014 anthropic-compatible custom providers, stream-only providers (49 connectable)"
     },
     {
       "label": "provider.anthropic-auth-and-headers",
@@ -9393,7 +9410,7 @@
       "author": null,
       "contributor": null,
       "id": "11_translation_i18n_provider_anthropic_auth_and_headers",
-      "community": 2,
+      "community": 5,
       "norm_label": "provider.anthropic-auth-and-headers"
     },
     {
@@ -9406,7 +9423,7 @@
       "author": null,
       "contributor": null,
       "id": "11_translation_i18n_translator_openai_to_claude_request",
-      "community": 2,
+      "community": 5,
       "norm_label": "translator.openai-to-claude-request"
     },
     {
@@ -9419,7 +9436,7 @@
       "author": null,
       "contributor": null,
       "id": "11_translation_i18n_translator_claude_to_openai_response",
-      "community": 2,
+      "community": 5,
       "norm_label": "translator.claude-to-openai-response"
     },
     {
@@ -9433,7 +9450,7 @@
       "contributor": null,
       "location": "packages/engine/src/adapters/anthropic.ts",
       "id": "anthropic_adapter",
-      "community": 2,
+      "community": 5,
       "norm_label": "anthropicadapter \u2014 cip <-> messages (max_tokens rules, thinking budgets, tool_use, sse events)"
     },
     {
@@ -9447,7 +9464,7 @@
       "contributor": null,
       "location": "packages/engine/src/adapters/http-adapter.ts",
       "id": "http_provider_adapter",
-      "community": 2,
+      "community": 5,
       "norm_label": "httpprovideradapter \u2014 shared auth headers, retry before first byte, error classification, redaction"
     },
     {
@@ -9461,7 +9478,7 @@
       "contributor": null,
       "location": "packages/engine/src/adapters/index.ts",
       "id": "create_adapter",
-      "community": 2,
+      "community": 5,
       "norm_label": "createadapter(provider, transport) \u2014 adapter chosen by protocol family"
     },
     {
@@ -9475,7 +9492,7 @@
       "contributor": null,
       "location": "packages/engine/src/registry.ts",
       "id": "provider_protocols",
-      "community": 2,
+      "community": 5,
       "norm_label": "provider_protocols: openai-compatible | anthropic; descriptor quirks"
     },
     {
@@ -9488,7 +9505,7 @@
       "author": null,
       "contributor": null,
       "id": "anthropic_deviations",
-      "community": 2,
+      "community": 5,
       "norm_label": "deviations not ported: stop/top_p kept, none stays none, no claude code line, stream errors fail, same stop/usage mapping, 403 invalid"
     },
     {
@@ -9502,7 +9519,7 @@
       "contributor": null,
       "location": "packages/engine/test/anthropic-adapter.test.mjs",
       "id": "anthropic_adapter_tests",
-      "community": 2,
+      "community": 5,
       "norm_label": "packages/engine/test/anthropic-adapter.test.mjs (10) + apps/server/test/anthropic-lane.test.mjs (4); 23 mutations caught"
     },
     {
@@ -9515,8 +9532,220 @@
       "author": null,
       "contributor": null,
       "id": "api_ui_map_row_sp14a",
-      "community": 2,
+      "community": 13,
       "norm_label": "api_ui_map row: sp14a anthropicadapter \u2014 no new screen; /providers pills follow connectable"
+    },
+    {
+      "label": "Stream-only providers contract (M2 SP14b)",
+      "file_type": "document",
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": "codebuddy-cn, codebuddy-intl, api-airforce connectable (49). Non-streaming clients get the 9router SSE collapse. User decision 2026-09-26: keep 9router.",
+      "id": "stream_only_contract",
+      "community": 5,
+      "norm_label": "stream-only providers contract (m2 sp14b)"
+    },
+    {
+      "label": "SP14c \u2014 remaining provider families (openai-responses first)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next",
+      "id": "sp_sp14c",
+      "community": 5,
+      "norm_label": "sp14c \u2014 remaining provider families (openai-responses first)"
+    },
+    {
+      "label": "User decision 2026-09-26: SP14b keeps 9router on every suspected bug asked",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": "Claude Code betas + substring official host, /v1/v1/messages node test, lossy SSE collapse, CodeBuddy CN prompt swap. Only deviation: 4 MiB collapse cap. sk-ant-oat cloaking not ported.",
+      "id": "decision_sp14b_keep_9router",
+      "community": 5,
+      "norm_label": "user decision 2026-09-26: sp14b keeps 9router on every suspected bug asked"
+    },
+    {
+      "label": "connection.anthropic-compatible-node",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "id": "02_providers_auth_connection_anthropic_compatible_node",
+      "community": 5,
+      "norm_label": "connection.anthropic-compatible-node"
+    },
+    {
+      "label": "routing.forced-stream-json-collapse",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "id": "05_request_routing_fallback_routing_forced_stream_json_collapse",
+      "community": 5,
+      "norm_label": "routing.forced-stream-json-collapse"
+    },
+    {
+      "label": "provider.codebuddy-request-quirks",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented",
+      "id": "11_translation_i18n_provider_codebuddy_request_quirks",
+      "community": 5,
+      "norm_label": "provider.codebuddy-request-quirks"
+    },
+    {
+      "label": "provider_nodes.type (migration 0005): openai-compatible | anthropic-compatible, id <type>-<hex>, fixed after creation",
+      "file_type": "document",
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "id": "provider_nodes_type_column",
+      "community": 5,
+      "norm_label": "provider_nodes.type (migration 0005): openai-compatible | anthropic-compatible, id <type>-<hex>, fixed after creation"
+    },
+    {
+      "label": "Anthropic node descriptor: <base>/messages, x-api-key, Bearer for third-party hosts, anthropicNode { official }",
+      "file_type": "document",
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "id": "anthropic_node_descriptor",
+      "community": 5,
+      "norm_label": "anthropic node descriptor: <base>/messages, x-api-key, bearer for third-party hosts, anthropicnode { official }"
+    },
+    {
+      "label": "Claude Code anthropic-beta list for claude-* models on an Anthropic node (claude-code flag only on the official host)",
+      "file_type": "document",
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "id": "anthropic_node_betas",
+      "community": 5,
+      "norm_label": "claude code anthropic-beta list for claude-* models on an anthropic node (claude-code flag only on the official host)"
+    },
+    {
+      "label": "Anthropic node connection test: POST <base>/v1/messages, claude-3-haiku, only 401/403 invalid (9router)",
+      "file_type": "document",
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "id": "anthropic_node_connection_test",
+      "community": 5,
+      "norm_label": "anthropic node connection test: post <base>/v1/messages, claude-3-haiku, only 401/403 invalid (9router)"
+    },
+    {
+      "label": "OpenAICompatibleAdapter.execute collapse: stream:true upstream, SSE folded into one answer (reasoning dropped with content, cut-off = complete, 4 MiB cap)",
+      "file_type": "document",
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "id": "stream_only_collapse",
+      "community": 5,
+      "norm_label": "openaicompatibleadapter.execute collapse: stream:true upstream, sse folded into one answer (reasoning dropped with content, cut-off = complete, 4 mib cap)"
+    },
+    {
+      "label": "CodeBuddy quirks: reasoningSummary (cn, intl), neutralAgentPrompt (cn) via EXECUTOR_QUIRKS",
+      "file_type": "document",
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "id": "codebuddy_quirks",
+      "community": 5,
+      "norm_label": "codebuddy quirks: reasoningsummary (cn, intl), neutralagentprompt (cn) via executor_quirks"
+    },
+    {
+      "label": "features/providers/node-rules.ts unreachable(): OpenAI-compatible prefixes win, then the oldest",
+      "file_type": "document",
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired",
+      "id": "node_rules_unreachable",
+      "community": 5,
+      "norm_label": "features/providers/node-rules.ts unreachable(): openai-compatible prefixes win, then the oldest"
+    },
+    {
+      "label": "SP14b tests: engine adapter tests (8 new), server provider-nodes (2) + stream-only.test.mjs (3), web node-rules.test.mjs; 34 mutations caught",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "id": "sp14b_tests",
+      "community": 5,
+      "norm_label": "sp14b tests: engine adapter tests (8 new), server provider-nodes (2) + stream-only.test.mjs (3), web node-rules.test.mjs; 34 mutations caught"
+    },
+    {
+      "label": "API_UI_MAP row: SP14b stream-only providers (no new screen) and the protocol select on /providers/new",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired",
+      "id": "api_ui_map_row_sp14b",
+      "community": 5,
+      "norm_label": "api_ui_map row: sp14b stream-only providers (no new screen) and the protocol select on /providers/new"
     }
   ],
   "links": [
@@ -15801,6 +16030,16 @@
       "target": "sp_sp14a"
     },
     {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "sp_sp14",
+      "target": "sp_sp14c"
+    },
+    {
       "relation": "conceptually_related_to",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
@@ -20893,6 +21132,16 @@
     {
       "relation": "references",
       "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "api_ui_map_doc",
+      "target": "api_ui_map_row_sp14b"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/design/API_UI_MAP.md",
       "source_location": null,
@@ -24561,6 +24810,16 @@
       "target": "chat_lane_custom_prefix"
     },
     {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "adapter_openai_compatible",
+      "target": "codebuddy_quirks"
+    },
+    {
       "relation": "calls",
       "confidence": "EXTRACTED",
       "confidence_score": 1,
@@ -24589,6 +24848,16 @@
       "weight": 1,
       "source": "adapter_openai_compatible",
       "target": "protocol_cip_detail_strict"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "adapter_openai_compatible",
+      "target": "stream_only_collapse"
     },
     {
       "relation": "references",
@@ -26393,6 +26662,16 @@
     {
       "relation": "references",
       "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "stream_only_contract",
+      "target": "catalog_providers_contract"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/contracts/custom-providers.md",
       "source_location": null,
@@ -26471,6 +26750,16 @@
       "target": "11_translation_i18n_provider_anthropic_auth_and_headers"
     },
     {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "builtin_registry_catalog",
+      "target": "codebuddy_quirks"
+    },
+    {
       "relation": "shares_data_with",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
@@ -26489,6 +26778,16 @@
       "weight": 1.0,
       "source": "builtin_registry_catalog",
       "target": "provider_protocols"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "builtin_registry_catalog",
+      "target": "stream_only_collapse"
     },
     {
       "relation": "calls",
@@ -26613,6 +26912,16 @@
     {
       "relation": "references",
       "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "custom_providers_contract",
+      "target": "02_providers_auth_connection_anthropic_compatible_node"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/contracts/custom-providers.md",
       "source_location": null,
@@ -26649,6 +26958,16 @@
       "weight": 1.0,
       "source": "custom_providers_contract",
       "target": "02_providers_auth_connection_provider_node_validate_partial_ssrf"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "sp_sp14b",
+      "target": "custom_providers_contract"
     },
     {
       "relation": "implements",
@@ -26691,6 +27010,26 @@
       "target": "provider_nodes_table"
     },
     {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "provider_nodes_type_column",
+      "target": "provider_nodes_table"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "provider_node_rules",
+      "target": "provider_nodes_type_column"
+    },
+    {
       "relation": "calls",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
@@ -26719,6 +27058,16 @@
       "weight": 1.0,
       "source": "provider_nodes_controller",
       "target": "provider_nodes_repo"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "provider_nodes_repo",
+      "target": "anthropic_node_descriptor"
     },
     {
       "relation": "implements",
@@ -26801,6 +27150,16 @@
       "target": "provider_nodes_controller"
     },
     {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "chat_lane_custom_prefix",
+      "target": "provider_nodes_type_column"
+    },
+    {
       "relation": "calls",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
@@ -26818,6 +27177,16 @@
       "source_location": null,
       "weight": 1.0,
       "source": "hook_use_provider_nodes",
+      "target": "api_post_provider_nodes"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "screen_custom_provider_form",
       "target": "api_post_provider_nodes"
     },
     {
@@ -26859,6 +27228,36 @@
       "weight": 1.0,
       "source": "screen_custom_providers_section",
       "target": "hook_use_provider_nodes"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "screen_custom_providers_section",
+      "target": "node_rules_unreachable"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "screen_custom_provider_form",
+      "target": "provider_nodes_type_column"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "sp14b_tests",
+      "target": "provider_nodes_tests"
     },
     {
       "relation": "references",
@@ -26971,6 +27370,36 @@
       "target": "sp_sp14b"
     },
     {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "sp_sp14b",
+      "target": "decision_sp14b_keep_9router"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "sp_sp14b",
+      "target": "sp_sp14c"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "sp_sp14b",
+      "target": "stream_only_contract"
+    },
+    {
       "relation": "implements",
       "confidence": "INFERRED",
       "confidence_score": 0.95,
@@ -26989,6 +27418,26 @@
       "weight": 1.0,
       "source": "anthropic_adapter",
       "target": "11_translation_i18n_translator_claude_to_openai_response"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "anthropic_adapter",
+      "target": "anthropic_node_betas"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "anthropic_adapter",
+      "target": "anthropic_node_connection_test"
     },
     {
       "relation": "implements",
@@ -27023,6 +27472,16 @@
     {
       "relation": "references",
       "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "anthropic_node_descriptor",
+      "target": "anthropic_adapter"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/design/API_UI_MAP.md",
       "source_location": null,
@@ -27039,6 +27498,146 @@
       "weight": 1.0,
       "source": "create_adapter",
       "target": "anthropic_adapter"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "anthropic_node_descriptor",
+      "target": "http_provider_adapter"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "api_ui_map_row_sp14b",
+      "target": "stream_only_contract"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "stream_only_contract",
+      "target": "05_request_routing_fallback_routing_forced_stream_json_collapse"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "stream_only_contract",
+      "target": "11_translation_i18n_provider_codebuddy_request_quirks"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "decision_sp14b_keep_9router",
+      "target": "02_providers_auth_connection_anthropic_compatible_node"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "decision_sp14b_keep_9router",
+      "target": "05_request_routing_fallback_routing_forced_stream_json_collapse"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "decision_sp14b_keep_9router",
+      "target": "11_translation_i18n_provider_codebuddy_request_quirks"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "anthropic_node_betas",
+      "target": "02_providers_auth_connection_anthropic_compatible_node"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "anthropic_node_connection_test",
+      "target": "02_providers_auth_connection_anthropic_compatible_node"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "stream_only_collapse",
+      "target": "05_request_routing_fallback_routing_forced_stream_json_collapse"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/stream-only-providers.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "codebuddy_quirks",
+      "target": "11_translation_i18n_provider_codebuddy_request_quirks"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "sp14b_tests",
+      "target": "anthropic_node_connection_test"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "sp14b_tests",
+      "target": "stream_only_collapse"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1,
+      "source": "sp14b_tests",
+      "target": "node_rules_unreachable"
     }
   ],
   "hyperedges": [
@@ -27434,7 +28033,23 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/contracts/provider-anthropic.md"
+    },
+    {
+      "id": "sp14b_custom_anthropic_nodes",
+      "label": "Anthropic-compatible custom providers: storage, descriptor, adapter headers, connection test, UI",
+      "nodes": [
+        "provider_nodes_type_column",
+        "anthropic_node_descriptor",
+        "anthropic_node_betas",
+        "anthropic_node_connection_test",
+        "node_rules_unreachable",
+        "anthropic_adapter"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md"
     }
   ],
-  "built_at_commit": "3a5472f4270512544cbf3dc7adfedf879b03ffe8"
+  "built_at_commit": "57cbe943eb22c7fdf558a6dc09edda84c81322e9"
 }

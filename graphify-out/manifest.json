@@ -35,9 +35,9 @@
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1790395364.8092387,
-    "ast_hash": "2166532aae9888f57d239766423fc056",
-    "semantic_hash": "2166532aae9888f57d239766423fc056"
+    "mtime": 1790398697.6596096,
+    "ast_hash": "1df64cb9891412c0fc537c9c66126665",
+    "semantic_hash": "1df64cb9891412c0fc537c9c66126665"
   },
   "docs/design/UI_HANDOFF.md": {
     "mtime": 1790304403.8708513,
@@ -60,9 +60,9 @@
     "semantic_hash": "04c0c50e7da7000a83ce1379183f0975"
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1790395364.8567803,
-    "ast_hash": "b9cd7cda40e8515e4d3d2a58c962d64e",
-    "semantic_hash": "b9cd7cda40e8515e4d3d2a58c962d64e"
+    "mtime": 1790399300.8400156,
+    "ast_hash": "a65845680cbf093a59bc73a95cdbfcef",
+    "semantic_hash": "a65845680cbf093a59bc73a95cdbfcef"
   },
   "docs/contracts/transport.md": {
     "mtime": 1790343138.4076855,
@@ -100,18 +100,23 @@
     "semantic_hash": "7dbf0ce39fc9eecb48ba8b829f40b777"
   },
   "docs/contracts/catalog-providers.md": {
-    "mtime": 1790395364.8112352,
-    "ast_hash": "9d20b53db73e543d5ce0bddc1de0a7e1",
-    "semantic_hash": "9d20b53db73e543d5ce0bddc1de0a7e1"
+    "mtime": 1790398651.732272,
+    "ast_hash": "c9fee076230267f68420f11f4f63313c",
+    "semantic_hash": "c9fee076230267f68420f11f4f63313c"
   },
   "docs/contracts/custom-providers.md": {
-    "mtime": 1790393361.6602757,
-    "ast_hash": "2d5bc636951ff033dff2aafcbf8bf97e",
-    "semantic_hash": "2d5bc636951ff033dff2aafcbf8bf97e"
+    "mtime": 1790398646.4741707,
+    "ast_hash": "f04521765e870dbfd549a4cd2df55421",
+    "semantic_hash": "f04521765e870dbfd549a4cd2df55421"
   },
   "docs/contracts/provider-anthropic.md": {
-    "mtime": 1790394219.53648,
-    "ast_hash": "137e969e47ed55904b1d1455df107850",
-    "semantic_hash": "137e969e47ed55904b1d1455df107850"
+    "mtime": 1790398651.8124115,
+    "ast_hash": "966aadf40ea0a6c6043a1929ce78b149",
+    "semantic_hash": "966aadf40ea0a6c6043a1929ce78b149"
+  },
+  "docs/contracts/stream-only-providers.md": {
+    "mtime": 1790398590.2892234,
+    "ast_hash": "5f21a26acc0dfd25a43a15b6da28f686",
+    "semantic_hash": "5f21a26acc0dfd25a43a15b6da28f686"
   }
 }
