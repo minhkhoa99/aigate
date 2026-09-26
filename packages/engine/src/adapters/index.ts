@@ -2,6 +2,7 @@ import type { AIProviderPort, HttpTransportPort } from "../ports.js";
 import type { ProviderDescriptor } from "../registry.js";
 import { AnthropicAdapter } from "./anthropic.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
+import { GeminiAdapter } from "./gemini.js";
 import { OllamaAdapter } from "./ollama.js";
 import { OpenAIResponsesAdapter } from "./openai-responses.js";
 
@@ -11,6 +12,7 @@ export function createAdapter(provider: ProviderDescriptor, transport: HttpTrans
     case "anthropic": return new AnthropicAdapter(provider, transport);
     case "openai-responses": return new OpenAIResponsesAdapter(provider, transport);
     case "ollama": return new OllamaAdapter(provider, transport);
+    case "gemini": return new GeminiAdapter(provider, transport);
     default: return new OpenAICompatibleAdapter(provider, transport);
   }
 }

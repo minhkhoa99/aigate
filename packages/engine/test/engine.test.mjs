@@ -92,13 +92,14 @@ test("every error code has an explicit fallback decision", () => {
 });
 
 test("the built-in registry is the connectable part of the catalog, with a reason for the rest", () => {
-  assert.equal(builtinRegistry.providers.length, 52);
+  assert.equal(builtinRegistry.providers.length, 53);
   assert.equal(builtinRegistry.model("openai", "gpt-4.1")?.contextWindow, 1_000_000);
   assert.equal(builtinRegistry.model("openai", "missing"), undefined);
   assert.equal(builtinRegistry.provider("ds")?.id, "deepseek", "aliases resolve");
   assert.equal(builtinRegistry.provider("anthropic")?.protocol, "anthropic");
   assert.deepEqual(builtinRegistry.status("anthropic"), { connectable: true });
-  assert.deepEqual(builtinRegistry.status("gemini"), { connectable: false, reason: "Needs the gemini adapter (SP14)" });
+  assert.deepEqual(builtinRegistry.status("gemini"), { connectable: true });
+  assert.deepEqual(builtinRegistry.status("vertex"), { connectable: false, reason: "Needs the vertex adapter (SP14)" });
   assert.deepEqual(builtinRegistry.status("openai"), { connectable: true });
   assert.equal(builtinRegistry.status("no-such-provider"), undefined);
   // 9router data defect: an output limit above the context window is not trusted.

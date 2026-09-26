@@ -77,6 +77,8 @@ export type StreamChunk =
   | { readonly type: "text_delta"; readonly index: number; readonly text: string }
   | { readonly type: "thinking_delta"; readonly index: number; readonly text: string; readonly signature?: string }
   | { readonly type: "tool_call_delta"; readonly index: number; readonly id?: string; readonly name?: string; readonly argumentsDelta: string }
+  // A generated image (Gemini image output; translator.gemini-to-openai-response renders it as 9router's images delta).
+  | { readonly type: "image_delta"; readonly mediaType: string; readonly data: string }
   | { readonly type: "usage"; readonly usage: TokenUsage }
   | { readonly type: "stop"; readonly stopReason: StopReason };
 

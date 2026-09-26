@@ -62,7 +62,7 @@ test("createAdapter picks the adapter by protocol family", () => {
   assert.ok(createAdapter(anthropic, fakeTransport()) instanceof AnthropicAdapter);
   assert.ok(createAdapter(builtinRegistry.provider("openai"), fakeTransport()) instanceof OpenAICompatibleAdapter);
   assert.deepEqual(["anthropic", "glm", "kimi", "minimax", "minimax-cn"].map((id) => builtinRegistry.provider(id)?.protocol), Array(5).fill("anthropic"));
-  assert.equal(builtinRegistry.providers.length, 52);
+  assert.equal(builtinRegistry.providers.length, 53);
   assert.deepEqual(builtinRegistry.status("claude"), { connectable: false, reason: "Needs OAuth sign-in (SP16)" });
 });
 

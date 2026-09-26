@@ -1,6 +1,6 @@
 # Discovery coverage
 
-Entries: 298
+Entries: 300
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
@@ -8,7 +8,7 @@ Entries: 298
 | pages | 5/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +15 |
 | providers | 18/124 | alicode, alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu … +98 |
 | executors | 12/31 | azure, devin-cli, gemini-cli, github, grok-cli, grok-web, iflow, kimchi … +11 |
-| translators | 41/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/formats/gemini.js |
+| translators | 42/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js |
 | repos | 11/11 |  |
 | settingsKeys | 47/52 | cloudEnabled, dnsToolEnabled, oidcLoginLabel, samlLoginLabel, tunnelProvider |
 
@@ -19,7 +19,7 @@ Entries: 298
 - connections: 51
 - identity: 11
 - media: 15
-- routing: 91
+- routing: 93
 - settings: 10
 - tooling: 45
 - transport: 14
@@ -28,8 +28,8 @@ Entries: 298
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 13
-- REFERENCE_BEHAVIOR: 251
-- SUSPECTED_BUG: 47
+- REFERENCE_BEHAVIOR: 253
+- SUSPECTED_BUG: 49
 
 ## Missing — pages
 
@@ -196,7 +196,6 @@ Entries: 298
 - open-sse/translator/concerns/modality.js
 - open-sse/translator/concerns/paramSupport.js
 - open-sse/translator/concerns/prefetch.js
-- open-sse/translator/formats/gemini.js
 
 ## Missing — settingsKeys
 

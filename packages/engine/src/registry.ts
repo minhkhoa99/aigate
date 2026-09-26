@@ -50,7 +50,7 @@ export interface ProviderDescriptor {
   readonly anthropicNode?: { readonly official: boolean };
 }
 
-export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic", "openai-responses", "ollama"] as const;
+export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic", "openai-responses", "ollama", "gemini"] as const;
 export type ProviderProtocol = (typeof PROVIDER_PROTOCOLS)[number];
 
 // The descriptor a connection with its own base URL talks to; one trailing "/" is removed (resolveOllamaLocalHost).

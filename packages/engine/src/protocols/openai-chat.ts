@@ -326,6 +326,8 @@ export function toOpenAIChatCompletion(response: CanonicalResponse, meta: Comple
     else throw new UnsupportedFeatureError(`${part.type} in a response`, "OpenAI Chat Completions");
   }
   const refusal = response.vendorExtensions?.openai?.refusal;
+  // A provider may pass its own finish_reason through (Gemini's lower-cased reason, kept from 9router).
+  const finish = response.vendorExtensions?.openai?.finish_reason;
   const message: Json = {
     role: "assistant",
     content: texts.length > 0 ? texts.join("") : null,
@@ -338,7 +340,7 @@ export function toOpenAIChatCompletion(response: CanonicalResponse, meta: Comple
     object: "chat.completion",
     created: meta.created,
     model: response.model,
-    choices: [{ index: 0, message, logprobs: null, finish_reason: FINISH_REASONS[response.stopReason] }],
+    choices: [{ index: 0, message, logprobs: null, finish_reason: typeof finish === "string" ? finish : FINISH_REASONS[response.stopReason] }],
     usage: usageJson(response.usage),
   };
 }
@@ -409,6 +411,8 @@ export class OpenAIChatStreamEncoder {
     switch (chunk.type) {
       case "text_delta": return head + this.delta({ content: chunk.text });
       case "thinking_delta": return head + this.delta({ reasoning_content: chunk.text });
+      // 9router's non-standard images delta for a generated image (translator.gemini-to-openai-response).
+      case "image_delta": return head + this.delta({ images: [{ type: "image_url", image_url: { url: `data:${chunk.mediaType};base64,${chunk.data}` } }] });
       case "tool_call_delta": {
         const fn = { ...(chunk.name ? { name: chunk.name } : {}), arguments: chunk.argumentsDelta };
         return head + this.delta({ tool_calls: [{ index: chunk.index, ...(chunk.id ? { id: chunk.id, type: "function" } : {}), function: fn }] });

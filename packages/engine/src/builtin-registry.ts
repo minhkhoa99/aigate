@@ -11,6 +11,8 @@ const PATHS: Readonly<Record<ProviderProtocol, { chat: RegExp; models: string }>
   anthropic: { chat: /\/messages$/, models: "/models" },
   "openai-responses": { chat: /\/responses$/, models: "/models" },
   ollama: { chat: /\/api\/chat$/, models: "/api/tags" },
+  // Gemini posts to <base>/<model>:generateContent; the base itself lists the models.
+  gemini: { chat: /\/models$/, models: "/models" },
 };
 // 9router forces streaming for these although the vendor answers non-streaming requests too
 // (IMPLEMENTATION_ACCIDENT for OpenAI: the API accepts stream:false; SP3 tapes replay that way).
@@ -58,6 +60,8 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
   // 9router authenticates every API key of the Anthropic family with a raw x-api-key, whatever the entry says.
   const auth: ProviderDescriptor["auth"] = protocol === "anthropic"
     ? { kind: "api-key", header: "x-api-key", scheme: "raw" }
+    // translator.openai-to-gemini-request: an API key goes in x-goog-api-key (the catalog records the OAuth header).
+    : protocol === "gemini" ? { kind: "api-key", header: "x-goog-api-key", scheme: "raw" }
     : { kind: "api-key", header: provider.auth.header ?? "authorization", scheme: provider.auth.scheme === "raw" ? "raw" : "bearer", ...(provider.id === "ollama-local" ? { optional: true } : {}) };
   return {
     id: provider.id,

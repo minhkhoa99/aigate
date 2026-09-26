@@ -59,7 +59,7 @@ test("perplexity-agent is connectable through the Responses adapter; codex and g
   assert.equal(pplx.protocol, "openai-responses");
   assert.equal(pplx.chatUrl, "https://api.perplexity.ai/v1/responses");
   assert.ok(createAdapter(pplx, fakeTransport()) instanceof OpenAIResponsesAdapter);
-  assert.equal(builtinRegistry.providers.length, 52);
+  assert.equal(builtinRegistry.providers.length, 53);
   assert.deepEqual(builtinRegistry.status("codex"), { connectable: false, reason: "Needs OAuth sign-in (SP16)" });
 });
 

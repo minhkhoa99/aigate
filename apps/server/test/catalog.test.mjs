@@ -22,7 +22,7 @@ test("the provider catalog lists every provider with its connectable status, beh
     const claude = list.find((p) => p.id === "claude");
     assert.deepEqual([claude.connectable, claude.reason], [false, "Needs OAuth sign-in (SP16)"]);
     assert.ok(list.every((p) => p.connectable === (p.reason === null)), "a reason exactly when not connectable");
-    assert.equal(list.filter((p) => p.connectable).length, 52);
+    assert.equal(list.filter((p) => p.connectable).length, 53);
     await app.close();
   }));
 
