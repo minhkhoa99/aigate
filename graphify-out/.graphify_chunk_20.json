@@ -1,0 +1,514 @@
+{
+  "nodes": [
+    {
+      "id": "provider_connection_data_contract",
+      "label": "Per-connection data providers contract (M2 SP14g)",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": "azure, cloudflare-ai, clinepass. User decisions 2026-09-26: keep 9router for Azure, correct Cloudflare images and the ClinePass test (a one-token chat after a live check)."
+    },
+    {
+      "id": "sp_sp14g",
+      "label": "SP14g — per-connection data (azure, cloudflare-ai; migration 0008) and ClinePass (58 connectable)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "sp_sp14h",
+      "label": "SP14h — commandcode adapter (NDJSON AI SDK v5 events, forced stream)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next"
+    },
+    {
+      "id": "decision_sp14g",
+      "label": "User decisions 2026-09-26: SP14g keeps 9router for Azure, refuses Cloudflare images, gives ClinePass a real test (chat probe after live GET /models returned 200 to a fake key)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "02_providers_auth_connection_azure_openai_deployment",
+      "label": "connection.azure-openai-deployment",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "02_providers_auth_connection_cloudflare_account_id",
+      "label": "connection.cloudflare-account-id",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "02_providers_auth_provider_clinepass_headers_envelope",
+      "label": "provider.clinepass-headers-envelope",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "11_translation_i18n_translator_cloudflare_content_flatten",
+      "label": "translator.cloudflare-content-flatten",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "connection_fields_descriptor",
+      "label": "Descriptor connectionFields + withConnection(): {field} URL tokens filled per connection (encoded), OpenAI-Organization header, {model} filled per request",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "chat_probe_test",
+      "label": "Descriptor chatProbe: connection test by a one-token chat (azure 401/403, cloudflare 401/403/404, clinepass 401/403)",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "connection_data_columns",
+      "label": "provider_connections.deployment, api_version, organization, account_id (migration 0008); POST/PATCH validation per field",
+      "file_type": "document",
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "clinepass_envelope_headers",
+      "label": "ClinePass: Cline headers naming AIGate, non-stream { success, data } unwrapped",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "screen_connections_fields",
+      "label": "Connections: CONNECTION_FIELDS per provider (ollama host, Azure endpoint/deployment/API version/organization, Cloudflare account); Edit keeps the key",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired"
+    },
+    {
+      "id": "sp14g_tests",
+      "label": "SP14g tests: engine connection-data.test.mjs (5), server connection-data-lane.test.mjs; 41 mutations caught",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "api_ui_map_row_sp14g",
+      "label": "API_UI_MAP row: SP14g per-connection data and ClinePass",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    }
+  ],
+  "edges": [
+    {
+      "source": "sp_sp14f",
+      "target": "sp_sp14g",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14g",
+      "target": "sp_sp14h",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14",
+      "target": "sp_sp14h",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14g",
+      "target": "provider_connection_data_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14g",
+      "target": "decision_sp14g",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14g",
+      "target": "02_providers_auth_connection_azure_openai_deployment",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14g",
+      "target": "02_providers_auth_connection_cloudflare_account_id",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14g",
+      "target": "02_providers_auth_provider_clinepass_headers_envelope",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14g",
+      "target": "11_translation_i18n_translator_cloudflare_content_flatten",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_connection_data_contract",
+      "target": "connection_fields_descriptor",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_connection_data_contract",
+      "target": "chat_probe_test",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_connection_data_contract",
+      "target": "clinepass_envelope_headers",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_connection_data_contract",
+      "target": "connection_data_columns",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connection_fields_descriptor",
+      "target": "connection_base_url",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "connection_fields_descriptor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "chat_probe_test",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "clinepass_envelope_headers",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "builtin_registry_catalog",
+      "target": "connection_fields_descriptor",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connection_fields_descriptor",
+      "target": "02_providers_auth_connection_azure_openai_deployment",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connection_fields_descriptor",
+      "target": "02_providers_auth_connection_cloudflare_account_id",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "clinepass_envelope_headers",
+      "target": "02_providers_auth_provider_clinepass_headers_envelope",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "adapter_openai_compatible",
+      "target": "11_translation_i18n_translator_cloudflare_content_flatten",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "connections_contract",
+      "target": "connection_data_columns",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/connections.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "screen_connections",
+      "target": "screen_connections_fields",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "screen_connections_fields",
+      "target": "screen_connections_ollama_host",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "screen_connections_fields",
+      "target": "connection_data_columns",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp14g_tests",
+      "target": "connection_fields_descriptor",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14g",
+      "target": "sp14g_tests",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_doc",
+      "target": "api_ui_map_row_sp14g",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp14g",
+      "target": "screen_connections_fields",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14g",
+      "target": "api_ui_map_row_sp14g",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "sp14g_connection_data",
+      "label": "Per-connection data: descriptor fields, withConnection, chat probe, migration 0008, connection fields UI",
+      "nodes": [
+        "connection_fields_descriptor",
+        "chat_probe_test",
+        "connection_data_columns",
+        "screen_connections_fields",
+        "clinepass_envelope_headers"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-connection-data.md"
+    }
+  ]
+}

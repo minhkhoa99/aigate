@@ -35,9 +35,9 @@
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1790434185.2239153,
-    "ast_hash": "773cd448e3c36ea96aa4a9e6741e7094",
-    "semantic_hash": "773cd448e3c36ea96aa4a9e6741e7094"
+    "mtime": 1790437371.0234883,
+    "ast_hash": "7970d3b8e020d2f145904124fd299bfd",
+    "semantic_hash": "7970d3b8e020d2f145904124fd299bfd"
   },
   "docs/design/UI_HANDOFF.md": {
     "mtime": 1790304403.8708513,
@@ -60,9 +60,9 @@
     "semantic_hash": "04c0c50e7da7000a83ce1379183f0975"
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1790434846.7335043,
-    "ast_hash": "857333fa90f05201a0944de3ee2c7670",
-    "semantic_hash": "857333fa90f05201a0944de3ee2c7670"
+    "mtime": 1790438284.4482732,
+    "ast_hash": "a8094bd926b7764ade325575039e94b3",
+    "semantic_hash": "a8094bd926b7764ade325575039e94b3"
   },
   "docs/contracts/transport.md": {
     "mtime": 1790343138.4076855,
@@ -80,9 +80,9 @@
     "semantic_hash": "001cf6d92b0729fa6c849c78fb49fc8f"
   },
   "docs/contracts/connections.md": {
-    "mtime": 1790434118.9865868,
-    "ast_hash": "a28413bd8a4b8c5bb1427521823cbcd2",
-    "semantic_hash": "a28413bd8a4b8c5bb1427521823cbcd2"
+    "mtime": 1790437371.020476,
+    "ast_hash": "e0e2ae7ba92d804c4015a24e818b7a0e",
+    "semantic_hash": "e0e2ae7ba92d804c4015a24e818b7a0e"
   },
   "docs/contracts/chat-lane.md": {
     "mtime": 1790366902.483582,
@@ -100,9 +100,9 @@
     "semantic_hash": "7dbf0ce39fc9eecb48ba8b829f40b777"
   },
   "docs/contracts/catalog-providers.md": {
-    "mtime": 1790434185.209915,
-    "ast_hash": "14af23db7855993e5a5eae06e71fcd60",
-    "semantic_hash": "14af23db7855993e5a5eae06e71fcd60"
+    "mtime": 1790437371.0214767,
+    "ast_hash": "3a474a93dd700a575db4edbb0c759591",
+    "semantic_hash": "3a474a93dd700a575db4edbb0c759591"
   },
   "docs/contracts/custom-providers.md": {
     "mtime": 1790411715.755863,
@@ -138,5 +138,10 @@
     "mtime": 1790434171.6344848,
     "ast_hash": "416d6d21e3b6a6c1bdcc73c3c57d1dc5",
     "semantic_hash": "416d6d21e3b6a6c1bdcc73c3c57d1dc5"
+  },
+  "docs/contracts/provider-connection-data.md": {
+    "mtime": 1790438215.5531056,
+    "ast_hash": "2d7f0047ae405f3567154cdb66be3076",
+    "semantic_hash": "2d7f0047ae405f3567154cdb66be3076"
   }
 }
