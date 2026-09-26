@@ -53,6 +53,9 @@ async function runTest(provider: ProviderDescriptor, transport: HttpTransportPor
   try {
     const status = await createAdapter(provider, transport).validateCredential({ kind: "api-key", apiKey }, ctx);
     if (status.valid) return { testStatus: "active", lastError: null, lastErrorCode: null };
+    if (status.code === "AUTH_ERROR" && status.message.includes("Check it in AIGate: Gateway → Endpoint & Keys.")) {
+      return { testStatus: "unreachable", lastError: `${provider.name} points back to AIGate. Edit its Base URL to the upstream provider API.`, lastErrorCode: "INVALID_REQUEST" };
+    }
     return { testStatus: status.code === "QUOTA_EXHAUSTED" ? "no_quota" : "invalid", lastError: status.message, lastErrorCode: status.code };
   } catch (error) {
     if (error instanceof EngineError) return { testStatus: "unreachable", lastError: error.message, lastErrorCode: error.code };

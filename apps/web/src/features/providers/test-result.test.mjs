@@ -8,11 +8,17 @@ const base = { providerName: "OpenAI", isActive: true, lastError: null, lastErro
 test("each test status has its own toast; a network failure never blames the key", () => {
   assert.deepEqual(describeTest({ ...base, testStatus: "active" }), { tone: "success", message: "OpenAI accepted the key." });
   assert.equal(describeTest({ ...base, testStatus: "invalid" }).code, "AUTH_ERROR");
-  assert.match(describeTest({ ...base, testStatus: "invalid" }).message, /rejected the key/);
+  assert.match(describeTest({ ...base, testStatus: "invalid" }).message, /rejected authentication.*endpoint and key/);
+  assert.equal(describeTest({ ...base, providerName: "vycel", testStatus: "invalid", lastError: "vycel answered 401: The API key is not valid or was disabled. Check it in AIGate: Gateway → Endpoint & Keys." }).message,
+    "vycel points back to AIGate. Edit its Base URL to the upstream provider API, then test again.");
+  assert.match(describeTest({ ...base, testStatus: "invalid", lastError: "OpenAI answered 401: expired token" }).message, /expired token.*endpoint and key/);
   assert.match(describeTest({ ...base, testStatus: "no_quota" }).message, /no quota or credit/);
   const down = describeTest({ ...base, testStatus: "unreachable", lastError: "Could not reach api.openai.com", lastErrorCode: "PROVIDER_UNAVAILABLE" });
   assert.deepEqual([down.tone, down.code], ["error", "PROVIDER_UNAVAILABLE"]);
   assert.match(down.message, /Could not reach api\.openai\.com.*not judged/);
+  const loop = describeTest({ ...base, testStatus: "unreachable", lastError: "vycel points back to AIGate. Edit its Base URL to the upstream provider API.", lastErrorCode: "INVALID_REQUEST" });
+  assert.equal(loop.code, "INVALID_REQUEST");
+  assert.match(loop.message, /points back to AIGate.*key was not judged/);
   assert.equal(describeTest({ ...base, testStatus: "unreachable", lastErrorCode: "TIMEOUT" }).code, "TIMEOUT");
   assert.match(describeTest({ ...base, testStatus: "untested" }).message, /changed while it was being tested/);
 });

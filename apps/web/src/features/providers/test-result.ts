@@ -25,7 +25,12 @@ export function describeTest(connection: Pick<Connection, "providerName" | "test
   const provider = connection.providerName;
   switch (connection.testStatus) {
     case "active": return { tone: "success", message: `${provider} accepted the key.` };
-    case "invalid": return { tone: "error", code: "AUTH_ERROR", message: `${provider} rejected the key. Check it, then use Replace key.` };
+    case "invalid": return {
+      tone: "error", code: "AUTH_ERROR",
+      message: connection.lastError?.includes("Check it in AIGate: Gateway → Endpoint & Keys.")
+        ? `${provider} points back to AIGate. Edit its Base URL to the upstream provider API, then test again.`
+        : `${connection.lastError ?? `${provider} rejected authentication.`} Check the provider endpoint and key.`,
+    };
     case "no_quota": return { tone: "error", code: "QUOTA_EXHAUSTED", message: `The key works, but the ${provider} account has no quota or credit left.` };
     case "unreachable": return {
       tone: "error", code: connection.lastErrorCode ?? "PROVIDER_UNAVAILABLE",

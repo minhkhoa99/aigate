@@ -11,13 +11,13 @@ import { unreachable } from "./node-rules";
 const PROTOCOLS: Readonly<Record<NodeType, { label: string; hint: string; placeholder: string; test: string }>> = {
   "openai-compatible": {
     label: "OpenAI compatible",
-    hint: "The URL before /chat/completions or /responses; empty means https://api.openai.com/v1. https, or http to this machine only.",
+    hint: "The upstream API URL before /chat/completions or /responses, not this AIGate gateway URL. Empty means https://api.openai.com/v1. https, or http to this machine only.",
     placeholder: "https://api.example.com/v1",
     test: "Add its API key; AIGate tests it at <base URL>/models",
   },
   "anthropic-compatible": {
     label: "Anthropic compatible",
-    hint: "The URL before /messages (a pasted /messages is removed); empty means https://api.anthropic.com/v1. https, or http to this machine only.",
+    hint: "The upstream API URL before /messages, not this AIGate gateway URL (a pasted /messages is removed). Empty means https://api.anthropic.com/v1. https, or http to this machine only.",
     placeholder: "https://api.anthropic.com/v1",
     // connection.anthropic-compatible-node: kept as 9router tests it.
     test: "Add its API key; like 9router, the test posts to <base URL>/v1/messages and accepts any answer except 401/403",

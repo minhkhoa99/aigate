@@ -101,6 +101,21 @@ test("a custom provider gets a connection, is tested at its own URL, and serves 
     await app.close();
   }));
 
+test("a custom provider pointed back at AIGate reports the endpoint, not a bad provider key", () =>
+  withTempDb(async (file) => {
+    const upstream = fakeUpstream(json(401, { error: {
+      code: "invalid_api_key", message: "The API key is not valid or was disabled. Check it in AIGate: Gateway → Endpoint & Keys.",
+    } }));
+    const { app, dash } = await ready(file, upstream);
+    const node = (await dash({ method: "POST", url: "/api/provider-nodes", body: { name: "vycel", prefix: "vycel", baseUrl: "http://127.0.0.1:5173/v1" } })).json();
+    const connection = (await dash({ method: "POST", url: "/api/connections", body: { provider: node.id, apiKey: "sk-custom-test-key" } })).json();
+    const tested = (await dash({ method: "POST", url: `/api/connections/${connection.id}/test` })).json();
+    assert.equal(upstream.calls[0].request.url, "http://127.0.0.1:5173/v1/models");
+    assert.deepEqual([tested.testStatus, tested.lastErrorCode], ["unreachable", "INVALID_REQUEST"]);
+    assert.match(tested.lastError, /points back to AIGate.*Base URL/);
+    await app.close();
+  }));
+
 test("9router routing quirks: built-in prefixes win, the oldest duplicate wins, a pasted endpoint doubles the path", () =>
   withTempDb(async (file) => {
     const upstream = fakeUpstream(json(200, completion), json(200, completion), json(200, completion));

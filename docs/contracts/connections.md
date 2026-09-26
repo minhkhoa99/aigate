@@ -67,6 +67,7 @@ Validation:
 The test:
 - It decrypts the key, then calls `OpenAICompatibleAdapter.validateCredential`: one `GET /models`, 15 s, no retry. That call runs **outside** any transaction.
 - It writes the result only if the sealed key is still the one it tested. If the key was changed during the test, the stale result is dropped and the current row is returned.
+- If a custom endpoint's `/models` returns AIGate's own `invalid_api_key` message, the URL points back to this gateway (including through the Vite proxy). The test records `unreachable` / `INVALID_REQUEST` and tells the user to edit the custom provider Base URL. It does not blame the provider key.
 
 ## UI
 
@@ -81,7 +82,7 @@ Precise messages:
 - **API errors**, via `shared/errors.ts`: `PROVIDER_NOT_SUPPORTED`, `ALREADY_CONNECTED`, `CREDENTIAL_UNREADABLE`, plus the existing `INVALID_REQUEST` and `NOT_FOUND`.
 - **Test results**, each with a toast:
   - `active`: "Key works"
-  - `invalid`: "rejected the key"
+  - `invalid`: the upstream's redacted reason, with advice to check the endpoint and key
   - `no_quota`: "no quota or credit"
   - `unreachable`: "could not reach; the key was not checked", plus the provider's message
 
