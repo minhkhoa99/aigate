@@ -2,10 +2,10 @@ import { randomUUID } from "node:crypto";
 import {
   BadRequestException, Body, ConflictException, Controller, Delete, Get, Header, HttpCode, HttpStatus, Inject, NotFoundException, Param, Patch, Post,
 } from "@nestjs/common";
-import { builtinRegistry, createAdapter, EngineError, withConnectionBaseUrl, type HttpTransportPort, type ProviderDescriptor } from "@aigate/engine";
+import { builtinRegistry, createAdapter, EngineError, parseGoogleCredential, withConnectionBaseUrl, type HttpTransportPort, type ProviderDescriptor } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
-import { parseChanges, parseNewConnection } from "../domain/connection.js";
+import { isJsonCredential, parseChanges, parseNewConnection } from "../domain/connection.js";
 import { ConnectionsRepository, type ConnectionView, type TestOutcome } from "./connections.repo.js";
 import { nodeDescriptor, ProviderNodesRepository } from "./provider-nodes.repo.js";
 
@@ -27,9 +27,14 @@ const named = (view: ConnectionView, nodeNames: ReadonlyMap<string, string>): Na
   ({ ...view, providerName: builtinRegistry.provider(view.provider)?.name ?? nodeNames.get(view.provider) ?? view.provider });
 
 // connection.ollama-local-host: only a provider with optional auth may have no key, and only one that declares
-// connectionBaseUrl takes a host.
+// connectionBaseUrl takes a host. provider.vertex-google-auth: only a Google Cloud provider takes a JSON credential.
 function checkForProvider(provider: ProviderDescriptor, fields: { apiKey?: string; baseUrl?: string | null }): void {
   if (fields.apiKey === "" && !provider.auth.optional) throw invalid("apiKey must be 8-4096 printable characters without spaces");
+  if (fields.apiKey !== undefined && isJsonCredential(fields.apiKey)) {
+    if (!provider.auth.googleCloud) throw invalid("apiKey must be 8-4096 printable characters without spaces");
+    const parsed = parseGoogleCredential(fields.apiKey);
+    if ("error" in parsed) throw invalid(`apiKey is not a usable Google Cloud credential: ${parsed.error}`);
+  }
   if (fields.baseUrl && !provider.connectionBaseUrl) throw invalid(`baseUrl cannot be set on a ${provider.name} connection`);
 }
 

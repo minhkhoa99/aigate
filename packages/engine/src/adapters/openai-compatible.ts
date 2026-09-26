@@ -281,8 +281,11 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
     }
   }
 
+  // vertex-partner builds the URL from the credential's project (routing.vertex-endpoints); others use the catalog URL.
+  protected chatUrl?(credential: Credential): string;
+
   private chat(request: CanonicalRequest, credential: Credential, stream: boolean): HttpRequest {
-    const base = this.request("POST", this.provider.chatUrl, credential, stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS);
+    const base = this.request("POST", this.chatUrl?.(credential) ?? this.provider.chatUrl, credential, stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS);
     return {
       ...base,
       headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json" },

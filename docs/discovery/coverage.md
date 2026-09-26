@@ -1,14 +1,14 @@
 # Discovery coverage
 
-Entries: 300
+Entries: 305
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
 | routes | 166/166 |  |
 | pages | 5/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +15 |
 | providers | 18/124 | alicode, alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu … +98 |
-| executors | 12/31 | azure, devin-cli, gemini-cli, github, grok-cli, grok-web, iflow, kimchi … +11 |
-| translators | 42/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js |
+| executors | 14/31 | azure, devin-cli, gemini-cli, github, grok-cli, grok-web, iflow, kimchi … +9 |
+| translators | 43/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js |
 | repos | 11/11 |  |
 | settingsKeys | 47/52 | cloudEnabled, dnsToolEnabled, oidcLoginLabel, samlLoginLabel, tunnelProvider |
 
@@ -16,10 +16,10 @@ Entries: 300
 
 - apikeys: 9
 - catalog: 29
-- connections: 51
+- connections: 52
 - identity: 11
 - media: 15
-- routing: 93
+- routing: 97
 - settings: 10
 - tooling: 45
 - transport: 14
@@ -27,9 +27,9 @@ Entries: 300
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 13
-- REFERENCE_BEHAVIOR: 253
-- SUSPECTED_BUG: 49
+- IMPLEMENTATION_ACCIDENT: 14
+- REFERENCE_BEHAVIOR: 258
+- SUSPECTED_BUG: 53
 
 ## Missing — pages
 
@@ -181,8 +181,6 @@ Entries: 300
 - opencode-go
 - opencode-zen
 - perplexity-web
-- qoder
-- vertex
 - windsurf
 - xiaomi-mimo
 - xiaomi-tokenplan
@@ -195,7 +193,6 @@ Entries: 300
 - open-sse/translator/concerns/message.js
 - open-sse/translator/concerns/modality.js
 - open-sse/translator/concerns/paramSupport.js
-- open-sse/translator/concerns/prefetch.js
 
 ## Missing — settingsKeys
 

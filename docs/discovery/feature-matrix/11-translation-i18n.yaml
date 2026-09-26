@@ -1167,3 +1167,45 @@
     expected: "Errors and blocked prompts are reported, a cut-off stream fails, both paths share one finish table and one usage count, and generated images use one form"
     actual: "They are dropped, cut-offs look complete, the non-stream path reports raw reasons and counts thoughts as prompt tokens, and images come as a non-standard field or markdown"
     impact: "Clients misread failures and token spend, and handle the same answer differently by stream mode"
+
+# 2026-09-26 SP14f: the Vertex request (the Gemini request, post-processed).
+- id: translator.openai-to-vertex-request
+  group: Translation
+  feature: Request translation
+  subFeature: "OpenAI chat completions request to a Vertex generateContent request (openaiToGeminiRequest + postProcessForVertex)"
+  trigger: "A chat request routed to vertex"
+  input: "An OpenAI chat completions body"
+  output: "A Gemini generateContent body for Vertex"
+  businessRules:
+    - "The body is the Gemini request of translator.openai-to-gemini-request (same fields, drops, safety settings, thinking level/budget by model pattern, tool-schema cleaner)"
+    - "Then every part's thoughtSignature, real or borrowed, is replaced by DEFAULT_THINKING_VERTEX_SIGNATURE (1672 characters)"
+    - "Then id is deleted from every functionCall and functionResponse ('Vertex rejects these')"
+    - "Remote image URLs are fetched server-side and sent as base64 inlineData (TARGETS_NEED_BASE64); a failed fetch only logs a warning"
+    - "The answer uses the Gemini response mapping (translator.gemini-to-openai-response); a streamed thoughtSignature is cached as for Gemini"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: ["the thought-signature cache"]
+  dependencies: ["translator.openai-to-gemini-request", "translator.gemini-to-openai-response", "routing.vertex-endpoints"]
+  providerInteraction: "POST <Vertex URL>:generateContent / :streamGenerateContent?alt=sse"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["server-side fetch of client image URLs"]
+  persistence: []
+  performanceConcerns: ["image URLs are downloaded before the request"]
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A real signature captured from an earlier Vertex answer is thrown away and replaced"
+  evidence:
+    - { file: open-sse/translator/request/openai-to-vertex.js, line: 37, note: "openaiToGeminiRequest then postProcessForVertex" }
+    - { file: open-sse/translator/request/openai-to-vertex.js, line: 20, note: "every thoughtSignature replaced" }
+    - { file: open-sse/translator/request/openai-to-vertex.js, line: 24, note: "functionCall / functionResponse id deleted" }
+    - { file: open-sse/translator/concerns/prefetch.js, line: 8, note: "VERTEX needs base64 images" }
+    - { file: open-sse/translator/response/gemini-to-openai.js, line: 162, note: "VERTEX → OPENAI uses the Gemini response translator" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG, IMPLEMENTATION_ACCIDENT]
+  suspicion:
+    expected: "Only a borrowed signature is replaced; a real one from the cache is sent back unchanged"
+    actual: "Every thoughtSignature is overwritten with the Vertex constant"
+    impact: "Multi-turn tool calls on Gemini 3 via Vertex may be refused or lose their thinking context"

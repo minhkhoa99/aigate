@@ -102,9 +102,16 @@ export function ProviderDetail({ isNew = false, providerId }: { isNew?: boolean;
 // connection.ollama-local-host: providers whose connection takes its own host and may have no key.
 // ponytail: one provider today; expose the descriptor flags in GET /api/providers when a second one arrives.
 const HOSTED = new Set(["ollama-local"]);
+// provider.vertex-google-auth: the key field also takes a service-account or authorized_user JSON.
+const GOOGLE_CLOUD = new Set(["vertex", "vertex-partner"]);
 
-function HostAndKey({ hosted, host, keyLabel = "API key" }: { hosted: boolean; host?: string | null; keyLabel?: string }) {
-  if (!hosted) return <Field label={keyLabel}><Input name="apiKey" type="password" required minLength={8} maxLength={4096} autoComplete="off" placeholder="sk-…" /></Field>;
+function HostAndKey({ provider, host, keyLabel = "API key" }: { provider: string; host?: string | null; keyLabel?: string }) {
+  if (GOOGLE_CLOUD.has(provider)) {
+    return <Field label={keyLabel} hint="Paste the service-account JSON key file from Google Cloud IAM, or a Vertex AI API key.">
+      <Input name="apiKey" type="password" required minLength={8} maxLength={16384} autoComplete="off" placeholder='{"type": "service_account", …} or an API key' />
+    </Field>;
+  }
+  if (!HOSTED.has(provider)) return <Field label={keyLabel}><Input name="apiKey" type="password" required minLength={8} maxLength={4096} autoComplete="off" placeholder="sk-…" /></Field>;
   return <>
     <Field label="Host" hint="Empty means http://localhost:11434. https, or http to this machine only."><Input name="baseUrl" maxLength={2048} defaultValue={host ?? ""} placeholder="http://localhost:11434" /></Field>
     <Field label={keyLabel} hint="Optional: a local Ollama needs no key."><Input name="apiKey" type="password" minLength={8} maxLength={4096} autoComplete="off" /></Field>
@@ -144,7 +151,7 @@ function AddConnection({ requested, connected, onClose, onCreated }: {
         <div className="stack">
           <Field label="Provider" hint={`${available.length} providers can be connected with an API key.`}><select className="input" name="provider" value={provider} onChange={(event) => setChosen(event.target.value)}>{available.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
           <Field label="Name" hint="Optional. Defaults to the provider name."><Input name="name" maxLength={64} placeholder="e.g. Work account" /></Field>
-          <HostAndKey hosted={HOSTED.has(provider)} />
+          <HostAndKey provider={provider} />
 
         </div>
         <div className="modal-actions"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" disabled={create.isPending}>{create.isPending ? "Saving…" : "Save and test"}</Button></div></form>}
@@ -164,7 +171,7 @@ function ReplaceKey({ connection, onClose, onSaved }: { connection: Connection; 
   };
   return <Modal title={`${hosted ? "Edit connection" : "Replace key"} · ${connection.name}`} onClose={onClose}><form onSubmit={submit}>
     <p>The current key is <code>{connection.keyHint}</code>. The change is saved and tested right away.</p>
-    <HostAndKey hosted={hosted} host={connection.baseUrl} keyLabel="New API key" />
+    <HostAndKey provider={connection.provider} host={connection.baseUrl} keyLabel="New API key" />
     <div className="modal-actions"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" disabled={update.isPending}>{update.isPending ? "Saving…" : "Save and test"}</Button></div>
   </form></Modal>;
 }

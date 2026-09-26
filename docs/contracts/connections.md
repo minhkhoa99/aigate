@@ -48,7 +48,7 @@ Scope, per spec §9: the `connections` context with **one API-key account per pr
 
 ## API (dashboard session required)
 
-Every response is `Cache-Control: no-store`. The view is `{ id, provider, providerName, name, keyHint, baseUrl, isActive, testStatus, lastError, lastErrorCode, lastTestedAt, createdAt, updatedAt }`, where `keyHint` looks like `••••abcd` (`no key` for a keyless ollama-local connection) and `baseUrl` is the connection's own host or `null` (SP14d, `provider-ollama.md`). It never contains the key.
+Every response is `Cache-Control: no-store`. The view is `{ id, provider, providerName, name, keyHint, baseUrl, isActive, testStatus, lastError, lastErrorCode, lastTestedAt, createdAt, updatedAt }`, where `keyHint` looks like `••••abcd` (`no key` for a keyless ollama-local connection; the service-account `client_email`, or `user credential`, for a Google Cloud JSON credential, SP14f) and `baseUrl` is the connection's own host or `null` (SP14d, `provider-ollama.md`). It never contains the key.
 
 | Method and path | Body | Success | Errors |
 |---|---|---|---|
@@ -59,7 +59,7 @@ Every response is `Cache-Control: no-store`. The view is `{ id, provider, provid
 | `POST /api/connections/:id/test` | — | 200 `View`, with the new `testStatus` | 404 `NOT_FOUND`; 409 `CREDENTIAL_UNREADABLE` |
 
 Validation:
-- `apiKey` is trimmed, then must be 8–4096 printable ASCII characters with no spaces. It may be left out (or `""`) only for a provider whose auth is optional (ollama-local, SP14d); elsewhere that is 400 naming `apiKey`.
+- `apiKey` is trimmed, then must be 8–4096 printable ASCII characters with no spaces. A value starting with `{` is a Google Cloud JSON credential (at most 16384 characters): only vertex and vertex-partner take one, and it must be a complete service_account or authorized_user JSON; otherwise 400 `apiKey is not a usable Google Cloud credential: …` (`provider-vertex.md`, SP14f). It may be left out (or `""`) only for a provider whose auth is optional (ollama-local, SP14d); elsewhere that is 400 naming `apiKey`.
 - `baseUrl` (SP14d): only for a provider that declares a connection host (ollama-local); elsewhere 400 "baseUrl cannot be set on a <provider> connection". It must be https, or http to this machine, without credentials, query, or fragment (the custom-provider rule).
 - `name` is trimmed to 1–64 characters, and defaults to the provider's name.
 - Unknown body keys are 400.

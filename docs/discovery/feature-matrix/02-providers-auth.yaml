@@ -1739,3 +1739,177 @@
   newModule: connections
   parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
+
+# 2026-09-26 SP14f: vertex and vertex-partner (Google Cloud credentials); qoder traced, not ported.
+- id: provider.vertex-google-auth
+  group: Providers
+  feature: Provider auth
+  subFeature: "vertex / vertex-partner: service-account JSON, authorized_user JSON, or a raw API key in the one apiKey field; access tokens"
+  trigger: "A /v1 request routed to vertex or vertex-partner"
+  input: "The connection apiKey: a service_account JSON, an authorized_user JSON, or an API key"
+  output: "An Authorization Bearer access token, or the API key on the request"
+  businessRules:
+    - "A JSON with type service_account and client_email, private_key, project_id is a service account; type authorized_user with client_id, client_secret, refresh_token is an ADC user credential; anything else is a raw API key"
+    - "Service account: an RS256 JWT { iss: client_email, scope: https://www.googleapis.com/auth/cloud-platform, aud: https://oauth2.googleapis.com/token, iat, exp: iat+3600 } signed with private_key (literal \\n turned into newlines) is exchanged at POST https://oauth2.googleapis.com/token (grant_type urn:ietf:params:oauth:grant-type:jwt-bearer, form-encoded)"
+    - "The token is cached in memory by client_email and reused while more than 5 minutes remain; expiresAt = now + expires_in (default 3600 s)"
+    - "ADC user credential: POST https://oauth2.googleapis.com/token grant_type=refresh_token with client_id, client_secret, refresh_token on every request (only a 10 s dedup)"
+    - "A raw API key is sent as the key= query parameter, never in a header, without URL encoding"
+    - "On an upstream 401/403 chatCore asks refreshCredentials (service accounts only) and retries once; refreshCredentials returns the cached token while it has more than 5 minutes left"
+    - "Headers: Content-Type application/json, Authorization Bearer <token> when there is a token, Accept text/event-stream when streaming"
+  state:
+    reads: ["providerConnections.apiKey"]
+    writes: []
+    runtimeOnly: ["service-account token cache keyed by client_email", "project id cache per API key (vertex-partner)"]
+  dependencies: ["routing.vertex-endpoints"]
+  providerInteraction: "POST https://oauth2.googleapis.com/token; the Vertex endpoints"
+  fallback: { hasFallback: false, retry: "one retry after a credential refresh on 401/403", timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "the token cannot be minted (502 'Vertex: failed to mint access token from Service Account JSON')", partial: false }
+    - { code: AUTH_ERROR, when: "Vertex answers 401/403", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["ADC refreshes the token on almost every request"]
+  behavior: { streaming: true, cancellation: null, concurrency: "no in-flight dedup for service-account minting" }
+  edgeCases:
+    - "Replacing the private key under the same client_email keeps serving the old cached token"
+    - "The API key in the URL reaches request logs"
+  evidence:
+    - { file: open-sse/services/tokenRefresh.js, line: 63, note: "service-account shape check" }
+    - { file: open-sse/executors/vertex.js, line: 13, note: "authorized_user shape check" }
+    - { file: open-sse/services/tokenRefresh.js, line: 93, note: "JWT claims, cloud-platform scope, exp now+3600" }
+    - { file: open-sse/services/tokenRefresh.js, line: 83, note: "cache reused while more than 5 minutes remain, keyed by client_email" }
+    - { file: open-sse/executors/vertex.js, line: 143, note: "ADC refresh on each execute" }
+    - { file: open-sse/executors/vertex.js, line: 104, note: "raw key as ?key= (also lines 39, 80)" }
+    - { file: open-sse/handlers/chatCore.js, line: 420, note: "401/403 → refreshWithRetry, re-execute once" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A 401 forces a new token, the cache follows the credential itself, ADC tokens are cached until they expire, and the key never goes in the URL"
+    actual: "The retry reuses the cached token, a replaced key under the same client_email keeps the old token, ADC refreshes on every request, and the raw key is an unencoded query parameter"
+    impact: "A revoked token keeps failing for up to 55 minutes, extra token round-trips, and the key leaks into logs"
+
+- id: connection.vertex-credential-test
+  group: Providers
+  feature: Provider connections
+  subFeature: "vertex / vertex-partner: key validation before save and the connection Test button"
+  trigger: "POST /api/providers/validate; the connection Test button"
+  input: "{ provider: vertex | vertex-partner, apiKey }"
+  output: "valid / invalid; the Test button stores testStatus"
+  businessRules:
+    - "Validate: a service_account JSON is valid when client_email, private_key and project_id are present; no token is minted"
+    - "Validate: anything else is a raw key; POST https://aiplatform.googleapis.com/v1/publishers/google/models/__probe__:generateContent?key=<key> with body {}; valid unless the status is 401 or 403"
+    - "vertex-partner validates exactly like vertex (the Gemini probe, not the partner endpoint)"
+    - "The Test button has no vertex case: 'Provider test not supported', stored as testStatus error"
+    - "The model list is static (the registry); GET /api/providers/<id>/models answers 400 'does not support models listing'"
+  state:
+    reads: ["providerConnections.apiKey"]
+    writes: ["providerConnections.testStatus"]
+    runtimeOnly: []
+  dependencies: ["provider.vertex-google-auth"]
+  providerInteraction: "POST <host>/v1/publishers/google/models/__probe__:generateContent"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "the probe answers 401 or 403", partial: false }
+  sideEffects: []
+  persistence: ["testStatus on the connection"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "An authorized_user JSON is sent whole as ?key="
+    - "Google answers a bad API key with 400, which counts as valid"
+  evidence:
+    - { file: src/app/api/providers/validate/route.js, line: 461, note: "vertex validate: field check or probe" }
+    - { file: src/app/api/providers/validate/route.js, line: 474, note: "valid unless 401/403" }
+    - { file: src/app/api/providers/validate/route.js, line: 479, note: "vertex-partner: same logic and probe" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 838, note: "default: Provider test not supported" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 605, note: "no models listing" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "The Test button works, a service account is checked by minting a token, and a bad key (400 API_KEY_INVALID) is invalid"
+    actual: "Test always fails, a service account is valid on field presence, and any status but 401/403 is valid"
+    impact: "Working connections look broken and broken ones look healthy"
+
+- id: routing.vertex-endpoints
+  group: Routing
+  feature: Provider endpoints
+  subFeature: "vertex (Gemini generateContent on Vertex) and vertex-partner (Vertex OpenAI-compatible endpoint) URLs and project ids"
+  trigger: "A /v1 request routed to vertex or vertex-partner"
+  input: "The model id, the stream flag, and the resolved credential"
+  output: "The upstream URL"
+  businessRules:
+    - "The project id is service_account.project_id, else authorized_user.quota_project_id, else providerSpecificData.projectId (no UI sets it)"
+    - "vertex with a token: https://aiplatform.googleapis.com/v1/projects/<project>/locations/<location>/publishers/google/models/<model>:generateContent, or :streamGenerateContent?alt=sse; location = providerSpecificData.location or us-central1 (no UI sets it)"
+    - "vertex with a raw key: https://aiplatform.googleapis.com/v1/publishers/google/models/<model>:<action>[?alt=sse]&key=<key>"
+    - "vertex-partner: https://aiplatform.googleapis.com/v1/projects/<project>/locations/global/endpoints/openapi/chat/completions, the same URL for stream and non-stream; the OpenAI body is sent unchanged"
+    - "vertex-partner with a raw key and no project: POST {} to the __probe__ URL and read /projects\\/([^/]+)\\// from error.message (or [0].error.message); cached per key without TTL; failures are not cached; no project → 'Vertex: could not resolve project_id from API key'"
+    - "Missing project id with a token → an error before any request"
+    - "No model listing upstream: /v1/models lists the static registry models"
+  state:
+    reads: ["providerConnections.apiKey", "providerSpecificData.projectId", "providerSpecificData.location"]
+    writes: []
+    runtimeOnly: ["project id cache per API key"]
+  dependencies: ["provider.vertex-google-auth", "translator.openai-to-vertex-request"]
+  providerInteraction: "POST the URLs above"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "no project id can be found (502 with the executor message)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["the project probe repeats on every request while it fails"]
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The regional location is sent to the global host"
+    - "The Gemini 3 preview models in the catalog are served on the global location only"
+  evidence:
+    - { file: open-sse/executors/vertex.js, line: 71, note: "project id order" }
+    - { file: open-sse/executors/vertex.js, line: 76, note: "vertex-partner openapi URL, location global" }
+    - { file: open-sse/executors/vertex.js, line: 86, note: "token path, location default us-central1 (line 94)" }
+    - { file: open-sse/executors/vertex.js, line: 102, note: "raw key express path" }
+    - { file: open-sse/executors/vertex.js, line: 35, note: "resolveProjectId probe and regex" }
+    - { file: src/app/api/v1/models/route.js, line: 334, note: "static models" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A token request reaches every catalog model, including the global-only Gemini 3 previews"
+    actual: "The token path defaults to locations/us-central1 on the global host, with no way to change it"
+    impact: "Gemini 3 preview models may answer 404 for service-account connections"
+
+- id: provider.qoder-agent-transport
+  group: Providers
+  feature: Provider transport
+  subFeature: "qoder / qoder-cn: the Qoder CLI agent endpoint (PAT exchange, COSY signing, obfuscated body)"
+  trigger: "A /v1 request routed to qoder or qoder-cn"
+  input: "An OpenAI chat request and a Personal Access Token (pt-...) or an OAuth device token"
+  output: "Qoder SSE frames { statusCodeValue, body } re-emitted as OpenAI chunks"
+  businessRules:
+    - "A pt- token is exchanged at <openApi>/api/v1/jobToken/exchange for a job token, and userinfo gives the user id"
+    - "The chat URL is built by the executor (api2.qoder.sh for a job token on intl, api3 for device tokens, gateway.qoder.com.cn for cn) with FetchKeys, AgentId and Encode=1; the registry baseUrl is unused"
+    - "The body is a Qoder CLI envelope, base64 reordered and mapped through a custom alphabet ('WAF bypass')"
+    - "Headers impersonate the Qoder CLI: a COSY signature over the body, an RSA-wrapped AES user-info blob, a fixed Windows machine OS, client type 5 and client IP 127.0.0.1"
+  state:
+    reads: ["providerConnections.apiKey"]
+    writes: []
+    runtimeOnly: ["job-token cache", "model_config catalog cache"]
+  dependencies: []
+  providerInteraction: "Qoder openApi and inference hosts"
+  fallback: { hasFallback: false, retry: null, timeout: "120 s to headers", quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "the PAT exchange fails or the token is not a pt- token", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "User decision 2026-09-26: AIGate does not port this transport (client impersonation and WAF-bypass encoding); qoder and qoder-cn stay unconnectable with that reason"
+  evidence:
+    - { file: open-sse/executors/qoder.js, line: 614, note: "execute override, PAT flow" }
+    - { file: open-sse/shared/qoder/encoding.js, line: 32, note: "body obfuscation" }
+    - { file: open-sse/shared/qoder/cosy.js, line: 154, note: "COSY headers" }
+    - { file: open-sse/shared/qoder/constants.js, line: 126, note: "inference URL" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]

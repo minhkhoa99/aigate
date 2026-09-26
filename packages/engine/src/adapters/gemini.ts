@@ -94,10 +94,18 @@ function userParts(parts: readonly ContentPart[]): Json[] {
   return out;
 }
 
-function functionResponse(id: string, name: string, answer: string): Json {
+// What differs between the Gemini API and Vertex (translator.openai-to-vertex-request).
+export interface BodyOptions {
+  // The signature for the first call of a model turn that has no cached one.
+  readonly borrowed: string;
+  // Vertex rejects id on functionCall and functionResponse.
+  readonly callIds: boolean;
+}
+
+function functionResponse(id: string, name: string, answer: string, options: BodyOptions): Json {
   const parsed = tryParse(answer);
   const result = parsed === null ? { result: answer } : typeof parsed === "object" ? parsed : { result: parsed };
-  return { functionResponse: { id, name: sanitizeName(name), response: { result } } };
+  return { functionResponse: { ...(options.callIds ? { id } : {}), name: sanitizeName(name), response: { result } } };
 }
 
 type Turn = { role: "user" | "model"; parts: Json[] };
@@ -115,7 +123,7 @@ function normalize(contents: readonly Turn[]): Turn[] {
   return out;
 }
 
-function toContents(request: CanonicalRequest): Turn[] {
+function toContents(request: CanonicalRequest, options: BodyOptions): Turn[] {
   const answers = new Map<string, string>();
   for (const message of request.messages) {
     for (const part of message.content) {
@@ -139,13 +147,14 @@ function toContents(request: CanonicalRequest): Turn[] {
       return;
     }
     calls.forEach((call, j) => {
-      const signature = cachedSignature(call.id, request.model) ?? (j === 0 ? BORROWED_THOUGHT_SIGNATURE : undefined);
-      parts.push({ functionCall: { id: call.id, name: sanitizeName(call.name), args: tryParse(call.arguments || "{}") }, ...(signature ? { thoughtSignature: signature } : {}) });
+      const signature = cachedSignature(call.id, request.model) ?? (j === 0 ? options.borrowed : undefined);
+      const functionCall = { ...(options.callIds ? { id: call.id } : {}), name: sanitizeName(call.name), args: tryParse(call.arguments || "{}") };
+      parts.push({ functionCall, ...(signature ? { thoughtSignature: signature } : {}) });
     });
     contents.push({ role: "model", parts });
     const intermediate = i < request.messages.length - 1;
     if (intermediate || calls.some((call) => answers.has(call.id))) {
-      contents.push({ role: "user", parts: calls.map((call) => functionResponse(call.id, call.name, answers.get(call.id) ?? "")) });
+      contents.push({ role: "user", parts: calls.map((call) => functionResponse(call.id, call.name, answers.get(call.id) ?? "", options)) });
     }
   });
   return contents;
@@ -215,7 +224,7 @@ function applyThinking(config: Json, request: CanonicalRequest): void {
   raise(budgetFloor(budget ?? -1));
 }
 
-function toBody(request: CanonicalRequest): Json {
+function toBody(request: CanonicalRequest, options: BodyOptions): Json {
   const extensions = request.vendorExtensions ?? {};
   for (const namespace of Object.keys(extensions)) if (namespace !== "openai") throw unsupported(`vendorExtensions.${namespace}`);
   const config: Json = {};
@@ -227,7 +236,7 @@ function toBody(request: CanonicalRequest): Json {
   applyThinking(config, request);
   // 9router keeps one system text; CIP holds the leading system messages as one prompt, joined here.
   const system = request.system?.map((part) => (part.type === "text" ? part.text : "")).join("");
-  const contents = toContents(request);
+  const contents = toContents(request, options);
   if (system !== undefined && request.messages.length === 0) contents.push({ role: "user", parts: [{ text: system }] });
   const declarations = (request.tools ?? []).map((tool) => {
     const parameters = cleanGeminiSchema(tool.parameters);
@@ -262,6 +271,11 @@ function streamUsage(value: unknown): TokenUsage | undefined {
 }
 
 export class GeminiAdapter extends OpenAICompatibleAdapter implements AIProviderPort {
+  protected readonly bodyOptions: BodyOptions = { borrowed: BORROWED_THOUGHT_SIGNATURE, callIds: true };
+
+  // <base>/<model>:generateContent; Vertex builds the base from the credential, the Gemini API uses the catalog URL.
+  protected modelsBase?(credential: Credential): string;
+
   // 9router's non-streaming mapping, kept: raw lower-cased finish_reason, thoughts counted as prompt tokens,
   // generated images as markdown in the text.
   override async execute(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): Promise<CanonicalResponse> {
@@ -387,12 +401,12 @@ export class GeminiAdapter extends OpenAICompatibleAdapter implements AIProvider
   }
 
   private generate(request: CanonicalRequest, credential: Credential, stream: boolean): HttpRequest {
-    const url = `${this.provider.chatUrl}/${request.model}:${stream ? "streamGenerateContent?alt=sse" : "generateContent"}`;
+    const url = `${this.modelsBase?.(credential) ?? this.provider.chatUrl}/${request.model}:${stream ? "streamGenerateContent?alt=sse" : "generateContent"}`;
     const base = this.request("POST", url, credential, stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS);
     return {
       ...base,
       headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json" },
-      body: JSON.stringify(toBody(request)),
+      body: JSON.stringify(toBody(request, this.bodyOptions)),
     };
   }
 }

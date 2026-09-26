@@ -13,7 +13,16 @@ const PATHS: Readonly<Record<ProviderProtocol, { chat: RegExp; models: string }>
   ollama: { chat: /\/api\/chat$/, models: "/api/tags" },
   // Gemini posts to <base>/<model>:generateContent; the base itself lists the models.
   gemini: { chat: /\/models$/, models: "/models" },
+  // routing.vertex-endpoints: the catalog URL is the host; the adapter builds every path, and lists the catalog models.
+  vertex: { chat: /^https:\/\/aiplatform\.googleapis\.com$/, models: "https://aiplatform.googleapis.com/v1/publishers/google/models" },
 };
+// provider.vertex-google-auth: Google Cloud credentials; vertex-partner speaks OpenAI chat on a URL built from the project.
+const GOOGLE_CLOUD = new Set(["vertex", "vertex-partner"]);
+// provider.qoder-agent-transport: user decision (2026-09-26), not ported.
+const NOT_PORTED = new Map([
+  ["qoder", "Not supported: needs Qoder CLI impersonation"],
+  ["qoder-cn", "Not supported: needs Qoder CLI impersonation"],
+]);
 // 9router forces streaming for these although the vendor answers non-streaming requests too
 // (IMPLEMENTATION_ACCIDENT for OpenAI: the API accepts stream:false; SP3 tapes replay that way).
 const STREAM_OPTIONAL = new Set(["openai"]);
@@ -35,6 +44,8 @@ const isProtocol = (value: string): value is ProviderProtocol => PROVIDER_PROTOC
 
 // A reason why the provider cannot be connected yet, or undefined when it can.
 export function unsupportedReason(provider: CatalogProvider): string | undefined {
+  const notPorted = NOT_PORTED.get(provider.id);
+  if (notPorted) return notPorted;
   // assemblyai and deepgram have no transport format, so the catalog calls them openai-compatible; they only transcribe.
   // ponytail: speech-to-text only; nanobanana (image-only, connectable since SP13) is left for SP22 to decide.
   if (provider.serviceKinds.length > 0 && provider.serviceKinds.every((kind) => kind === "stt")) return PROTOCOL_REASONS.service;
@@ -47,7 +58,7 @@ export function unsupportedReason(provider: CatalogProvider): string | undefined
   if (provider.hidden) return "Hidden in the 9router catalog";
   if (provider.chatUrl === null) return "Each connection needs its own endpoint URL (later)";
   if (provider.chatUrl.includes("{")) return "The endpoint needs per-account data (later)";
-  if (!PATHS[provider.protocol].chat.test(provider.chatUrl)) return "Non-standard endpoint (SP14)";
+  if (!GOOGLE_CLOUD.has(provider.id) && !PATHS[provider.protocol].chat.test(provider.chatUrl)) return "Non-standard endpoint (SP14)";
   const quirk = provider.quirks.find((q) => BLOCKING_QUIRKS.has(q));
   if (quirk) return BLOCKING_QUIRKS.get(quirk);
   return undefined;
@@ -62,6 +73,8 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
     ? { kind: "api-key", header: "x-api-key", scheme: "raw" }
     // translator.openai-to-gemini-request: an API key goes in x-goog-api-key (the catalog records the OAuth header).
     : protocol === "gemini" ? { kind: "api-key", header: "x-goog-api-key", scheme: "raw" }
+    // provider.vertex-google-auth: an API key goes in x-goog-api-key (9router: the URL); a JSON credential becomes a Bearer token.
+    : GOOGLE_CLOUD.has(provider.id) ? { kind: "api-key", header: "x-goog-api-key", scheme: "raw", googleCloud: true }
     : { kind: "api-key", header: provider.auth.header ?? "authorization", scheme: provider.auth.scheme === "raw" ? "raw" : "bearer", ...(provider.id === "ollama-local" ? { optional: true } : {}) };
   return {
     id: provider.id,

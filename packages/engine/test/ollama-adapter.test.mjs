@@ -44,7 +44,7 @@ const hello = { model: "glm-5", stream: false, messages: [{ role: "user", conten
 const answer = { model: "glm-5", message: { role: "assistant", content: "Done", thinking: "think", tool_calls: [{ function: { name: "lookup", arguments: { q: 1 } } }] }, done: true, done_reason: "stop", prompt_eval_count: 12, eval_count: 5 };
 
 test("ollama and ollama-local are connectable; speech-to-text services are media; ollama-local takes a host and no key", () => {
-  assert.equal(builtinRegistry.providers.length, 53);
+  assert.equal(builtinRegistry.providers.length, 55);
   assert.ok(createAdapter(cloud, fakeTransport()) instanceof OllamaAdapter);
   assert.deepEqual([cloud.chatUrl, cloud.modelsUrl], ["https://ollama.com/api/chat", "https://ollama.com/api/tags"]);
   for (const id of ["assemblyai", "deepgram"]) assert.deepEqual(builtinRegistry.status(id), { connectable: false, reason: "Media and search services come with SP22/SP23" });

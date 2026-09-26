@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test --test-timeout=30000 test/engine.test.mjs test/openai-adapter.test.mjs test/anthropic-adapter.test.mjs test/openai-responses-adapter.test.mjs test/ollama-adapter.test.mjs test/gemini-adapter.test.mjs test/openai-protocol.test.mjs test/catalog.test.mjs"
+    "test": "tsc -p tsconfig.json && node --test --test-timeout=30000 test/engine.test.mjs test/openai-adapter.test.mjs test/anthropic-adapter.test.mjs test/openai-responses-adapter.test.mjs test/ollama-adapter.test.mjs test/gemini-adapter.test.mjs test/vertex-adapter.test.mjs test/openai-protocol.test.mjs test/catalog.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",

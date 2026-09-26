@@ -2040,6 +2040,21 @@ Every item below is a capability AIGate must have. Derived from tracing
   - DELETE cascades: deleteProviderConnectionsByProvider(id) removes every connection under this node before deleteProviderNode(id) removes the node itself — deleting a node silently deletes all its connections too, with no confirmation or count returned
 - **Errors:** `INVALID_REQUEST` (node not found (404), or PUT is missing name/prefix/baseUrl, or apiType is invalid for an openai-compatible node)
 
+### vertex / vertex-partner: key validation before save and the connection Test button
+
+- **id:** `connection.vertex-credential-test` · **module:** `connections`
+- **Trigger:** POST /api/providers/validate; the connection Test button
+- **Input:** { provider: vertex | vertex-partner, apiKey }
+- **Output:** valid / invalid; the Test button stores testStatus
+- **Rules:**
+  - Validate: a service_account JSON is valid when client_email, private_key and project_id are present; no token is minted
+  - Validate: anything else is a raw key; POST https://aiplatform.googleapis.com/v1/publishers/google/models/__probe__:generateContent?key=<key> with body {}; valid unless the status is 401 or 403
+  - vertex-partner validates exactly like vertex (the Gemini probe, not the partner endpoint)
+  - The Test button has no vertex case: 'Provider test not supported', stored as testStatus error
+  - The model list is static (the registry); GET /api/providers/<id>/models answers 400 'does not support models listing'
+- **Errors:** `AUTH_ERROR` (the probe answers 401 or 403)
+- **AIGate required behavior:** The Test button works, a service account is checked by minting a token, and a bad key (400 API_KEY_INVALID) is invalid
+
 ### URL, auth header, static headers, and the connection test for claude-format API-key providers (anthropic, glm, kimi, minimax, minimax-cn)
 
 - **id:** `provider.anthropic-auth-and-headers` · **module:** `routing`
@@ -2070,6 +2085,38 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Streaming:** yes
 - **Errors:** `INVALID_REQUEST` (the gateway content filter refuses the request)
 - **AIGate required behavior:** The system prompt reaches the model as the client sent it; a content-filter refusal is reported
+
+### qoder / qoder-cn: the Qoder CLI agent endpoint (PAT exchange, COSY signing, obfuscated body)
+
+- **id:** `provider.qoder-agent-transport` · **module:** `routing`
+- **Trigger:** A /v1 request routed to qoder or qoder-cn
+- **Input:** An OpenAI chat request and a Personal Access Token (pt-...) or an OAuth device token
+- **Output:** Qoder SSE frames { statusCodeValue, body } re-emitted as OpenAI chunks
+- **Rules:**
+  - A pt- token is exchanged at <openApi>/api/v1/jobToken/exchange for a job token, and userinfo gives the user id
+  - The chat URL is built by the executor (api2.qoder.sh for a job token on intl, api3 for device tokens, gateway.qoder.com.cn for cn) with FetchKeys, AgentId and Encode=1; the registry baseUrl is unused
+  - The body is a Qoder CLI envelope, base64 reordered and mapped through a custom alphabet ('WAF bypass')
+  - Headers impersonate the Qoder CLI: a COSY signature over the body, an RSA-wrapped AES user-info blob, a fixed Windows machine OS, client type 5 and client IP 127.0.0.1
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (the PAT exchange fails or the token is not a pt- token)
+
+### vertex / vertex-partner: service-account JSON, authorized_user JSON, or a raw API key in the one apiKey field; access tokens
+
+- **id:** `provider.vertex-google-auth` · **module:** `routing`
+- **Trigger:** A /v1 request routed to vertex or vertex-partner
+- **Input:** The connection apiKey: a service_account JSON, an authorized_user JSON, or an API key
+- **Output:** An Authorization Bearer access token, or the API key on the request
+- **Rules:**
+  - A JSON with type service_account and client_email, private_key, project_id is a service account; type authorized_user with client_id, client_secret, refresh_token is an ADC user credential; anything else is a raw API key
+  - Service account: an RS256 JWT { iss: client_email, scope: https://www.googleapis.com/auth/cloud-platform, aud: https://oauth2.googleapis.com/token, iat, exp: iat+3600 } signed with private_key (literal \n turned into newlines) is exchanged at POST https://oauth2.googleapis.com/token (grant_type urn:ietf:params:oauth:grant-type:jwt-bearer, form-encoded)
+  - The token is cached in memory by client_email and reused while more than 5 minutes remain; expiresAt = now + expires_in (default 3600 s)
+  - ADC user credential: POST https://oauth2.googleapis.com/token grant_type=refresh_token with client_id, client_secret, refresh_token on every request (only a 10 s dedup)
+  - A raw API key is sent as the key= query parameter, never in a header, without URL encoding
+  - On an upstream 401/403 chatCore asks refreshCredentials (service accounts only) and retries once; refreshCredentials returns the cached token while it has more than 5 minutes left
+  - Headers: Content-Type application/json, Authorization Bearer <token> when there is a token, Accept text/event-stream when streaming
+- **Streaming:** yes
+- **Errors:** `PROVIDER_UNAVAILABLE` (the token cannot be minted (502 'Vertex: failed to mint access token from Service Account JSON')), `AUTH_ERROR` (Vertex answers 401/403)
+- **AIGate required behavior:** A 401 forces a new token, the cache follows the credential itself, ADC tokens are cached until they expire, and the key never goes in the URL
 
 ## Proxy Pools
 
@@ -2849,6 +2896,26 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Rules:**
   - The /v1 root route is a one-line re-export of the models route's GET and OPTIONS; it is not part of the chat routing chain
 
+## Routing
+
+### vertex (Gemini generateContent on Vertex) and vertex-partner (Vertex OpenAI-compatible endpoint) URLs and project ids
+
+- **id:** `routing.vertex-endpoints` · **module:** `routing`
+- **Trigger:** A /v1 request routed to vertex or vertex-partner
+- **Input:** The model id, the stream flag, and the resolved credential
+- **Output:** The upstream URL
+- **Rules:**
+  - The project id is service_account.project_id, else authorized_user.quota_project_id, else providerSpecificData.projectId (no UI sets it)
+  - vertex with a token: https://aiplatform.googleapis.com/v1/projects/<project>/locations/<location>/publishers/google/models/<model>:generateContent, or :streamGenerateContent?alt=sse; location = providerSpecificData.location or us-central1 (no UI sets it)
+  - vertex with a raw key: https://aiplatform.googleapis.com/v1/publishers/google/models/<model>:<action>[?alt=sse]&key=<key>
+  - vertex-partner: https://aiplatform.googleapis.com/v1/projects/<project>/locations/global/endpoints/openapi/chat/completions, the same URL for stream and non-stream; the OpenAI body is sent unchanged
+  - vertex-partner with a raw key and no project: POST {} to the __probe__ URL and read /projects\/([^/]+)\// from error.message (or [0].error.message); cached per key without TTL; failures are not cached; no project → 'Vertex: could not resolve project_id from API key'
+  - Missing project id with a token → an error before any request
+  - No model listing upstream: /v1/models lists the static registry models
+- **Streaming:** yes
+- **Errors:** `PROVIDER_UNAVAILABLE` (no project id can be found (502 with the executor message))
+- **AIGate required behavior:** A token request reaches every catalog model, including the global-only Gemini 3 previews
+
 ## Settings
 
 ### GET /api/auth/status — unauthenticated auth-configuration probe
@@ -3443,6 +3510,22 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Streaming:** yes
 - **AIGate required behavior:** Every client field is carried or refused: tool_choice, response_format, parallel_tool_calls, and user map to Responses; every system message reaches instructions; a part or argument that cannot be carried is an error naming it
 
+### OpenAI chat completions request to a Vertex generateContent request (openaiToGeminiRequest + postProcessForVertex)
+
+- **id:** `translator.openai-to-vertex-request` · **module:** `routing`
+- **Trigger:** A chat request routed to vertex
+- **Input:** An OpenAI chat completions body
+- **Output:** A Gemini generateContent body for Vertex
+- **Rules:**
+  - The body is the Gemini request of translator.openai-to-gemini-request (same fields, drops, safety settings, thinking level/budget by model pattern, tool-schema cleaner)
+  - Then every part's thoughtSignature, real or borrowed, is replaced by DEFAULT_THINKING_VERTEX_SIGNATURE (1672 characters)
+  - Then id is deleted from every functionCall and functionResponse ('Vertex rejects these')
+  - Remote image URLs are fetched server-side and sent as base64 inlineData (TARGETS_NEED_BASE64); a failed fetch only logs a warning
+  - The answer uses the Gemini response mapping (translator.gemini-to-openai-response); a streamed thoughtSignature is cached as for Gemini
+- **Streaming:** yes
+- **AIGate required behavior:** Only a borrowed signature is replaced; a real one from the cache is sent back unchanged
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
 ### OpenAI Responses SSE events to OpenAI chat completion chunks (openaiResponsesToOpenAIResponse)
 
 - **id:** `translator.responses-to-openai-stream` · **module:** `routing`
@@ -3913,6 +3996,9 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `connection.provider-node-validate-partial-ssrf` | A remote (non-local) caller's user-supplied baseUrl is validated with the same DNS-resolution and redirect-safe protection ssrfGuard.js documents as necessary (assertPublicUrlResolved / fetchPublic) — the module comment explicitly says layer 1 alone leaves DNS-rebinding and redirect bypasses open | Only assertPublicUrl (layer 1, literal hostname/IP string check) runs, and the actual request uses a plain fetch with no manual redirect re-validation. dashboardGuard.js does require a valid dashboard session, a valid CLI token, or settings.requireLogin===false to reach the route at all — this is not an anonymous-internet-facing endpoint by default, and its POST+JSON-body shape is not CSRF-reachable the way a GET route would be under a sameSite:lax cookie | Exploitability is scoped to a caller that is BOTH non-local (reverse-proxied or tunnel-exposed, so isLocalRequest() is false and the route's own SSRF check actually runs) AND already past dashboardGuard's auth gate (a valid dashboard session, a valid CLI token, or settings.requireLogin===false) — e.g. an operator's own tunnel-exposed dashboard session, a compromised/leaked session or CLI token, or a requireLogin:false deployment combined with 13's tunnel.enable-lacks-server-side-security-gate (tunnel exposure enforces no requireLogin/requireApiKey check of its own). Within that scope, such a caller can supply a hostname that resolves to an internal/metadata address, or a URL that redirects to one, and this route will still fetch it and echo back a validity signal — a real but narrower-than-anonymous-internet SSRF gap, and one that (unlike catalog.suggested-models-open-proxy) is not reachable via a simple crafted-link CSRF because of its POST+JSON shape |
 | `connection.provider-node-create-list` | A custom provider without a base URL is refused, a pasted /chat/completions suffix is normalized like the sibling node types, and a prefix that is reserved, duplicated, or unusable is refused when the node is saved | A missing baseUrl silently becomes https://api.openai.com/v1; a pasted /chat/completions yields .../chat/completions/chat/completions at request time; a reserved, duplicate, or slash-containing prefix is stored and then silently unreachable | The custom provider's key is sent to OpenAI (a 401 and a leaked credential) or requests fail with a 404 from a doubled path; a shadowed prefix routes nowhere with no error at save time |
 | `connection.anthropic-compatible-node` | An API-key request carries only the betas it needs; the official host is decided by hostname; the connection test calls <baseUrl>/messages and reports 404 or 5xx as not verified | claude-* models get the Claude Code OAuth and redact-thinking betas with an API key; a substring decides the official host; the test calls <baseUrl>/v1/messages and counts any status but 401/403 as valid | Thinking text can come back redacted, a look-alike gateway URL skips the Bearer header, and a wrong base URL or dead endpoint tests as a working key |
+| `provider.vertex-google-auth` | A 401 forces a new token, the cache follows the credential itself, ADC tokens are cached until they expire, and the key never goes in the URL | The retry reuses the cached token, a replaced key under the same client_email keeps the old token, ADC refreshes on every request, and the raw key is an unencoded query parameter | A revoked token keeps failing for up to 55 minutes, extra token round-trips, and the key leaks into logs |
+| `connection.vertex-credential-test` | The Test button works, a service account is checked by minting a token, and a bad key (400 API_KEY_INVALID) is invalid | Test always fails, a service account is valid on field presence, and any status but 401/403 is valid | Working connections look broken and broken ones look healthy |
+| `routing.vertex-endpoints` | A token request reaches every catalog model, including the global-only Gemini 3 previews | The token path defaults to locations/us-central1 on the global host, with no way to change it | Gemini 3 preview models may answer 404 for service-account connections |
 | `account.concurrent-refresh-race` | Two concurrent requests hitting an expired/rejected token on the same connection should converge on one valid refreshed token — either serialized so the second reuses the first's fresh token, or each refresh is independently idempotent regardless of which refreshToken value it started from | No per-connection lock exists around either the proactive (checkAndRefreshToken) or reactive (chatCore.js 401/403) refresh call; each concurrent request refreshes using its own in-memory refreshToken snapshot with no coordination with other in-flight requests for the same connection | For providers with single-use rotating refresh tokens (the code names xAI and grok-cli explicitly), a burst of concurrent requests around token-expiry time causes all but the first refresh to fail with invalid_grant, which can further trigger markAccountUnavailable and lock the connection out even though it was just successfully refreshed by a sibling request |
 | `catalog.alias-disabled-model-bypass` | A model marked disabled in the dashboard should be rejected if a request targets it — directly or via an alias — mirroring how it disappears from every model-listing endpoint ("disable" implies block, not just hide) | The chat/routing path never reads the disabledModels table at all; only the discovery endpoints (/api/models, /v1/models) filter by it, so a disabled model keeps working for any client that already knows its id, or that reaches it through an alias or combo | The 'disable' control only removes discoverability, not access — a compliance or cost-control use case ('stop routing to this expensive/broken model') is not actually enforced, silently, with no error surfaced to the operator who disabled it |
 | `catalog.alias-dual-convention-collision` | Both endpoints described as setting 'the alias for a model' should write the same KV shape so a value set through either surface is visible to the other, and to actual chat routing | The two routes call the same setModelAlias(alias, model) primitive with swapped argument order, so /api/models/alias produces routable aliases (key=alias) while /api/models produces display-only rows (key=modelId) in the same table — each is invisible to the other's reader | An alias set via the main /api/models list page's inline rename never actually works as a callable alias in a chat request (resolveModelAliasFromMap won't find it), while a routable alias created via the dedicated alias-management endpoint never appears as that model's display label in the main list — two silently disconnected features sharing one KV namespace |
@@ -3950,6 +4036,7 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `translator.ollama-to-openai-response` | An error line fails the answer, and a stream without its done line is a failure (fallback.partial-stream-failure) | Error lines are dropped and a cut-off stream ends as if complete | Clients take a failed or truncated answer for a finished one |
 | `translator.openai-to-gemini-request` | Every system message reaches the model, stop/JSON mode/tool_choice/seed/penalties map to Gemini, tool names round-trip, only real signatures are replayed, and the schema cleaner removes keywords without removing parameters or adding one | Earlier system messages vanish, those fields are dropped, renamed tools come back renamed, a signature from another product is replayed, parameters named like keywords are deleted, and a required reason parameter is invented | Silent loss of instructions and controls, tool calls the client cannot match, and tools called with wrong arguments |
 | `translator.gemini-to-openai-response` | Errors and blocked prompts are reported, a cut-off stream fails, both paths share one finish table and one usage count, and generated images use one form | They are dropped, cut-offs look complete, the non-stream path reports raw reasons and counts thoughts as prompt tokens, and images come as a non-standard field or markdown | Clients misread failures and token spend, and handle the same answer differently by stream mode |
+| `translator.openai-to-vertex-request` | Only a borrowed signature is replaced; a real one from the cache is sent back unchanged | Every thoughtSignature is overwritten with the Vertex constant | Multi-turn tool calls on Gemini 3 via Vertex may be refused or lose their thinking context |
 | `clitools.write-not-atomic` | Given every one of these writes targets the user's own IDE/CLI configuration file (not 9router's own data), and one of the affected routes' own comment explicitly promises 'Backup old fields and write new settings', a crash mid-write should not be able to corrupt or truncate that file — either via a temp-file-then-rename swap (the exact pattern already implemented in this codebase at src/lib/mitmAliasCache.js:15-21 for 9router's own alias cache) or an actual on-disk backup copy. | All 13 write-capable cli-tools routes call fs.writeFile(path, content) directly on the final path with no temp file, no rename, and no backup copy anywhere on disk. The 'backup' language in the claude-settings POST comment refers only to merging the previously-read JSON object in memory before the single overwrite call — nothing is preserved outside process memory. | A crash, OOM kill, disk-full error, or power loss during any of these writes can truncate or corrupt the user's real tool config (e.g. ~/.claude/settings.json, ~/.codex/config.toml, ~/.openclaw/openclaw.json). Because every route's read path treats an unparseable file as simply 'no config', the damage is silent: the next status check reports the tool as unconfigured, and the next Apply starts from empty, permanently discarding whatever unrelated settings that file held before 9router wrote to it. |
 | `clitools.copilot-settings-array-upsert` | Like every other cli-tools GET handler (claude, codex, cline, droid, kilo, etc.), Copilot's GET should reflect a real detection check — a `where`/`which` lookup or a marker-file probe — before reporting installed: true, so the dashboard only shows Copilot as available on a machine that actually has it. | copilot-settings/route.js's GET performs no detection at all: it reads chatLanguageModels.json (which may not exist, in which case config is null) and always returns installed: true regardless. | The dashboard's Copilot integration card (and any 'all installed tools' summary the UI derives from installed flags) will show Copilot as installed on any machine, even one with no VS Code and no Copilot extension, inviting the user to Apply — which just writes a file nobody will ever read. |
 | `clitools.deepseek-tui-full-overwrite` | Like every other tool's Apply/Reset in this set (codex, droid, opencode, openclaw, grok-build, hermes, jcode, kilo, cline, cowork all read-merge-write or perform a targeted key removal), DeepSeek TUI's POST should merge 9router's fields into whatever config.toml already contains, and DELETE should remove only what 9router added — preserving any other DeepSeek TUI settings the user configured. | Both POST and DELETE build a fixed, hand-written TOML string from scratch and write it directly, completely replacing the file's prior contents regardless of what else was in it (POST never even calls the file's own readConfigToml() result; DELETE writes a hardcoded 2-line default). | The first time a user clicks Apply or Reset for DeepSeek TUI in the 9router dashboard, any other settings they had configured directly in ~/.deepseek/config.toml (other providers, TUI preferences, anything not related to 9router) are silently and irrecoverably destroyed. |

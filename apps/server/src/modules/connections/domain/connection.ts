@@ -3,6 +3,8 @@ import { parseBaseUrl } from "./provider-node.js";
 export const MAX_NAME = 64;
 // Printable ASCII, no spaces: a key can never break out of the Authorization header upstream.
 const API_KEY = /^[\x21-\x7e]{8,4096}$/;
+// provider.vertex-google-auth: a service-account JSON is about 2.4 KB; the controller allows JSON only where the provider takes it.
+const MAX_JSON_KEY = 16_384;
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; message: string };
 
@@ -37,8 +39,11 @@ function parseName(value: unknown): Parsed<string> {
   return name.length > 0 && name.length <= MAX_NAME ? { ok: true, value: name } : fail(`name must be 1-${MAX_NAME} characters`);
 }
 
+export const isJsonCredential = (key: string): boolean => key.startsWith("{");
+
 function parseApiKey(value: unknown): Parsed<string> {
   const key = typeof value === "string" ? value.trim() : "";
+  if (isJsonCredential(key)) return key.length <= MAX_JSON_KEY ? { ok: true, value: key } : fail(`A JSON credential must be at most ${MAX_JSON_KEY} characters`);
   return API_KEY.test(key) ? { ok: true, value: key } : fail("apiKey must be 8-4096 printable characters without spaces");
 }
 
@@ -96,8 +101,18 @@ export function parseChanges(input: unknown): Parsed<ConnectionChanges> {
   return Object.keys(changes).length > 0 ? { ok: true, value: changes } : fail("Send at least one of name, apiKey, isActive, baseUrl");
 }
 
-export const keyHint = (apiKey: string): string => apiKey.slice(-4);
-// A keyless connection (ollama-local) shows "no key".
-export const maskHint = (hint: string): string => (hint === "" ? "no key" : `••••${hint}`);
+// A JSON credential is named by its account, never by a piece of the key; anything else shows its last 4 characters.
+export function keyHint(apiKey: string): string {
+  if (!isJsonCredential(apiKey)) return apiKey.slice(-4);
+  try {
+    const json: unknown = JSON.parse(apiKey);
+    const email = typeof json === "object" && json !== null && "client_email" in json ? json.client_email : undefined;
+    return typeof email === "string" && email.length > 4 ? email.slice(0, 254) : "user credential";
+  } catch {
+    return "JSON credential";
+  }
+}
+// A keyless connection (ollama-local) shows "no key"; a named JSON credential shows its name.
+export const maskHint = (hint: string): string => (hint === "" ? "no key" : hint.length <= 4 ? `••••${hint}` : hint);
 // Authenticated with the sealed value, so it only opens for this row and field.
 export const sealContext = (id: string): string => `provider_connections:${id}:api_key`;

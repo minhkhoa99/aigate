@@ -37,7 +37,8 @@ export interface ProviderDescriptor {
   readonly headers: Readonly<Record<string, string>>;
   readonly aliases: readonly string[];
   // optional: the connection may have no key, and then no auth header is sent (connection.ollama-local-host).
-  readonly auth: { readonly kind: "api-key"; readonly header: string; readonly scheme: "bearer" | "raw"; readonly optional?: boolean };
+  // googleCloud: the key may also be a service-account or authorized_user JSON (provider.vertex-google-auth).
+  readonly auth: { readonly kind: "api-key"; readonly header: string; readonly scheme: "bearer" | "raw"; readonly optional?: boolean; readonly googleCloud?: boolean };
   // The connection may carry its own base URL (ollama-local's host); these paths are appended to it.
   readonly connectionBaseUrl?: { readonly chatPath: string; readonly modelsPath: string };
   readonly models: readonly ModelDescriptor[];
@@ -50,7 +51,7 @@ export interface ProviderDescriptor {
   readonly anthropicNode?: { readonly official: boolean };
 }
 
-export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic", "openai-responses", "ollama", "gemini"] as const;
+export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic", "openai-responses", "ollama", "gemini", "vertex"] as const;
 export type ProviderProtocol = (typeof PROVIDER_PROTOCOLS)[number];
 
 // The descriptor a connection with its own base URL talks to; one trailing "/" is removed (resolveOllamaLocalHost).
