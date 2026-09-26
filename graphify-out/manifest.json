@@ -35,9 +35,9 @@
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1790398697.6596096,
-    "ast_hash": "1df64cb9891412c0fc537c9c66126665",
-    "semantic_hash": "1df64cb9891412c0fc537c9c66126665"
+    "mtime": 1790411755.6708496,
+    "ast_hash": "86352197e0bfd7b33fba2739658df1c8",
+    "semantic_hash": "86352197e0bfd7b33fba2739658df1c8"
   },
   "docs/design/UI_HANDOFF.md": {
     "mtime": 1790304403.8708513,
@@ -60,9 +60,9 @@
     "semantic_hash": "04c0c50e7da7000a83ce1379183f0975"
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1790399300.8400156,
-    "ast_hash": "a65845680cbf093a59bc73a95cdbfcef",
-    "semantic_hash": "a65845680cbf093a59bc73a95cdbfcef"
+    "mtime": 1790412167.7085328,
+    "ast_hash": "230040d037d08a8f814e921b7558c729",
+    "semantic_hash": "230040d037d08a8f814e921b7558c729"
   },
   "docs/contracts/transport.md": {
     "mtime": 1790343138.4076855,
@@ -100,14 +100,14 @@
     "semantic_hash": "7dbf0ce39fc9eecb48ba8b829f40b777"
   },
   "docs/contracts/catalog-providers.md": {
-    "mtime": 1790398651.732272,
-    "ast_hash": "c9fee076230267f68420f11f4f63313c",
-    "semantic_hash": "c9fee076230267f68420f11f4f63313c"
+    "mtime": 1790411727.7354276,
+    "ast_hash": "45e95dc6ec43b896206fa25bde21ed7b",
+    "semantic_hash": "45e95dc6ec43b896206fa25bde21ed7b"
   },
   "docs/contracts/custom-providers.md": {
-    "mtime": 1790398646.4741707,
-    "ast_hash": "f04521765e870dbfd549a4cd2df55421",
-    "semantic_hash": "f04521765e870dbfd549a4cd2df55421"
+    "mtime": 1790411715.755863,
+    "ast_hash": "442575527c98bde423a336ea7aca197c",
+    "semantic_hash": "442575527c98bde423a336ea7aca197c"
   },
   "docs/contracts/provider-anthropic.md": {
     "mtime": 1790398651.8124115,
@@ -115,8 +115,13 @@
     "semantic_hash": "966aadf40ea0a6c6043a1929ce78b149"
   },
   "docs/contracts/stream-only-providers.md": {
-    "mtime": 1790398590.2892234,
-    "ast_hash": "5f21a26acc0dfd25a43a15b6da28f686",
-    "semantic_hash": "5f21a26acc0dfd25a43a15b6da28f686"
+    "mtime": 1790401515.3933322,
+    "ast_hash": "ff3cb1bc84d7c77f4a5f5239c627d85b",
+    "semantic_hash": "ff3cb1bc84d7c77f4a5f5239c627d85b"
+  },
+  "docs/contracts/provider-openai-responses.md": {
+    "mtime": 1790411684.8212306,
+    "ast_hash": "65304000279fa29ae93cab61d547a7fd",
+    "semantic_hash": "65304000279fa29ae93cab61d547a7fd"
   }
 }
