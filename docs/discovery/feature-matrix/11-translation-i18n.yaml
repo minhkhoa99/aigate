@@ -841,3 +841,43 @@
     expected: "A mid-stream error reaches the client as an error; non-streaming and streaming map stop reasons and usage the same way; reasoning goes only to reasoning_content; text is returned as the model wrote it"
     actual: "Mid-stream error events are dropped, non-streaming passes max_tokens/refusal through raw and drops cache usage, empty think tags appear in content, and json fences are stripped from all claude providers"
     impact: "A failed stream looks like a normal short answer, clients see non-OpenAI finish reasons and wrong cache accounting, and model output is altered"
+
+# 2026-09-26 SP14b: the CodeBuddy executors.
+- id: provider.codebuddy-request-quirks
+  group: Providers
+  feature: CodeBuddy providers
+  subFeature: "What the CodeBuddy executors change in an OpenAI chat request (codebuddy-cn, codebuddy-intl)"
+  trigger: Every chat request to codebuddy-cn or codebuddy-intl
+  input: "The translated OpenAI chat completions body"
+  output: "The body sent to <gateway>/v2/chat/completions"
+  businessRules:
+    - "stream is always true, since the gateway refuses non-streaming chat (HTTP 400, code 11101); a non-streaming client gets the collapsed answer (routing.forced-stream-json-collapse)"
+    - "reasoning_effort none or off is removed; any other reasoning_effort adds reasoning_summary auto, so the gateway returns reasoning"
+    - "codebuddy-cn only: a system message whose text (string, or text blocks joined by newlines) is longer than 2000 characters or matches an agent-identity pattern (you are claude code, you are cursor/windsurf/cline/aider/continue/copilot/cody, you are an ai coding agent, cc_entrypoint, <agent-identity>, and others) is replaced by the neutral prompt You are a helpful AI assistant that helps with software engineering tasks., keeping the string or block shape"
+    - "Catalog headers (User-Agent CLI or IDE, X-Product, X-IDE-Type, X-IDE-Name, x-requested-with, x-codebuddy-request) and Authorization Bearer are sent as for any registry provider"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.forced-stream-json-collapse"]
+  providerInteraction: "POST https://copilot.tencent.com/v2/chat/completions or https://www.codebuddy.ai/v2/chat/completions"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "the gateway content filter refuses the request", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Any legitimate system prompt over 2000 characters is replaced on codebuddy-cn, so the model never sees its instructions"
+  evidence:
+    - { file: open-sse/executors/codebuddy-cn.js, line: 19, note: "stream forced true" }
+    - { file: open-sse/executors/codebuddy-cn.js, line: 29, note: "agent-identity pattern" }
+    - { file: open-sse/executors/codebuddy-cn.js, line: 41, note: "over 2000 characters or pattern: neutral prompt" }
+    - { file: open-sse/executors/codebuddy-cn.js, line: 55, note: "none/off removed, else reasoning_summary auto" }
+    - { file: open-sse/executors/codebuddy-intl.js, line: 18, note: "intl: stream forced, reasoning rule at 21, no prompt rewrite" }
+    - { file: open-sse/providers/registry/codebuddy-cn.js, line: 23, note: "forceStream true; headers from line 28" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "The system prompt reaches the model as the client sent it; a content-filter refusal is reported"
+    actual: "codebuddy-cn silently replaces long or agent-like system prompts with a one-line neutral prompt"
+    impact: "Coding agents lose their tool and behavior instructions without any error"

@@ -10,6 +10,6 @@ export { AnthropicAdapter } from "./adapters/anthropic.js";
 export { createAdapter } from "./adapters/index.js";
 export * from "./protocols/openai-chat.js";
 export type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, HttpResponse, HttpTransportPort, ListedModel } from "./ports.js";
-export { builtinRegistry, toDescriptor, unsupportedReason } from "./builtin-registry.js";
+export { ANTHROPIC_VERSION, builtinRegistry, toDescriptor, unsupportedReason } from "./builtin-registry.js";
 export * from "./catalog/schema.js";
 export { CATALOG } from "./catalog/providers.generated.js";

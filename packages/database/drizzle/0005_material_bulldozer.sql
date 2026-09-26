@@ -1,0 +1,1 @@
+ALTER TABLE `provider_nodes` ADD `type` text DEFAULT 'openai-compatible' NOT NULL;

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "test": "node --no-warnings --test src/features/providers/catalog.test.mjs src/shared/errors.test.mjs src/features/providers/test-result.test.mjs"
+    "test": "node --no-warnings --test src/features/providers/catalog.test.mjs src/shared/errors.test.mjs src/features/providers/test-result.test.mjs src/features/providers/node-rules.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",

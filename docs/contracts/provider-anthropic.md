@@ -3,7 +3,7 @@
 Scope, per spec §9 (SP14, provider adapters by protocol family): one `AIProviderPort` for the `anthropic` family (9router format `claude`), over `HttpTransportPort`. It maps CIP to `POST <chatUrl>` (`…/v1/messages`) and back, JSON and SSE. The adapter is chosen by protocol (`createAdapter`); the `/v1` chat lane and the connection test use it unchanged.
 - **Unblocked providers:** `anthropic`, `glm`, `kimi`, `minimax`, `minimax-cn` (API key). `claude` stays OAuth-only (SP16). The catalog now has **46** connectable providers.
 - **UI:** no new screen. `/providers` pills, `ProviderDetail`, and the Connections Add modal read `connectable` from `GET /api/providers`, so the five providers become connectable there by themselves.
-- **SP14b:** Anthropic-compatible custom providers and stream-only providers.
+- **SP14b (done):** Anthropic-compatible custom providers reuse this adapter (`custom-providers.md` "Anthropic-compatible"); stream-only providers are in `stream-only-providers.md`.
 
 **User decision (2026-09-26):** 9router's suspected bugs in this path are **not** ported; AIGate implements the correct behavior, as in SP9/SP10. Each deviation is listed below.
 

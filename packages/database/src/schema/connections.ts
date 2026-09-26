@@ -25,11 +25,12 @@ export const providerConnections = sqliteTable(
   () => [check("provider_connections_test_status", sql.raw(`test_status IN (${TEST_STATUSES.map((s) => `'${s}'`).join(", ")})`))],
 );
 
-// docs/contracts/custom-providers.md (SP13b). OpenAI-compatible endpoints the user defines; a connection
-// under one stores this id as its provider. The prefix is how /v1 names it. Like 9router it may repeat
-// (the oldest node wins), so it is indexed for the lookup but not unique.
+// docs/contracts/custom-providers.md (SP13b, SP14b). OpenAI- or Anthropic-compatible endpoints the user defines;
+// a connection under one stores this id as its provider. The prefix is how /v1 names it. Like 9router it may
+// repeat (OpenAI-compatible nodes first, then the oldest wins), so it is indexed for the lookup but not unique.
 export const providerNodes = sqliteTable("provider_nodes", {
   id: text("id").primaryKey(),
+  type: text("type", { enum: ["openai-compatible", "anthropic-compatible"] }).notNull().default("openai-compatible"),
   name: text("name").notNull(),
   prefix: text("prefix").notNull(),
   baseUrl: text("base_url").notNull(),

@@ -5,7 +5,7 @@ import { isRecord, list, parseJson, record, text, type Json } from "../json.js";
 import type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, ListedModel } from "../ports.js";
 import { MODEL_ID } from "../registry.js";
 import { readSseData } from "../sse.js";
-import { count, HttpProviderAdapter, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
+import { classifyStatus, count, HttpProviderAdapter, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
 
 // AIProviderPort for the openai-compatible family (docs/contracts/provider-openai.md).
 
@@ -19,6 +19,11 @@ const AUDIO_FORMATS = new Map([["audio/wav", "wav"], ["audio/x-wav", "wav"], ["a
 const STOP_REASONS = new Map<string, StopReason>([
   ["stop", "end_turn"], ["length", "max_tokens"], ["tool_calls", "tool_use"], ["function_call", "tool_use"], ["content_filter", "content_filter"],
 ]);
+
+// provider.codebuddy-request-quirks, kept as 9router has it (user decision 2026-09-26).
+const NEUTRAL_PROMPT = "You are a helpful AI assistant that helps with software engineering tasks.";
+const MAX_SYSTEM_PROMPT = 2000;
+const AGENT_PATTERN = /you are claude code|claude.?code.+official.+cli|anthropic.+official.+cli|anxthxropic.+official.+cli|you are (?:cursor|windsurf|cline|aider|continue|copilot|cody)|you are an? (?:ai )?(?:coding |code )?agent|cc_entrypoint\s*=\s*(?:cli|vscode|jetbrains|gui)|claude.?code.+issues|give feedback.+claude.?code|you are .{0,30}(?:powerful )?ai agent|orchestration capabilities|OhMyOpenCode|<agent-identity>|<Role>|<Behavior_Instructions>/i;
 
 const unsupported = (feature: string) => new UnsupportedFeatureError(feature, TARGET);
 
@@ -92,7 +97,26 @@ function toMessages(request: CanonicalRequest): Json[] {
   return out;
 }
 
-function toBody(request: CanonicalRequest, stream: boolean): Json {
+// Replaces a system message that is long or reads like a coding agent, keeping its string or block shape.
+function neutralAgentPrompt(message: Json): Json {
+  if (message.role !== "system") return message;
+  const content = message.content;
+  const prompt = typeof content === "string" ? content : list(content).map((block) => text(record(block).text) ?? "").join("\n");
+  if (prompt === "" || (prompt.length <= MAX_SYSTEM_PROMPT && !AGENT_PATTERN.test(prompt))) return message;
+  return { ...message, content: typeof content === "string" ? NEUTRAL_PROMPT : [{ type: "text", text: NEUTRAL_PROMPT }] };
+}
+
+// What the 9router CodeBuddy executors change in the finished body.
+function applyQuirks(body: Json, quirks: readonly string[]): void {
+  if (quirks.includes("reasoningSummary")) {
+    const effort = body.reasoning_effort;
+    if (effort === "none" || effort === "off") delete body.reasoning_effort;
+    else if (effort) body.reasoning_summary = "auto";
+  }
+  if (quirks.includes("neutralAgentPrompt")) body.messages = list(body.messages).map((message) => neutralAgentPrompt(record(message)));
+}
+
+function toBody(request: CanonicalRequest, stream: boolean, quirks: readonly string[] = []): Json {
   if (request.reasoning?.budgetTokens !== undefined) throw unsupported("reasoning.budgetTokens");
   const extensions = request.vendorExtensions ?? {};
   for (const namespace of Object.keys(extensions)) if (namespace !== "openai") throw unsupported(`vendorExtensions.${namespace}`);
@@ -115,6 +139,7 @@ function toBody(request: CanonicalRequest, stream: boolean): Json {
   if (request.topP !== undefined) body.top_p = request.topP;
   if (request.stop !== undefined) body.stop = request.stop;
   if (request.reasoning?.effort !== undefined) body.reasoning_effort = request.reasoning.effort;
+  applyQuirks(body, quirks);
   return body;
 }
 
@@ -139,8 +164,12 @@ function stopReasonOf(finishReason: unknown, sawToolCall: boolean): StopReason {
 
 export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIProviderPort {
   async execute(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): Promise<CanonicalResponse> {
-    const response = await this.send(this.chat(request, credential, false), credential, ctx, RETRY.maxAttempts);
-    const root = parseJson(await readBoundedText(response.body));
+    const streamOnly = this.provider.streamOnly === true;
+    const response = await this.send(this.chat(request, credential, streamOnly), credential, ctx, RETRY.maxAttempts);
+    // ponytail: the 4 MiB cap of every JSON answer bounds the collapsed stream too (9router buffers without a limit).
+    const raw = await readBoundedText(response.body);
+    if (streamOnly && (response.headers["content-type"] ?? "").includes("text/event-stream")) return this.collapse(raw, request, credential);
+    const root = parseJson(raw);
     const choice = record(list(record(root).choices)[0]);
     if (!isRecord(root) || !isRecord(choice.message)) throw this.invalid("a chat response without choices[0].message");
     const message = choice.message;
@@ -256,7 +285,68 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
     return {
       ...base,
       headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json" },
-      body: JSON.stringify(toBody(request, stream)),
+      body: JSON.stringify(toBody(request, stream, this.provider.quirks)),
     };
+  }
+
+  // routing.forced-stream-json-collapse, kept as 9router has it (user decision 2026-09-26): unparsable lines are
+  // skipped, a stream cut off before its end is a complete answer, and reasoning is dropped when there is content.
+  private collapse(raw: string, request: CanonicalRequest, credential: Credential): CanonicalResponse {
+    const chunks: Json[] = [];
+    let failure: unknown;
+    for (const line of raw.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (payload === "" || payload === "[DONE]") continue;
+      const chunk = parseJson(payload);
+      if (!isRecord(chunk)) continue;
+      if (chunk.error) failure = chunk.error;
+      else chunks.push(chunk);
+    }
+    if (failure !== undefined) throw this.collapsedError(failure, credential);
+    const first = chunks[0];
+    if (first === undefined) throw this.invalid("an SSE response without data to a non-streaming request");
+    let content = "";
+    let reasoning = "";
+    let finishReason: unknown;
+    let usage: unknown;
+    const calls = new Map<number, { id: string; name: string; arguments: string }>();
+    for (const chunk of chunks) {
+      const choice = record(list(chunk.choices)[0]);
+      const delta = record(choice.delta);
+      content += text(delta.content) ?? "";
+      reasoning += text(delta.reasoning_content) ?? "";
+      if (choice.finish_reason) finishReason = choice.finish_reason;
+      if (isRecord(chunk.usage)) usage = chunk.usage;
+      for (const entry of list(delta.tool_calls)) {
+        const call = record(entry);
+        const fn = record(call.function);
+        const index = typeof call.index === "number" ? call.index : 0;
+        const merged = calls.get(index) ?? { id: "", name: "", arguments: "" };
+        calls.set(index, { id: text(call.id) || merged.id, name: merged.name + (text(fn.name) ?? ""), arguments: merged.arguments + (text(fn.arguments) ?? "") });
+      }
+    }
+    const parts: ContentPart[] = [];
+    if (reasoning && !content) parts.push({ type: "thinking", text: reasoning });
+    if (content) parts.push({ type: "text", text: content });
+    for (const [, call] of [...calls].sort((a, b) => a[0] - b[0])) parts.push({ type: "tool_call", ...call });
+    return {
+      id: text(first.id) ?? "",
+      model: text(first.model) || request.model,
+      content: parts,
+      stopReason: stopReasonOf(finishReason, calls.size > 0),
+      usage: usageOf(usage),
+    };
+  }
+
+  // An error event keeps the upstream status when it is 400..599, as 9router does; the message is bounded and redacted.
+  private collapsedError(value: unknown, credential: Credential): EngineError {
+    const error = record(value);
+    const status = Number(error.status);
+    const known = Number.isInteger(status) && status >= 400 && status <= 599;
+    const message = this.clean(text(error.message) || "Upstream SSE stream failed", credential);
+    return new EngineError(known ? classifyStatus(status, text(error.code) ?? text(error.type)) : "PROVIDER_UNAVAILABLE",
+      `${this.provider.name} sent an error in the stream: ${message}`, { provider: this.provider.id, ...(known ? { status } : {}) });
   }
 }

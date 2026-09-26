@@ -13,12 +13,17 @@ const PATHS: Readonly<Record<ProviderProtocol, { chat: RegExp; models: string }>
 // 9router forces streaming for these although the vendor answers non-streaming requests too
 // (IMPLEMENTATION_ACCIDENT for OpenAI: the API accepts stream:false; SP3 tapes replay that way).
 const STREAM_OPTIONAL = new Set(["openai"]);
+// provider.codebuddy-request-quirks: what the 9router CodeBuddy executors change in the body.
+const EXECUTOR_QUIRKS: Readonly<Record<string, readonly string[]>> = {
+  "codebuddy-cn": ["reasoningSummary", "neutralAgentPrompt"],
+  "codebuddy-intl": ["reasoningSummary"],
+};
 const BLOCKING_QUIRKS = new Map([["clineEnvelope", "Needs a provider-specific request envelope (SP14)"]]);
 const PROTOCOL_REASONS: Readonly<Record<string, string>> = {
   service: "Media and search services come with SP22/SP23",
 };
 // provider.anthropic-auth-and-headers: the family always sends this version.
-const ANTHROPIC_VERSION = "2023-06-01";
+export const ANTHROPIC_VERSION = "2023-06-01";
 
 const isProtocol = (value: string): value is ProviderProtocol => PROVIDER_PROTOCOLS.some((p) => p === value);
 
@@ -36,7 +41,6 @@ export function unsupportedReason(provider: CatalogProvider): string | undefined
   if (!PATHS[provider.protocol].chat.test(provider.chatUrl)) return "Non-standard endpoint (SP14)";
   const quirk = provider.quirks.find((q) => BLOCKING_QUIRKS.has(q));
   if (quirk) return BLOCKING_QUIRKS.get(quirk);
-  if (provider.forceStream && !STREAM_OPTIONAL.has(provider.id)) return "Only answers streaming requests (SP14)";
   return undefined;
 }
 
@@ -64,7 +68,8 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
       // gives a 262144 output. An output limit above the context window is not trusted, so it is unknown.
       maxOutputTokens: m.contextWindow !== null && m.maxOutputTokens !== null && m.maxOutputTokens > m.contextWindow ? null : m.maxOutputTokens,
     })),
-    quirks: provider.quirks,
+    quirks: [...provider.quirks, ...(EXECUTOR_QUIRKS[provider.id] ?? [])],
+    ...(provider.forceStream && !STREAM_OPTIONAL.has(provider.id) ? { streamOnly: true } : {}),
   };
 }
 

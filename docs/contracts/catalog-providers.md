@@ -15,9 +15,9 @@ Scope, per spec §9 ("SP13 | the 123-provider registry"): the SP4 `CATALOG` beco
 | not `hidden` | "Hidden in the 9router catalog" |
 | `chatUrl` is set, has no `{placeholder}`, and ends in `/chat/completions` | "Each connection needs its own endpoint URL", "The endpoint needs per-account data", or "Non-standard endpoint (SP14)" |
 | no blocking quirk: `clineEnvelope` | "Needs a provider-specific request envelope (SP14)" |
-| not `forceStream`, except OpenAI | "Only answers streaming requests (SP14)" |
+| (SP14b) `forceStream` providers are connectable: a non-streaming client gets the collapsed stream (`stream-only-providers.md`) | — |
 
-- **Result:** 41 of the 121 catalog providers are connectable (46 since SP14a added the `anthropic` family, `provider-anthropic.md`).
+- **Result:** 41 of the 121 catalog providers are connectable (46 since SP14a added the `anthropic` family, `provider-anthropic.md`; 49 since SP14b added the stream-only providers, `stream-only-providers.md`).
 - **The OpenAI exception.** 9router forces streaming for OpenAI. The OpenAI API answers non-streaming requests, and SP3 tier 1 replays that way, so AIGate does not force it. It is labeled `IMPLEMENTATION_ACCIDENT` for OpenAI.
 - **Ignored fields.** `transport.usage`, `modelsFetcher`, `thinkingFormat`, `reasoningInject`, `regions`, and multi-`transports` do not stop a plain chat call. They stay in `unmodelled` for their SPs, and the default region URL is used.
 

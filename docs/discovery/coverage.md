@@ -1,13 +1,13 @@
 # Discovery coverage
 
-Entries: 288
+Entries: 291
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
 | routes | 166/166 |  |
 | pages | 5/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +15 |
-| providers | 16/124 | alicode, alicode-intl, alims-intl, alitp-intl, api-airforce, assemblyai, aws-polly, azure … +100 |
-| executors | 9/31 | azure, codebuddy-cn, codebuddy-intl, devin-cli, gemini-cli, github, grok-cli, grok-web … +14 |
+| providers | 18/124 | alicode, alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu … +98 |
+| executors | 11/31 | azure, devin-cli, gemini-cli, github, grok-cli, grok-web, iflow, kimchi … +12 |
 | translators | 40/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/formats/gemini.js, open-sse/translator/formats/responsesApi.js |
 | repos | 11/11 |  |
 | settingsKeys | 47/52 | cloudEnabled, dnsToolEnabled, oidcLoginLabel, samlLoginLabel, tunnelProvider |
@@ -16,10 +16,10 @@ Entries: 288
 
 - apikeys: 9
 - catalog: 29
-- connections: 48
+- connections: 49
 - identity: 11
 - media: 15
-- routing: 84
+- routing: 86
 - settings: 10
 - tooling: 45
 - transport: 14
@@ -27,9 +27,9 @@ Entries: 288
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 12
-- REFERENCE_BEHAVIOR: 242
-- SUSPECTED_BUG: 39
+- IMPLEMENTATION_ACCIDENT: 13
+- REFERENCE_BEHAVIOR: 245
+- SUSPECTED_BUG: 42
 
 ## Missing — pages
 
@@ -63,7 +63,6 @@ Entries: 288
 - alicode-intl
 - alims-intl
 - alitp-intl
-- api-airforce
 - assemblyai
 - aws-polly
 - azure
@@ -80,7 +79,6 @@ Entries: 288
 - cline
 - clinepass
 - cloudflare-ai
-- codebuddy-cn
 - codebuddy-intl
 - cohere
 - comfyui
@@ -171,8 +169,6 @@ Entries: 288
 ## Missing — executors
 
 - azure
-- codebuddy-cn
-- codebuddy-intl
 - devin-cli
 - gemini-cli
 - github

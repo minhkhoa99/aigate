@@ -92,7 +92,7 @@ test("every error code has an explicit fallback decision", () => {
 });
 
 test("the built-in registry is the connectable part of the catalog, with a reason for the rest", () => {
-  assert.equal(builtinRegistry.providers.length, 46);
+  assert.equal(builtinRegistry.providers.length, 49);
   assert.equal(builtinRegistry.model("openai", "gpt-4.1")?.contextWindow, 1_000_000);
   assert.equal(builtinRegistry.model("openai", "missing"), undefined);
   assert.equal(builtinRegistry.provider("ds")?.id, "deepseek", "aliases resolve");

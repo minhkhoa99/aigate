@@ -307,3 +307,90 @@ test("validateCredential answers only about the key and never retries", async ()
   const badKey = await new OpenAICompatibleAdapter(openai, fakeTransport()).validateCredential({ kind: "api-key", apiKey: "has space" }, ctx());
   assert.equal(badKey.code, "AUTH_ERROR");
 });
+
+// ---- SP14b: stream-only providers (routing.forced-stream-json-collapse, provider.codebuddy-request-quirks) ----
+
+const airforce = builtinRegistry.provider("api-airforce");
+const chunk = (delta, extra = {}) => ({ id: "cmpl-7", model: "gpt-oss-120b", choices: [{ index: 0, delta, ...extra }] });
+
+test("the three stream-only providers are connectable and marked; openai is not", () => {
+  assert.deepEqual(["codebuddy-cn", "codebuddy-intl", "api-airforce"].map((id) => builtinRegistry.provider(id)?.streamOnly), [true, true, true]);
+  assert.equal(openai.streamOnly, undefined, "OpenAI answers stream:false (SP13 exception)");
+  assert.deepEqual(builtinRegistry.provider("codebuddy-cn").quirks, ["reasoningSummary", "neutralAgentPrompt"]);
+  assert.deepEqual(builtinRegistry.provider("codebuddy-intl").quirks, ["reasoningSummary"]);
+});
+
+test("execute on a stream-only provider streams upstream and collapses the answer as 9router does", async () => {
+  const transport = fakeTransport(sse([
+    { ...chunk({ role: "assistant", reasoning_content: "hmm " }), usage: { prompt_tokens: 1, completion_tokens: 1 } },
+    "not json at all",
+    chunk({ reasoning_content: "ok", content: "Hel" }),
+    chunk({ content: "lo", tool_calls: [{ index: 1, id: "call_b", function: { name: "second", arguments: "{}" } }] }),
+    chunk({ tool_calls: [{ index: 0, id: "call_tmp", function: { name: "fir", arguments: "{\"q\"" } }] }),
+    chunk({ tool_calls: [{ index: 0, id: "call_a", function: { name: "st", arguments: ":1}" } }] }, { finish_reason: "tool_calls" }),
+    { id: "cmpl-7", choices: [], usage: { prompt_tokens: 9, completion_tokens: 4 } },
+    "[DONE]",
+  ]));
+  const response = await new OpenAICompatibleAdapter(airforce, transport).execute({ ...hello, model: "gpt-oss-120b" }, credential, ctx());
+  const [call] = transport.calls;
+  assert.equal(call.headers.accept, "text/event-stream");
+  const sent = JSON.parse(call.body);
+  assert.equal(sent.stream, true, "the client did not ask to stream; the provider needs it");
+  assert.deepEqual(sent.stream_options, { include_usage: true });
+  assert.equal(response.id, "cmpl-7");
+  assert.equal(response.model, "gpt-oss-120b");
+  assert.deepEqual(response.content, [
+    { type: "text", text: "Hello" },
+    { type: "tool_call", id: "call_a", name: "first", arguments: "{\"q\":1}" },
+    { type: "tool_call", id: "call_b", name: "second", arguments: "{}" },
+  ], "reasoning is dropped when there is content; tool calls merged (a later id replaces) and sorted by index; the bad line is skipped");
+  assert.equal(response.stopReason, "tool_use");
+  assert.deepEqual(response.usage, { inputTokens: 9, outputTokens: 4 }, "the last usage object wins");
+});
+
+test("a collapsed answer keeps reasoning without content, and a cut-off stream is still an answer", async () => {
+  const response = await new OpenAICompatibleAdapter(airforce, fakeTransport(sse([chunk({ reasoning_content: "only thinking" })]))).execute(hello, credential, ctx());
+  assert.deepEqual(response.content, [{ type: "thinking", text: "only thinking" }]);
+  assert.equal(response.stopReason, "end_turn", "no finish_reason and no [DONE]: 9router answers stop");
+  assert.equal(response.model, "gpt-oss-120b");
+  const bare = await new OpenAICompatibleAdapter(airforce, fakeTransport(sse([{ choices: [{ delta: { content: "x" } }] }]))).execute(hello, credential, ctx());
+  assert.deepEqual([bare.id, bare.model], ["", "gpt-4.1"], "no id or model in the first chunk: the renderer id and the requested model");
+});
+
+test("a collapsed stream fails on an error event (keeping a 4xx/5xx status) or on no data", async () => {
+  const run = (answer) => new OpenAICompatibleAdapter(airforce, fakeTransport(answer)).execute(hello, credential, ctx());
+  await assert.rejects(run(sse([chunk({ content: "partial" }), { error: { status: 429, message: `slow down ${SECRET}` } }])),
+    isCode("RATE_LIMIT", (e) => e.details.status === 429 && e.message.includes("slow down ***")));
+  await assert.rejects(run(sse([{ error: { status: 200, message: "odd" } }])), isCode("PROVIDER_UNAVAILABLE", (e) => e.details.status === undefined && e.message.endsWith(": odd")));
+  await assert.rejects(run(sse([{ error: "text only" }])), isCode("PROVIDER_UNAVAILABLE", (e) => e.message.endsWith("Upstream SSE stream failed")));
+  await assert.rejects(run(sse(["[DONE]"])), isCode("PROVIDER_UNAVAILABLE", (e) => /without data/.test(e.message)));
+});
+
+test("a stream-only provider that answers JSON anyway is read as JSON", async () => {
+  const response = await new OpenAICompatibleAdapter(airforce, fakeTransport(json(200, ok))).execute(hello, credential, ctx());
+  assert.deepEqual(response.content, [{ type: "text", text: "hi" }]);
+});
+
+test("CodeBuddy: reasoning_summary follows reasoning_effort, and codebuddy-cn swaps agent system prompts", async () => {
+  const sent = async (id, request) => {
+    const transport = fakeTransport(sse([chunk({ content: "ok" })]));
+    await new OpenAICompatibleAdapter(builtinRegistry.provider(id), transport).execute({ ...hello, ...request }, credential, ctx());
+    return JSON.parse(transport.calls[0].body);
+  };
+  const high = await sent("codebuddy-intl", { reasoning: { effort: "high" } });
+  assert.deepEqual([high.reasoning_effort, high.reasoning_summary], ["high", "auto"]);
+  const none = await sent("codebuddy-intl", { vendorExtensions: { openai: { reasoning_effort: "none" } } });
+  assert.deepEqual([none.reasoning_effort, none.reasoning_summary], [undefined, undefined], "none is removed");
+  const plain = await sent("codebuddy-cn", { system: [{ type: "text", text: "Answer in French." }] });
+  assert.equal(plain.reasoning_summary, undefined);
+  assert.deepEqual(plain.messages[0], { role: "system", content: "Answer in French." }, "a short plain prompt is kept");
+  const NEUTRAL = "You are a helpful AI assistant that helps with software engineering tasks.";
+  const agent = await sent("codebuddy-cn", { system: [{ type: "text", text: "You are Claude Code, Anthropic's official CLI" }] });
+  assert.deepEqual(agent.messages[0], { role: "system", content: NEUTRAL });
+  const long = await sent("codebuddy-cn", { system: [{ type: "text", text: "a".repeat(1000) }, { type: "text", text: "b".repeat(1000) }] });
+  assert.deepEqual(long.messages[0], { role: "system", content: [{ type: "text", text: NEUTRAL }] }, "2001 characters with the newline join; block shape kept");
+  const edge = await sent("codebuddy-cn", { system: [{ type: "text", text: "c".repeat(2000) }] });
+  assert.equal(edge.messages[0].content.length, 2000, "exactly 2000 characters is kept");
+  const intl = await sent("codebuddy-intl", { system: [{ type: "text", text: "You are Claude Code" }] });
+  assert.equal(intl.messages[0].content, "You are Claude Code", "only codebuddy-cn rewrites");
+});

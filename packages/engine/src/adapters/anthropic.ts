@@ -25,6 +25,25 @@ const STOP_REASONS = new Map<string, StopReason>([
   ["refusal", "content_filter"], ["model_context_window_exceeded", "max_tokens"],
 ]);
 const CONTENT_BLOCKS = new Set(["text", "thinking", "redacted_thinking", "tool_use"]);
+// connection.anthropic-compatible-node, kept as 9router has it (user decision 2026-09-26): claude-* models on a
+// custom Anthropic node get the Claude Code beta list, and the connection test is 9router's.
+const CLAUDE_CODE_BETA = "claude-code-20250219";
+const REDACT_THINKING_BETA = "redact-thinking-2026-02-12";
+const NODE_BETAS = [
+  CLAUDE_CODE_BETA, "oauth-2025-04-20", "interleaved-thinking-2025-05-14", "context-management-2025-06-27", "prompt-caching-scope-2026-01-05",
+  "structured-outputs-2025-12-15", "fast-mode-2026-02-01", REDACT_THINKING_BETA, "token-efficient-tools-2026-03-28",
+];
+const HEAVY_AGENT_BETAS = ["advanced-tool-use-2025-11-20", "effort-2025-11-24"];
+const NODE_TEST_MODEL = "claude-3-haiku-20240307";
+
+function nodeBetas(body: Json, official: boolean): string | undefined {
+  const model = text(body.model) ?? "";
+  if (!model.startsWith("claude-")) return undefined;
+  const summarized = record(body.thinking).display === "summarized";
+  const flags = NODE_BETAS.filter((flag) => (official || flag !== CLAUDE_CODE_BETA) && !(summarized && flag === REDACT_THINKING_BETA));
+  if (/^claude-(opus|sonnet)/.test(model)) flags.push(...HEAVY_AGENT_BETAS);
+  return flags.join(",");
+}
 
 const unsupported = (feature: string) => new UnsupportedFeatureError(feature, TARGET);
 
@@ -222,6 +241,7 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
   // One call, no retry: the free model list, or a 1-token message where a compatible host has no list.
   // Only an answer about the key itself is returned; anything else says nothing about the key, so it is thrown.
   async validateCredential(credential: Credential, ctx: ExecCtx): Promise<CredentialStatus> {
+    if (this.provider.anthropicNode) return this.nodeTest(credential, ctx);
     try {
       const response = await this.send(this.request("GET", this.provider.modelsUrl, credential, METADATA_TIMEOUT_MS), credential, ctx, 1)
         .catch((error: unknown) => {
@@ -357,10 +377,26 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
 
   private post(body: Json, credential: Credential, timeoutMs: number, stream: boolean): HttpRequest {
     const base = this.request("POST", this.provider.chatUrl, credential, timeoutMs);
+    const node = this.provider.anthropicNode;
+    const beta = node ? nodeBetas(body, node.official) : undefined;
     return {
       ...base,
-      headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json" },
+      headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json", ...(beta ? { "anthropic-beta": beta } : {}) },
       body: JSON.stringify(body),
     };
+  }
+
+  // 9router: <base>/v1/messages (so /v1/v1/messages with the default base), a retired model, and every status but
+  // 401/403 counts as a valid key. A network failure is still thrown, so the dashboard shows it as unreachable.
+  private async nodeTest(credential: Credential, ctx: ExecCtx): Promise<CredentialStatus> {
+    const base = this.request("POST", this.provider.chatUrl.replace(/\/messages$/, "/v1/messages"), credential, METADATA_TIMEOUT_MS);
+    const response = await this.transport.send({
+      ...base,
+      headers: { ...base.headers, "content-type": "application/json", authorization: `Bearer ${credential.apiKey}` },
+      body: JSON.stringify({ model: NODE_TEST_MODEL, max_tokens: 1, messages: [{ role: "user", content: "test" }] }),
+    }, ctx);
+    await response.body?.cancel();
+    if (response.status !== 401 && response.status !== 403) return { valid: true };
+    return { valid: false, code: "AUTH_ERROR", message: `${this.provider.name} answered ${response.status}: invalid API key or base URL` };
   }
 }

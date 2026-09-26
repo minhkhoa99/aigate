@@ -17,7 +17,8 @@ test("create stores the fields as 9router does; bad fields name the problem", ()
     const node = res.json();
     assert.match(node.id, /^openai-compatible-[0-9a-f]{12}$/);
     assert.deepEqual([node.name, node.prefix, node.baseUrl], ["Local LLM", "local", "https://llm.example.com/v1/"], "trimmed, otherwise as given");
-    assert.deepEqual(Object.keys(node).sort(), ["baseUrl", "createdAt", "id", "name", "prefix", "updatedAt"]);
+    assert.deepEqual(Object.keys(node).sort(), ["baseUrl", "createdAt", "id", "name", "prefix", "type", "updatedAt"]);
+    assert.equal(node.type, "openai-compatible", "the default type");
     const defaulted = await create({ name: "No URL", prefix: "nourl" });
     assert.deepEqual([defaulted.statusCode, defaulted.json().baseUrl], [201, "https://api.openai.com/v1"], "the 9router default base URL");
     // Stored even though /v1 can never reach them (connection.provider-node-create-list).
@@ -29,7 +30,8 @@ test("create stores the fields as 9router does; bad fields name the problem", ()
       [{ ...body, baseUrl: "https://user:pw@llm.example.com" }, /username or password/],
       [{ ...body, baseUrl: "https://llm.example.com/v1?key=1" }, /query or fragment/],
       [{ ...body, baseUrl: "not a url" }, /baseUrl/],
-      [{ ...body, type: "anthropic-compatible" }, /type is not a field/],
+      [{ ...body, type: "custom-embedding" }, /type must be openai-compatible or anthropic-compatible/],
+      [{ ...body, apiType: "chat" }, /apiType is not a field/],
       [{ ...body, name: "" }, /name must be/],
     ]) {
       const bad = await create(payload);
@@ -112,6 +114,58 @@ test("9router routing quirks: built-in prefixes win, the oldest duplicate wins, 
     assert.equal(upstream.calls[1].request.url, "https://first.example.com/v1/chat/completions", "the oldest node with the prefix");
     assert.equal((await chat({ ...hello, model: "pasted/llama-3" })).statusCode, 200);
     assert.equal(upstream.calls[2].request.url, "https://p.example.com/v1/chat/completions/chat/completions", "kept as 9router builds it");
+    await app.close();
+  }));
+
+// ---- SP14b: Anthropic-compatible custom providers (connection.anthropic-compatible-node) ----
+
+const claudeReply = { id: "msg_node", type: "message", model: "claude-sonnet-4-5", stop_reason: "end_turn", content: [{ type: "text", text: "From the node" }], usage: { input_tokens: 5, output_tokens: 3 } };
+
+test("an Anthropic-compatible provider: its id, the default base, a pasted /messages removed, and a fixed type", () =>
+  withTempDb(async (file) => {
+    const { app, dash } = await ready(file, fakeUpstream());
+    const create = async (payload) => (await dash({ method: "POST", url: "/api/provider-nodes", body: { type: "anthropic-compatible", ...payload } })).json();
+    const plain = await create({ name: "Claude", prefix: "cl" });
+    assert.match(plain.id, /^anthropic-compatible-[0-9a-f]{12}$/);
+    assert.deepEqual([plain.type, plain.baseUrl], ["anthropic-compatible", "https://api.anthropic.com/v1"], "the 9router default");
+    const pasted = await create({ name: "Gateway", prefix: "gw", baseUrl: " https://gw.example/anthropic/v1/messages/ " });
+    assert.equal(pasted.baseUrl, "https://gw.example/anthropic/v1", "one trailing / and then /messages removed");
+    const patch = (id, payload) => dash({ method: "PATCH", url: `/api/provider-nodes/${id}`, body: payload });
+    assert.equal((await patch(pasted.id, { baseUrl: "https://gw2.example/v1/messages" })).json().baseUrl, "https://gw2.example/v1", "the same rule on update");
+    const changed = await patch(pasted.id, { type: "openai-compatible" });
+    assert.deepEqual([changed.statusCode, changed.json().code], [400, "INVALID_REQUEST"]);
+    assert.match(changed.json().message, /type cannot be changed/);
+    assert.equal((await patch("nope", { type: "x" })).statusCode, 404, "an unknown id is 404 before the body is read");
+    const openai = (await dash({ method: "POST", url: "/api/provider-nodes", body: { name: "O", prefix: "o", baseUrl: "https://o.example/v1/messages" } })).json();
+    assert.equal(openai.baseUrl, "https://o.example/v1/messages", "an OpenAI-compatible provider keeps its URL as given");
+    assert.equal((await patch(openai.id, { baseUrl: "https://o.example/v1/messages/" })).json().baseUrl, "https://o.example/v1/messages/");
+    await app.close();
+  }));
+
+test("an Anthropic-compatible provider is tested and served as 9router does, and OpenAI-compatible prefixes win", () =>
+  withTempDb(async (file) => {
+    const upstream = fakeUpstream(json(404, { error: { message: "no route" } }), json(200, claudeReply), json(200, completion));
+    const { app, dash, chat } = await ready(file, upstream);
+    const create = async (payload) => (await dash({ method: "POST", url: "/api/provider-nodes", body: payload })).json();
+    const node = await create({ type: "anthropic-compatible", name: "Gateway", prefix: "gate", baseUrl: "https://gw.example/anthropic/v1" });
+    const connection = (await dash({ method: "POST", url: "/api/connections", body: { provider: node.id, apiKey: "sk-node-key-5678" } })).json();
+    const tested = (await dash({ method: "POST", url: `/api/connections/${connection.id}/test` })).json();
+    assert.equal(tested.testStatus, "active", "404 counts as a valid key in 9router");
+    assert.equal(upstream.calls[0].request.url, "https://gw.example/anthropic/v1/v1/messages");
+    const res = await chat({ ...hello, model: "gate/claude-sonnet-4-5" });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.json().choices[0].message.content, "From the node");
+    const sent = upstream.calls[1].request;
+    assert.equal(sent.url, "https://gw.example/anthropic/v1/messages");
+    assert.equal(sent.headers["x-api-key"], "sk-node-key-5678");
+    assert.equal(sent.headers.authorization, "Bearer sk-node-key-5678", "a third-party host gets Bearer too");
+    assert.match(sent.headers["anthropic-beta"], /^oauth-2025-04-20,.*effort-2025-11-24$/);
+    assert.equal(JSON.parse(sent.body).model, "claude-sonnet-4-5");
+    // A newer OpenAI-compatible provider with the same prefix wins over the older Anthropic one.
+    const newer = await create({ name: "Newer", prefix: "gate", baseUrl: "https://newer.example/v1" });
+    await dash({ method: "POST", url: "/api/connections", body: { provider: newer.id, apiKey: "sk-node-key-9999" } });
+    assert.equal((await chat({ ...hello, model: "gate/llama" })).statusCode, 200);
+    assert.equal(upstream.calls[2].request.url, "https://newer.example/v1/chat/completions");
     await app.close();
   }));
 

@@ -1592,3 +1592,69 @@
   newModule: connections
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+
+# 2026-09-26 SP14b: Anthropic-compatible custom provider nodes.
+- id: connection.anthropic-compatible-node
+  group: Providers
+  feature: Custom provider nodes
+  subFeature: "Anthropic-compatible nodes: create and update rules, /v1 precedence, request URL and headers, and the connection test"
+  trigger: "POST /api/provider-nodes with type anthropic-compatible; PUT /api/provider-nodes/:id on such a node; a /v1 request naming <prefix>/<model>; a connection test on the connection of the node"
+  input: "POST { name, prefix, type: anthropic-compatible, baseUrl? }; the API key of the node connection"
+  output: "A node with id anthropic-compatible-<id>; requests to <baseUrl>/messages in the claude format"
+  businessRules:
+    - "An omitted baseUrl defaults to https://api.anthropic.com/v1; the stored value is trimmed, one trailing / is removed, then a trailing /messages is removed (create and update alike)"
+    - "The node id is anthropic-compatible-<generated id>; update never changes the type"
+    - "At /v1 a prefix is matched against openai-compatible nodes first, then anthropic-compatible nodes, whatever their age; built-in ids and aliases always win"
+    - "The chat URL is <baseUrl without one trailing />/messages and the target format is claude (the same request and response translation as the anthropic provider)"
+    - "Auth is x-api-key with the raw key, plus anthropic-version 2023-06-01; no catalog headers are sent"
+    - "When the upstream model id starts with claude-, Anthropic-Beta is the Claude Code list: claude-code-20250219, oauth-2025-04-20, interleaved-thinking-2025-05-14, context-management-2025-06-27, prompt-caching-scope-2026-01-05, structured-outputs-2025-12-15, fast-mode-2026-02-01, redact-thinking-2026-02-12, token-efficient-tools-2026-03-28, plus advanced-tool-use-2025-11-20 and effort-2025-11-24 for claude-opus* and claude-sonnet*; redact-thinking is left out only when the body asks thinking.display summarized"
+    - "The host counts as official Anthropic when the stored baseUrl is empty or contains the substring api.anthropic.com; for any other host the key is also sent as Authorization Bearer, and claude-code-20250219 is removed from the beta list"
+    - "The connection test POSTs a 1-token message (content test) to <baseUrl>/v1/messages with the default model of the connection or claude-3-haiku-20240307, sending x-api-key, anthropic-version, and Authorization Bearer; every status except 401 and 403 counts as a valid key"
+    - "An sk-ant-oat OAuth token pasted as the key triggers Claude Code cloaking (a billing header in system[0] and a fake metadata.user_id)"
+    - "Thinking blocks in the history of a claude-format client get a fixed default signature, and images inside tool results are not hoisted (unlike other claude-format providers)"
+  state:
+    reads: ["providerNodes", "the API key of the node connection"]
+    writes: ["providerNodes (create, update)", "connection testStatus (test)"]
+    runtimeOnly: []
+  dependencies: ["connection.provider-node-create-list", "connection.provider-node-update-delete", "provider.anthropic-auth-and-headers", "translator.openai-to-claude-request", "translator.claude-to-openai-response"]
+  providerInteraction: "POST <baseUrl>/messages (chat); POST <baseUrl>/v1/messages (connection test)"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "name or prefix missing, or an unknown type (400 Invalid provider node type)", partial: false }
+    - { code: AUTH_ERROR, when: "the connection test gets 401 or 403", partial: false }
+  sideEffects: ["The connection test spends up to one output token"]
+  persistence: ["providerNodes row with type anthropic-compatible"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "With the default base https://api.anthropic.com/v1 the test URL is https://api.anthropic.com/v1/v1/messages, which answers 404, so every key tests as valid"
+    - "A gateway URL that merely contains api.anthropic.com (another host, or a path segment) is treated as official: no Bearer header, and claude-code-20250219 stays"
+    - "An anthropic-compatible node whose prefix equals the prefix of a newer openai-compatible node is unreachable"
+  evidence:
+    - { file: src/app/api/provider-nodes/route.js, line: 81, note: "anthropic-compatible create branch" }
+    - { file: src/app/api/provider-nodes/route.js, line: 84, note: "default ANTHROPIC_COMPATIBLE_DEFAULTS.baseUrl, trim, strip one trailing /, strip /messages" }
+    - { file: src/app/api/provider-nodes/route.js, line: 90, note: "id = anthropic-compatible-<generated>" }
+    - { file: "src/app/api/provider-nodes/[id]/route.js", line: 36, note: "update applies the same /messages stripping" }
+    - { file: open-sse/providers/shared.js, line: 85, note: "ANTHROPIC_COMPAT_BASE https://api.anthropic.com/v1" }
+    - { file: src/sse/services/model.js, line: 45, note: "openai-compatible nodes are matched before anthropic-compatible (line 51)" }
+    - { file: open-sse/executors/default.js, line: 116, note: "chat URL <baseUrl>/messages" }
+    - { file: open-sse/executors/default.js, line: 140, note: "x-api-key raw, Bearer for OAuth, anthropic-version" }
+    - { file: open-sse/executors/default.js, line: 166, note: "claude-* models get selectAnthropicBeta" }
+    - { file: open-sse/providers/shared.js, line: 51, note: "Claude Code beta list; heavy-agent flags for opus/sonnet at 62, redact-thinking rule at 75" }
+    - { file: open-sse/executors/default.js, line: 175, note: "official = empty baseUrl or includes api.anthropic.com" }
+    - { file: open-sse/executors/default.js, line: 180, note: "non-official: add Authorization Bearer" }
+    - { file: open-sse/executors/default.js, line: 188, note: "non-official: strip claude-code-20250219" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 497, note: "anthropic-compatible connection test" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 501, note: "<base>/v1/messages" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 518, note: "only 401/403 invalid" }
+    - { file: open-sse/translator/formats/claude.js, line: 643, note: "cloaking for anthropic-compatible" }
+    - { file: open-sse/utils/claudeCloaking.js, line: 166, note: "only for sk-ant-oat tokens" }
+    - { file: open-sse/translator/formats/claude.js, line: 557, note: "thinking signature replaced with the default" }
+    - { file: open-sse/translator/formats/claude.js, line: 637, note: "no image hoisting for anthropic-compatible" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG, IMPLEMENTATION_ACCIDENT]
+  suspicion:
+    expected: "An API-key request carries only the betas it needs; the official host is decided by hostname; the connection test calls <baseUrl>/messages and reports 404 or 5xx as not verified"
+    actual: "claude-* models get the Claude Code OAuth and redact-thinking betas with an API key; a substring decides the official host; the test calls <baseUrl>/v1/messages and counts any status but 401/403 as valid"
+    impact: "Thinking text can come back redacted, a look-alike gateway URL skips the Bearer header, and a wrong base URL or dead endpoint tests as a working key"

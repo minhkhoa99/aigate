@@ -62,7 +62,7 @@ test("createAdapter picks the adapter by protocol family", () => {
   assert.ok(createAdapter(anthropic, fakeTransport()) instanceof AnthropicAdapter);
   assert.ok(createAdapter(builtinRegistry.provider("openai"), fakeTransport()) instanceof OpenAICompatibleAdapter);
   assert.deepEqual(["anthropic", "glm", "kimi", "minimax", "minimax-cn"].map((id) => builtinRegistry.provider(id)?.protocol), Array(5).fill("anthropic"));
-  assert.equal(builtinRegistry.providers.length, 46);
+  assert.equal(builtinRegistry.providers.length, 49);
   assert.deepEqual(builtinRegistry.status("claude"), { connectable: false, reason: "Needs OAuth sign-in (SP16)" });
 });
 
@@ -259,4 +259,65 @@ test("the connection test uses the free model list, then a 1-token message where
   await assert.rejects(new AnthropicAdapter(anthropic, fakeTransport(json(500, {}))).validateCredential(credential, ctx()), (e) => e.code === "PROVIDER_UNAVAILABLE");
   const models = await new AnthropicAdapter(anthropic, fakeTransport(json(200, { data: [{ id: "claude-sonnet-4-20250514" }, { id: "bad id" }, { id: "new" }] }))).getModels(credential, ctx());
   assert.deepEqual(models.map((m) => [m.id, Boolean(m.descriptor)]), [["claude-sonnet-4-20250514", true], ["new", false]]);
+});
+
+// ---- SP14b: Anthropic-compatible custom providers (connection.anthropic-compatible-node), kept as 9router has them ----
+
+const node = (base, official) => ({
+  id: "anthropic-compatible-abc", name: "Gateway", protocol: "anthropic", chatUrl: `${base}/messages`, modelsUrl: `${base}/models`,
+  headers: { "anthropic-version": "2023-06-01" }, aliases: [], models: [], auth: { kind: "api-key", header: "x-api-key", scheme: "raw" },
+  anthropicNode: { official },
+});
+const officialNode = node("https://api.anthropic.com/v1", true);
+const gateway = node("https://gw.example/anthropic/v1", false);
+const CLAUDE_CODE_BETAS = "oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,"
+  + "structured-outputs-2025-12-15,fast-mode-2026-02-01,redact-thinking-2026-02-12,token-efficient-tools-2026-03-28";
+
+test("an Anthropic node sends x-api-key, the Claude Code betas for claude-* models, and Bearer to a third-party host", async () => {
+  const headersFor = async (provider, model) => {
+    const transport = fakeTransport(json(200, reply));
+    await new AnthropicAdapter(provider, transport).execute({ ...hello, model }, credential, ctx());
+    return transport.calls[0];
+  };
+  const sonnet = await headersFor(officialNode, "claude-sonnet-4-5");
+  assert.equal(sonnet.url, "https://api.anthropic.com/v1/messages");
+  assert.equal(sonnet.headers["x-api-key"], SECRET);
+  assert.equal(sonnet.headers.authorization, undefined, "no Bearer for the official host");
+  assert.equal(sonnet.headers["anthropic-version"], "2023-06-01");
+  assert.equal(sonnet.headers["anthropic-beta"], `claude-code-20250219,${CLAUDE_CODE_BETAS},advanced-tool-use-2025-11-20,effort-2025-11-24`);
+  const haiku = await headersFor(gateway, "claude-haiku-4-5");
+  assert.equal(haiku.url, "https://gw.example/anthropic/v1/messages");
+  assert.equal(haiku.headers.authorization, `Bearer ${SECRET}`, "9router adds Bearer for any other host");
+  assert.equal(haiku.headers["x-api-key"], SECRET);
+  assert.equal(haiku.headers["anthropic-beta"], CLAUDE_CODE_BETAS, "no claude-code flag off Anthropic, no heavy-agent flags for haiku");
+  // thinking.display summarized can only come from vendorExtensions.anthropic (no OpenAI client field maps to it).
+  const summarizedTransport = fakeTransport(json(200, reply));
+  await new AnthropicAdapter(gateway, summarizedTransport).execute({ ...hello, model: "claude-haiku-4-5", vendorExtensions: { anthropic: { thinking: { type: "enabled", budget_tokens: 2048, display: "summarized" } } } }, credential, ctx());
+  assert.equal(summarizedTransport.calls[0].headers["anthropic-beta"], CLAUDE_CODE_BETAS.replace(",redact-thinking-2026-02-12", ""), "summaries asked: no redact-thinking");
+  const glm = await headersFor(gateway, "glm-4.6");
+  assert.equal(glm.headers["anthropic-beta"], undefined, "a non-Claude model gets no beta header");
+  const catalogAnthropic = await headersFor(anthropic, "claude-sonnet-4-20250514");
+  assert.equal(catalogAnthropic.headers["anthropic-beta"], "claude-code-20250219,interleaved-thinking-2025-05-14", "the catalog provider is unchanged");
+});
+
+test("an Anthropic node connection test is 9router's: <base>/v1/messages, and only 401/403 are invalid", async () => {
+  const check = async (answer, provider = officialNode) => {
+    const transport = fakeTransport(answer);
+    return { result: await new AnthropicAdapter(provider, transport).validateCredential(credential, ctx()), call: transport.calls[0] };
+  };
+  const notFound = await check(json(404, { error: { message: "no such route" } }));
+  assert.deepEqual(notFound.result, { valid: true }, "the doubled /v1 answers 404, which 9router counts as valid");
+  assert.equal(notFound.call.url, "https://api.anthropic.com/v1/v1/messages");
+  assert.equal(notFound.call.method, "POST");
+  assert.equal(notFound.call.headers.authorization, `Bearer ${SECRET}`, "the test always sends Bearer too");
+  assert.equal(notFound.call.headers["x-api-key"], SECRET);
+  assert.deepEqual(JSON.parse(notFound.call.body), { model: "claude-3-haiku-20240307", max_tokens: 1, messages: [{ role: "user", content: "test" }] });
+  assert.deepEqual((await check(json(500, {}), gateway)).result, { valid: true });
+  for (const status of [401, 403]) {
+    const refused = (await check(json(status, {}))).result;
+    assert.deepEqual([refused.valid, refused.code], [false, "AUTH_ERROR"]);
+    assert.ok(!refused.message.includes(SECRET));
+  }
+  await assert.rejects(new AnthropicAdapter(officialNode, fakeTransport(new EngineError("PROVIDER_UNAVAILABLE", "down"))).validateCredential(credential, ctx()),
+    (e) => e.code === "PROVIDER_UNAVAILABLE", "a network failure is not an answer about the key");
 });

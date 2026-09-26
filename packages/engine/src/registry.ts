@@ -38,8 +38,13 @@ export interface ProviderDescriptor {
   readonly aliases: readonly string[];
   readonly auth: { readonly kind: "api-key"; readonly header: string; readonly scheme: "bearer" | "raw" };
   readonly models: readonly ModelDescriptor[];
-  // Catalog quirks an adapter reads (docs/contracts/provider-anthropic.md: requireClaudeToolType).
+  // Catalog quirks an adapter reads (docs/contracts/provider-anthropic.md: requireClaudeToolType;
+  // docs/contracts/stream-only-providers.md: reasoningSummary, neutralAgentPrompt).
   readonly quirks?: readonly string[];
+  // The provider refuses non-streaming chat: execute() streams and collapses the answer (routing.forced-stream-json-collapse).
+  readonly streamOnly?: boolean;
+  // An Anthropic-compatible custom provider (connection.anthropic-compatible-node); official = 9router's api.anthropic.com test.
+  readonly anthropicNode?: { readonly official: boolean };
 }
 
 export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic"] as const;

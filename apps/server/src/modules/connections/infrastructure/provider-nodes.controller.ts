@@ -32,7 +32,9 @@ export class ProviderNodesController {
   @Patch(":id")
   @Header("Cache-Control", "no-store")
   async update(@Param("id") id: string, @Body() body: unknown): Promise<NodeView> {
-    const parsed = parseNodeChanges(body);
+    const node = await this.nodes.get(id);
+    if (!node) throw notFound();
+    const parsed = parseNodeChanges(body, node.type);
     if (!parsed.ok) throw invalid(parsed.message);
     const updated = await this.nodes.update(id, parsed.value);
     if (!updated) throw notFound();

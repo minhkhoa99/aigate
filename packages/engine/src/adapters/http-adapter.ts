@@ -19,7 +19,7 @@ const API_KEY = /^[\x21-\x7e]{1,4096}$/;
 export const count = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0);
 
 // By status and the upstream code only, never by message text.
-function classifyStatus(status: number, upstreamCode: string | undefined): ErrorCode {
+export function classifyStatus(status: number, upstreamCode: string | undefined): ErrorCode {
   if (status === 401 || status === 403) return "AUTH_ERROR";
   if (status === 402 || (status === 429 && upstreamCode === "insufficient_quota")) return "QUOTA_EXHAUSTED";
   if (status === 429) return "RATE_LIMIT";
@@ -55,6 +55,8 @@ export abstract class HttpProviderAdapter {
     }
     const { header, scheme } = this.provider.auth;
     const headers = { ...this.provider.headers, [header]: scheme === "bearer" ? `Bearer ${credential.apiKey}` : credential.apiKey };
+    // connection.anthropic-compatible-node: 9router also sends the key as Bearer to any gateway but api.anthropic.com.
+    if (this.provider.anthropicNode?.official === false) headers.authorization = `Bearer ${credential.apiKey}`;
     return { method, url, headers, timeoutMs };
   }
 

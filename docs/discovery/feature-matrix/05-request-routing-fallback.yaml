@@ -1497,3 +1497,56 @@
   newModule: routing
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+
+# 2026-09-26 SP14b: stream-only providers answering a non-streaming client.
+- id: routing.forced-stream-json-collapse
+  group: Request routing
+  feature: Request routing
+  subFeature: "A forceStream provider in the chat completions format answering a client that did not ask to stream: the SSE body is collapsed into one chat.completion"
+  trigger: "clientRequestedStreaming is false and PROVIDERS[provider].forceStream is true (codebuddy-cn, codebuddy-intl, api-airforce among the API-key providers)"
+  input: "The upstream SSE response to a stream:true request"
+  output: "One chat.completion JSON body, or an error result"
+  businessRules:
+    - "The upstream call always streams for a forceStream provider"
+    - "Only a 2xx response whose content-type contains text/event-stream is collapsed; any other content-type falls through to the plain non-streaming JSON handler"
+    - "The body is read whole as text; each line starting with data: is JSON-parsed after trimming, empty payloads and [DONE] are skipped, and lines that fail to parse are skipped silently"
+    - "A chunk with an error field is not content: the last such error wins and the whole answer becomes an error with the upstream error.status when it is an integer 400..599 (else 502) and error.message (else Upstream SSE stream failed)"
+    - "No content chunk at all is a 502 Invalid SSE response for non-streaming request"
+    - "id, created, and model come from the first chunk (model falls back to the requested one); delta.content and delta.reasoning_content are concatenated; tool calls are merged by index (id replaced, name and arguments concatenated) and sorted by index"
+    - "finish_reason is the last non-empty one, stop when none came, so a stream cut off before its finish_reason or [DONE] is returned as a complete answer"
+    - "usage is the last usage object seen and is re-attached to the body"
+    - "reasoning_content is deleted when content is non-empty (it is kept only when content is empty)"
+  state: { reads: ["PROVIDERS[provider].forceStream"], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.stream-mode-decision", "routing.response-mode-dispatch"]
+  providerInteraction: "POST chat completions with stream:true"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "no parsable content chunk, or an error chunk without a 4xx/5xx status", partial: false }
+    - { code: RATE_LIMIT, when: "an error chunk carrying status 429 (any 400..599 status is kept)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["The whole SSE body is buffered in memory with no size limit before parsing"]
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "An answer that thinks and then speaks reaches a non-streaming client without its reasoning, while the same answer streamed keeps it"
+    - "A connection drop mid-answer yields 200 with a truncated message and finish_reason stop"
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 133, note: "providerRequiresStreaming from forceStream; upstream stream forced true" }
+    - { file: open-sse/handlers/chatCore.js, line: 497, note: "forced SSE to JSON branch when the client did not ask to stream" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 185, note: "only text/event-stream is collapsed; otherwise null falls through" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 294, note: "providerResponse.text() reads the whole body" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 113, note: "parseSSEToOpenAIResponse" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 124, note: "error chunk captured, malformed lines ignored at 126" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 136, note: "finish_reason defaults to stop" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 148, note: "tool calls merged by index" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 296, note: "no chunks: 502 Invalid SSE response for non-streaming request" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 302, note: "error status 400..599 kept, else 502" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 345, note: "reasoning_content deleted when content is non-empty" }
+    - { file: open-sse/providers/registry/api-airforce.js, line: 32, note: "forceStream true" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "The collapsed answer carries what the stream carried (reasoning too), a stream that stops early is an error as on the streaming path, a malformed event is reported, and the buffer is bounded"
+    actual: "reasoning_content is dropped when there is content, a cut-off stream is a complete 200 with finish_reason stop, malformed lines vanish, and the body is buffered without limit"
+    impact: "Non-streaming clients silently lose reasoning and receive truncated answers as finished ones"

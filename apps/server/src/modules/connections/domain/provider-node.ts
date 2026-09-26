@@ -5,17 +5,25 @@ export const MAX_NODES = 100;
 const MAX_NAME = 64;
 const MAX_URL = 2048;
 const MAX_PREFIX = 200;
-// The 9router default when a custom provider names no base URL (user decision 2026-09-26: keep 9router behavior).
-export const DEFAULT_BASE_URL = "https://api.openai.com/v1";
+export const NODE_TYPES = ["openai-compatible", "anthropic-compatible"] as const;
+export type NodeType = (typeof NODE_TYPES)[number];
+// The 9router defaults when a custom provider names no base URL (user decisions 2026-09-26: keep 9router behavior).
+export const DEFAULT_BASE_URLS: Readonly<Record<NodeType, string>> = {
+  "openai-compatible": "https://api.openai.com/v1",
+  "anthropic-compatible": "https://api.anthropic.com/v1",
+};
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 export interface NodeFields {
+  type: NodeType;
   name: string;
   prefix: string;
   baseUrl: string;
 }
+export type NodeChanges = Partial<Omit<NodeFields, "type">>;
 
 const fail = (message: string): { ok: false; message: string } => ({ ok: false, message });
+const isNodeType = (value: unknown): value is NodeType => NODE_TYPES.some((type) => type === value);
 
 function parseName(value: unknown): Parsed<string> {
   const name = typeof value === "string" ? value.trim() : "";
@@ -48,32 +56,51 @@ export function parseBaseUrl(value: unknown): Parsed<string> {
   return { ok: true, value: base };
 }
 
+// connection.anthropic-compatible-node: one trailing "/" and then a pasted "/messages" are removed, on create and update.
+function stored(type: NodeType, base: string): string {
+  if (type !== "anthropic-compatible") return base;
+  const trimmed = base.replace(/\/$/, "");
+  return trimmed.endsWith("/messages") ? trimmed.slice(0, -"/messages".length) : trimmed;
+}
+
 function asBody(input: unknown): Parsed<Record<string, unknown>> {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return fail("Body must be a JSON object");
   const body = Object.fromEntries(Object.entries(input));
-  const unknown = Object.keys(body).find((key) => key !== "name" && key !== "prefix" && key !== "baseUrl");
+  const unknown = Object.keys(body).find((key) => !["type", "name", "prefix", "baseUrl"].includes(key));
   return unknown === undefined ? { ok: true, value: body } : fail(`${unknown} is not a field of a custom provider`);
 }
 
-export function parseNodeChanges(input: unknown): Parsed<Partial<NodeFields>> {
-  const body = asBody(input);
-  if (!body.ok) return body;
-  const changes: Partial<NodeFields> = {};
+function parseFields(body: Record<string, unknown>, type: NodeType): Parsed<NodeChanges> {
+  const changes: NodeChanges = {};
   const parsers = { name: parseName, prefix: parsePrefix, baseUrl: parseBaseUrl } as const;
   for (const field of ["name", "prefix", "baseUrl"] as const) {
-    if (body.value[field] === undefined) continue;
-    const parsed = parsers[field](body.value[field]);
+    if (body[field] === undefined) continue;
+    const parsed = parsers[field](body[field]);
     if (!parsed.ok) return parsed;
-    changes[field] = parsed.value;
+    changes[field] = field === "baseUrl" ? stored(type, parsed.value) : parsed.value;
   }
-  return Object.keys(changes).length > 0 ? { ok: true, value: changes } : fail("Send at least one of name, prefix, baseUrl");
+  return { ok: true, value: changes };
+}
+
+// The type is fixed at creation (connection.provider-node-update-delete).
+export function parseNodeChanges(input: unknown, type: NodeType): Parsed<NodeChanges> {
+  const body = asBody(input);
+  if (!body.ok) return body;
+  if (body.value.type !== undefined) return fail("type cannot be changed; add a new custom provider instead");
+  const parsed = parseFields(body.value, type);
+  if (!parsed.ok) return parsed;
+  return Object.keys(parsed.value).length > 0 ? parsed : fail("Send at least one of name, prefix, baseUrl");
 }
 
 export function parseNewNode(input: unknown): Parsed<NodeFields> {
-  const parsed = parseNodeChanges(input);
+  const body = asBody(input);
+  if (!body.ok) return body;
+  const type = body.value.type ?? "openai-compatible";
+  if (!isNodeType(type)) return fail(`type must be ${NODE_TYPES.join(" or ")}`);
+  const parsed = parseFields(body.value, type);
   if (!parsed.ok) return parsed;
   const { name, prefix, baseUrl } = parsed.value;
-  if (name === undefined) return fail("name must be 1-64 characters");
+  if (name === undefined) return fail(`name must be 1-${MAX_NAME} characters`);
   if (prefix === undefined) return fail("prefix is required");
-  return { ok: true, value: { name, prefix, baseUrl: baseUrl ?? DEFAULT_BASE_URL } };
+  return { ok: true, value: { type, name, prefix, baseUrl: baseUrl ?? stored(type, DEFAULT_BASE_URLS[type]) } };
 }
