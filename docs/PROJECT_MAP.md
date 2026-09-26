@@ -60,6 +60,7 @@ Nguồn: `docs/superpowers/specs/2026-09-22-aigate-design.md` (spec — thắng 
 | **/providers/new → CustomProviderForm (create; ?id= edit); save → Add connection modal preselected** | — | — | — | — | — | — |
 | **/providers → Custom providers section (features/providers/custom.tsx): Connect, Edit, Delete** | — | — | — | — | — | — |
 | **Relay deploy wizard (3 steps)** | U9 | transport | proxy_pools | secret_field, state_error | — | happy_path_only, showcase_screens |
+| **Endpoint screen: OpenAI and Anthropic chips, Claude Code and Anthropic curl copy fields** | — | — | — | — | — | — |
 | **Endpoint & Keys — /gateway/endpoint** | U3 | apikeys | endpoint_apikey | copy_field, secret_field, status_pill | — | credential_scan_pass |
 | **LLM Providers — /providers, /:id, /new** | U4 | catalog, connections | providers | health_dot, density_rules | — | — |
 | **Login (/login)** | U2 | identity | — | warning_banner | — | sidebar_drift, showcase_screens |

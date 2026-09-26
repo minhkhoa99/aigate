@@ -35,9 +35,9 @@
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1790442658.9879844,
-    "ast_hash": "691bddc5ea1ea8bdb1d8e53be865d6e4",
-    "semantic_hash": "691bddc5ea1ea8bdb1d8e53be865d6e4"
+    "mtime": 1790448621.1072545,
+    "ast_hash": "fa36d30b11ad11c73e5ecb71d31ec941",
+    "semantic_hash": "fa36d30b11ad11c73e5ecb71d31ec941"
   },
   "docs/design/UI_HANDOFF.md": {
     "mtime": 1790304403.8708513,
@@ -60,9 +60,9 @@
     "semantic_hash": "04c0c50e7da7000a83ce1379183f0975"
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1790445428.1539948,
-    "ast_hash": "1b8c6dcc626ee772cad1aa0d778c7d15",
-    "semantic_hash": "1b8c6dcc626ee772cad1aa0d778c7d15"
+    "mtime": 1790463474.3897889,
+    "ast_hash": "42ed4bc0d51f0de81eccff20317ff5aa",
+    "semantic_hash": "42ed4bc0d51f0de81eccff20317ff5aa"
   },
   "docs/contracts/transport.md": {
     "mtime": 1790343138.4076855,
@@ -80,14 +80,14 @@
     "semantic_hash": "001cf6d92b0729fa6c849c78fb49fc8f"
   },
   "docs/contracts/connections.md": {
-    "mtime": 1790437371.020476,
-    "ast_hash": "e0e2ae7ba92d804c4015a24e818b7a0e",
-    "semantic_hash": "e0e2ae7ba92d804c4015a24e818b7a0e"
+    "mtime": 1790447542.9662611,
+    "ast_hash": "9c3a6eea81ff6e614336fc09ea916ab0",
+    "semantic_hash": "9c3a6eea81ff6e614336fc09ea916ab0"
   },
   "docs/contracts/chat-lane.md": {
-    "mtime": 1790366902.483582,
-    "ast_hash": "24ab5b8eb0b51c0102e435c6bfd23271",
-    "semantic_hash": "24ab5b8eb0b51c0102e435c6bfd23271"
+    "mtime": 1790448621.1067452,
+    "ast_hash": "ecf5f6fee745dbf400134a1ea6881097",
+    "semantic_hash": "ecf5f6fee745dbf400134a1ea6881097"
   },
   "docs/contracts/parity.md": {
     "mtime": 1790361488.8968892,
@@ -105,9 +105,9 @@
     "semantic_hash": "332ce6cc4a7f57658f5351c637d94611"
   },
   "docs/contracts/custom-providers.md": {
-    "mtime": 1790411715.755863,
-    "ast_hash": "442575527c98bde423a336ea7aca197c",
-    "semantic_hash": "442575527c98bde423a336ea7aca197c"
+    "mtime": 1790447542.9772687,
+    "ast_hash": "9a8a9fb3c5e5dd190393951389c133d3",
+    "semantic_hash": "9a8a9fb3c5e5dd190393951389c133d3"
   },
   "docs/contracts/provider-anthropic.md": {
     "mtime": 1790398651.8124115,
@@ -148,5 +148,10 @@
     "mtime": 1790442599.426833,
     "ast_hash": "1187960f9ef1d586205ddb5698b222d6",
     "semantic_hash": "1187960f9ef1d586205ddb5698b222d6"
+  },
+  "docs/contracts/protocol-anthropic.md": {
+    "mtime": 1790448550.137679,
+    "ast_hash": "f516c5d6a59bdf272bd1c32dbaa06181",
+    "semantic_hash": "f516c5d6a59bdf272bd1c32dbaa06181"
   }
 }

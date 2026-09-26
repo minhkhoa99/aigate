@@ -1,0 +1,392 @@
+{
+  "nodes": [
+    {
+      "id": "protocol_anthropic_contract",
+      "label": "Anthropic Messages client protocol contract (M2 SP15)",
+      "file_type": "document",
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": "/v1/messages and count_tokens. User decision 2026-09-27: keep 9router errors, stream default, non-stream shape, claude→openai request rules; correct usage, live tool arguments, signature_delta."
+    },
+    {
+      "id": "sp_sp15",
+      "label": "SP15 — Anthropic Messages client protocol (/v1/messages, count_tokens)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "sp_sp15b",
+      "label": "SP15b — OpenAI Responses client protocol (/v1/responses), then SP15c Gemini (/v1beta)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next"
+    },
+    {
+      "id": "decision_sp15",
+      "label": "User decision 2026-09-27: SP15 Anthropic first; OpenAI-shaped errors and 9router non-stream/stream-default kept; real usage, live tool args, signature_delta corrected",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "11_translation_i18n_translator_claude_client_request",
+      "label": "translator.claude-client-request",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "11_translation_i18n_translator_openai_to_claude_client_response",
+      "label": "translator.openai-to-claude-client-response",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "05_request_routing_fallback_routing_count_tokens_estimate",
+      "label": "routing.count-tokens-estimate",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/05-request-routing-fallback.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "anthropic_messages_protocol",
+      "label": "protocols/anthropic-messages.ts — parse to CIP, anthropicRequestFor (passthrough for Anthropic, claude→openai rules otherwise), message, SSE encoder, count_tokens",
+      "file_type": "document",
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "client_protocol_lane",
+      "label": "Chat lane client protocol object (parse, prepare, respond, encoder) shared by /v1/chat/completions and /v1/messages",
+      "file_type": "document",
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "screen_endpoint_anthropic",
+      "label": "Endpoint screen: OpenAI and Anthropic chips, Claude Code and Anthropic curl copy fields",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired"
+    },
+    {
+      "id": "sp15_tests",
+      "label": "SP15 tests: engine anthropic-protocol.test.mjs (7), server messages-lane.test.mjs; 52 mutations, 1 equivalent",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "api_ui_map_row_sp15",
+      "label": "API_UI_MAP row: SP15 Anthropic Messages client protocol",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    }
+  ],
+  "edges": [
+    {
+      "source": "sp_sp14h",
+      "target": "sp_sp15",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp15",
+      "target": "sp_sp15b",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp15",
+      "target": "protocol_anthropic_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp15",
+      "target": "decision_sp15",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp15",
+      "target": "11_translation_i18n_translator_claude_client_request",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp15",
+      "target": "11_translation_i18n_translator_openai_to_claude_client_response",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp15",
+      "target": "05_request_routing_fallback_routing_count_tokens_estimate",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_anthropic_contract",
+      "target": "anthropic_messages_protocol",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_anthropic_contract",
+      "target": "client_protocol_lane",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "anthropic_messages_protocol",
+      "target": "concept_cip",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "anthropic_messages_protocol",
+      "target": "protocol_stream_encoder",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "anthropic_messages_protocol",
+      "target": "anthropic_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "anthropic_messages_protocol",
+      "target": "11_translation_i18n_translator_claude_client_request",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "anthropic_messages_protocol",
+      "target": "11_translation_i18n_translator_openai_to_claude_client_response",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "anthropic_messages_protocol",
+      "target": "05_request_routing_fallback_routing_count_tokens_estimate",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "client_protocol_lane",
+      "target": "chat_lane_service",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "chat_lane_contract",
+      "target": "client_protocol_lane",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/chat-lane.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "client_protocol_lane",
+      "target": "05_request_routing_fallback_routing_lane_entry_routes",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-anthropic.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "screen_endpoint_keys",
+      "target": "screen_endpoint_anthropic",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp15_tests",
+      "target": "anthropic_messages_protocol",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp15",
+      "target": "sp15_tests",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_doc",
+      "target": "api_ui_map_row_sp15",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp15",
+      "target": "screen_endpoint_anthropic",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp15",
+      "target": "api_ui_map_row_sp15",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    }
+  ],
+  "hyperedges": []
+}
