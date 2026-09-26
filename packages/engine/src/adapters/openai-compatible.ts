@@ -1,6 +1,6 @@
 import { UnsupportedFeatureError, type CanonicalRequest, type CanonicalResponse, type ContentPart, type MediaSource, type StopReason, type StreamChunk, type TokenUsage } from "../cip.js";
 import { EngineError } from "../errors.js";
-import { readBoundedText } from "../http.js";
+import { DEFAULT_MAX_BODY_BYTES, readBoundedText } from "../http.js";
 import { isRecord, list, parseJson, record, text, type Json } from "../json.js";
 import type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, ListedModel } from "../ports.js";
 import { MODEL_ID } from "../registry.js";
@@ -166,8 +166,9 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
   async execute(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): Promise<CanonicalResponse> {
     const streamOnly = this.provider.streamOnly === true;
     const response = await this.send(this.chat(request, credential, streamOnly), credential, ctx, RETRY.maxAttempts);
-    // ponytail: the 4 MiB cap of every JSON answer bounds the collapsed stream too (9router buffers without a limit).
-    const raw = await readBoundedText(response.body);
+    // routing.forced-stream-json-collapse: 9router buffers a stream-only answer without a size limit (user decision
+    // 2026-09-26); only the transport deadline bounds it. Every other JSON answer keeps the 4 MiB cap.
+    const raw = await readBoundedText(response.body, streamOnly ? Number.MAX_SAFE_INTEGER : DEFAULT_MAX_BODY_BYTES);
     if (streamOnly && (response.headers["content-type"] ?? "").includes("text/event-stream")) return this.collapse(raw, request, credential);
     const root = parseJson(raw);
     const choice = record(list(record(root).choices)[0]);

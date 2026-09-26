@@ -12,7 +12,7 @@ Scope: the catalog providers that refuse non-streaming chat (9router `transport.
 |---|---|---|
 | `routing.forced-stream-json-collapse` | `REFERENCE_BEHAVIOR` | A non-streaming client of a stream-only provider gets one `chat.completion`. |
 | same: reasoning dropped when there is content, a cut-off stream answered as complete, malformed lines skipped | `SUSPECTED_BUG`, kept by decision | Kept (see "Collapse"). |
-| same: unbounded buffering | `SUSPECTED_BUG` | Bounded at 4 MiB, the cap of every JSON answer (`DEFAULT_MAX_BODY_BYTES`); a larger stream is `PROVIDER_UNAVAILABLE`. |
+| same: unbounded buffering | `SUSPECTED_BUG`, kept by decision (2026-09-26, second ask) | The stream-only answer is read without a size limit; only the transport deadline (600 s) bounds it. Every other JSON answer keeps the 4 MiB cap. |
 | `provider.codebuddy-request-quirks` | `REFERENCE_BEHAVIOR` | `reasoning_summary: "auto"` with any effort; effort `none`/`off` removed. |
 | same: codebuddy-cn system prompt rewrite | `SUSPECTED_BUG`, kept by decision | Kept (see "CodeBuddy"). |
 
@@ -23,7 +23,7 @@ Scope: the catalog providers that refuse non-streaming chat (9router `transport.
 ## Upstream call
 
 - A **streaming** client: unchanged (`provider-openai.md` "Stream"; a cut-off stream is an error there).
-- A **non-streaming** client of a stream-only provider: `execute()` posts `stream: true` with `stream_options.include_usage` and `accept: text/event-stream`, reads the body (at most 4 MiB), and:
+- A **non-streaming** client of a stream-only provider: `execute()` posts `stream: true` with `stream_options.include_usage` and `accept: text/event-stream`, reads the whole body with no size limit (9router), and:
   - if the answer's content-type contains `text/event-stream`, collapses it (below);
   - otherwise reads it as a normal chat-completions JSON answer (9router falls through to its JSON handler the same way).
 - Retries, timeouts, and HTTP error classification are the adapter's (`provider-openai.md`).

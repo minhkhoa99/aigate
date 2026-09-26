@@ -366,6 +366,14 @@ test("a collapsed stream fails on an error event (keeping a 4xx/5xx status) or o
   await assert.rejects(run(sse(["[DONE]"])), isCode("PROVIDER_UNAVAILABLE", (e) => /without data/.test(e.message)));
 });
 
+test("a collapsed stream has no size limit, as in 9router, while a plain JSON answer keeps the 4 MiB cap", async () => {
+  const big = "x".repeat(5 * 1024 * 1024);
+  const collapsed = await new OpenAICompatibleAdapter(airforce, fakeTransport(sse([chunk({ content: big })], 1 << 20))).execute(hello, credential, ctx());
+  assert.equal(collapsed.content[0].text.length, big.length);
+  await assert.rejects(new OpenAICompatibleAdapter(openai, fakeTransport(json(200, { ...ok, filler: big }))).execute(hello, credential, ctx()),
+    isCode("PROVIDER_UNAVAILABLE", (e) => /exceeded/.test(e.message)));
+});
+
 test("a stream-only provider that answers JSON anyway is read as JSON", async () => {
   const response = await new OpenAICompatibleAdapter(airforce, fakeTransport(json(200, ok))).execute(hello, credential, ctx());
   assert.deepEqual(response.content, [{ type: "text", text: "hi" }]);
