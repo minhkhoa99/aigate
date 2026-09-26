@@ -35,9 +35,9 @@
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1790411755.6708496,
-    "ast_hash": "86352197e0bfd7b33fba2739658df1c8",
-    "semantic_hash": "86352197e0bfd7b33fba2739658df1c8"
+    "mtime": 1790417014.4744318,
+    "ast_hash": "f15cfb32742ac6ffb70185749e540ad5",
+    "semantic_hash": "f15cfb32742ac6ffb70185749e540ad5"
   },
   "docs/design/UI_HANDOFF.md": {
     "mtime": 1790304403.8708513,
@@ -60,9 +60,9 @@
     "semantic_hash": "04c0c50e7da7000a83ce1379183f0975"
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1790412167.7085328,
-    "ast_hash": "230040d037d08a8f814e921b7558c729",
-    "semantic_hash": "230040d037d08a8f814e921b7558c729"
+    "mtime": 1790417420.9558723,
+    "ast_hash": "0007a43af29dde22a563574cf6fb356e",
+    "semantic_hash": "0007a43af29dde22a563574cf6fb356e"
   },
   "docs/contracts/transport.md": {
     "mtime": 1790343138.4076855,
@@ -80,9 +80,9 @@
     "semantic_hash": "001cf6d92b0729fa6c849c78fb49fc8f"
   },
   "docs/contracts/connections.md": {
-    "mtime": 1790366902.483582,
-    "ast_hash": "6d2262bc6de36994014ddb5f94d4ecdb",
-    "semantic_hash": "6d2262bc6de36994014ddb5f94d4ecdb"
+    "mtime": 1790416973.3836544,
+    "ast_hash": "9f49886979c33de79b5aed3ee0c4834a",
+    "semantic_hash": "9f49886979c33de79b5aed3ee0c4834a"
   },
   "docs/contracts/chat-lane.md": {
     "mtime": 1790366902.483582,
@@ -100,9 +100,9 @@
     "semantic_hash": "7dbf0ce39fc9eecb48ba8b829f40b777"
   },
   "docs/contracts/catalog-providers.md": {
-    "mtime": 1790411727.7354276,
-    "ast_hash": "45e95dc6ec43b896206fa25bde21ed7b",
-    "semantic_hash": "45e95dc6ec43b896206fa25bde21ed7b"
+    "mtime": 1790416985.9137874,
+    "ast_hash": "0b385950b3961be0625526341428b153",
+    "semantic_hash": "0b385950b3961be0625526341428b153"
   },
   "docs/contracts/custom-providers.md": {
     "mtime": 1790411715.755863,
@@ -123,5 +123,10 @@
     "mtime": 1790411684.8212306,
     "ast_hash": "65304000279fa29ae93cab61d547a7fd",
     "semantic_hash": "65304000279fa29ae93cab61d547a7fd"
+  },
+  "docs/contracts/provider-ollama.md": {
+    "mtime": 1790416955.6250374,
+    "ast_hash": "40089f80e09fba4d3499e5c4626928d9",
+    "semantic_hash": "40089f80e09fba4d3499e5c4626928d9"
   }
 }

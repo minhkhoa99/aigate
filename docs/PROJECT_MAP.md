@@ -53,6 +53,7 @@ Nguồn: `docs/superpowers/specs/2026-09-22-aigate-design.md` (spec — thắng 
 | **CLI Tool detail (/integrations/cli-tools/:toolId)** | U10 | tooling | cli_tools | copy_field | — | — |
 | **CLI Tools — /integrations/cli-tools, /:toolId** | U10 | tooling | cli_tools | — | — | — |
 | **Connections & AuthFlow — /providers/connections** | U4 | connections | provider_account_management, provider_authentication, multi_account | status_pill | llm_providers | happy_path_only |
+| **Connections: Host field and optional key for Ollama Local; row shows host, no key, Edit** | — | — | — | — | — | — |
 | **Console — /traffic/console (dev only)** | U11 | tooling | console_log | color_tokens, type_scale | — | console_visibility |
 | **/providers/new → CustomProviderForm (create; ?id= edit); save → Add connection modal preselected** | — | — | — | — | — | — |
 | **/providers → Custom providers section (features/providers/custom.tsx): Connect, Edit, Delete** | — | — | — | — | — | — |
