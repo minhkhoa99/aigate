@@ -1,6 +1,7 @@
 import type { AIProviderPort, HttpTransportPort } from "../ports.js";
 import type { ProviderDescriptor } from "../registry.js";
 import { AnthropicAdapter } from "./anthropic.js";
+import { CommandCodeAdapter } from "./commandcode.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
 import { GeminiAdapter } from "./gemini.js";
 import { OllamaAdapter } from "./ollama.js";
@@ -15,6 +16,7 @@ export function createAdapter(provider: ProviderDescriptor, transport: HttpTrans
     case "ollama": return new OllamaAdapter(provider, transport);
     case "gemini": return new GeminiAdapter(provider, transport);
     case "vertex": return new VertexAdapter(provider, transport);
+    case "commandcode": return new CommandCodeAdapter(provider, transport);
     // vertex-partner: the OpenAI chat protocol with Google Cloud credentials (routing.vertex-endpoints).
     default: return provider.auth.googleCloud ? new VertexPartnerAdapter(provider, transport) : new OpenAICompatibleAdapter(provider, transport);
   }

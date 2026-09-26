@@ -1,12 +1,12 @@
 # Discovery coverage
 
-Entries: 309
+Entries: 312
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
 | routes | 166/166 |  |
 | pages | 5/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +15 |
-| providers | 20/124 | alicode, alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu … +96 |
+| providers | 21/124 | alicode, alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu … +95 |
 | executors | 15/31 | devin-cli, gemini-cli, github, grok-cli, grok-web, iflow, kimchi, mimo-free … +8 |
 | translators | 44/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js |
 | repos | 11/11 |  |
@@ -16,10 +16,10 @@ Entries: 309
 
 - apikeys: 9
 - catalog: 29
-- connections: 54
+- connections: 55
 - identity: 11
 - media: 15
-- routing: 99
+- routing: 101
 - settings: 10
 - tooling: 45
 - transport: 14
@@ -27,9 +27,9 @@ Entries: 309
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 15
-- REFERENCE_BEHAVIOR: 262
-- SUSPECTED_BUG: 56
+- IMPLEMENTATION_ACCIDENT: 16
+- REFERENCE_BEHAVIOR: 265
+- SUSPECTED_BUG: 59
 
 ## Missing — pages
 
@@ -80,7 +80,6 @@ Entries: 309
 - codebuddy-intl
 - cohere
 - comfyui
-- commandcode
 - coqui
 - cursor
 - deepgram

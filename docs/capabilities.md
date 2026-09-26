@@ -1999,6 +1999,19 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Streaming:** yes
 - **Errors:** `AUTH_ERROR` (the test answers 401/403/404)
 
+### commandcode: key validation and the connection Test button
+
+- **id:** `connection.commandcode-key-test` · **module:** `connections`
+- **Trigger:** POST /api/providers/validate; the connection Test button
+- **Input:** { provider: commandcode, apiKey }
+- **Output:** valid / invalid; the Test button stores testStatus
+- **Rules:**
+  - Validate POSTs the envelope for 'ping' with max_tokens 1 and the headers; valid unless the status is 401 or 403; the body is never read
+  - The Test button has no commandcode case: 'Provider test not supported', stored as testStatus error
+  - The model list is static (the registry)
+- **Errors:** `AUTH_ERROR` (the probe answers 401/403)
+- **AIGate required behavior:** The Test button checks the key, including an error event in a 200 answer
+
 ### ollama-local: an optional API key, a host per connection, and its connection test
 
 - **id:** `connection.ollama-local-host` · **module:** `connections`
@@ -3455,6 +3468,27 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Any part that is not text becomes an empty string, so images, audio and files are dropped without an error
 - **AIGate required behavior:** A part the endpoint cannot take is refused with a clear error
 
+### Command Code NDJSON AI SDK v5 events to OpenAI chunks, and the collapsed answer for non-streaming clients
+
+- **id:** `translator.commandcode-to-openai-response` · **module:** `routing`
+- **Trigger:** An answer from commandcode
+- **Input:** NDJSON lines: start, start-step, reasoning-*, text-*, tool-input-start/delta/end, tool-call, finish-step, finish, error
+- **Output:** OpenAI chat.completion.chunk events, or one chat.completion for a non-streaming client
+- **Rules:**
+  - Before the first content event (text-delta, reasoning-delta, tool-input-start, tool-call, finish, finish-step), an error event becomes an HTTP error { error: { message: [CommandCode error: <message>] } } with its statusCode/status, else a status guessed from the message (rate limit 429, unauthorized 401, billing 402, quota/forbidden 403, not found 404, else 503)
+  - text-delta (text or delta) → content; reasoning-delta (text only) → reasoning_content
+  - tool-input-start → a tool call (id from id, toolCallId, or a fallback) with empty arguments; tool-input-delta → arguments for a known id, dropped otherwise; tool-call → a whole call only when its id was not seen
+  - finish-step stores the mapped finish reason and its usage (the last one wins); finish emits the finish chunk with finish-step's reason, else its own, and usage from totalUsage or the stored usage
+  - Finish reasons: stop → stop, length → length, tool-calls/tool_use → tool_calls, content-filter → content_filter, error → stop, anything else passed through raw
+  - Usage: prompt = inputTokens, completion = outputTokens, total = totalTokens or the sum; cached and reasoning tokens dropped
+  - An error event after content throws; streaming clients get the fixed text 'upstream connection lost', non-streaming ones 'Failed to convert streaming response to JSON'
+  - A stream that ends without finish still ends: no finish reason for streaming clients, stop for non-streaming ones; tool-error and abort events are ignored
+  - Non-streaming clients (forceStream): the chunks are collapsed; zero chunks is 502 'Invalid SSE response'
+- **Streaming:** yes
+- **Errors:** `PROVIDER_UNAVAILABLE` (an error event after content (streaming: 'upstream connection lost'))
+- **AIGate required behavior:** Every line is read, [DONE] ends the stream, a mid-stream error keeps its message, a cut-off fails, error finishes fail, usage keeps cache and reasoning tokens
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
 ### Gemini SSE chunks and generateContent JSON to OpenAI chat completion chunks and body
 
 - **id:** `translator.gemini-to-openai-response` · **module:** `routing`
@@ -3509,6 +3543,26 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Client cache_control markers are stripped and 9router places its own (1h on the last system block and tool, 5m on the last assistant turn)
   - thinking is deleted silently when the last message is not from the user
 - **AIGate required behavior:** Every OpenAI field is either mapped (stop to stop_sequences, top_p, max_completion_tokens, tool_choice none to none) or refused with a clear error; the client's own system prompt and cache markers are kept, and requested reasoning is never removed silently
+
+### OpenAI chat completions request to a Command Code /alpha/generate envelope
+
+- **id:** `translator.openai-to-commandcode-request` · **module:** `routing`
+- **Trigger:** A chat request routed to commandcode
+- **Input:** An OpenAI chat completions body
+- **Output:** { threadId, memory, config, params, model, stream: true } with x-command-code-version, x-cli-environment, x-session-id headers
+- **Rules:**
+  - Envelope: threadId random UUID, memory "", config { workingDir: process.cwd(), date: YYYY-MM-DD, environment: process.platform, structure: [], isGitRepo: false, currentBranch/mainBranch/gitStatus: "", recentCommits: [] }, params, model (suffix stripped), stream: true
+  - params: model, messages, stream (always true upstream), max_tokens = max_tokens ?? max_output_tokens ?? 64000 (max_completion_tokens ignored), temperature ?? 0.3, system (string) when present, tools when present, top_p when set, reasoning_effort from the thinking level
+  - system messages (any position) are text-flattened and joined with two newlines into params.system; developer and every other role becomes a user message
+  - tool message → { role: tool, content: [{ type: tool-result, toolCallId, toolName: message.name or "", output: { type: text, value } }] }
+  - assistant → a reasoning block (reasoning text, or " " when there are tool calls), a text block, then tool-call blocks { toolCallId, toolName, input: parsed arguments, {} when they do not parse }
+  - user content → text blocks and data-URI images { type: image, image, mimeType, mediaType }; other parts without text are dropped; remote image URLs are fetched server-side first and dropped when the fetch fails
+  - tools → { name, description, input_schema: parameters or { type: object } }; strict and non-function tools dropped
+  - tool_choice, stop, response_format, n, seed, penalties, logprobs, user, parallel_tool_calls are dropped silently
+  - Thinking: reasoning_effort = the level (budget mapped to a level, auto kept); none deletes the field
+  - Headers: Content-Type application/json, x-command-code-version 0.25.7, x-cli-environment cli, x-session-id random UUID per attempt, Authorization Bearer <key>, Accept text/event-stream
+- **Streaming:** yes
+- **AIGate required behavior:** Fields the envelope cannot carry are refused, max_completion_tokens is honored, developer stays system, tool names and bad arguments are not invented
 
 ### OpenAI chat completions request to a Gemini generateContent request (openaiToGeminiBase), thinking config, and the tool-schema cleaner
 
@@ -4060,6 +4114,7 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `routing.vertex-endpoints` | A token request reaches every catalog model, including the global-only Gemini 3 previews | The token path defaults to locations/us-central1 on the global host, with no way to change it | Gemini 3 preview models may answer 404 for service-account connections |
 | `connection.azure-openai-deployment` | A wrong deployment (404) or api-version (400) fails the test, Organization is optional, and a missing endpoint is refused | Only 401/403 fail, the form forces an Organization that is then sent on every request, and a missing endpoint sends the key to api.openai.com | Broken connections look healthy, and an Azure key can leak to another vendor |
 | `provider.clinepass-headers-envelope` | The Test button checks the key | It always fails with 'Provider test not supported', and validate's GET /models passes any key | Working ClinePass connections look broken, and wrong keys look valid when added |
+| `connection.commandcode-key-test` | The Test button checks the key, including an error event in a 200 answer | Test always fails; validate passes an in-band error | Working connections look broken and some bad keys look valid |
 | `account.concurrent-refresh-race` | Two concurrent requests hitting an expired/rejected token on the same connection should converge on one valid refreshed token — either serialized so the second reuses the first's fresh token, or each refresh is independently idempotent regardless of which refreshToken value it started from | No per-connection lock exists around either the proactive (checkAndRefreshToken) or reactive (chatCore.js 401/403) refresh call; each concurrent request refreshes using its own in-memory refreshToken snapshot with no coordination with other in-flight requests for the same connection | For providers with single-use rotating refresh tokens (the code names xAI and grok-cli explicitly), a burst of concurrent requests around token-expiry time causes all but the first refresh to fail with invalid_grant, which can further trigger markAccountUnavailable and lock the connection out even though it was just successfully refreshed by a sibling request |
 | `catalog.alias-disabled-model-bypass` | A model marked disabled in the dashboard should be rejected if a request targets it — directly or via an alias — mirroring how it disappears from every model-listing endpoint ("disable" implies block, not just hide) | The chat/routing path never reads the disabledModels table at all; only the discovery endpoints (/api/models, /v1/models) filter by it, so a disabled model keeps working for any client that already knows its id, or that reaches it through an alias or combo | The 'disable' control only removes discoverability, not access — a compliance or cost-control use case ('stop routing to this expensive/broken model') is not actually enforced, silently, with no error surfaced to the operator who disabled it |
 | `catalog.alias-dual-convention-collision` | Both endpoints described as setting 'the alias for a model' should write the same KV shape so a value set through either surface is visible to the other, and to actual chat routing | The two routes call the same setModelAlias(alias, model) primitive with swapped argument order, so /api/models/alias produces routable aliases (key=alias) while /api/models produces display-only rows (key=modelId) in the same table — each is invisible to the other's reader | An alias set via the main /api/models list page's inline rename never actually works as a callable alias in a chat request (resolveModelAliasFromMap won't find it), while a routable alias created via the dedicated alias-management endpoint never appears as that model's display label in the main list — two silently disconnected features sharing one KV namespace |
@@ -4099,6 +4154,8 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `translator.gemini-to-openai-response` | Errors and blocked prompts are reported, a cut-off stream fails, both paths share one finish table and one usage count, and generated images use one form | They are dropped, cut-offs look complete, the non-stream path reports raw reasons and counts thoughts as prompt tokens, and images come as a non-standard field or markdown | Clients misread failures and token spend, and handle the same answer differently by stream mode |
 | `translator.openai-to-vertex-request` | Only a borrowed signature is replaced; a real one from the cache is sent back unchanged | Every thoughtSignature is overwritten with the Vertex constant | Multi-turn tool calls on Gemini 3 via Vertex may be refused or lose their thinking context |
 | `translator.cloudflare-content-flatten` | A part the endpoint cannot take is refused with a clear error | Images, audio and files are silently replaced by empty strings | Vision requests get answers about text the user did not send alone |
+| `translator.openai-to-commandcode-request` | Fields the envelope cannot carry are refused, max_completion_tokens is honored, developer stays system, tool names and bad arguments are not invented | They are dropped, 64000 and 0.3 are sent instead, developer becomes user, toolName is empty, bad arguments become {} | Silent loss of client controls and instructions |
+| `translator.commandcode-to-openai-response` | Every line is read, [DONE] ends the stream, a mid-stream error keeps its message, a cut-off fails, error finishes fail, usage keeps cache and reasoning tokens | Lines can be lost, [DONE] is missing, the error text is replaced, cut-offs and error finishes look complete, usage details are dropped | Truncated answers and failures reported as success |
 | `clitools.write-not-atomic` | Given every one of these writes targets the user's own IDE/CLI configuration file (not 9router's own data), and one of the affected routes' own comment explicitly promises 'Backup old fields and write new settings', a crash mid-write should not be able to corrupt or truncate that file — either via a temp-file-then-rename swap (the exact pattern already implemented in this codebase at src/lib/mitmAliasCache.js:15-21 for 9router's own alias cache) or an actual on-disk backup copy. | All 13 write-capable cli-tools routes call fs.writeFile(path, content) directly on the final path with no temp file, no rename, and no backup copy anywhere on disk. The 'backup' language in the claude-settings POST comment refers only to merging the previously-read JSON object in memory before the single overwrite call — nothing is preserved outside process memory. | A crash, OOM kill, disk-full error, or power loss during any of these writes can truncate or corrupt the user's real tool config (e.g. ~/.claude/settings.json, ~/.codex/config.toml, ~/.openclaw/openclaw.json). Because every route's read path treats an unparseable file as simply 'no config', the damage is silent: the next status check reports the tool as unconfigured, and the next Apply starts from empty, permanently discarding whatever unrelated settings that file held before 9router wrote to it. |
 | `clitools.copilot-settings-array-upsert` | Like every other cli-tools GET handler (claude, codex, cline, droid, kilo, etc.), Copilot's GET should reflect a real detection check — a `where`/`which` lookup or a marker-file probe — before reporting installed: true, so the dashboard only shows Copilot as available on a machine that actually has it. | copilot-settings/route.js's GET performs no detection at all: it reads chatLanguageModels.json (which may not exist, in which case config is null) and always returns installed: true regardless. | The dashboard's Copilot integration card (and any 'all installed tools' summary the UI derives from installed flags) will show Copilot as installed on any machine, even one with no VS Code and no Copilot extension, inviting the user to Apply — which just writes a file nobody will ever read. |
 | `clitools.deepseek-tui-full-overwrite` | Like every other tool's Apply/Reset in this set (codex, droid, opencode, openclaw, grok-build, hermes, jcode, kilo, cline, cowork all read-merge-write or perform a targeted key removal), DeepSeek TUI's POST should merge 9router's fields into whatever config.toml already contains, and DELETE should remove only what 9router added — preserving any other DeepSeek TUI settings the user configured. | Both POST and DELETE build a fixed, hand-written TOML string from scratch and write it directly, completely replacing the file's prior contents regardless of what else was in it (POST never even calls the file's own readConfigToml() result; DELETE writes a hardcoded 2-line default). | The first time a user clicks Apply or Reset for DeepSeek TUI in the 9router dashboard, any other settings they had configured directly in ~/.deepseek/config.toml (other providers, TUI preferences, anything not related to 9router) are silently and irrecoverably destroyed. |

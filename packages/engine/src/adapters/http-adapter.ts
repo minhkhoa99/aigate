@@ -31,7 +31,7 @@ export function classifyStatus(status: number, upstreamCode: string | undefined)
 
 // Retry only what a second try can fix: 502/503/504, or a transport failure with no status.
 // A redirect carries a 3xx status and a timeout has its own code, so neither is retried.
-function isTransient(error: unknown): boolean {
+export function isTransient(error: unknown): boolean {
   if (!(error instanceof EngineError) || error.code !== "PROVIDER_UNAVAILABLE") return false;
   const status = error.details.status;
   return status === undefined || (typeof status === "number" && RETRY_STATUSES.has(status));

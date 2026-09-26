@@ -1245,3 +1245,99 @@
     expected: "A part the endpoint cannot take is refused with a clear error"
     actual: "Images, audio and files are silently replaced by empty strings"
     impact: "Vision requests get answers about text the user did not send alone"
+
+# 2026-09-27 SP14h: the commandcode family (Command Code /alpha/generate, NDJSON AI SDK v5 events).
+- id: translator.openai-to-commandcode-request
+  group: Translation
+  feature: Request translation
+  subFeature: "OpenAI chat completions request to a Command Code /alpha/generate envelope"
+  trigger: "A chat request routed to commandcode"
+  input: "An OpenAI chat completions body"
+  output: "{ threadId, memory, config, params, model, stream: true } with x-command-code-version, x-cli-environment, x-session-id headers"
+  businessRules:
+    - "Envelope: threadId random UUID, memory \"\", config { workingDir: process.cwd(), date: YYYY-MM-DD, environment: process.platform, structure: [], isGitRepo: false, currentBranch/mainBranch/gitStatus: \"\", recentCommits: [] }, params, model (suffix stripped), stream: true"
+    - "params: model, messages, stream (always true upstream), max_tokens = max_tokens ?? max_output_tokens ?? 64000 (max_completion_tokens ignored), temperature ?? 0.3, system (string) when present, tools when present, top_p when set, reasoning_effort from the thinking level"
+    - "system messages (any position) are text-flattened and joined with two newlines into params.system; developer and every other role becomes a user message"
+    - "tool message → { role: tool, content: [{ type: tool-result, toolCallId, toolName: message.name or \"\", output: { type: text, value } }] }"
+    - "assistant → a reasoning block (reasoning text, or \" \" when there are tool calls), a text block, then tool-call blocks { toolCallId, toolName, input: parsed arguments, {} when they do not parse }"
+    - "user content → text blocks and data-URI images { type: image, image, mimeType, mediaType }; other parts without text are dropped; remote image URLs are fetched server-side first and dropped when the fetch fails"
+    - "tools → { name, description, input_schema: parameters or { type: object } }; strict and non-function tools dropped"
+    - "tool_choice, stop, response_format, n, seed, penalties, logprobs, user, parallel_tool_calls are dropped silently"
+    - "Thinking: reasoning_effort = the level (budget mapped to a level, auto kept); none deletes the field"
+    - "Headers: Content-Type application/json, x-command-code-version 0.25.7, x-cli-environment cli, x-session-id random UUID per attempt, Authorization Bearer <key>, Accept text/event-stream"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["translator.commandcode-to-openai-response"]
+  providerInteraction: "POST https://api.commandcode.ai/alpha/generate"
+  fallback: { hasFallback: false, retry: "502/503/504 up to 3 attempts; an in-band 502/503/504 error before content up to 2 more", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["server-side fetch of client image URLs"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "config.workingDir sends the server directory upstream"
+  evidence:
+    - { file: open-sse/translator/request/openai-to-commandcode.js, line: 185, note: "envelope and params defaults" }
+    - { file: open-sse/translator/request/openai-to-commandcode.js, line: 106, note: "convertMessages" }
+    - { file: open-sse/translator/request/openai-to-commandcode.js, line: 163, note: "convertTools" }
+    - { file: open-sse/executors/commandcode.js, line: 28, note: "headers" }
+    - { file: open-sse/executors/commandcode.js, line: 42, note: "retry on in-band 502/503/504" }
+    - { file: open-sse/providers/registry/commandcode.js, line: 22, note: "baseUrl, format, forceStream, headers" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Fields the envelope cannot carry are refused, max_completion_tokens is honored, developer stays system, tool names and bad arguments are not invented"
+    actual: "They are dropped, 64000 and 0.3 are sent instead, developer becomes user, toolName is empty, bad arguments become {}"
+    impact: "Silent loss of client controls and instructions"
+
+- id: translator.commandcode-to-openai-response
+  group: Translation
+  feature: Response translation
+  subFeature: "Command Code NDJSON AI SDK v5 events to OpenAI chunks, and the collapsed answer for non-streaming clients"
+  trigger: "An answer from commandcode"
+  input: "NDJSON lines: start, start-step, reasoning-*, text-*, tool-input-start/delta/end, tool-call, finish-step, finish, error"
+  output: "OpenAI chat.completion.chunk events, or one chat.completion for a non-streaming client"
+  businessRules:
+    - "Before the first content event (text-delta, reasoning-delta, tool-input-start, tool-call, finish, finish-step), an error event becomes an HTTP error { error: { message: [CommandCode error: <message>] } } with its statusCode/status, else a status guessed from the message (rate limit 429, unauthorized 401, billing 402, quota/forbidden 403, not found 404, else 503)"
+    - "text-delta (text or delta) → content; reasoning-delta (text only) → reasoning_content"
+    - "tool-input-start → a tool call (id from id, toolCallId, or a fallback) with empty arguments; tool-input-delta → arguments for a known id, dropped otherwise; tool-call → a whole call only when its id was not seen"
+    - "finish-step stores the mapped finish reason and its usage (the last one wins); finish emits the finish chunk with finish-step's reason, else its own, and usage from totalUsage or the stored usage"
+    - "Finish reasons: stop → stop, length → length, tool-calls/tool_use → tool_calls, content-filter → content_filter, error → stop, anything else passed through raw"
+    - "Usage: prompt = inputTokens, completion = outputTokens, total = totalTokens or the sum; cached and reasoning tokens dropped"
+    - "An error event after content throws; streaming clients get the fixed text 'upstream connection lost', non-streaming ones 'Failed to convert streaming response to JSON'"
+    - "A stream that ends without finish still ends: no finish reason for streaming clients, stop for non-streaming ones; tool-error and abort events are ignored"
+    - "Non-streaming clients (forceStream): the chunks are collapsed; zero chunks is 502 'Invalid SSE response'"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["translator.openai-to-commandcode-request"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "an error event after content (streaming: 'upstream connection lost')", partial: true }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Lines after the first content event in the same network read are lost by the executor's peek"
+    - "OpenAI streaming clients never receive data: [DONE]"
+  evidence:
+    - { file: open-sse/executors/commandcode.js, line: 80, note: "parseCommandCodeError status guess" }
+    - { file: open-sse/executors/commandcode.js, line: 140, note: "peek until the first content event" }
+    - { file: open-sse/translator/response/commandcode-to-openai.js, line: 81, note: "event mapping" }
+    - { file: open-sse/translator/concerns/finishReason.js, line: 20, note: "commandcode finish mapping" }
+    - { file: open-sse/translator/concerns/usage.js, line: 57, note: "commandcode usage" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG, IMPLEMENTATION_ACCIDENT]
+  suspicion:
+    expected: "Every line is read, [DONE] ends the stream, a mid-stream error keeps its message, a cut-off fails, error finishes fail, usage keeps cache and reasoning tokens"
+    actual: "Lines can be lost, [DONE] is missing, the error text is replaced, cut-offs and error finishes look complete, usage details are dropped"
+    impact: "Truncated answers and failures reported as success"
+

@@ -2038,3 +2038,42 @@
     expected: "The Test button checks the key"
     actual: "It always fails with 'Provider test not supported', and validate's GET /models passes any key"
     impact: "Working ClinePass connections look broken, and wrong keys look valid when added"
+
+# 2026-09-27 SP14h: the commandcode connection test.
+- id: connection.commandcode-key-test
+  group: Providers
+  feature: Provider connections
+  subFeature: "commandcode: key validation and the connection Test button"
+  trigger: "POST /api/providers/validate; the connection Test button"
+  input: "{ provider: commandcode, apiKey }"
+  output: "valid / invalid; the Test button stores testStatus"
+  businessRules:
+    - "Validate POSTs the envelope for 'ping' with max_tokens 1 and the headers; valid unless the status is 401 or 403; the body is never read"
+    - "The Test button has no commandcode case: 'Provider test not supported', stored as testStatus error"
+    - "The model list is static (the registry)"
+  state:
+    reads: []
+    writes: ["providerConnections.testStatus"]
+    runtimeOnly: []
+  dependencies: ["translator.openai-to-commandcode-request"]
+  providerInteraction: "POST https://api.commandcode.ai/alpha/generate"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "the probe answers 401/403", partial: false }
+  sideEffects: []
+  persistence: ["testStatus on the connection"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Command Code reports some errors as a type:error event in an HTTP 200, which validate counts as valid"
+    - "Checked live 2026-09-27: a fake key gets HTTP 401 { success: false, error: { code: UNAUTHORIZED, status: 401, message } }"
+  evidence:
+    - { file: src/app/api/providers/validate/route.js, line: 413, note: "validate: valid unless 401/403" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 838, note: "Provider test not supported" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "The Test button checks the key, including an error event in a 200 answer"
+    actual: "Test always fails; validate passes an in-band error"
+    impact: "Working connections look broken and some bad keys look valid"

@@ -14,6 +14,8 @@ const PATHS: Readonly<Record<ProviderProtocol, { chat: RegExp; models: string }>
   // Gemini posts to <base>/<model>:generateContent; the base itself lists the models.
   gemini: { chat: /\/models$/, models: "/models" },
   // routing.vertex-endpoints: the catalog URL is the host; the adapter builds every path, and lists the catalog models.
+  // translator.openai-to-commandcode-request: POST <host>/alpha/generate; the model list is the catalog.
+  commandcode: { chat: /\/alpha\/generate$/, models: "/alpha/models" },
   vertex: { chat: /^https:\/\/aiplatform\.googleapis\.com$/, models: "https://aiplatform.googleapis.com/v1/publishers/google/models" },
 };
 // provider.vertex-google-auth: Google Cloud credentials; vertex-partner speaks OpenAI chat on a URL built from the project.

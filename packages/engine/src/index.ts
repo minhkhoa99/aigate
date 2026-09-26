@@ -13,6 +13,7 @@ export { GeminiAdapter } from "./adapters/gemini.js";
 export { cleanGeminiSchema } from "./adapters/gemini-schema.js";
 export { parseGoogleCredential, type GoogleCredential } from "./adapters/google-auth.js";
 export { VertexAdapter, VertexPartnerAdapter } from "./adapters/vertex.js";
+export { CommandCodeAdapter } from "./adapters/commandcode.js";
 export { createAdapter } from "./adapters/index.js";
 export * from "./protocols/openai-chat.js";
 export type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, HttpResponse, HttpTransportPort, ListedModel } from "./ports.js";

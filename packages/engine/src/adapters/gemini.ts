@@ -171,7 +171,8 @@ function intentOf(request: CanonicalRequest): Intent | undefined {
   return level === "auto" ? { mode: "auto" } : { mode: "level", level };
 }
 
-function budgetToLevel(budget: number): string | undefined {
+// 9router's budget-to-level table (translator/concerns/thinking.js), shared with the commandcode adapter.
+export function budgetToLevel(budget: number): string | undefined {
   if (budget <= 0) return undefined;
   if (budget <= 768) return "minimal";
   if (budget <= 4096) return "low";

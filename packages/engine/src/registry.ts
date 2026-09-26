@@ -66,7 +66,7 @@ export const CONNECTION_FIELDS = ["baseUrl", "deployment", "apiVersion", "organi
 export type ConnectionField = (typeof CONNECTION_FIELDS)[number];
 export type ConnectionData = Readonly<Partial<Record<ConnectionField, string | null>>>;
 
-export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic", "openai-responses", "ollama", "gemini", "vertex"] as const;
+export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic", "openai-responses", "ollama", "gemini", "vertex", "commandcode"] as const;
 export type ProviderProtocol = (typeof PROVIDER_PROTOCOLS)[number];
 
 // The descriptor a connection talks to. ollama-local: its own host, one trailing "/" removed (resolveOllamaLocalHost).

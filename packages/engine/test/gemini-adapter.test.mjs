@@ -44,7 +44,7 @@ const reply = (parts, extra = {}) => ({ responseId: "r1", modelVersion: "gemini-
 const sentBody = (transport, i = 0) => JSON.parse(transport.calls[i].body);
 
 test("gemini is connectable with x-goog-api-key at <base>/<model>:generateContent", async () => {
-  assert.equal(builtinRegistry.providers.length, 58);
+  assert.equal(builtinRegistry.providers.length, 59);
   assert.ok(createAdapter(gemini, fakeTransport()) instanceof GeminiAdapter);
   assert.deepEqual(gemini.auth, { kind: "api-key", header: "x-goog-api-key", scheme: "raw" });
   const transport = fakeTransport(json(200, reply([{ text: "ok" }])));
