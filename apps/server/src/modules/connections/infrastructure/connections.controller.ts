@@ -2,10 +2,10 @@ import { randomUUID } from "node:crypto";
 import {
   BadRequestException, Body, ConflictException, Controller, Delete, Get, Header, HttpCode, HttpStatus, Inject, NotFoundException, Param, Patch, Post,
 } from "@nestjs/common";
-import { builtinRegistry, createAdapter, EngineError, parseGoogleCredential, withConnectionBaseUrl, type HttpTransportPort, type ProviderDescriptor } from "@aigate/engine";
+import { builtinRegistry, createAdapter, EngineError, parseGoogleCredential, withConnection, type HttpTransportPort, type ProviderDescriptor } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
-import { isJsonCredential, parseChanges, parseNewConnection } from "../domain/connection.js";
+import { DATA_FIELD_NAMES, isJsonCredential, parseChanges, parseNewConnection, type ConnectionChanges } from "../domain/connection.js";
 import { ConnectionsRepository, type ConnectionView, type TestOutcome } from "./connections.repo.js";
 import { nodeDescriptor, ProviderNodesRepository } from "./provider-nodes.repo.js";
 
@@ -26,16 +26,25 @@ const notSupported = (id: string) => {
 const named = (view: ConnectionView, nodeNames: ReadonlyMap<string, string>): Named =>
   ({ ...view, providerName: builtinRegistry.provider(view.provider)?.name ?? nodeNames.get(view.provider) ?? view.provider });
 
-// connection.ollama-local-host: only a provider with optional auth may have no key, and only one that declares
-// connectionBaseUrl takes a host. provider.vertex-google-auth: only a Google Cloud provider takes a JSON credential.
-function checkForProvider(provider: ProviderDescriptor, fields: { apiKey?: string; baseUrl?: string | null }): void {
+// connection.ollama-local-host: only a provider with optional auth may have no key. A connection field is taken only
+// by a provider that declares it (connectionBaseUrl, connectionFields), and a required one cannot be missing or cleared.
+// provider.vertex-google-auth: only a Google Cloud provider takes a JSON credential.
+function checkForProvider(provider: ProviderDescriptor, fields: ConnectionChanges, creating: boolean): void {
   if (fields.apiKey === "" && !provider.auth.optional) throw invalid("apiKey must be 8-4096 printable characters without spaces");
+  const declared = provider.connectionFields;
+  const takes = (field: string) => (field === "baseUrl" && provider.connectionBaseUrl !== undefined)
+    || declared?.required.some((name) => name === field) === true || declared?.optional.some((name) => name === field) === true;
+  for (const field of ["baseUrl", ...DATA_FIELD_NAMES] as const) {
+    const value = fields[field];
+    if (value && !takes(field)) throw invalid(`${field} cannot be set on a ${provider.name} connection`);
+    const required = declared?.required.some((name) => name === field) === true;
+    if (required && (creating ? !value : value === null)) throw invalid(`${field} is required for a ${provider.name} connection`);
+  }
   if (fields.apiKey !== undefined && isJsonCredential(fields.apiKey)) {
     if (!provider.auth.googleCloud) throw invalid("apiKey must be 8-4096 printable characters without spaces");
     const parsed = parseGoogleCredential(fields.apiKey);
     if ("error" in parsed) throw invalid(`apiKey is not a usable Google Cloud credential: ${parsed.error}`);
   }
-  if (fields.baseUrl && !provider.connectionBaseUrl) throw invalid(`baseUrl cannot be set on a ${provider.name} connection`);
 }
 
 // Only an answer about the key is invalid or no_quota; anything else means "not checked" (connection.test-single-connection).
@@ -94,9 +103,10 @@ export class ConnectionsController {
     if (!parsed.ok) throw invalid(parsed.message);
     const provider = await this.provider(parsed.value.provider);
     if (!provider) throw notSupported(parsed.value.provider);
-    checkForProvider(provider, parsed.value);
-    const { apiKey, baseUrl } = parsed.value;
-    const created = await this.connections.create({ provider: provider.id, name: parsed.value.name ?? provider.name, apiKey, ...(baseUrl ? { baseUrl } : {}) });
+    checkForProvider(provider, parsed.value, true);
+    // The id replaces the alias the client may have sent.
+    const { name, ...fields } = parsed.value;
+    const created = await this.connections.create({ ...fields, provider: provider.id, name: name ?? provider.name });
     if (!created) throw new ConflictException({ code: "ALREADY_CONNECTED", message: `${provider.name} is already connected. Replace its key instead.` });
     return this.withName(created);
   }
@@ -106,12 +116,16 @@ export class ConnectionsController {
   async update(@Param("id") id: string, @Body() body: unknown): Promise<Named> {
     const parsed = parseChanges(body);
     if (!parsed.ok) throw invalid(parsed.message);
-    if (parsed.value.apiKey !== undefined || parsed.value.baseUrl !== undefined) {
+    // Renaming or disabling needs no provider check; a key or connection field does.
+    const checked: ConnectionChanges = { ...parsed.value };
+    delete checked.name;
+    delete checked.isActive;
+    if (Object.keys(checked).length > 0) {
       const current = await this.connections.get(id);
       if (!current) throw notFound();
       const provider = await this.provider(current.provider);
       if (!provider) throw notSupported(current.provider);
-      checkForProvider(provider, parsed.value);
+      checkForProvider(provider, checked, false);
     }
     const view = await this.connections.update(id, parsed.value);
     if (!view) throw notFound();
@@ -141,7 +155,7 @@ export class ConnectionsController {
     if (!stored) throw notFound();
     const provider = await this.provider(stored.provider);
     if (!provider) throw notSupported(stored.provider);
-    const outcome = await runTest(withConnectionBaseUrl(provider, stored.baseUrl), this.transport, stored.apiKey);
+    const outcome = await runTest(withConnection(provider, stored), this.transport, stored.apiKey);
     const view = await this.connections.recordTest(id, stored.sealed, outcome);
     if (!view) throw notFound();
     return this.withName(view);

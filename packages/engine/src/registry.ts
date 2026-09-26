@@ -41,6 +41,17 @@ export interface ProviderDescriptor {
   readonly auth: { readonly kind: "api-key"; readonly header: string; readonly scheme: "bearer" | "raw"; readonly optional?: boolean; readonly googleCloud?: boolean };
   // The connection may carry its own base URL (ollama-local's host); these paths are appended to it.
   readonly connectionBaseUrl?: { readonly chatPath: string; readonly modelsPath: string };
+  // Data each connection supplies (connection.azure-openai-deployment, connection.cloudflare-account-id): chatUrl and
+  // modelsUrl hold {field} tokens that withConnection fills, and a {model} token the adapter fills per request.
+  readonly connectionFields?: {
+    readonly required: readonly ConnectionField[];
+    readonly optional: readonly ConnectionField[];
+    // Used as is (not encoded) when the connection leaves the field empty.
+    readonly defaults?: Readonly<Partial<Record<ConnectionField, string>>>;
+  };
+  // The connection test posts this chat body; a status in invalidStatuses is an answer about the key, anything else
+  // passes (9router's test for azure and cloudflare-ai). {model} in the URL becomes `model`.
+  readonly chatProbe?: { readonly model: string; readonly body: Readonly<Record<string, unknown>>; readonly invalidStatuses: readonly number[] };
   readonly models: readonly ModelDescriptor[];
   // Catalog quirks an adapter reads (docs/contracts/provider-anthropic.md: requireClaudeToolType;
   // docs/contracts/stream-only-providers.md: reasoningSummary, neutralAgentPrompt).
@@ -51,15 +62,36 @@ export interface ProviderDescriptor {
   readonly anthropicNode?: { readonly official: boolean };
 }
 
+export const CONNECTION_FIELDS = ["baseUrl", "deployment", "apiVersion", "organization", "accountId"] as const;
+export type ConnectionField = (typeof CONNECTION_FIELDS)[number];
+export type ConnectionData = Readonly<Partial<Record<ConnectionField, string | null>>>;
+
 export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic", "openai-responses", "ollama", "gemini", "vertex"] as const;
 export type ProviderProtocol = (typeof PROVIDER_PROTOCOLS)[number];
 
-// The descriptor a connection with its own base URL talks to; one trailing "/" is removed (resolveOllamaLocalHost).
-export function withConnectionBaseUrl(provider: ProviderDescriptor, baseUrl: string | null | undefined): ProviderDescriptor {
+// The descriptor a connection talks to. ollama-local: its own host, one trailing "/" removed (resolveOllamaLocalHost).
+// azure / cloudflare-ai: the {field} tokens filled from the connection, values URL-encoded (9router encodes nothing),
+// and OpenAI-Organization when the connection has an organization.
+export function withConnection(provider: ProviderDescriptor, data: ConnectionData): ProviderDescriptor {
   const paths = provider.connectionBaseUrl;
-  if (!paths || !baseUrl) return provider;
-  const base = baseUrl.replace(/\/$/, "");
-  return { ...provider, chatUrl: `${base}${paths.chatPath}`, modelsUrl: `${base}${paths.modelsPath}` };
+  if (paths) {
+    if (!data.baseUrl) return provider;
+    const base = data.baseUrl.replace(/\/$/, "");
+    return { ...provider, chatUrl: `${base}${paths.chatPath}`, modelsUrl: `${base}${paths.modelsPath}` };
+  }
+  const fields = provider.connectionFields;
+  if (!fields) return provider;
+  const fill = (url: string) => url.replace(/\{(\w+)\}/g, (token, name: string) => {
+    const field = CONNECTION_FIELDS.find((known) => known === name);
+    const value = field ? data[field] : undefined;
+    if (field && value) return field === "baseUrl" ? value.replace(/\/$/, "") : encodeURIComponent(value);
+    return (field && fields.defaults?.[field]) || token;
+  });
+  const organization = data.organization;
+  return {
+    ...provider, chatUrl: fill(provider.chatUrl), modelsUrl: fill(provider.modelsUrl),
+    ...(organization ? { headers: { ...provider.headers, "openai-organization": organization } } : {}),
+  };
 }
 
 // Why a catalog provider can or cannot be connected (the UI shows the reason).
@@ -101,11 +133,14 @@ function checkUrl(value: string, where: string, problems: string[]): void {
   }
 }
 
+// A URL template is checked with sample values: a connection's base URL is checked when it is saved.
+const sample = (url: string) => url.replace("{baseUrl}", "https://connection.example").replace(/\{\w+\}/g, "x");
+
 function checkProvider(provider: ProviderDescriptor, problems: string[]): void {
   const where = `provider ${provider.id}`;
   if (!PROVIDER_ID.test(provider.id)) problems.push(`${where}: id must match ${PROVIDER_ID}`);
-  checkUrl(provider.chatUrl, `${where} chatUrl`, problems);
-  checkUrl(provider.modelsUrl, `${where} modelsUrl`, problems);
+  checkUrl(sample(provider.chatUrl), `${where} chatUrl`, problems);
+  checkUrl(sample(provider.modelsUrl), `${where} modelsUrl`, problems);
   const seen = new Set<string>();
   for (const model of provider.models) {
     const at = `${where} model ${model.id}`;

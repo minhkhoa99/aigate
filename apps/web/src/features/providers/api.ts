@@ -10,8 +10,13 @@ export interface Connection {
   providerName: string;
   name: string;
   keyHint: string;
-  // The connection's own host (ollama-local), or null.
+  // The connection's own host (ollama-local) or endpoint (azure), or null.
   baseUrl: string | null;
+  // SP14g (docs/contracts/provider-connection-data.md): azure deployment, api-version, organization; cloudflare-ai account.
+  deployment: string | null;
+  apiVersion: string | null;
+  organization: string | null;
+  accountId: string | null;
   isActive: boolean;
   testStatus: TestStatus;
   lastError: string | null;
@@ -67,10 +72,13 @@ function useConnectionMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
 
 const path = (id: string) => `/api/connections/${encodeURIComponent(id)}`;
 
+export type ConnectionField = "baseUrl" | "deployment" | "apiVersion" | "organization" | "accountId";
+type FieldValues = Partial<Record<ConnectionField, string>>;
+
 export const useCreateConnection = () =>
-  useConnectionMutation((body: { provider: string; apiKey?: string; name?: string; baseUrl?: string }) => api<Connection>("/api/connections", { method: "POST", body }));
+  useConnectionMutation((body: { provider: string; apiKey?: string; name?: string } & FieldValues) => api<Connection>("/api/connections", { method: "POST", body }));
 export const useUpdateConnection = () =>
-  useConnectionMutation(({ id, ...body }: { id: string; name?: string; apiKey?: string; isActive?: boolean; baseUrl?: string }) =>
+  useConnectionMutation(({ id, ...body }: { id: string; name?: string; apiKey?: string; isActive?: boolean } & FieldValues) =>
     api<Connection>(path(id), { method: "PATCH", body }));
 export const useDeleteConnection = () => useConnectionMutation((id: string) => apiVoid(path(id), "DELETE"));
 export const useTestConnection = () =>

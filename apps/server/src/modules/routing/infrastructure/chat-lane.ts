@@ -5,7 +5,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import {
   assertModelSupports, builtinRegistry, createAdapter, EngineError, OpenAIChatStreamEncoder, parseOpenAIChatRequest, toOpenAIChatCompletion,
-  toOpenAIError, UnsupportedFeatureError, withConnectionBaseUrl, type AIProviderPort, type CanonicalRequest, type Credential, type ExecCtx, type HttpTransportPort, type ProviderDescriptor,
+  toOpenAIError, UnsupportedFeatureError, withConnection, type AIProviderPort, type CanonicalRequest, type Credential, type ExecCtx, type HttpTransportPort, type ProviderDescriptor,
   type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
@@ -212,7 +212,7 @@ export class ChatLane {
     const upstream: CanonicalRequest = { ...request, model: modelId };
     assertModelSupports(upstream, provider.id, builtinRegistry.model(provider.id, modelId), modelId);
     // connection.ollama-local-host: a connection may point the provider at its own host.
-    return { provider: withConnectionBaseUrl(provider, stored.baseUrl), request: upstream, credential: { kind: "api-key", apiKey: stored.apiKey } };
+    return { provider: withConnection(provider, stored), request: upstream, credential: { kind: "api-key", apiKey: stored.apiKey } };
   }
 
   private modelNotFound(ref: string): GatewayError {

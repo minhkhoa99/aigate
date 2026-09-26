@@ -3,7 +3,7 @@ import { EngineError } from "../errors.js";
 import { DEFAULT_MAX_BODY_BYTES, readBoundedText } from "../http.js";
 import { isRecord, list, parseJson, record, text, type Json } from "../json.js";
 import type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, ListedModel } from "../ports.js";
-import { MODEL_ID } from "../registry.js";
+import { MODEL_ID, type ProviderDescriptor } from "../registry.js";
 import { readSseData } from "../sse.js";
 import { classifyStatus, count, HttpProviderAdapter, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
 
@@ -26,6 +26,15 @@ const MAX_SYSTEM_PROMPT = 2000;
 const AGENT_PATTERN = /you are claude code|claude.?code.+official.+cli|anthropic.+official.+cli|anxthxropic.+official.+cli|you are (?:cursor|windsurf|cline|aider|continue|copilot|cody)|you are an? (?:ai )?(?:coding |code )?agent|cc_entrypoint\s*=\s*(?:cli|vscode|jetbrains|gui)|claude.?code.+issues|give feedback.+claude.?code|you are .{0,30}(?:powerful )?ai agent|orchestration capabilities|OhMyOpenCode|<agent-identity>|<Role>|<Behavior_Instructions>/i;
 
 const unsupported = (feature: string) => new UnsupportedFeatureError(feature, TARGET);
+const PROBE_BODY_BYTES = 64 * 1024;
+const UNFILLED = /\{(\w+)\}/;
+
+// provider.clinepass-headers-envelope: a non-streaming { success: true, data: {...} } answer is its data; anything else
+// (including { success: false }) is left as it is.
+const unwrapEnvelope = (root: unknown): unknown => {
+  const body = record(root);
+  return body.success === true && isRecord(body.data) ? body.data : root;
+};
 
 // ---- CIP -> chat completions ----
 
@@ -114,6 +123,17 @@ function applyQuirks(body: Json, quirks: readonly string[]): void {
     else if (effort) body.reasoning_summary = "auto";
   }
   if (quirks.includes("neutralAgentPrompt")) body.messages = list(body.messages).map((message) => neutralAgentPrompt(record(message)));
+  // translator.cloudflare-content-flatten, corrected (user decision 2026-09-26): text parts are joined as 9router does,
+  // but a part the endpoint cannot take is refused instead of becoming "".
+  if (quirks.includes("flattenContent")) {
+    for (const message of list(body.messages).map(record)) {
+      if (!Array.isArray(message.content)) continue;
+      const parts = message.content.map(record);
+      const other = parts.find((part) => part.type !== "text");
+      if (other) throw unsupported(`${text(other.type) ?? "non-text"} content for a provider that takes text only`);
+      message.content = parts.map((part) => text(part.text) ?? "").join("");
+    }
+  }
 }
 
 function toBody(request: CanonicalRequest, stream: boolean, quirks: readonly string[] = []): Json {
@@ -170,7 +190,8 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
     // 2026-09-26); only the transport deadline bounds it. Every other JSON answer keeps the 4 MiB cap.
     const raw = await readBoundedText(response.body, streamOnly ? Number.MAX_SAFE_INTEGER : DEFAULT_MAX_BODY_BYTES);
     if (streamOnly && (response.headers["content-type"] ?? "").includes("text/event-stream")) return this.collapse(raw, request, credential);
-    const root = parseJson(raw);
+    const parsed = parseJson(raw);
+    const root = this.provider.quirks?.includes("clineEnvelope") ? unwrapEnvelope(parsed) : parsed;
     const choice = record(list(record(root).choices)[0]);
     if (!isRecord(root) || !isRecord(choice.message)) throw this.invalid("a chat response without choices[0].message");
     const message = choice.message;
@@ -269,6 +290,7 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
   // One call, no retry. Only an answer about the key itself is returned; a network failure or a
   // 5xx says nothing about the key, so it is thrown.
   async validateCredential(credential: Credential, ctx: ExecCtx): Promise<CredentialStatus> {
+    if (this.provider.chatProbe) return this.probeChat(this.provider.chatProbe, credential, ctx);
     try {
       const response = await this.send(this.request("GET", this.provider.modelsUrl, credential, METADATA_TIMEOUT_MS), credential, ctx, 1);
       await response.body?.cancel();
@@ -284,8 +306,36 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
   // vertex-partner builds the URL from the credential's project (routing.vertex-endpoints); others use the catalog URL.
   protected chatUrl?(credential: Credential): string;
 
+  // connection.azure-openai-deployment: {model} is the request model (azure with no deployment); any other token left
+  // means the connection lacks a field the server should have required.
+  private url(template: string, model: string): string {
+    const url = template.replaceAll("{model}", encodeURIComponent(model));
+    const missing = UNFILLED.exec(url)?.[1];
+    if (missing) throw new EngineError("INVALID_REQUEST", `The ${this.provider.name} connection has no ${missing}; set it in AIGate: Providers → Connections`, { provider: this.provider.id });
+    return url;
+  }
+
+  // connection.azure-openai-deployment, connection.cloudflare-account-id: one small chat; only the listed statuses are
+  // answers about the key, every other status passes, as in 9router.
+  private async probeChat(probe: NonNullable<ProviderDescriptor["chatProbe"]>, credential: Credential, ctx: ExecCtx): Promise<CredentialStatus> {
+    const base = this.request("POST", this.url(this.provider.chatUrl, probe.model), credential, METADATA_TIMEOUT_MS);
+    const response = await this.transport.send({ ...base, headers: { ...base.headers, "content-type": "application/json" }, body: JSON.stringify(probe.body) }, ctx);
+    if (!probe.invalidStatuses.includes(response.status)) {
+      await response.body?.cancel();
+      return { valid: true };
+    }
+    // The status alone decides; a caller abort while reading the reason is not swallowed.
+    const raw = await readBoundedText(response.body, PROBE_BODY_BYTES).catch((error: unknown) => {
+      if (ctx.signal.aborted) throw error;
+      return "";
+    });
+    const error = record(record(parseJson(raw)).error);
+    const detail = this.clean(text(error.message), credential);
+    return { valid: false, code: "AUTH_ERROR", message: `${this.provider.name} answered ${response.status}${detail ? `: ${detail}` : ""}` };
+  }
+
   private chat(request: CanonicalRequest, credential: Credential, stream: boolean): HttpRequest {
-    const base = this.request("POST", this.chatUrl?.(credential) ?? this.provider.chatUrl, credential, stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS);
+    const base = this.request("POST", this.url(this.chatUrl?.(credential) ?? this.provider.chatUrl, request.model), credential, stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS);
     return {
       ...base,
       headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json" },

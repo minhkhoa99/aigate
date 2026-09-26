@@ -29,11 +29,41 @@ const STREAM_OPTIONAL = new Set(["openai"]);
 // provider.codebuddy-request-quirks: what the 9router CodeBuddy executors change in the body.
 // connection.ollama-local-host: the key is optional and each connection may name its own host.
 const OLLAMA_LOCAL = { connectionBaseUrl: { chatPath: "/api/chat", modelsPath: "/api/tags" } } as const;
+// translator.cloudflare-content-flatten: Workers AI takes string content only.
 const EXECUTOR_QUIRKS: Readonly<Record<string, readonly string[]>> = {
   "codebuddy-cn": ["reasoningSummary", "neutralAgentPrompt"],
   "codebuddy-intl": ["reasoningSummary"],
+  "cloudflare-ai": ["flattenContent"],
 };
-const BLOCKING_QUIRKS = new Map([["clineEnvelope", "Needs a provider-specific request envelope (SP14)"]]);
+// provider.clinepass-headers-envelope: the Cline client headers, naming AIGate (user decision 2026-09-26; 9router names
+// itself). ponytail: AIGate has no release version yet; 0.1.0 until it does.
+const CLIENT_VERSION = "0.1.0";
+const EXTRA_HEADERS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  clinepass: {
+    "user-agent": `AIGate/${CLIENT_VERSION}`, "x-platform": process.platform, "x-platform-version": process.version, "x-client-type": "aigate",
+    "x-client-version": CLIENT_VERSION, "x-core-version": CLIENT_VERSION, "x-is-multiroot": "false",
+  },
+};
+// connection.azure-openai-deployment (kept as 9router, user decision 2026-09-26) and connection.cloudflare-account-id:
+// each connection fills the URL, and the connection test posts a one-token chat.
+const PROBE_MESSAGES = [{ role: "user", content: "test" }];
+const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Partial<ProviderDescriptor>>> = {
+  azure: () => ({
+    chatUrl: "{baseUrl}/openai/deployments/{deployment}/chat/completions?api-version={apiVersion}",
+    modelsUrl: "{baseUrl}/openai/models?api-version={apiVersion}",
+    auth: { kind: "api-key", header: "api-key", scheme: "raw" },
+    // An empty deployment is the request model, as in 9router.
+    connectionFields: { required: ["baseUrl"], optional: ["deployment", "apiVersion", "organization"], defaults: { deployment: "{model}", apiVersion: "2024-10-01-preview" } },
+    chatProbe: { model: "gpt-4", body: { messages: PROBE_MESSAGES, max_completion_tokens: 1 }, invalidStatuses: [401, 403] },
+  }),
+  "cloudflare-ai": (provider) => {
+    const model = provider.models[0]?.id ?? "";
+    return {
+      connectionFields: { required: ["accountId"], optional: [] },
+      chatProbe: { model, body: { model, messages: PROBE_MESSAGES, max_tokens: 1 }, invalidStatuses: [401, 403, 404] },
+    };
+  },
+};
 const PROTOCOL_REASONS: Readonly<Record<string, string>> = {
   service: "Media and search services come with SP22/SP23",
 };
@@ -56,18 +86,17 @@ export function unsupportedReason(provider: CatalogProvider): string | undefined
     return "Keyless providers come later";
   }
   if (provider.hidden) return "Hidden in the 9router catalog";
+  if (PER_CONNECTION[provider.id]) return undefined;
   if (provider.chatUrl === null) return "Each connection needs its own endpoint URL (later)";
   if (provider.chatUrl.includes("{")) return "The endpoint needs per-account data (later)";
   if (!GOOGLE_CLOUD.has(provider.id) && !PATHS[provider.protocol].chat.test(provider.chatUrl)) return "Non-standard endpoint (SP14)";
-  const quirk = provider.quirks.find((q) => BLOCKING_QUIRKS.has(q));
-  if (quirk) return BLOCKING_QUIRKS.get(quirk);
   return undefined;
 }
 
 export function toDescriptor(provider: CatalogProvider, chatUrl: string): ProviderDescriptor {
   const protocol: ProviderProtocol = isProtocol(provider.protocol) ? provider.protocol : "openai-compatible";
   const paths = PATHS[protocol];
-  const headers = Object.fromEntries(Object.entries(provider.headers).map(([name, value]) => [name.toLowerCase(), value]));
+  const headers = { ...Object.fromEntries(Object.entries(provider.headers).map(([name, value]) => [name.toLowerCase(), value])), ...EXTRA_HEADERS[provider.id] };
   // 9router authenticates every API key of the Anthropic family with a raw x-api-key, whatever the entry says.
   const auth: ProviderDescriptor["auth"] = protocol === "anthropic"
     ? { kind: "api-key", header: "x-api-key", scheme: "raw" }
@@ -95,6 +124,7 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
     quirks: [...provider.quirks, ...(EXECUTOR_QUIRKS[provider.id] ?? [])],
     ...(provider.id === "ollama-local" ? OLLAMA_LOCAL : {}),
     ...(provider.forceStream && !STREAM_OPTIONAL.has(provider.id) ? { streamOnly: true } : {}),
+    ...PER_CONNECTION[provider.id]?.(provider),
   };
 }
 
@@ -102,9 +132,9 @@ const statuses = new Map<string, ProviderStatus>();
 const connectable: ProviderDescriptor[] = [];
 for (const provider of CATALOG) {
   const reason = unsupportedReason(provider);
-  // unsupportedReason returns undefined only for a provider with a chat URL.
-  if (reason === undefined && provider.chatUrl !== null) connectable.push(toDescriptor(provider, provider.chatUrl));
-  else statuses.set(provider.id, { connectable: false, reason: reason ?? "Each connection needs its own endpoint URL (later)" });
+  // unsupportedReason returns undefined only for a provider with a chat URL, or one whose connection supplies it (azure).
+  if (reason === undefined) connectable.push(toDescriptor(provider, provider.chatUrl ?? ""));
+  else statuses.set(provider.id, { connectable: false, reason });
 }
 
 // Validated once at load; a bad entry fails startup, not a user request.

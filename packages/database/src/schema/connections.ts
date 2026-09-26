@@ -16,6 +16,11 @@ export const providerConnections = sqliteTable(
     keyHint: text("key_hint").notNull(),
     // SP14d: the connection's own host for providers that take one (ollama-local); null means the catalog URL.
     baseUrl: text("base_url"),
+    // SP14g: data the provider URL or headers need (azure deployment, api-version, organization; cloudflare-ai account).
+    deployment: text("deployment"),
+    apiVersion: text("api_version"),
+    organization: text("organization"),
+    accountId: text("account_id"),
     isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
     testStatus: text("test_status", { enum: TEST_STATUSES }).notNull().default("untested"),
     lastError: text("last_error"),

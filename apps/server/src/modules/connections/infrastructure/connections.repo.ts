@@ -4,7 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { providerConnections, type DatabaseHandle, type TestStatus } from "@aigate/database";
 import { DATABASE } from "../../../database.provider.js";
 import { SECRET_CIPHER, type SecretCipherPort } from "../../../secret-cipher.js";
-import { keyHint, maskHint, sealContext, type ConnectionChanges } from "../domain/connection.js";
+import { keyHint, maskHint, sealContext, type ConnectionChanges, type ConnectionFields } from "../domain/connection.js";
 
 // SP11 allows one connection per registry provider; the bound only guards the listing.
 const MAX_CONNECTIONS = 100;
@@ -14,8 +14,13 @@ export interface ConnectionView {
   provider: string;
   name: string;
   keyHint: string;
-  // The connection's own host (ollama-local), or null for the catalog URL.
+  // The connection's own host (ollama-local) or endpoint (azure), or null for the catalog URL.
   baseUrl: string | null;
+  // SP14g: azure deployment, api-version, organization; cloudflare-ai account id. Null when the provider takes none.
+  deployment: string | null;
+  apiVersion: string | null;
+  organization: string | null;
+  accountId: string | null;
   isActive: boolean;
   testStatus: TestStatus;
   lastError: string | null;
@@ -34,10 +39,15 @@ export interface TestOutcome {
 // A positive allowlist: the sealed key is not in it, so no read can return it (catalog.connection-listing).
 const t = providerConnections;
 const columns = {
-  id: t.id, provider: t.provider, name: t.name, keyHint: t.keyHint, baseUrl: t.baseUrl, isActive: t.isActive, testStatus: t.testStatus,
+  id: t.id, provider: t.provider, name: t.name, keyHint: t.keyHint, baseUrl: t.baseUrl,
+  deployment: t.deployment, apiVersion: t.apiVersion, organization: t.organization, accountId: t.accountId, isActive: t.isActive, testStatus: t.testStatus,
   lastError: t.lastError, lastErrorCode: t.lastErrorCode, lastTestedAt: t.lastTestedAt, createdAt: t.createdAt, updatedAt: t.updatedAt,
 };
 type Row = Omit<ConnectionView, "lastTestedAt" | "createdAt" | "updatedAt"> & { lastTestedAt: Date | null; createdAt: Date; updatedAt: Date };
+
+// What withConnection needs to reach the provider (connection.ollama-local-host, connection.azure-openai-deployment, …).
+const data = { baseUrl: t.baseUrl, deployment: t.deployment, apiVersion: t.apiVersion, organization: t.organization, accountId: t.accountId };
+export type ConnectionData = { [K in keyof typeof data]: string | null };
 
 const toView = (row: Row): ConnectionView => ({
   ...row,
@@ -65,12 +75,13 @@ export class ConnectionsRepository {
   }
 
   // Undefined when the provider already has a connection: the unique index decides, never a prior SELECT.
-  async create(input: { provider: string; name: string; apiKey: string; baseUrl?: string }): Promise<ConnectionView | undefined> {
+  async create(input: { provider: string; name: string; apiKey: string; baseUrl?: string } & ConnectionFields): Promise<ConnectionView | undefined> {
     const id = randomUUID();
     const now = new Date();
     const [row] = await this.database.db.insert(t).values({
       id, provider: input.provider, name: input.name, apiKeySealed: this.cipher.seal(input.apiKey, sealContext(id)),
-      keyHint: keyHint(input.apiKey), baseUrl: input.baseUrl ?? null, createdAt: now, updatedAt: now,
+      keyHint: keyHint(input.apiKey), baseUrl: input.baseUrl ?? null, deployment: input.deployment ?? null, apiVersion: input.apiVersion ?? null,
+      organization: input.organization ?? null, accountId: input.accountId ?? null, createdAt: now, updatedAt: now,
     }).onConflictDoNothing({ target: t.provider }).returning(columns);
     return row ? toView(row) : undefined;
   }
@@ -92,17 +103,19 @@ export class ConnectionsRepository {
   }
 
   // Throws SecretUnreadableError when the secret key changed since the key was saved.
-  async readKey(id: string): Promise<{ provider: string; apiKey: string; sealed: string; baseUrl: string | null } | undefined> {
-    const row = await this.database.db.select({ provider: t.provider, sealed: t.apiKeySealed, baseUrl: t.baseUrl }).from(t).where(eq(t.id, id)).get();
+  async readKey(id: string): Promise<({ provider: string; apiKey: string; sealed: string } & ConnectionData) | undefined> {
+    const row = await this.database.db.select({ provider: t.provider, sealed: t.apiKeySealed, ...data }).from(t).where(eq(t.id, id)).get();
     return row ? { ...row, apiKey: this.cipher.open(row.sealed, sealContext(id)) } : undefined;
   }
 
-  // The key (and host) routing uses (SP12): only an active connection counts; its test status does not.
+  // The key and connection data routing uses (SP12): only an active connection counts; its test status does not.
   // Throws SecretUnreadableError when the secret key changed since the key was saved.
-  async activeCredential(provider: string): Promise<{ apiKey: string; baseUrl: string | null } | undefined> {
-    const row = await this.database.db.select({ id: t.id, sealed: t.apiKeySealed, baseUrl: t.baseUrl }).from(t)
+  async activeCredential(provider: string): Promise<({ apiKey: string } & ConnectionData) | undefined> {
+    const row = await this.database.db.select({ id: t.id, sealed: t.apiKeySealed, ...data }).from(t)
       .where(and(eq(t.provider, provider), eq(t.isActive, true))).get();
-    return row ? { apiKey: this.cipher.open(row.sealed, sealContext(row.id)), baseUrl: row.baseUrl } : undefined;
+    if (!row) return undefined;
+    const { id, sealed, ...rest } = row;
+    return { apiKey: this.cipher.open(sealed, sealContext(id)), ...rest };
   }
 
   async activeProviders(): Promise<Set<string>> {

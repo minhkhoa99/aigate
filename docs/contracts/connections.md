@@ -48,13 +48,13 @@ Scope, per spec §9: the `connections` context with **one API-key account per pr
 
 ## API (dashboard session required)
 
-Every response is `Cache-Control: no-store`. The view is `{ id, provider, providerName, name, keyHint, baseUrl, isActive, testStatus, lastError, lastErrorCode, lastTestedAt, createdAt, updatedAt }`, where `keyHint` looks like `••••abcd` (`no key` for a keyless ollama-local connection; the service-account `client_email`, or `user credential`, for a Google Cloud JSON credential, SP14f) and `baseUrl` is the connection's own host or `null` (SP14d, `provider-ollama.md`). It never contains the key.
+Every response is `Cache-Control: no-store`. The view is `{ id, provider, providerName, name, keyHint, baseUrl, deployment, apiVersion, organization, accountId, isActive, testStatus, lastError, lastErrorCode, lastTestedAt, createdAt, updatedAt }`, where `keyHint` looks like `••••abcd` (`no key` for a keyless ollama-local connection; the service-account `client_email`, or `user credential`, for a Google Cloud JSON credential, SP14f) and `baseUrl` is the connection's own host or `null` (SP14d, `provider-ollama.md`). It never contains the key.
 
 | Method and path | Body | Success | Errors |
 |---|---|---|---|
 | `GET /api/connections` | — | 200 `View[]` | — |
-| `POST /api/connections` | `{ provider, apiKey, name?, baseUrl? }` (`apiKey` optional for ollama-local) | 201 `View` | 400 `INVALID_REQUEST` (names the field); 400 `PROVIDER_NOT_SUPPORTED` (the catalog reason, or "is not in the catalog"); 409 `ALREADY_CONNECTED` |
-| `PATCH /api/connections/:id` | any of `{ name, apiKey, isActive, baseUrl }` (`baseUrl: ""` clears it) | 200 `View` | 400 `INVALID_REQUEST`; 404 `NOT_FOUND` |
+| `POST /api/connections` | `{ provider, apiKey, name?, baseUrl?, deployment?, apiVersion?, organization?, accountId? }` (`apiKey` optional for ollama-local; the fields per `provider-connection-data.md`) | 201 `View` | 400 `INVALID_REQUEST` (names the field); 400 `PROVIDER_NOT_SUPPORTED` (the catalog reason, or "is not in the catalog"); 409 `ALREADY_CONNECTED` |
+| `PATCH /api/connections/:id` | any of `{ name, apiKey, isActive, baseUrl, deployment, apiVersion, organization, accountId }` (`""` or `null` clears a field; a required one cannot be cleared) | 200 `View` | 400 `INVALID_REQUEST`; 404 `NOT_FOUND` |
 | `DELETE /api/connections/:id` | — | 204 | 404 `NOT_FOUND` |
 | `POST /api/connections/:id/test` | — | 200 `View`, with the new `testStatus` | 404 `NOT_FOUND`; 409 `CREDENTIAL_UNREADABLE` |
 

@@ -57,6 +57,13 @@
       "when": 1790416402788,
       "tag": "0007_broad_black_cat",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790436766878,
+      "tag": "0008_freezing_wild_child",
+      "breakpoints": true
     }
   ]
 }

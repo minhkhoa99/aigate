@@ -6,7 +6,7 @@ import { toProblem } from "../../shared/errors";
 import { mediaGroups } from "./catalog";
 import { CustomProviderForm, CustomProviders } from "./custom";
 import {
-  useConnections, useCreateConnection, useDeleteConnection, useProvider, useProviderNodes, useProviders, useTestConnection, useUpdateConnection, type Connection,
+  useConnections, useCreateConnection, useDeleteConnection, useProvider, useProviderNodes, useProviders, useTestConnection, useUpdateConnection, type Connection, type ConnectionField,
   type ProviderDetailView,
 } from "./api";
 import { describeTest, needsAttention, statusPill } from "./test-result";
@@ -99,23 +99,45 @@ export function ProviderDetail({ isNew = false, providerId }: { isNew?: boolean;
   return <CatalogProvider providerId={providerId} />;
 }
 
-// connection.ollama-local-host: providers whose connection takes its own host and may have no key.
-// ponytail: one provider today; expose the descriptor flags in GET /api/providers when a second one arrives.
-const HOSTED = new Set(["ollama-local"]);
+// Fields a connection supplies besides its key: connection.ollama-local-host (host, no key needed),
+// connection.azure-openai-deployment (9router's form, kept: endpoint, deployment, and organization required),
+// connection.cloudflare-account-id. ponytail: fixed here; expose descriptor.connectionFields in GET /api/providers
+// when the list grows.
+type FieldSpec = { name: ConnectionField; label: string; hint?: string; placeholder?: string; required?: boolean; initial?: string };
+const CONNECTION_FIELDS: Readonly<Record<string, readonly FieldSpec[]>> = {
+  "ollama-local": [{ name: "baseUrl", label: "Host", hint: "Empty means http://localhost:11434. https, or http to this machine only.", placeholder: "http://localhost:11434" }],
+  azure: [
+    { name: "baseUrl", label: "Azure endpoint", hint: "https, for example your resource's endpoint.", placeholder: "https://your-resource.openai.azure.com", required: true },
+    { name: "deployment", label: "Deployment name", placeholder: "gpt-4", required: true },
+    { name: "apiVersion", label: "API version", initial: "2024-10-01-preview" },
+    { name: "organization", label: "Organization", hint: "Required for billing.", required: true },
+  ],
+  "cloudflare-ai": [{ name: "accountId", label: "Account ID", hint: "From the Cloudflare dashboard URL or Workers AI overview.", required: true }],
+};
+const KEYLESS = new Set(["ollama-local"]);
 // provider.vertex-google-auth: the key field also takes a service-account or authorized_user JSON.
 const GOOGLE_CLOUD = new Set(["vertex", "vertex-partner"]);
+const fieldsOf = (provider: string) => CONNECTION_FIELDS[provider] ?? [];
 
-function HostAndKey({ provider, host, keyLabel = "API key" }: { provider: string; host?: string | null; keyLabel?: string }) {
-  if (GOOGLE_CLOUD.has(provider)) {
-    return <Field label={keyLabel} hint="Paste the service-account JSON key file from Google Cloud IAM, or a Vertex AI API key.">
+// Only fields the provider takes: on Add an empty field is left out; on Edit it is sent as "" to clear it.
+function fieldValues(form: HTMLFormElement, provider: string, editing: boolean): Partial<Record<ConnectionField, string>> {
+  return Object.fromEntries(fieldsOf(provider).map((field) => [field.name, formText(form, field.name)]).filter(([, value]) => editing || value !== ""));
+}
+
+function ConnectionFields({ provider, connection, keyLabel = "API key" }: { provider: string; connection?: Connection; keyLabel?: string }) {
+  const fields = fieldsOf(provider).map((field) => <Field key={field.name} label={field.label} hint={field.hint}>
+    <Input name={field.name} required={field.required} maxLength={field.name === "baseUrl" ? 2048 : 128} defaultValue={connection?.[field.name] ?? field.initial ?? ""} placeholder={field.placeholder} />
+  </Field>);
+  // Editing a connection with fields keeps its key unless a new one is typed.
+  const keyOptional = KEYLESS.has(provider) || (connection !== undefined && fields.length > 0);
+  const key = GOOGLE_CLOUD.has(provider)
+    ? <Field label={keyLabel} hint="Paste the service-account JSON key file from Google Cloud IAM, or a Vertex AI API key.">
       <Input name="apiKey" type="password" required minLength={8} maxLength={16384} autoComplete="off" placeholder='{"type": "service_account", …} or an API key' />
+    </Field>
+    : <Field label={keyLabel} hint={KEYLESS.has(provider) ? "Optional: a local Ollama needs no key." : keyOptional ? "Optional: leave empty to keep the current key." : undefined}>
+      <Input name="apiKey" type="password" required={!keyOptional} minLength={8} maxLength={4096} autoComplete="off" placeholder={keyOptional ? undefined : "sk-…"} />
     </Field>;
-  }
-  if (!HOSTED.has(provider)) return <Field label={keyLabel}><Input name="apiKey" type="password" required minLength={8} maxLength={4096} autoComplete="off" placeholder="sk-…" /></Field>;
-  return <>
-    <Field label="Host" hint="Empty means http://localhost:11434. https, or http to this machine only."><Input name="baseUrl" maxLength={2048} defaultValue={host ?? ""} placeholder="http://localhost:11434" /></Field>
-    <Field label={keyLabel} hint="Optional: a local Ollama needs no key."><Input name="apiKey" type="password" minLength={8} maxLength={4096} autoComplete="off" /></Field>
-  </>;
+  return <>{fields}{key}</>;
 }
 
 function AddConnection({ requested, connected, onClose, onCreated }: {
@@ -139,8 +161,8 @@ function AddConnection({ requested, connected, onClose, onCreated }: {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const [name, apiKey, baseUrl] = [formText(form, "name"), formText(form, "apiKey"), formText(form, "baseUrl")];
-    const body = { provider: formText(form, "provider"), ...(apiKey ? { apiKey } : {}), ...(name ? { name } : {}), ...(baseUrl ? { baseUrl } : {}) };
+    const [name, apiKey, chosenProvider] = [formText(form, "name"), formText(form, "apiKey"), formText(form, "provider")];
+    const body = { provider: chosenProvider, ...(apiKey ? { apiKey } : {}), ...(name ? { name } : {}), ...fieldValues(form, chosenProvider, false) };
     create.mutate(body, { onSuccess: onCreated, onError: (error) => showToast({ tone: "error", ...toProblem(error) }) });
   };
   const provider = available.some((p) => p.id === chosen) ? chosen : available.some((p) => p.id === requested) ? requested ?? "" : available[0]?.id ?? "";
@@ -151,7 +173,7 @@ function AddConnection({ requested, connected, onClose, onCreated }: {
         <div className="stack">
           <Field label="Provider" hint={`${available.length} providers can be connected with an API key.`}><select className="input" name="provider" value={provider} onChange={(event) => setChosen(event.target.value)}>{available.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
           <Field label="Name" hint="Optional. Defaults to the provider name."><Input name="name" maxLength={64} placeholder="e.g. Work account" /></Field>
-          <HostAndKey provider={provider} />
+          <ConnectionFields key={provider} provider={provider} />
 
         </div>
         <div className="modal-actions"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" disabled={create.isPending}>{create.isPending ? "Saving…" : "Save and test"}</Button></div></form>}
@@ -161,17 +183,17 @@ function AddConnection({ requested, connected, onClose, onCreated }: {
 function ReplaceKey({ connection, onClose, onSaved }: { connection: Connection; onClose: () => void; onSaved: (connection: Connection) => void }) {
   const update = useUpdateConnection();
   const showToast = useToast();
-  const hosted = HOSTED.has(connection.provider);
+  const editable = fieldsOf(connection.provider).length > 0;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const apiKey = formText(event.currentTarget, "apiKey");
-    // A hosted connection sends its host (empty clears it) and keeps its key unless a new one is typed.
-    const changes = hosted ? { baseUrl: formText(event.currentTarget, "baseUrl"), ...(apiKey ? { apiKey } : {}) } : { apiKey };
+    // A connection with fields sends them (empty clears one) and keeps its key unless a new one is typed.
+    const changes = editable ? { ...fieldValues(event.currentTarget, connection.provider, true), ...(apiKey ? { apiKey } : {}) } : { apiKey };
     update.mutate({ id: connection.id, ...changes }, { onSuccess: onSaved, onError: (error) => showToast({ tone: "error", ...toProblem(error) }) });
   };
-  return <Modal title={`${hosted ? "Edit connection" : "Replace key"} · ${connection.name}`} onClose={onClose}><form onSubmit={submit}>
+  return <Modal title={`${editable ? "Edit connection" : "Replace key"} · ${connection.name}`} onClose={onClose}><form onSubmit={submit}>
     <p>The current key is <code>{connection.keyHint}</code>. The change is saved and tested right away.</p>
-    <HostAndKey provider={connection.provider} host={connection.baseUrl} keyLabel="New API key" />
+    <ConnectionFields provider={connection.provider} connection={connection} keyLabel="New API key" />
     <div className="modal-actions"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" disabled={update.isPending}>{update.isPending ? "Saving…" : "Save and test"}</Button></div>
   </form></Modal>;
 }
@@ -202,12 +224,12 @@ export function Connections() {
           columns={["Account", "Key", "Status", "Last tested", "Actions"]} rows={rows.map((c) => {
             const pill = statusPill(c);
             return [
-              <div><strong>{c.name}</strong>{c.name !== c.providerName && <small className="muted"> · {c.providerName}</small>}{c.baseUrl && <small className="muted"> · {c.baseUrl}</small>}</div>,
+              <div><strong>{c.name}</strong>{c.name !== c.providerName && <small className="muted"> · {c.providerName}</small>}{c.baseUrl && <small className="muted"> · {c.baseUrl}</small>}{c.deployment && <small className="muted"> · {c.deployment}</small>}{c.accountId && <small className="muted"> · account {c.accountId}</small>}</div>,
               <code>{c.keyHint}</code>,
               <div><Pill tone={pill.tone}>{pill.label}</Pill>{c.isActive && c.testStatus !== "active" && c.lastError && <small className="muted"> {c.lastError}</small>}</div>,
               c.lastTestedAt ? new Date(c.lastTestedAt).toLocaleString() : "Never",
               <><Button variant="ghost" disabled={testConnection.isPending} onClick={() => runTest(c.id)}>{testing(c.id) ? "Testing…" : "Test"}</Button>
-                <Button variant="ghost" onClick={() => setReplacing(c)}>{HOSTED.has(c.provider) ? "Edit" : "Replace key"}</Button>
+                <Button variant="ghost" onClick={() => setReplacing(c)}>{fieldsOf(c.provider).length > 0 ? "Edit" : "Replace key"}</Button>
                 <Button variant="ghost" disabled={update.isPending} onClick={() => update.mutate({ id: c.id, isActive: !c.isActive }, { onError: fail })}>{c.isActive ? "Disable" : "Enable"}</Button>
                 <Button variant="ghost" onClick={() => setRemoving(c)}>Delete</Button></>,
             ];

@@ -1,7 +1,7 @@
 // Contract: docs/contracts/provider-ollama.md — the ollama adapter against a fake HttpTransportPort.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { builtinRegistry, createAdapter, EngineError, OllamaAdapter, UnsupportedFeatureError, withConnectionBaseUrl } from "../dist/index.js";
+import { builtinRegistry, createAdapter, EngineError, OllamaAdapter, UnsupportedFeatureError, withConnection } from "../dist/index.js";
 
 const SECRET = "ollama-test-secret-value";
 const credential = { kind: "api-key", apiKey: SECRET };
@@ -44,7 +44,7 @@ const hello = { model: "glm-5", stream: false, messages: [{ role: "user", conten
 const answer = { model: "glm-5", message: { role: "assistant", content: "Done", thinking: "think", tool_calls: [{ function: { name: "lookup", arguments: { q: 1 } } }] }, done: true, done_reason: "stop", prompt_eval_count: 12, eval_count: 5 };
 
 test("ollama and ollama-local are connectable; speech-to-text services are media; ollama-local takes a host and no key", () => {
-  assert.equal(builtinRegistry.providers.length, 55);
+  assert.equal(builtinRegistry.providers.length, 58);
   assert.ok(createAdapter(cloud, fakeTransport()) instanceof OllamaAdapter);
   assert.deepEqual([cloud.chatUrl, cloud.modelsUrl], ["https://ollama.com/api/chat", "https://ollama.com/api/tags"]);
   for (const id of ["assemblyai", "deepgram"]) assert.deepEqual(builtinRegistry.status(id), { connectable: false, reason: "Media and search services come with SP22/SP23" });
@@ -52,10 +52,10 @@ test("ollama and ollama-local are connectable; speech-to-text services are media
   assert.equal(local.auth.optional, true);
   assert.equal(cloud.auth.optional, undefined);
   assert.deepEqual([local.chatUrl, local.modelsUrl], ["http://localhost:11434/api/chat", "http://localhost:11434/api/tags"]);
-  const moved = withConnectionBaseUrl(local, "https://gpu.example:11434/");
+  const moved = withConnection(local, { baseUrl: "https://gpu.example:11434/" });
   assert.deepEqual([moved.chatUrl, moved.modelsUrl], ["https://gpu.example:11434/api/chat", "https://gpu.example:11434/api/tags"]);
-  assert.equal(withConnectionBaseUrl(local, null), local);
-  assert.equal(withConnectionBaseUrl(cloud, "https://x.example"), cloud, "only providers that declare it take a host");
+  assert.equal(withConnection(local, { baseUrl: null }), local);
+  assert.equal(withConnection(cloud, { baseUrl: "https://x.example" }), cloud, "only providers that declare it take a host");
 });
 
 test("execute maps CIP to /api/chat, with the corrected fields, and the answer back", async () => {

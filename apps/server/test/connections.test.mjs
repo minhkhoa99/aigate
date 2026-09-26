@@ -59,7 +59,7 @@ test("create stores the key sealed and never returns it", () =>
     assert.equal(view.isActive, true);
     assert.ok(!res.body.includes(SECRET));
     assert.deepEqual(Object.keys(view).sort(), [
-      "baseUrl", "createdAt", "id", "isActive", "keyHint", "lastError", "lastErrorCode", "lastTestedAt", "name", "provider", "providerName", "testStatus", "updatedAt",
+      "accountId", "apiVersion", "baseUrl", "createdAt", "deployment", "id", "isActive", "keyHint", "lastError", "lastErrorCode", "lastTestedAt", "name", "organization", "provider", "providerName", "testStatus", "updatedAt",
     ], "an allowlisted view: nothing sealed or secret");
     const list = await as({ url: "/api/connections" });
     assert.equal(list.json().length, 1);

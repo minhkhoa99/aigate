@@ -1913,3 +1913,127 @@
   newModule: routing
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+
+# 2026-09-26 SP14g: per-connection data (azure, cloudflare-ai) and the ClinePass headers and envelope.
+- id: connection.azure-openai-deployment
+  group: Providers
+  feature: Provider connections
+  subFeature: "azure: an Azure OpenAI resource per connection (endpoint, deployment, api-version, organization) and its test"
+  trigger: "POST /api/providers for azure; a /v1 request to azure/<model>; the connection Test button"
+  input: "{ provider: azure, apiKey, providerSpecificData: { azureEndpoint, deployment, apiVersion, organization } }"
+  output: "A connection whose requests go to the Azure deployment"
+  businessRules:
+    - "Chat URL: <azureEndpoint without one trailing />/openai/deployments/<deployment>/chat/completions?api-version=<apiVersion>, nothing URL-encoded"
+    - "azureEndpoint defaults to AZURE_ENDPOINT, then https://api.openai.com; apiVersion to AZURE_API_VERSION, then 2024-10-01-preview; deployment to the request model, then AZURE_DEPLOYMENT, then gpt-4"
+    - "The key goes in an api-key header (not Authorization); OpenAI-Organization is sent when an organization is set; the body is sent unchanged"
+    - "The Test button POSTs { messages: [{ role: user, content: test }], max_completion_tokens: 1 } to the URL with deployment or gpt-4; the connection is valid unless the status is 401 or 403"
+    - "The Add form keeps Save disabled until endpoint, deployment and organization are filled; the Edit form calls Organization 'Required for billing'"
+    - "No model listing; the catalog has no Azure models, so any azure/<model> is sent as the deployment when none is stored"
+  state:
+    reads: ["providerConnections.providerSpecificData (azureEndpoint, deployment, apiVersion, organization)"]
+    writes: ["providerConnections"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "POST <endpoint>/openai/deployments/<deployment>/chat/completions?api-version=<apiVersion>"
+  fallback: { hasFallback: false, retry: null, timeout: "15 s for the test", quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "the test or a request answers 401/403", partial: false }
+  sideEffects: []
+  persistence: ["providerSpecificData on the connection"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A connection without an endpoint sends the Azure key to https://api.openai.com"
+    - "A client model or a stored deployment with / or ? changes the path"
+  evidence:
+    - { file: open-sse/executors/azure.js, line: 8, note: "buildUrl defaults and URL" }
+    - { file: open-sse/executors/azure.js, line: 26, note: "api-key and OpenAI-Organization headers" }
+    - { file: open-sse/executors/azure.js, line: 54, note: "body sent unchanged" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 542, note: "test: valid unless 401/403" }
+    - { file: "src/app/(dashboard)/dashboard/providers/[id]/AddApiKeyModal.js", line: 396, note: "Save needs endpoint, deployment, organization" }
+    - { file: src/shared/components/EditConnectionModal.js, line: 261, note: "Organization 'Required for billing'" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A wrong deployment (404) or api-version (400) fails the test, Organization is optional, and a missing endpoint is refused"
+    actual: "Only 401/403 fail, the form forces an Organization that is then sent on every request, and a missing endpoint sends the key to api.openai.com"
+    impact: "Broken connections look healthy, and an Azure key can leak to another vendor"
+
+- id: connection.cloudflare-account-id
+  group: Providers
+  feature: Provider connections
+  subFeature: "cloudflare-ai: the Cloudflare account id per connection, filled into the Workers AI URL, and its test"
+  trigger: "POST /api/providers for cloudflare-ai; a /v1 request to cloudflare-ai; the connection Test button"
+  input: "{ provider: cloudflare-ai, apiKey, providerSpecificData: { accountId } }"
+  output: "Requests to https://api.cloudflare.com/client/v4/accounts/<accountId>/ai/v1/chat/completions"
+  businessRules:
+    - "{accountId} in the catalog URL is replaced by providerSpecificData.accountId, not trimmed or encoded; a missing one throws '<provider> requires accountId in providerSpecificData'"
+    - "Auth is Authorization: Bearer <key>"
+    - "The Test button POSTs { model: the first catalog model, messages: [{ role: user, content: test }], max_tokens: 1 }; valid unless 401, 403 or 404 ('Invalid API token or Account ID'); no account id → 'Missing Account ID'"
+    - "The Add form keeps Save disabled without an account id"
+  state:
+    reads: ["providerConnections.providerSpecificData.accountId"]
+    writes: ["providerConnections"]
+    runtimeOnly: []
+  dependencies: ["translator.cloudflare-content-flatten"]
+  providerInteraction: "POST https://api.cloudflare.com/client/v4/accounts/<accountId>/ai/v1/chat/completions"
+  fallback: { hasFallback: false, retry: null, timeout: "15 s for the test", quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "the test answers 401/403/404", partial: false }
+  sideEffects: []
+  persistence: ["providerSpecificData.accountId on the connection"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "An account id with /, ? or # rewrites the path on api.cloudflare.com"
+  evidence:
+    - { file: open-sse/executors/default.js, line: 129, note: "{accountId} replacement" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 529, note: "test: valid unless 401/403/404" }
+    - { file: src/app/api/providers/validate/route.js, line: 185, note: "validate: Missing Account ID" }
+    - { file: open-sse/providers/registry/cloudflare-ai.js, line: 26, note: "URL template" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: provider.clinepass-headers-envelope
+  group: Providers
+  feature: Provider transport
+  subFeature: "clinepass with an API key: Cline client headers, the non-stream { success, data } envelope, and the test"
+  trigger: "A /v1 request routed to clinepass; the connection Test button"
+  input: "An OpenAI chat request and a ClinePass API key"
+  output: "An OpenAI chat answer"
+  businessRules:
+    - "Headers: HTTP-Referer https://cline.bot, X-Title Cline, User-Agent 9Router/<version>, X-PLATFORM <process.platform>, X-PLATFORM-VERSION <process.version>, X-CLIENT-TYPE 9router, X-CLIENT-VERSION and X-CORE-VERSION <version>, X-IS-MULTIROOT false, Authorization Bearer <key>"
+    - "The request body is the normal OpenAI chat body"
+    - "A non-streaming answer { success: true, data: { ... } } is unwrapped to data; { success: false, ... } and streams pass through unchanged"
+    - "Validate (before save): GET https://api.cline.bot/api/v1/models; 401/403 invalid, 2xx valid"
+    - "The Test button has no clinepass case: 'Provider test not supported', stored as testStatus error"
+  state:
+    reads: []
+    writes: ["providerConnections.testStatus"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: "POST https://api.cline.bot/api/v1/chat/completions; GET https://api.cline.bot/api/v1/models"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "the model list answers 401/403", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The client identifies itself as 9router"
+  evidence:
+    - { file: open-sse/shared/clineAuth.js, line: 25, note: "buildClineHeaders" }
+    - { file: open-sse/shared/clineEnvelope.js, line: 14, note: "unwrapClineEnvelope" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 312, note: "unwrap on the non-stream path only" }
+    - { file: open-sse/providers/registry/clinepass.js, line: 29, note: "clineEnvelope quirk" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 838, note: "Provider test not supported" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG, IMPLEMENTATION_ACCIDENT]
+  suspicion:
+    expected: "The Test button checks the key like validate does"
+    actual: "It always fails with 'Provider test not supported'"
+    impact: "Working ClinePass connections look broken"

@@ -1,0 +1,14 @@
+caught   values not encoded
+caught   base url encoded
+caught   defaults ignored
+caught   organization header lost
+caught   chat url not filled
+caught   no flatten quirk
+caught   client type 9router
+caught   no user agent
+caught   azure bearer auth
+caught   no model deployment
+caught   api version default
+caught   azure 404 invalid
+caught   cloudflare 404 valid
+caught   azure probe model

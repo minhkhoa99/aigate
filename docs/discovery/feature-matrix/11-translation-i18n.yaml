@@ -1209,3 +1209,39 @@
     expected: "Only a borrowed signature is replaced; a real one from the cache is sent back unchanged"
     actual: "Every thoughtSignature is overwritten with the Vertex constant"
     impact: "Multi-turn tool calls on Gemini 3 via Vertex may be refused or lose their thinking context"
+
+# 2026-09-26 SP14g: Cloudflare Workers AI takes string content only.
+- id: translator.cloudflare-content-flatten
+  group: Translation
+  feature: Request translation
+  subFeature: "cloudflare-ai: every message content array is flattened to a string"
+  trigger: "A chat request routed to cloudflare-ai"
+  input: "An OpenAI chat body whose messages may carry content-part arrays"
+  output: "The same body with each content array joined into one string"
+  businessRules:
+    - "For provider cloudflare-ai, each message whose content is an array becomes the text parts joined with no separator"
+    - "Any part that is not text becomes an empty string, so images, audio and files are dropped without an error"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["connection.cloudflare-account-id"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A vision request reaches the model with its image removed"
+  evidence:
+    - { file: open-sse/translator/concerns/paramSupport.js, line: 15, note: "cloudflare-ai flattenContent rule" }
+    - { file: open-sse/translator/concerns/paramSupport.js, line: 65, note: "non-text parts become empty strings" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A part the endpoint cannot take is refused with a clear error"
+    actual: "Images, audio and files are silently replaced by empty strings"
+    impact: "Vision requests get answers about text the user did not send alone"
