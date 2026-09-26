@@ -28,9 +28,9 @@ export interface ModelDescriptor {
 export interface ProviderDescriptor {
   readonly id: string;
   readonly name: string;
-  // Adapters are chosen by protocol family, not per vendor (spec §4.2 AIProviderPort).
-  readonly protocol: "openai-compatible";
-  // The full chat request URL; modelsUrl lists models (the OpenAI layout when the catalog names none).
+  // Adapters are chosen by protocol family, not per vendor (spec §4.2 AIProviderPort; createAdapter).
+  readonly protocol: ProviderProtocol;
+  // The full chat request URL; modelsUrl lists models (the family layout when the catalog names none).
   readonly chatUrl: string;
   readonly modelsUrl: string;
   // Static request headers from the catalog; the auth header is always set after them.
@@ -38,7 +38,12 @@ export interface ProviderDescriptor {
   readonly aliases: readonly string[];
   readonly auth: { readonly kind: "api-key"; readonly header: string; readonly scheme: "bearer" | "raw" };
   readonly models: readonly ModelDescriptor[];
+  // Catalog quirks an adapter reads (docs/contracts/provider-anthropic.md: requireClaudeToolType).
+  readonly quirks?: readonly string[];
 }
+
+export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic"] as const;
+export type ProviderProtocol = (typeof PROVIDER_PROTOCOLS)[number];
 
 // Why a catalog provider can or cannot be connected (the UI shows the reason).
 export type ProviderStatus = { readonly connectable: true } | { readonly connectable: false; readonly reason: string };

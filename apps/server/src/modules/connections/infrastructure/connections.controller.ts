@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   BadRequestException, Body, ConflictException, Controller, Delete, Get, Header, HttpCode, HttpStatus, Inject, NotFoundException, Param, Patch, Post,
 } from "@nestjs/common";
-import { builtinRegistry, EngineError, OpenAICompatibleAdapter, type HttpTransportPort, type ProviderDescriptor } from "@aigate/engine";
+import { builtinRegistry, createAdapter, EngineError, type HttpTransportPort, type ProviderDescriptor } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
 import { parseChanges, parseNewConnection } from "../domain/connection.js";
@@ -30,7 +30,7 @@ const named = (view: ConnectionView, nodeNames: ReadonlyMap<string, string>): Na
 async function runTest(provider: ProviderDescriptor, transport: HttpTransportPort, apiKey: string): Promise<TestOutcome> {
   const ctx = { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID() };
   try {
-    const status = await new OpenAICompatibleAdapter(provider, transport).validateCredential({ kind: "api-key", apiKey }, ctx);
+    const status = await createAdapter(provider, transport).validateCredential({ kind: "api-key", apiKey }, ctx);
     if (status.valid) return { testStatus: "active", lastError: null, lastErrorCode: null };
     return { testStatus: status.code === "QUOTA_EXHAUSTED" ? "no_quota" : "invalid", lastError: status.message, lastErrorCode: status.code };
   } catch (error) {

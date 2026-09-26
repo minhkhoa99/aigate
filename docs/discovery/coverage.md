@@ -1,14 +1,14 @@
 # Discovery coverage
 
-Entries: 285
+Entries: 288
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
 | routes | 166/166 |  |
 | pages | 5/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +15 |
-| providers | 15/124 | alicode, alicode-intl, alims-intl, alitp-intl, anthropic, api-airforce, assemblyai, aws-polly … +101 |
+| providers | 16/124 | alicode, alicode-intl, alims-intl, alitp-intl, api-airforce, assemblyai, aws-polly, azure … +100 |
 | executors | 9/31 | azure, codebuddy-cn, codebuddy-intl, devin-cli, gemini-cli, github, grok-cli, grok-web … +14 |
-| translators | 37/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/concerns/thinking.js, open-sse/translator/formats/claude.js … +3 |
+| translators | 40/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js, open-sse/translator/concerns/paramSupport.js, open-sse/translator/concerns/prefetch.js, open-sse/translator/formats/gemini.js, open-sse/translator/formats/responsesApi.js |
 | repos | 11/11 |  |
 | settingsKeys | 47/52 | cloudEnabled, dnsToolEnabled, oidcLoginLabel, samlLoginLabel, tunnelProvider |
 
@@ -19,7 +19,7 @@ Entries: 285
 - connections: 48
 - identity: 11
 - media: 15
-- routing: 81
+- routing: 84
 - settings: 10
 - tooling: 45
 - transport: 14
@@ -28,8 +28,8 @@ Entries: 285
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 12
-- REFERENCE_BEHAVIOR: 239
-- SUSPECTED_BUG: 36
+- REFERENCE_BEHAVIOR: 242
+- SUSPECTED_BUG: 39
 
 ## Missing — pages
 
@@ -63,7 +63,6 @@ Entries: 285
 - alicode-intl
 - alims-intl
 - alitp-intl
-- anthropic
 - api-airforce
 - assemblyai
 - aws-polly
@@ -202,10 +201,7 @@ Entries: 285
 - open-sse/translator/concerns/modality.js
 - open-sse/translator/concerns/paramSupport.js
 - open-sse/translator/concerns/prefetch.js
-- open-sse/translator/concerns/thinking.js
-- open-sse/translator/formats/claude.js
 - open-sse/translator/formats/gemini.js
-- open-sse/translator/formats/maxTokens.js
 - open-sse/translator/formats/responsesApi.js
 
 ## Missing — settingsKeys

@@ -1987,6 +1987,22 @@ Every item below is a capability AIGate must have. Derived from tracing
   - DELETE cascades: deleteProviderConnectionsByProvider(id) removes every connection under this node before deleteProviderNode(id) removes the node itself — deleting a node silently deletes all its connections too, with no confirmation or count returned
 - **Errors:** `INVALID_REQUEST` (node not found (404), or PUT is missing name/prefix/baseUrl, or apiType is invalid for an openai-compatible node)
 
+### URL, auth header, static headers, and the connection test for claude-format API-key providers (anthropic, glm, kimi, minimax, minimax-cn)
+
+- **id:** `provider.anthropic-auth-and-headers` · **module:** `routing`
+- **Trigger:** Every request or connection test to a provider whose transport format is claude
+- **Input:** The provider registry entry and the connection's API key
+- **Output:** An HTTPS request to <provider>/v1/messages (or /v1/models) with the auth and version headers
+- **Rules:**
+  - A claude-format provider with no auth block (anthropic) falls back to x-api-key with the raw key, and adds anthropic-version when it is missing
+  - glm, kimi, minimax, minimax-cn declare x-api-key with the raw key; the claude entry sends an API key as x-api-key and an OAuth token as Authorization Bearer
+  - Every claude-format provider sends Anthropic-Version 2023-06-01 and Anthropic-Beta claude-code-20250219,interleaved-thinking-2025-05-14
+  - Accept text/event-stream is added when streaming
+  - The anthropic connection test POSTs a 1-token message to claude-3-haiku-20240307 and treats any status but 401 as valid; glm, kimi, minimax reject 401 and 403
+  - The model list is GET https://api.anthropic.com/v1/models with x-api-key and Anthropic-Version, reading data[]
+- **Errors:** `AUTH_ERROR` (upstream 401 (anthropic) or 401/403 (glm, kimi, minimax))
+- **AIGate required behavior:** An Anthropic key that is refused with 403 is reported as invalid, as the sibling claude-format providers do
+
 ## Proxy Pools
 
 ### A real (non-noAuth) connection is bound to a proxy pool via its own create/update body
@@ -3191,6 +3207,50 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Idempotency is exact: the prompt must appear as its own SEP-delimited segment (or the whole string), not merely as a substring, before it is considered already-injected
   - Kiro injection additionally mirrors/repairs the prompt into the first user turn's content (not just systemPrompt), with a rollback if the write doesn't converge
 
+## Translation
+
+### Anthropic Messages response (JSON and SSE) to OpenAI chat completions, and upstream error handling
+
+- **id:** `translator.claude-to-openai-response` · **module:** `routing`
+- **Trigger:** A response from a claude-format provider
+- **Input:** An Anthropic Messages JSON body, or its SSE events (message_start, content_block_*, message_delta, message_stop, ping, error)
+- **Output:** An OpenAI chat completion or chunk stream
+- **Rules:**
+  - text blocks become content, thinking becomes reasoning_content, tool_use becomes tool_calls with the input as a JSON string
+  - Streaming stop_reason mapping: end_turn and stop_sequence to stop, max_tokens to length, tool_use to tool_calls, refusal to content_filter, anything else to stop
+  - Streaming usage: prompt_tokens = input + cache_read + cache_creation, completion_tokens = output, with cached_tokens details when above 0
+  - Streaming ids are chatcmpl-<message id>; input_json_delta fragments become tool call argument deltas
+  - Upstream errors take the message from error.message and keep the HTTP status; 401-404 and 429 feed account fallback; 529 is never retried
+  - A mid-stream error event has no handler and is dropped silently
+  - Non-streaming maps only end_turn and tool_use; max_tokens, stop_sequence and refusal pass through raw, and usage drops the cache fields
+  - Thinking blocks also emit empty <think></think> tags into content while streaming
+  - Non-streaming strips json code fences from every text block (a Kimi workaround)
+- **Streaming:** yes
+- **Errors:** `PROVIDER_UNAVAILABLE` (upstream 5xx or 529 overloaded), `RATE_LIMIT` (upstream 429), `AUTH_ERROR` (upstream 401 or 403)
+- **AIGate required behavior:** A mid-stream error reaches the client as an error; non-streaming and streaming map stop reasons and usage the same way; reasoning goes only to reasoning_content; text is returned as the model wrote it
+
+### OpenAI chat completions request to Anthropic Messages request
+
+- **id:** `translator.openai-to-claude-request` · **module:** `routing`
+- **Trigger:** A chat request routed to a claude-format provider
+- **Input:** An OpenAI chat completions body
+- **Output:** An Anthropic Messages body: model, max_tokens, system, messages, tools, tool_choice, thinking, sampling
+- **Rules:**
+  - max_tokens is the client value or 64000; with tools it is raised to at least 32000; if it is not above the thinking budget it becomes budget + 1024; finally it is capped at the model output limit
+  - System messages are pulled out of the conversation into the system field
+  - user and tool roles map to user turns, everything else to assistant; consecutive same-role turns are merged, and tool_result blocks come first in a user turn
+  - Assistant tool_calls become tool_use blocks with the arguments parsed as JSON input; tool messages become tool_result blocks
+  - An image data URI becomes a base64 source and an http(s) URL a url source; a PDF file becomes a document block
+  - Function tools become { name, description, input_schema }; tool_choice required maps to any and a named function to { type: tool, name }
+  - reasoning_effort maps to thinking { type: enabled, budget_tokens } with low 1024, medium 8192, high 24576
+  - Providers with the requireClaudeToolType quirk (MiniMax) get type custom on every tool; dropOutputConfig providers never receive output_config
+  - stop is never mapped to stop_sequences, and top_p, seed, user and similar fields are dropped
+  - tool_choice none becomes auto
+  - The system prompt always starts with the Claude Code identity line, for API-key providers too
+  - Client cache_control markers are stripped and 9router places its own (1h on the last system block and tool, 5m on the last assistant turn)
+  - thinking is deleted silently when the last message is not from the user
+- **AIGate required behavior:** Every OpenAI field is either mapped (stop to stop_sequences, top_p, max_completion_tokens, tool_choice none to none) or refused with a clear error; the client's own system prompt and cache markers are kept, and requested reasoning is never removed silently
+
 ## Translation / language functionality
 
 ### Supported-locale catalog and the DEFAULT_LOCALE fallback
@@ -3668,6 +3728,9 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `proxypool.vercel-relay-deploy` | A failed or timed-out Vercel relay deployment should be cleaned up (deleted from Vercel) or otherwise reconciled so no orphaned billable resource is left with zero trace in 9router — the deno-deploy route (proxypool.deno-relay-deploy) shows this codebase already knows how to do that: it issues a DELETE rollback on 2 of its 3 failure paths | vercel-deploy/route.js has no DELETE/cleanup call anywhere in the file — every failure mode (deployment-creation failure, pollDeployment timeout, or Vercel reporting ERROR/CANCELED) throws straight into the single outer catch, which just logs and returns a 500. This is a strictly worse gap than deno-deploy's: Deno only orphans on its timeout path (see proxypool.deno-relay-deploy's own SUSPECTED_BUG), while Vercel orphans unconditionally on every failure path, including ones its own Deno sibling already handles correctly (e.g. the deployment-creation-call failure, which Deno rolls back but Vercel does not) | Repeated failed/slow deploy attempts accumulate orphaned Vercel deployments/projects that consume the operator's Vercel account quota and cost, discoverable only by manually auditing the Vercel dashboard, since 9router has no local record of them at all |
 | `proxypool.deno-relay-deploy` | Given that this route already rolls back on 2 of its 3 failure paths (deploy-call failure, bad-final-status), the timeout path should follow the same pattern — either DELETE before throwing, or set a sentinel status and let it fall through to the existing `if (status !== "succeeded")` rollback block, instead of throwing straight past it | The timeout branch (`if (attempts >= maxAttempts) throw new Error(...)`) throws from inside the while loop, which unwinds directly to the function's single outer try/catch — a scope that only logs and returns a 500, with no DELETE call anywhere in it. The rollback block at `if (status !== "succeeded")` is structurally unreachable once that throw fires | A Deno deploy that hangs in 'queued'/'building' for the full 60s (slow build, transient Deno Deploy backend delay, etc.) leaves the app+revision live on the operator's Deno Deploy account with zero local record and zero cleanup attempt — the same class of orphaned-billable-resource risk flagged for proxypool.vercel-relay-deploy, just reachable only via this one specific failure mode here instead of all of them |
 | `translator.responses-format-transformer` | createResponsesApiTransformStream is exercised by the live /v1/responses streaming lane, since it exists specifically to shape Codex Responses-API SSE events | Its only caller, handleResponsesCore, is never invoked from any route — the live /v1/responses route uses handleChat and the registered openai-responses translator pair instead, so handleResponsesCore and the transform stream it drives are unreachable | A maintainer could change or delete createResponsesApiTransformStream believing it affects the Responses-API streaming lane and see no effect on live traffic, or conversely trust its event-shaping logic (reasoning items, sequence numbers) as authoritative when the actually-live path (the registered translator pair) may have since diverged from it |
+| `provider.anthropic-auth-and-headers` | An Anthropic key that is refused with 403 is reported as invalid, as the sibling claude-format providers do | The anthropic connection test treats 403 as a valid key | A key without permission shows as working until the first real request fails |
+| `translator.openai-to-claude-request` | Every OpenAI field is either mapped (stop to stop_sequences, top_p, max_completion_tokens, tool_choice none to none) or refused with a clear error; the client's own system prompt and cache markers are kept, and requested reasoning is never removed silently | stop, top_p and other fields are dropped, max_completion_tokens is ignored, none becomes auto, a Claude Code identity line is injected into every system prompt, cache markers are replaced, and thinking is deleted when the last message is not from the user | Requests behave differently from what the client asked (no stop sequences, forced tool use possible, a changed system prompt), with no error to explain it |
+| `translator.claude-to-openai-response` | A mid-stream error reaches the client as an error; non-streaming and streaming map stop reasons and usage the same way; reasoning goes only to reasoning_content; text is returned as the model wrote it | Mid-stream error events are dropped, non-streaming passes max_tokens/refusal through raw and drops cache usage, empty think tags appear in content, and json fences are stripped from all claude providers | A failed stream looks like a normal short answer, clients see non-OpenAI finish reasons and wrong cache accounting, and model output is altered |
 | `clitools.write-not-atomic` | Given every one of these writes targets the user's own IDE/CLI configuration file (not 9router's own data), and one of the affected routes' own comment explicitly promises 'Backup old fields and write new settings', a crash mid-write should not be able to corrupt or truncate that file — either via a temp-file-then-rename swap (the exact pattern already implemented in this codebase at src/lib/mitmAliasCache.js:15-21 for 9router's own alias cache) or an actual on-disk backup copy. | All 13 write-capable cli-tools routes call fs.writeFile(path, content) directly on the final path with no temp file, no rename, and no backup copy anywhere on disk. The 'backup' language in the claude-settings POST comment refers only to merging the previously-read JSON object in memory before the single overwrite call — nothing is preserved outside process memory. | A crash, OOM kill, disk-full error, or power loss during any of these writes can truncate or corrupt the user's real tool config (e.g. ~/.claude/settings.json, ~/.codex/config.toml, ~/.openclaw/openclaw.json). Because every route's read path treats an unparseable file as simply 'no config', the damage is silent: the next status check reports the tool as unconfigured, and the next Apply starts from empty, permanently discarding whatever unrelated settings that file held before 9router wrote to it. |
 | `clitools.copilot-settings-array-upsert` | Like every other cli-tools GET handler (claude, codex, cline, droid, kilo, etc.), Copilot's GET should reflect a real detection check — a `where`/`which` lookup or a marker-file probe — before reporting installed: true, so the dashboard only shows Copilot as available on a machine that actually has it. | copilot-settings/route.js's GET performs no detection at all: it reads chatLanguageModels.json (which may not exist, in which case config is null) and always returns installed: true regardless. | The dashboard's Copilot integration card (and any 'all installed tools' summary the UI derives from installed flags) will show Copilot as installed on any machine, even one with no VS Code and no Copilot extension, inviting the user to Apply — which just writes a file nobody will ever read. |
 | `clitools.deepseek-tui-full-overwrite` | Like every other tool's Apply/Reset in this set (codex, droid, opencode, openclaw, grok-build, hermes, jcode, kilo, cline, cowork all read-merge-write or perform a targeted key removal), DeepSeek TUI's POST should merge 9router's fields into whatever config.toml already contains, and DELETE should remove only what 9router added — preserving any other DeepSeek TUI settings the user configured. | Both POST and DELETE build a fixed, hand-written TOML string from scratch and write it directly, completely replacing the file's prior contents regardless of what else was in it (POST never even calls the file's own readConfigToml() result; DELETE writes a hardcoded 2-line default). | The first time a user clicks Apply or Reset for DeepSeek TUI in the 9router dashboard, any other settings they had configured directly in ~/.deepseek/config.toml (other providers, TUI preferences, anything not related to 9router) are silently and irrecoverably destroyed. |

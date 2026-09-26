@@ -685,3 +685,159 @@
   newModule: tooling
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+
+# 2026-09-26 SP14a: the Anthropic Messages family (claude format), traced before the adapter.
+- id: provider.anthropic-auth-and-headers
+  group: Providers
+  feature: Anthropic Messages providers
+  subFeature: "URL, auth header, static headers, and the connection test for claude-format API-key providers (anthropic, glm, kimi, minimax, minimax-cn)"
+  trigger: Every request or connection test to a provider whose transport format is claude
+  input: "The provider registry entry and the connection's API key"
+  output: "An HTTPS request to <provider>/v1/messages (or /v1/models) with the auth and version headers"
+  businessRules:
+    - "A claude-format provider with no auth block (anthropic) falls back to x-api-key with the raw key, and adds anthropic-version when it is missing"
+    - "glm, kimi, minimax, minimax-cn declare x-api-key with the raw key; the claude entry sends an API key as x-api-key and an OAuth token as Authorization Bearer"
+    - "Every claude-format provider sends Anthropic-Version 2023-06-01 and Anthropic-Beta claude-code-20250219,interleaved-thinking-2025-05-14"
+    - "Accept text/event-stream is added when streaming"
+    - "The anthropic connection test POSTs a 1-token message to claude-3-haiku-20240307 and treats any status but 401 as valid; glm, kimi, minimax reject 401 and 403"
+    - "The model list is GET https://api.anthropic.com/v1/models with x-api-key and Anthropic-Version, reading data[]"
+  state:
+    reads: ["provider registry entry", "connection API key"]
+    writes: ["connection testStatus (test only)"]
+    runtimeOnly: []
+  dependencies: ["routing.build-url", "connection.test-single-connection"]
+  providerInteraction: "POST {base}/v1/messages; GET {base}/v1/models"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "upstream 401 (anthropic) or 401/403 (glm, kimi, minimax)", partial: false }
+  sideEffects: ["The anthropic connection test spends one output token"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "applyAuth checks only the lower-case anthropic-version key, so a capitalised Anthropic-Version that falls through to the fallback is sent twice"
+  evidence:
+    - { file: open-sse/providers/registry/anthropic.js, line: 16, note: "anthropic: baseUrl https://api.anthropic.com/v1/messages, format claude, no auth block" }
+    - { file: open-sse/providers/shared.js, line: 24, note: "ANTHROPIC_API_VERSION 2023-06-01" }
+    - { file: open-sse/providers/shared.js, line: 28, note: "shared Anthropic-Beta list" }
+    - { file: open-sse/executors/default.js, line: 139, note: "claude-format fallback auth: x-api-key raw plus anthropic-version" }
+    - { file: open-sse/executors/default.js, line: 205, note: "Accept text/event-stream when streaming" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 565, note: "anthropic test: POST /v1/messages max_tokens 1; only 401 is invalid" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 588, note: "glm test rejects 401 and 403" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "An Anthropic key that is refused with 403 is reported as invalid, as the sibling claude-format providers do"
+    actual: "The anthropic connection test treats 403 as a valid key"
+    impact: "A key without permission shows as working until the first real request fails"
+
+- id: translator.openai-to-claude-request
+  group: Translation
+  feature: Request translation
+  subFeature: "OpenAI chat completions request to Anthropic Messages request"
+  trigger: A chat request routed to a claude-format provider
+  input: "An OpenAI chat completions body"
+  output: "An Anthropic Messages body: model, max_tokens, system, messages, tools, tool_choice, thinking, sampling"
+  businessRules:
+    - "max_tokens is the client value or 64000; with tools it is raised to at least 32000; if it is not above the thinking budget it becomes budget + 1024; finally it is capped at the model output limit"
+    - "System messages are pulled out of the conversation into the system field"
+    - "user and tool roles map to user turns, everything else to assistant; consecutive same-role turns are merged, and tool_result blocks come first in a user turn"
+    - "Assistant tool_calls become tool_use blocks with the arguments parsed as JSON input; tool messages become tool_result blocks"
+    - "An image data URI becomes a base64 source and an http(s) URL a url source; a PDF file becomes a document block"
+    - "Function tools become { name, description, input_schema }; tool_choice required maps to any and a named function to { type: tool, name }"
+    - "reasoning_effort maps to thinking { type: enabled, budget_tokens } with low 1024, medium 8192, high 24576"
+    - "Providers with the requireClaudeToolType quirk (MiniMax) get type custom on every tool; dropOutputConfig providers never receive output_config"
+    - "stop is never mapped to stop_sequences, and top_p, seed, user and similar fields are dropped"
+    - "tool_choice none becomes auto"
+    - "The system prompt always starts with the Claude Code identity line, for API-key providers too"
+    - "Client cache_control markers are stripped and 9router places its own (1h on the last system block and tool, 5m on the last assistant turn)"
+    - "thinking is deleted silently when the last message is not from the user"
+  state:
+    reads: ["model output limit", "provider quirks"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["translator.registered-format-pairs", "translator.pivot-loss"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "max_completion_tokens is ignored, so an OpenAI client that sends it gets the 64000 default"
+    - "A client omitting stream gets an upstream stream and an SSE reply"
+  evidence:
+    - { file: open-sse/translator/request/openai-to-claude.js, line: 22, note: "max_tokens via the maxTokens helper" }
+    - { file: open-sse/translator/formats/maxTokens.js, line: 12, note: "64000 default, tools floor 32000, budget + 1024, model cap" }
+    - { file: open-sse/translator/request/openai-to-claude.js, line: 30, note: "only temperature is copied; top_p and stop are dropped" }
+    - { file: open-sse/translator/request/openai-to-claude.js, line: 40, note: "system messages pulled out" }
+    - { file: open-sse/translator/request/openai-to-claude.js, line: 133, note: "Claude Code identity line always prepended" }
+    - { file: open-sse/translator/request/openai-to-claude.js, line: 226, note: "image data URI and URL sources, PDF documents" }
+    - { file: open-sse/translator/request/openai-to-claude.js, line: 276, note: "tool_calls to tool_use with parsed input" }
+    - { file: open-sse/translator/request/openai-to-claude.js, line: 299, note: "tool_choice mapping; none becomes auto at 307" }
+    - { file: open-sse/translator/concerns/thinking.js, line: 9, note: "budgets: low 1024, medium 8192, high 24576" }
+    - { file: open-sse/translator/formats/claude.js, line: 137, note: "merge same-role turns, tool_result first" }
+    - { file: open-sse/translator/formats/claude.js, line: 442, note: "dropOutputConfig quirk" }
+    - { file: open-sse/translator/concerns/toolCall.js, line: 175, note: "requireClaudeToolType quirk adds type custom" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Every OpenAI field is either mapped (stop to stop_sequences, top_p, max_completion_tokens, tool_choice none to none) or refused with a clear error; the client's own system prompt and cache markers are kept, and requested reasoning is never removed silently"
+    actual: "stop, top_p and other fields are dropped, max_completion_tokens is ignored, none becomes auto, a Claude Code identity line is injected into every system prompt, cache markers are replaced, and thinking is deleted when the last message is not from the user"
+    impact: "Requests behave differently from what the client asked (no stop sequences, forced tool use possible, a changed system prompt), with no error to explain it"
+
+- id: translator.claude-to-openai-response
+  group: Translation
+  feature: Response translation
+  subFeature: "Anthropic Messages response (JSON and SSE) to OpenAI chat completions, and upstream error handling"
+  trigger: A response from a claude-format provider
+  input: "An Anthropic Messages JSON body, or its SSE events (message_start, content_block_*, message_delta, message_stop, ping, error)"
+  output: "An OpenAI chat completion or chunk stream"
+  businessRules:
+    - "text blocks become content, thinking becomes reasoning_content, tool_use becomes tool_calls with the input as a JSON string"
+    - "Streaming stop_reason mapping: end_turn and stop_sequence to stop, max_tokens to length, tool_use to tool_calls, refusal to content_filter, anything else to stop"
+    - "Streaming usage: prompt_tokens = input + cache_read + cache_creation, completion_tokens = output, with cached_tokens details when above 0"
+    - "Streaming ids are chatcmpl-<message id>; input_json_delta fragments become tool call argument deltas"
+    - "Upstream errors take the message from error.message and keep the HTTP status; 401-404 and 429 feed account fallback; 529 is never retried"
+    - "A mid-stream error event has no handler and is dropped silently"
+    - "Non-streaming maps only end_turn and tool_use; max_tokens, stop_sequence and refusal pass through raw, and usage drops the cache fields"
+    - "Thinking blocks also emit empty <think></think> tags into content while streaming"
+    - "Non-streaming strips json code fences from every text block (a Kimi workaround)"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["translator.response-pivot-dispatch", "fallback.error-classification"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "upstream 5xx or 529 overloaded", partial: false }
+    - { code: RATE_LIMIT, when: "upstream 429", partial: false }
+    - { code: AUTH_ERROR, when: "upstream 401 or 403", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "message_stop without message_delta finishes with tool_calls or stop, and usage without cache counts"
+  evidence:
+    - { file: open-sse/translator/response/claude-to-openai.js, line: 26, note: "message_start: id, role chunk, usage seed" }
+    - { file: open-sse/translator/response/claude-to-openai.js, line: 53, note: "content_block_start: tool_use to tool_calls" }
+    - { file: open-sse/translator/response/claude-to-openai.js, line: 62, note: "thinking block emits <think> tags into content" }
+    - { file: open-sse/translator/response/claude-to-openai.js, line: 124, note: "message_delta: stop_reason and usage" }
+    - { file: open-sse/translator/concerns/finishReason.js, line: 8, note: "stop_reason to finish_reason table" }
+    - { file: open-sse/translator/concerns/usage.js, line: 27, note: "prompt = input + cache_read + cache_creation" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 238, note: "json fences stripped from every text block" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 253, note: "non-streaming maps only end_turn and tool_use" }
+    - { file: open-sse/utils/error.js, line: 58, note: "upstream error message extraction; status kept" }
+    - { file: open-sse/config/errorConfig.js, line: 2, note: "status table; 529 not in it" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A mid-stream error reaches the client as an error; non-streaming and streaming map stop reasons and usage the same way; reasoning goes only to reasoning_content; text is returned as the model wrote it"
+    actual: "Mid-stream error events are dropped, non-streaming passes max_tokens/refusal through raw and drops cache usage, empty think tags appear in content, and json fences are stripped from all claude providers"
+    impact: "A failed stream looks like a normal short answer, clients see non-OpenAI finish reasons and wrong cache accounting, and model output is altered"

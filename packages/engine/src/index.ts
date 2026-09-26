@@ -6,6 +6,8 @@ export * from "./retry.js";
 export * from "./http.js";
 export * from "./sse.js";
 export { OpenAICompatibleAdapter } from "./adapters/openai-compatible.js";
+export { AnthropicAdapter } from "./adapters/anthropic.js";
+export { createAdapter } from "./adapters/index.js";
 export * from "./protocols/openai-chat.js";
 export type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, HttpResponse, HttpTransportPort, ListedModel } from "./ports.js";
 export { builtinRegistry, toDescriptor, unsupportedReason } from "./builtin-registry.js";

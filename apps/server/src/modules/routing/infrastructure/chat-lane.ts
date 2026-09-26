@@ -4,8 +4,8 @@ import type { ServerResponse } from "node:http";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import {
-  assertModelSupports, builtinRegistry, EngineError, OpenAIChatStreamEncoder, OpenAICompatibleAdapter, parseOpenAIChatRequest, toOpenAIChatCompletion,
-  toOpenAIError, UnsupportedFeatureError, type CanonicalRequest, type Credential, type ExecCtx, type HttpTransportPort, type ProviderDescriptor,
+  assertModelSupports, builtinRegistry, createAdapter, EngineError, OpenAIChatStreamEncoder, parseOpenAIChatRequest, toOpenAIChatCompletion,
+  toOpenAIError, UnsupportedFeatureError, type AIProviderPort, type CanonicalRequest, type Credential, type ExecCtx, type HttpTransportPort, type ProviderDescriptor,
   type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
@@ -113,7 +113,7 @@ export class ChatLane {
       }
       const { request: parsed, includeUsage } = parseOpenAIChatRequest(request.body);
       const target = await this.resolve(parsed);
-      const adapter = new OpenAICompatibleAdapter(target.provider, this.transport);
+      const adapter = createAdapter(target.provider, this.transport);
       const ids = { created: Math.floor(Date.now() / 1000), fallbackId: `chatcmpl-${requestId.replaceAll("-", "")}`, requestId };
       if (!parsed.stream) {
         const ctx: ExecCtx = { signal: AbortSignal.any([client.signal, budget.signal]), requestId };
@@ -221,7 +221,7 @@ export class ChatLane {
 
   // Headers are sent only after the first chunk, so a failure before it is a normal JSON error.
   private async stream(
-    reply: FastifyReply, adapter: OpenAICompatibleAdapter, target: Target,
+    reply: FastifyReply, adapter: AIProviderPort, target: Target,
     ids: { created: number; fallbackId: string; requestId: string; includeUsage: boolean }, client: AbortController, budget: AbortSignal,
   ): Promise<void> {
     const idle = new AbortController();

@@ -17,7 +17,7 @@ Scope, per spec §9 ("SP13 | the 123-provider registry"): the SP4 `CATALOG` beco
 | no blocking quirk: `clineEnvelope` | "Needs a provider-specific request envelope (SP14)" |
 | not `forceStream`, except OpenAI | "Only answers streaming requests (SP14)" |
 
-- **Result:** 41 of the 121 catalog providers are connectable.
+- **Result:** 41 of the 121 catalog providers are connectable (46 since SP14a added the `anthropic` family, `provider-anthropic.md`).
 - **The OpenAI exception.** 9router forces streaming for OpenAI. The OpenAI API answers non-streaming requests, and SP3 tier 1 replays that way, so AIGate does not force it. It is labeled `IMPLEMENTATION_ACCIDENT` for OpenAI.
 - **Ignored fields.** `transport.usage`, `modelsFetcher`, `thinkingFormat`, `reasoningInject`, `regions`, and multi-`transports` do not stop a plain chat call. They stay in `unmodelled` for their SPs, and the default region URL is used.
 

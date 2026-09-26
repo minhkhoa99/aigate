@@ -26,7 +26,8 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M0 SP4 `tools/extract` registry extraction | Done, no UI | `docs/contracts/registry-extract.md` |
 | M2 SP13 catalog → runtime registry (41 connectable providers) | Done, UI wired | `docs/contracts/catalog-providers.md` |
 | M2 SP13b custom OpenAI-compatible providers; `tools/extract` deleted | Done, UI wired | `docs/contracts/custom-providers.md` |
-| M2 SP14 provider adapters by protocol family | **Next** | SP13b below |
+| M2 SP14a Anthropic Messages adapter (5 more providers) | Done, no new screen | `docs/contracts/provider-anthropic.md` |
+| M2 SP14b Anthropic-compatible custom providers, stream-only providers | **Next** | SP14a below |
 
 ## Completed and verified
 
@@ -487,7 +488,16 @@ Checks and status:
 
 **SP13b follow-up (2026-09-26, user decision "keep the 9router behavior").** The three `SUSPECTED_BUG` rules are now ported as 9router has them: a missing `baseUrl` defaults to `https://api.openai.com/v1`; the base URL is stored trimmed, so a pasted `/chat/completions` doubles the path (one trailing `/` is dropped when the URL is built); any prefix is stored, built-in ids and aliases win at `/v1`, and the oldest duplicate wins. Migration `0004` drops the unique prefix index for a plain `(prefix, created_at)` index. `PREFIX_RESERVED` and `PREFIX_TAKEN` are gone. The dashboard card shows an **Unreachable** pill with the reason (`/api/providers` now carries `aliases` for it). The https-or-loopback, credential, and query checks stay: they are AIGate security rules. Server tests 72/72 (a new routing-quirks test).
 
-**Next step, M2 SP14 (provider adapters by protocol family).** The catalog reasons show where the providers are blocked: the Anthropic adapter 6, stream-only providers 3, openai-responses 3, non-standard endpoints 5, ollama 2, and one each for gemini, gemini-cli, vertex, kiro, cursor, commandcode, antigravity, and the Cline envelope.
-1. Start with the **Anthropic Messages adapter** (`AIProviderPort`, CIP ↔ `/v1/messages`, SSE events). It unblocks 6 catalog providers and the Anthropic-compatible custom providers (the disabled option on `/providers/new`).
-2. Then **stream-only providers**: call with `stream: true` and aggregate for a non-streaming client.
-3. Matrix entries first for each family (`porting-behavior-not-code`), then a contract per adapter; `unsupportedReason` must drop each reason as its adapter lands, and `/providers` pills update by themselves.
+**M2 SP14a (Anthropic Messages adapter) is complete.** The contract is `docs/contracts/provider-anthropic.md`.
+
+- **Matrix first.** Three entries in `11-translation-i18n.yaml`, traced by an agent over the 9router claude path: `provider.anthropic-auth-and-headers`, `translator.openai-to-claude-request`, `translator.claude-to-openai-response` (now `implemented`, 288 entries).
+- **User decision (2026-09-26): correct behavior, like SP9/SP10.** Kept from 9router: `max_tokens` default 64000, at least 32000 with tools, budget + 1024, capped at the model limit; thinking budgets low 1024 / medium 8192 / high 24576; `anthropic-version: 2023-06-01` and the catalog `anthropic-beta`; x-api-key; same-role merging with tool results first; the stop-reason table; `requireClaudeToolType`. Not ported: dropped `stop`/`top_p`, `none`→`auto`, the Claude Code identity line, replaced cache markers, silent thinking removal, dropped mid-stream errors, raw non-stream stop reasons, lost cache usage, `<think>` tags, json-fence stripping, 403 counted as a valid key.
+- **Engine.** `adapters/http-adapter.ts` holds the shared HTTP handling (auth, retry before the first byte, error classification, redaction); `OpenAICompatibleAdapter` now extends it with no behavior change. `AnthropicAdapter` maps CIP ↔ Messages, JSON and SSE. `createAdapter` picks by `protocol` (`"openai-compatible" | "anthropic"`). Unmodelled OpenAI fields: `user` → `metadata.user_id`, `parallel_tool_calls: false` → `disable_parallel_tool_use`, anything else → 400 `unsupported_feature` naming the field.
+- **Registry.** 46 connectable providers (anthropic, glm, kimi, minimax, minimax-cn added). `claude` now says "Needs OAuth sign-in (SP16)". The connection test reads `GET …/v1/models` (free) and falls back to a 1-token message where a host has no list.
+- **Server.** The chat lane and the connection test use `createAdapter`. No new API or screen: `/providers` pills and the Add modal follow `connectable`.
+- **Checks.** Engine 57/57 (10 new in `test/anthropic-adapter.test.mjs`), server 76/76 (4 new in `test/anthropic-lane.test.mjs`: JSON, stream, mid-stream error, refused field, connection test), web 7/7, parity 5/5, database 6/6, discovery 54/54; `pnpm lint`, `pnpm build`. 23 mutations, all caught (two survivors at first exposed real test gaps: the default version header and tool-result ordering).
+
+**Next step, M2 SP14b.**
+1. **Anthropic-compatible custom providers.** A `type` column on `provider_nodes` (`openai-compatible` | `anthropic-compatible`), id prefix `anthropic-compatible-`, default base `https://api.anthropic.com/v1`, a pasted `/messages` stripped (9router `connection.provider-node-update-delete`), chat URL `<base>/messages`. Enable the Anthropic option on `/providers/new`. Trace the extra headers 9router sends for non-Anthropic hosts (`default.js:173-203`) into the matrix first.
+2. **Stream-only providers** (`codebuddy-cn`, `codebuddy-intl`, `api-airforce`): call with `stream: true` and aggregate for a non-streaming client (`translator.stream-to-json-converter`; do not port its suspected bugs without asking).
+3. Then the remaining families by provider count: `openai-responses` (3), non-standard endpoints (5), `ollama` (2), `gemini`, `vertex`, …

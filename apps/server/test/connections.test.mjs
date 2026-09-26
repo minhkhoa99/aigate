@@ -79,7 +79,7 @@ test("one connection per provider; unsupported providers and bad bodies name the
     const unsupported = await create(as, { provider: "claude", apiKey: SECRET });
     assert.equal(unsupported.statusCode, 400);
     assert.equal(unsupported.json().code, "PROVIDER_NOT_SUPPORTED");
-    assert.match(unsupported.json().message, /claude cannot be connected yet: Needs the anthropic adapter \(SP14\)\.$/, "the catalog reason");
+    assert.match(unsupported.json().message, /claude cannot be connected yet: Needs OAuth sign-in \(SP16\)\.$/, "the catalog reason");
     const unknown = await create(as, { provider: "no-such-provider", apiKey: SECRET });
     assert.deepEqual([unknown.statusCode, unknown.json().code], [400, "PROVIDER_NOT_SUPPORTED"]);
     assert.match(unknown.json().message, /not in the catalog/);

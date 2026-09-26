@@ -1,11 +1,11 @@
 import { UnsupportedFeatureError, type CanonicalRequest, type CanonicalResponse, type ContentPart, type MediaSource, type StopReason, type StreamChunk, type TokenUsage } from "../cip.js";
-import { EngineError, type ErrorCode } from "../errors.js";
+import { EngineError } from "../errors.js";
 import { readBoundedText } from "../http.js";
 import { isRecord, list, parseJson, record, text, type Json } from "../json.js";
-import type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, HttpResponse, HttpTransportPort, ListedModel } from "../ports.js";
-import { MODEL_ID, type ModelDescriptor, type ProviderDescriptor } from "../registry.js";
-import { withRetry } from "../retry.js";
+import type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, ListedModel } from "../ports.js";
+import { MODEL_ID } from "../registry.js";
 import { readSseData } from "../sse.js";
+import { count, HttpProviderAdapter, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
 
 // AIProviderPort for the openai-compatible family (docs/contracts/provider-openai.md).
 
@@ -13,21 +13,13 @@ const TARGET = "openai-compatible";
 const CHAT_TIMEOUT_MS = 300_000;
 // ponytail: the transport deadline bounds the whole stream until the SP12 idle timeout exists.
 const STREAM_TIMEOUT_MS = 600_000;
-const METADATA_TIMEOUT_MS = 15_000;
-const RETRY = { maxAttempts: 3, baseDelayMs: 500, maxDelayMs: 1_000 };
-const RETRY_STATUSES = new Set([502, 503, 504]);
-const ERROR_BODY_BYTES = 64 * 1024;
-const MAX_MESSAGE_CHARS = 300;
 const MAX_LISTED_MODELS = 1_000;
 const MAX_TOOL_CALLS = 128;
-// Printable ASCII only: a key can never break out of its header.
-const API_KEY = /^[\x21-\x7e]{1,4096}$/;
 const AUDIO_FORMATS = new Map([["audio/wav", "wav"], ["audio/x-wav", "wav"], ["audio/mpeg", "mp3"], ["audio/mp3", "mp3"]]);
 const STOP_REASONS = new Map<string, StopReason>([
   ["stop", "end_turn"], ["length", "max_tokens"], ["tool_calls", "tool_use"], ["function_call", "tool_use"], ["content_filter", "content_filter"],
 ]);
 
-const count = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0);
 const unsupported = (feature: string) => new UnsupportedFeatureError(feature, TARGET);
 
 // ---- CIP -> chat completions ----
@@ -145,37 +137,7 @@ function stopReasonOf(finishReason: unknown, sawToolCall: boolean): StopReason {
   return STOP_REASONS.get(text(finishReason) ?? "") ?? "end_turn";
 }
 
-// ---- errors ----
-
-function classifyStatus(status: number, upstreamCode: string | undefined): ErrorCode {
-  if (status === 401 || status === 403) return "AUTH_ERROR";
-  if (status === 402 || (status === 429 && upstreamCode === "insufficient_quota")) return "QUOTA_EXHAUSTED";
-  if (status === 429) return "RATE_LIMIT";
-  if (status === 404 || upstreamCode === "model_not_found") return "MODEL_UNAVAILABLE";
-  if (status === 408) return "TIMEOUT";
-  if (status >= 500) return "PROVIDER_UNAVAILABLE";
-  return "INVALID_REQUEST";
-}
-
-// Retry only what a second try can fix: 502/503/504, or a transport failure with no status.
-// A redirect carries a 3xx status and a timeout has its own code, so neither is retried.
-function isTransient(error: unknown): boolean {
-  if (!(error instanceof EngineError) || error.code !== "PROVIDER_UNAVAILABLE") return false;
-  const status = error.details.status;
-  return status === undefined || (typeof status === "number" && RETRY_STATUSES.has(status));
-}
-
-export class OpenAICompatibleAdapter implements AIProviderPort {
-  private readonly provider: ProviderDescriptor;
-  private readonly transport: HttpTransportPort;
-  private readonly known: ReadonlyMap<string, ModelDescriptor>;
-
-  constructor(provider: ProviderDescriptor, transport: HttpTransportPort) {
-    this.provider = provider;
-    this.transport = transport;
-    this.known = new Map(provider.models.map((model) => [model.id, model]));
-  }
-
+export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIProviderPort {
   async execute(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): Promise<CanonicalResponse> {
     const response = await this.send(this.chat(request, credential, false), credential, ctx, RETRY.maxAttempts);
     const root = parseJson(await readBoundedText(response.body));
@@ -296,57 +258,5 @@ export class OpenAICompatibleAdapter implements AIProviderPort {
       headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json" },
       body: JSON.stringify(toBody(request, stream)),
     };
-  }
-
-  // Catalog headers first, the key last: a static header can never replace the credential.
-  private request(method: HttpRequest["method"], url: string, credential: Credential, timeoutMs: number): HttpRequest {
-    if (!API_KEY.test(credential.apiKey)) {
-      throw new EngineError("AUTH_ERROR", `The ${this.provider.name} API key is empty, too long, or has spaces or control characters`, { provider: this.provider.id });
-    }
-    const { header, scheme } = this.provider.auth;
-    const headers = { ...this.provider.headers, [header]: scheme === "bearer" ? `Bearer ${credential.apiKey}` : credential.apiKey };
-    return { method, url, headers, timeoutMs };
-  }
-
-  // The only place the adapter retries, and only before any byte of a stream was used.
-  private send(request: HttpRequest, credential: Credential, ctx: ExecCtx, maxAttempts: number): Promise<HttpResponse> {
-    return withRetry(async () => {
-      const response = await this.transport.send(request, ctx);
-      if (response.status >= 200 && response.status < 300) return response;
-      throw await this.upstreamError(response, credential, ctx);
-    }, { ...RETRY, maxAttempts, signal: ctx.signal, shouldRetry: isTransient });
-  }
-
-  private async upstreamError(response: HttpResponse, credential: Credential, ctx: ExecCtx): Promise<EngineError> {
-    // The status alone still classifies the failure if the body cannot be read; a caller abort cannot be swallowed.
-    const raw = await readBoundedText(response.body, ERROR_BODY_BYTES).catch((error: unknown) => {
-      if (ctx.signal.aborted) throw error;
-      return "";
-    });
-    const root = record(parseJson(raw));
-    const error = record(root.error);
-    const upstreamCode = text(error.code) ?? text(error.type);
-    const code = classifyStatus(response.status, upstreamCode);
-    const message = this.clean(text(error.message) ?? text(root.error), credential);
-    return new EngineError(code, `${this.provider.name} answered ${response.status}${message ? `: ${message}` : ""}`, {
-      provider: this.provider.id, status: response.status, ...(upstreamCode ? { upstreamCode } : {}),
-    });
-  }
-
-  private streamError(value: unknown, credential: Credential, partial: boolean): EngineError {
-    const error = record(value);
-    const message = this.clean(text(error.message) ?? text(value), credential);
-    return new EngineError("PROVIDER_UNAVAILABLE", `${this.provider.name} sent an error in the stream${message ? `: ${message}` : ""}`, {
-      provider: this.provider.id, partial,
-    });
-  }
-
-  // Upstream text is shown to users: bounded, and never the credential, even if a provider echoes it.
-  private clean(message: string | undefined, credential: Credential): string {
-    return (message ?? "").split(credential.apiKey).join("***").slice(0, MAX_MESSAGE_CHARS);
-  }
-
-  private invalid(what: string, partial = false): EngineError {
-    return new EngineError("PROVIDER_UNAVAILABLE", `${this.provider.name} sent ${what}`, { provider: this.provider.id, ...(partial ? { partial } : {}) });
   }
 }

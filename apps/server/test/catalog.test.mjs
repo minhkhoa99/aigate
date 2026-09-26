@@ -20,9 +20,9 @@ test("the provider catalog lists every provider with its connectable status, beh
       connectable: true, reason: null, modelCount: true,
     });
     const claude = list.find((p) => p.id === "claude");
-    assert.deepEqual([claude.connectable, claude.reason], [false, "Needs the anthropic adapter (SP14)"]);
+    assert.deepEqual([claude.connectable, claude.reason], [false, "Needs OAuth sign-in (SP16)"]);
     assert.ok(list.every((p) => p.connectable === (p.reason === null)), "a reason exactly when not connectable");
-    assert.equal(list.filter((p) => p.connectable).length, 41);
+    assert.equal(list.filter((p) => p.connectable).length, 46);
     await app.close();
   }));
 
