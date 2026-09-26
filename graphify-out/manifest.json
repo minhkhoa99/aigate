@@ -35,9 +35,9 @@
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1790437371.0234883,
-    "ast_hash": "7970d3b8e020d2f145904124fd299bfd",
-    "semantic_hash": "7970d3b8e020d2f145904124fd299bfd"
+    "mtime": 1790442658.9879844,
+    "ast_hash": "691bddc5ea1ea8bdb1d8e53be865d6e4",
+    "semantic_hash": "691bddc5ea1ea8bdb1d8e53be865d6e4"
   },
   "docs/design/UI_HANDOFF.md": {
     "mtime": 1790304403.8708513,
@@ -60,9 +60,9 @@
     "semantic_hash": "04c0c50e7da7000a83ce1379183f0975"
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1790438284.4482732,
-    "ast_hash": "a8094bd926b7764ade325575039e94b3",
-    "semantic_hash": "a8094bd926b7764ade325575039e94b3"
+    "mtime": 1790445428.1539948,
+    "ast_hash": "1b8c6dcc626ee772cad1aa0d778c7d15",
+    "semantic_hash": "1b8c6dcc626ee772cad1aa0d778c7d15"
   },
   "docs/contracts/transport.md": {
     "mtime": 1790343138.4076855,
@@ -100,9 +100,9 @@
     "semantic_hash": "7dbf0ce39fc9eecb48ba8b829f40b777"
   },
   "docs/contracts/catalog-providers.md": {
-    "mtime": 1790437371.0214767,
-    "ast_hash": "3a474a93dd700a575db4edbb0c759591",
-    "semantic_hash": "3a474a93dd700a575db4edbb0c759591"
+    "mtime": 1790442658.9859827,
+    "ast_hash": "332ce6cc4a7f57658f5351c637d94611",
+    "semantic_hash": "332ce6cc4a7f57658f5351c637d94611"
   },
   "docs/contracts/custom-providers.md": {
     "mtime": 1790411715.755863,
@@ -143,5 +143,10 @@
     "mtime": 1790438215.5531056,
     "ast_hash": "2d7f0047ae405f3567154cdb66be3076",
     "semantic_hash": "2d7f0047ae405f3567154cdb66be3076"
+  },
+  "docs/contracts/provider-commandcode.md": {
+    "mtime": 1790442599.426833,
+    "ast_hash": "1187960f9ef1d586205ddb5698b222d6",
+    "semantic_hash": "1187960f9ef1d586205ddb5698b222d6"
   }
 }

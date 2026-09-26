@@ -1,0 +1,328 @@
+{
+  "nodes": [
+    {
+      "id": "provider_commandcode_contract",
+      "label": "Command Code provider contract (M2 SP14h)",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": "commandcode via /alpha/generate NDJSON. User decision 2026-09-27: keep 9router request and stream behavior except lost lines and missing [DONE]; correct the connection test."
+    },
+    {
+      "id": "sp_sp14h",
+      "label": "SP14h — Command Code adapter (NDJSON AI SDK v5 events, forced stream; 59 connectable)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "sp_sp15",
+      "label": "SP15 — client-facing protocol adapters (the 13 formats of spec §9)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next"
+    },
+    {
+      "id": "decision_sp14h",
+      "label": "User decision 2026-09-27: SP14h keeps 9router request drops/defaults and stream error/end/finish/usage behavior; corrects the connection test; URL images refused and workingDir neutral for security",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "11_translation_i18n_translator_openai_to_commandcode_request",
+      "label": "translator.openai-to-commandcode-request",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "11_translation_i18n_translator_commandcode_to_openai_response",
+      "label": "translator.commandcode-to-openai-response",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "02_providers_auth_connection_commandcode_key_test",
+      "label": "connection.commandcode-key-test",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "commandcode_adapter",
+      "label": "CommandCodeAdapter — envelope, NDJSON events via readJsonLines, peek with in-band error classification and 5xx retries, collapse for non-streaming clients, ping test",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "sp14h_tests",
+      "label": "SP14h tests: engine commandcode-adapter.test.mjs (8), server commandcode-lane.test.mjs; 39 mutations caught",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "api_ui_map_row_sp14h",
+      "label": "API_UI_MAP row: SP14h Command Code adapter (no new screen)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    }
+  ],
+  "edges": [
+    {
+      "source": "sp_sp14g",
+      "target": "sp_sp14h",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14h",
+      "target": "sp_sp15",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14h",
+      "target": "provider_commandcode_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14h",
+      "target": "decision_sp14h",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14h",
+      "target": "11_translation_i18n_translator_openai_to_commandcode_request",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14h",
+      "target": "11_translation_i18n_translator_commandcode_to_openai_response",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14h",
+      "target": "02_providers_auth_connection_commandcode_key_test",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_commandcode_contract",
+      "target": "commandcode_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "create_adapter",
+      "target": "commandcode_adapter",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_protocols",
+      "target": "commandcode_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "builtin_registry_catalog",
+      "target": "commandcode_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "commandcode_adapter",
+      "target": "read_json_lines",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "commandcode_adapter",
+      "target": "11_translation_i18n_translator_openai_to_commandcode_request",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "commandcode_adapter",
+      "target": "11_translation_i18n_translator_commandcode_to_openai_response",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "commandcode_adapter",
+      "target": "02_providers_auth_connection_commandcode_key_test",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-commandcode.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp14h_tests",
+      "target": "commandcode_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14h",
+      "target": "sp14h_tests",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_doc",
+      "target": "api_ui_map_row_sp14h",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp14h",
+      "target": "commandcode_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14h",
+      "target": "api_ui_map_row_sp14h",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    }
+  ],
+  "hyperedges": []
+}
