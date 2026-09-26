@@ -1550,3 +1550,41 @@
     expected: "The collapsed answer carries what the stream carried (reasoning too), a stream that stops early is an error as on the streaming path, a malformed event is reported, and the buffer is bounded"
     actual: "reasoning_content is dropped when there is content, a cut-off stream is a complete 200 with finish_reason stop, malformed lines vanish, and the body is buffered without limit"
     impact: "Non-streaming clients silently lose reasoning and receive truncated answers as finished ones"
+
+# 2026-09-26 SP14c: a non-streaming client of a Responses provider.
+- id: routing.responses-non-stream-answer
+  group: Request routing
+  feature: Request routing
+  subFeature: "What a client that did not ask to stream receives from an openai-responses provider"
+  trigger: "A chat request with stream false (or omitted with Accept application/json) to perplexity-agent or an openai-compatible node with apiType responses"
+  input: "The upstream answer to the translated request, which always carries stream true"
+  output: "A chat.completion body"
+  businessRules:
+    - "The request translator always sends stream true, so the upstream answers with Responses SSE"
+    - "The provider is not forceStream, so the answer goes to the plain non-streaming handler, which parses text/event-stream with the chat-completions SSE parser"
+    - "Responses events carry no choices, so the parsed body has content empty, finish_reason stop, a generated id, and no usage; it is returned as is (no openai-responses to openai non-streaming translation exists)"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["translator.openai-to-responses-request", "routing.non-streaming-response", "routing.forced-stream-json-collapse"]
+  providerInteraction: "POST <chatUrl> with stream true"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "the SSE body has no data line (502 Invalid SSE response for non-streaming request)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["The whole SSE body is buffered before parsing"]
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Usage is lost too, so the request is recorded with zero tokens"
+  evidence:
+    - { file: open-sse/translator/request/openai-responses.js, line: 337, note: "stream true on every translated request" }
+    - { file: open-sse/handlers/chatCore.js, line: 497, note: "forced SSE branch only for forceStream providers" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 291, note: "text/event-stream parsed with parseSSEToOpenAIResponse" }
+    - { file: open-sse/handlers/chatCore/sseToJsonHandler.js, line: 140, note: "only choices[0].delta is read" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 146, note: "no openai-responses to openai non-streaming branch" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A non-streaming client receives the model answer: text, reasoning, tool calls, usage, and the finish reason"
+    actual: "The client receives an empty assistant message with finish_reason stop"
+    impact: "Every non-streaming request to a Responses provider silently loses its answer"

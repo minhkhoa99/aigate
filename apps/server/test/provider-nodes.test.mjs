@@ -15,9 +15,10 @@ test("create stores the fields as 9router does; bad fields name the problem", ()
     assert.equal(res.statusCode, 201);
     assert.equal(res.headers["cache-control"], "no-store");
     const node = res.json();
-    assert.match(node.id, /^openai-compatible-[0-9a-f]{12}$/);
+    assert.match(node.id, /^openai-compatible-chat-[0-9a-f]{12}$/, "9router ids embed the apiType");
     assert.deepEqual([node.name, node.prefix, node.baseUrl], ["Local LLM", "local", "https://llm.example.com/v1/"], "trimmed, otherwise as given");
-    assert.deepEqual(Object.keys(node).sort(), ["baseUrl", "createdAt", "id", "name", "prefix", "type", "updatedAt"]);
+    assert.deepEqual(Object.keys(node).sort(), ["apiType", "baseUrl", "createdAt", "id", "name", "prefix", "type", "updatedAt"]);
+    assert.equal(node.apiType, "chat", "chat when apiType is left out");
     assert.equal(node.type, "openai-compatible", "the default type");
     const defaulted = await create({ name: "No URL", prefix: "nourl" });
     assert.deepEqual([defaulted.statusCode, defaulted.json().baseUrl], [201, "https://api.openai.com/v1"], "the 9router default base URL");
@@ -31,7 +32,9 @@ test("create stores the fields as 9router does; bad fields name the problem", ()
       [{ ...body, baseUrl: "https://llm.example.com/v1?key=1" }, /query or fragment/],
       [{ ...body, baseUrl: "not a url" }, /baseUrl/],
       [{ ...body, type: "custom-embedding" }, /type must be openai-compatible or anthropic-compatible/],
-      [{ ...body, apiType: "chat" }, /apiType is not a field/],
+      [{ ...body, apiType: "completions" }, /apiType must be chat or responses/],
+      [{ ...body, type: "anthropic-compatible", apiType: "chat" }, /apiType applies only to OpenAI-compatible providers/],
+      [{ ...body, extra: 1 }, /extra is not a field/],
       [{ ...body, name: "" }, /name must be/],
     ]) {
       const bad = await create(payload);
@@ -127,7 +130,7 @@ test("an Anthropic-compatible provider: its id, the default base, a pasted /mess
     const create = async (payload) => (await dash({ method: "POST", url: "/api/provider-nodes", body: { type: "anthropic-compatible", ...payload } })).json();
     const plain = await create({ name: "Claude", prefix: "cl" });
     assert.match(plain.id, /^anthropic-compatible-[0-9a-f]{12}$/);
-    assert.deepEqual([plain.type, plain.baseUrl], ["anthropic-compatible", "https://api.anthropic.com/v1"], "the 9router default");
+    assert.deepEqual([plain.type, plain.baseUrl, plain.apiType], ["anthropic-compatible", "https://api.anthropic.com/v1", null], "the 9router default; no apiType");
     const pasted = await create({ name: "Gateway", prefix: "gw", baseUrl: " https://gw.example/anthropic/v1/messages/ " });
     assert.equal(pasted.baseUrl, "https://gw.example/anthropic/v1", "one trailing / and then /messages removed");
     const patch = (id, payload) => dash({ method: "PATCH", url: `/api/provider-nodes/${id}`, body: payload });
@@ -166,6 +169,32 @@ test("an Anthropic-compatible provider is tested and served as 9router does, and
     await dash({ method: "POST", url: "/api/connections", body: { provider: newer.id, apiKey: "sk-node-key-9999" } });
     assert.equal((await chat({ ...hello, model: "gate/llama" })).statusCode, 200);
     assert.equal(upstream.calls[2].request.url, "https://newer.example/v1/chat/completions");
+    await app.close();
+  }));
+
+// ---- SP14c: OpenAI-compatible nodes with apiType responses (connection.provider-node-api-type) ----
+
+test("apiType responses sends /v1 to <base>/responses through the Responses adapter, and can be switched back", () =>
+  withTempDb(async (file) => {
+    const answer = { id: "resp_n", object: "response", model: "m1", status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: "From responses" }] }], usage: { input_tokens: 3, output_tokens: 2 } };
+    const upstream = fakeUpstream(json(200, answer), json(200, completion));
+    const { app, dash, chat } = await ready(file, upstream);
+    const node = (await dash({ method: "POST", url: "/api/provider-nodes", body: { ...body, prefix: "resp", apiType: "responses" } })).json();
+    assert.match(node.id, /^openai-compatible-responses-[0-9a-f]{12}$/);
+    assert.equal(node.apiType, "responses");
+    await dash({ method: "POST", url: "/api/connections", body: { provider: node.id, apiKey: "sk-resp-key-1234" } });
+    const res = await chat({ ...hello, model: "resp/m1" });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.json().choices[0].message.content, "From responses", "the non-streaming answer is read, not emptied");
+    assert.equal(upstream.calls[0].request.url, "https://llm.example.com/v1/responses");
+    const sent = JSON.parse(upstream.calls[0].request.body);
+    assert.deepEqual([sent.model, sent.stream, sent.store, sent.input[0].content[0].text], ["m1", false, false, "hi"]);
+    const switched = await dash({ method: "PATCH", url: `/api/provider-nodes/${node.id}`, body: { apiType: "chat" } });
+    assert.deepEqual([switched.statusCode, switched.json().apiType, switched.json().id], [200, "chat", node.id], "the id is not renamed");
+    assert.equal((await chat({ ...hello, model: "resp/m1" })).statusCode, 200);
+    assert.equal(upstream.calls[1].request.url, "https://llm.example.com/v1/chat/completions", "the change applies at once");
+    const bad = await dash({ method: "PATCH", url: `/api/provider-nodes/${node.id}`, body: { apiType: "nope" } });
+    assert.deepEqual([bad.statusCode, bad.json().code], [400, "INVALID_REQUEST"]);
     await app.close();
   }));
 

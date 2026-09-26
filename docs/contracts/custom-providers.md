@@ -2,7 +2,7 @@
 
 Scope: user-defined **OpenAI-compatible** (SP13b) and **Anthropic-compatible** (SP14b) providers (9router "provider nodes"). A custom provider is a type, a name, a prefix, and a base URL. It gets one API-key connection like a built-in provider, and `/v1` reaches it as `<prefix>/<model>`.
 - **UI:** `/providers` (Custom providers section), `/providers/new` (create and edit form, both protocols), and the Connections Add modal.
-- **Not here:** `apiType: responses` (the Responses protocol, SP15), custom-embedding nodes (SP22), custom model lists (`catalog.model-custom-registration`), and a separate validate endpoint. The connection test checks the endpoint and the key together (OpenAI: `GET {baseUrl}/models`; Anthropic: see "Anthropic-compatible").
+- **Not here:** custom-embedding nodes (SP22), custom model lists (`catalog.model-custom-registration`), and a separate validate endpoint. The connection test checks the endpoint and the key together (OpenAI: `GET {baseUrl}/models`; Anthropic: see "Anthropic-compatible").
 
 ## Matrix entries
 
@@ -10,7 +10,7 @@ Scope: user-defined **OpenAI-compatible** (SP13b) and **Anthropic-compatible** (
 
 | Entry | 9router | Label | AIGate |
 |---|---|---|---|
-| `connection.provider-node-create-list` | name and prefix required; id is `openai-compatible-<apiType>-<id>`; `<prefix>/<model>` reaches the node; built-in ids and aliases win | `REFERENCE_BEHAVIOR` | Kept. The id is `openai-compatible-<12 hex>`. |
+| `connection.provider-node-create-list` | name and prefix required; id is `openai-compatible-<apiType>-<id>`; `<prefix>/<model>` reaches the node; built-in ids and aliases win | `REFERENCE_BEHAVIOR` | Kept. SP13b ids were `openai-compatible-<12 hex>`; since SP14c new ids are `openai-compatible-<apiType>-<12 hex>` (see `connection.provider-node-api-type`). |
 | same | A missing `baseUrl` becomes `https://api.openai.com/v1` | `SUSPECTED_BUG`, kept by decision | Kept. The form hint says so. |
 | same | A pasted `/chat/completions` is kept, so the request path doubles | `SUSPECTED_BUG`, kept by decision | Kept: the base URL is stored trimmed, and one trailing `/` is dropped when the URL is built (`routing.build-url`). |
 | same | A reserved, duplicate, or slash-containing prefix is stored, then silently unreachable | `SUSPECTED_BUG`, kept by decision | Kept. Built-in ids and aliases win, and among duplicates the oldest node wins. The card shows an **Unreachable** pill with the exact reason. |
@@ -19,12 +19,13 @@ Scope: user-defined **OpenAI-compatible** (SP13b) and **Anthropic-compatible** (
 | `connection.provider-node-repo-storage` | id/type/name columns, everything else in a JSON blob | `REFERENCE_BEHAVIOR` (shape) | Typed columns only (SCHEMA_CONVENTIONS rule 1). |
 | `connection.provider-node-validate-partial-ssrf` | A literal-only SSRF check for non-local callers | `SUSPECTED_BUG` | No validate route. The base URL must be `https`, or `http` to this machine (the transport rule), and the dashboard is session-only on `127.0.0.1`. |
 
-## Table `provider_nodes` (migrations `0003`, `0004`, `0005`)
+## Table `provider_nodes` (migrations `0003`, `0004`, `0005`, `0006`)
 
 | Column | Type |
 |---|---|
-| `id` | text primary key, `<type>-<12 hex>` |
+| `id` | text primary key, `openai-compatible-<apiType>-<12 hex>` or `anthropic-compatible-<12 hex>` (SP13b rows keep `openai-compatible-<12 hex>`); never renamed |
 | `type` | text, `openai-compatible` (default, so rows from before `0005` keep working) or `anthropic-compatible`; fixed at creation |
+| `api_type` | text, `chat` (default, so older rows keep working) or `responses`; changeable on OpenAI-compatible providers, unused on Anthropic ones (migration `0006`) |
 | `name` | text, 1–64 characters |
 | `prefix` | text, indexed with `created_at` (not unique; `0004` dropped the unique index of `0003`) |
 | `base_url` | text, trimmed |
@@ -38,19 +39,20 @@ At most **100** custom providers (409 `NODE_LIMIT`); the count and the insert ru
 - `name`: trimmed, 1–64 characters.
 - `prefix`: trimmed, 1–200 characters. No format, reserved, or uniqueness check (9router).
 - `baseUrl`: optional on create, default `https://api.openai.com/v1` (OpenAI) or `https://api.anthropic.com/v1` (Anthropic). Trimmed, at most 2048 characters, no spaces. It must parse as a URL with `https:`, or `http:` to `localhost`, `127.0.0.1`, or `[::1]`, and may not carry a username, password, query, or fragment. These checks are AIGate security rules, not 9router's. For an Anthropic-compatible provider, one trailing `/` and then a trailing `/messages` are removed before it is stored, on create and update.
-- Unknown body keys are 400. `apiType` is not accepted yet.
+- `apiType` (SP14c, `connection.provider-node-api-type`): `chat` or `responses`, else 400 "apiType must be chat or responses"; only on OpenAI-compatible providers (400 "apiType applies only to OpenAI-compatible providers"); changeable by PATCH, applied to the next request. Left out on create it is `chat`: 9router refuses a missing apiType, AIGate keeps the pre-SP14c behavior.
+- Unknown body keys are 400.
 
-The OpenAI descriptor: with one trailing `/` removed from the base URL, `chatUrl` = `<base>/chat/completions` and `modelsUrl` = `<base>/models`; `Authorization: Bearer <key>`, no static headers, no declared models. The Anthropic descriptor is under "Anthropic-compatible".
+The OpenAI descriptor: with one trailing `/` removed from the base URL, `chatUrl` = `<base>/chat/completions` (apiType `chat`, OpenAI adapter) or `<base>/responses` (apiType `responses`, Responses adapter, `provider-openai-responses.md`) and `modelsUrl` = `<base>/models`; `Authorization: Bearer <key>`, no static headers, no declared models. The Anthropic descriptor is under "Anthropic-compatible".
 
 ## API (dashboard session)
 
-Every response is `Cache-Control: no-store`. The view is `{ id, type, name, prefix, baseUrl, createdAt, updatedAt }`.
+Every response is `Cache-Control: no-store`. The view is `{ id, type, apiType, name, prefix, baseUrl, createdAt, updatedAt }` (`apiType` is `null` for an Anthropic-compatible provider).
 
 | Method and path | Body | Success | Errors |
 |---|---|---|---|
 | `GET /api/provider-nodes` | — | 200 `View[]`, oldest first | — |
-| `POST /api/provider-nodes` | `{ type?, name, prefix, baseUrl? }` | 201 `View` | 400 `INVALID_REQUEST` (names the field); 409 `NODE_LIMIT` |
-| `PATCH /api/provider-nodes/:id` | any of `{ name, prefix, baseUrl }` | 200 `View` | 404 `NOT_FOUND` (checked first); 400 |
+| `POST /api/provider-nodes` | `{ type?, apiType?, name, prefix, baseUrl? }` | 201 `View` | 400 `INVALID_REQUEST` (names the field); 409 `NODE_LIMIT` |
+| `PATCH /api/provider-nodes/:id` | any of `{ name, prefix, baseUrl, apiType }` | 200 `View` | 404 `NOT_FOUND` (checked first); 400 |
 | `DELETE /api/provider-nodes/:id` | — | 204; the node's connection is deleted in the same transaction | 404 `NOT_FOUND` |
 
 `GET /api/providers` summaries also carry `aliases`, so the dashboard can tell a reserved prefix. Connections (`connections.md`) accept a custom provider id. Its connection test calls `GET <base>/models`.
@@ -77,9 +79,9 @@ Every response is `Cache-Control: no-store`. The view is `{ id, type, name, pref
 | Screen | Wired |
 |---|---|
 | `/providers` → `LlmProviders`, Custom providers section | Cards from `GET /api/provider-nodes`: name, `<prefix>/…` and the protocol, base URL, a Connected pill or Connect, Edit, Delete. **Unreachable** pill with the reason (`features/providers/node-rules.ts`): the prefix contains `/`, is a built-in id or alias, or another custom provider wins it (an OpenAI-compatible one, else an older one of the same type). Delete asks for the name and says the connection and its key are deleted too. `+ Anthropic compatible` opens `/providers/new?type=anthropic-compatible`. |
-| `/providers/new` → `ProviderDetail isNew` | A real form: name, prefix (the hint says which prefixes are unreachable), protocol (OpenAI or Anthropic compatible; fixed when editing), base URL (the hint and placeholder follow the protocol; empty means its 9router default). "How it works" says how the key is tested, including 9router's lenient Anthropic test. Save goes to `/providers/connections?provider=<id>` to add the key. `?id=` edits an existing provider. Server messages (`INVALID_REQUEST`, `NODE_LIMIT`, `NOT_FOUND`) are toasts through `shared/errors.ts`. |
+| `/providers/new` → `ProviderDetail isNew` | A real form: name, prefix (the hint says which prefixes are unreachable), protocol (OpenAI or Anthropic compatible; fixed when editing), API (Chat completions or Responses, OpenAI compatible only; editable), base URL (the hint and placeholder follow the protocol; empty means its 9router default). "How it works" says how the key is tested, including 9router's lenient Anthropic test. Save goes to `/providers/connections?provider=<id>` to add the key. `?id=` edits an existing provider. Server messages (`INVALID_REQUEST`, `NODE_LIMIT`, `NOT_FOUND`) are toasts through `shared/errors.ts`. |
 | `Connections` Add modal | Lists the connectable built-in providers and the custom providers without a connection. |
 
 ## Matrix
 
-`connection.provider-node-create-list`, `connection.provider-node-update-delete`, `connection.provider-node-repo-storage`, and (SP14b) `connection.anthropic-compatible-node` are `implemented`. `connection.provider-node-validate-partial-ssrf` stays `traced`: there is no validate route.
+`connection.provider-node-create-list`, `connection.provider-node-update-delete`, `connection.provider-node-repo-storage`, (SP14b) `connection.anthropic-compatible-node`, and (SP14c) `connection.provider-node-api-type` are `implemented`. `connection.provider-node-validate-partial-ssrf` stays `traced`: there is no validate route.

@@ -2,8 +2,13 @@ import type { AIProviderPort, HttpTransportPort } from "../ports.js";
 import type { ProviderDescriptor } from "../registry.js";
 import { AnthropicAdapter } from "./anthropic.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
+import { OpenAIResponsesAdapter } from "./openai-responses.js";
 
 // Adapters are chosen by protocol family, never per vendor (spec §4.2).
 export function createAdapter(provider: ProviderDescriptor, transport: HttpTransportPort): AIProviderPort {
-  return provider.protocol === "anthropic" ? new AnthropicAdapter(provider, transport) : new OpenAICompatibleAdapter(provider, transport);
+  switch (provider.protocol) {
+    case "anthropic": return new AnthropicAdapter(provider, transport);
+    case "openai-responses": return new OpenAIResponsesAdapter(provider, transport);
+    default: return new OpenAICompatibleAdapter(provider, transport);
+  }
 }

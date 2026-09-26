@@ -76,9 +76,12 @@ export const useTestConnection = () =>
 
 // docs/contracts/custom-providers.md
 export type NodeType = "openai-compatible" | "anthropic-compatible";
+export type ApiType = "chat" | "responses";
 export interface ProviderNode {
   id: string;
   type: NodeType;
+  // null for an anthropic-compatible provider.
+  apiType: ApiType | null;
   name: string;
   prefix: string;
   baseUrl: string;
@@ -100,7 +103,7 @@ function useNodeMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
   });
 }
 
-type NodeFields = { name: string; prefix: string; baseUrl?: string };
+type NodeFields = { name: string; prefix: string; baseUrl?: string; apiType?: ApiType };
 // The type is chosen at creation only (docs/contracts/custom-providers.md).
 export const useCreateNode = () => useNodeMutation((body: NodeFields & { type: NodeType }) => api<ProviderNode>("/api/provider-nodes", { method: "POST", body }));
 export const useUpdateNode = () => useNodeMutation(({ id, ...body }: NodeFields & { id: string }) => api<ProviderNode>(nodePath(id), { method: "PATCH", body }));

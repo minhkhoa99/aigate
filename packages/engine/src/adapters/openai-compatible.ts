@@ -29,7 +29,7 @@ const unsupported = (feature: string) => new UnsupportedFeatureError(feature, TA
 
 // ---- CIP -> chat completions ----
 
-function mediaUrl(source: MediaSource): string {
+export function mediaUrl(source: MediaSource): string {
   return source.kind === "url" ? source.url : `data:${source.mediaType};base64,${source.data}`;
 }
 
@@ -48,7 +48,7 @@ function textParts(parts: readonly ContentPart[], where: string): Json[] {
   });
 }
 
-function userPart(part: ContentPart): Json {
+export function userPart(part: ContentPart): Json {
   switch (part.type) {
     case "text": return { type: "text", text: part.text };
     case "image": return { type: "image_url", image_url: { url: mediaUrl(part.source), ...(part.detail ? { detail: part.detail } : {}) } };

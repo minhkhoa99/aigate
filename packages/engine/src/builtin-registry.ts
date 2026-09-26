@@ -9,6 +9,7 @@ import { defineRegistry, PROVIDER_PROTOCOLS, type ProviderDescriptor, type Provi
 const PATHS: Readonly<Record<ProviderProtocol, { chat: RegExp; models: string }>> = {
   "openai-compatible": { chat: /\/chat\/completions$/, models: "/models" },
   anthropic: { chat: /\/messages$/, models: "/models" },
+  "openai-responses": { chat: /\/responses$/, models: "/models" },
 };
 // 9router forces streaming for these although the vendor answers non-streaming requests too
 // (IMPLEMENTATION_ACCIDENT for OpenAI: the API accepts stream:false; SP3 tapes replay that way).

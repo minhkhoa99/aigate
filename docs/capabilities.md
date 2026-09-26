@@ -1968,6 +1968,22 @@ Every item below is a capability AIGate must have. Derived from tracing
   - maskName partially masks a long (over 16 char) name that also matches a 32+ char alnum/underscore/hyphen token pattern (e.g. an email-like or token-like display name) down to its first 8 characters — a defense against a raw credential accidentally landing in the display name field
   - pageSize is clamped to MAX_PAGE_SIZE (500); an out-of-range page number is clamped down to the last valid page rather than returning an empty page
 
+### apiType chat or responses on an OpenAI-compatible node: create, update, id, and the request URL
+
+- **id:** `connection.provider-node-api-type` · **module:** `connections`
+- **Trigger:** POST or PUT /api/provider-nodes for an openai-compatible node; a /v1 request to such a node
+- **Input:** { apiType: chat | responses } with the node fields
+- **Output:** The node with apiType; requests to <baseUrl>/chat/completions or <baseUrl>/responses
+- **Rules:**
+  - An openai-compatible node needs apiType chat or responses on create and on update (400 Invalid OpenAI compatible API type)
+  - The id embeds the apiType at creation (openai-compatible-<apiType>-<id>) and is not renamed when apiType changes
+  - Update changes apiType, and the next request uses the new one (the stored apiType wins; the id substring is only a fallback for legacy nodes)
+  - apiType responses sends the Responses request to <baseUrl without one trailing />/responses with the openai-responses translators; chat keeps /chat/completions
+  - apiType is ignored for anthropic-compatible nodes
+  - The connection test is GET <baseUrl>/models for both apiTypes
+- **Streaming:** yes
+- **Errors:** `INVALID_REQUEST` (apiType missing or not chat/responses on an openai-compatible node)
+
 ### GET/POST /api/provider-nodes — list and create custom compatible provider nodes, and how /v1 reaches them by prefix
 
 - **id:** `connection.provider-node-create-list` · **module:** `connections`
@@ -2691,6 +2707,19 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Errors:** `INVALID_REQUEST` (body is not JSON — request.json() throws in the route (unhandled, 500), unlike the 400 of the other lanes)
 - **AIGate required behavior:** A compact request goes to .../responses/compact and a normal request to .../responses
 
+### What a client that did not ask to stream receives from an openai-responses provider
+
+- **id:** `routing.responses-non-stream-answer` · **module:** `routing`
+- **Trigger:** A chat request with stream false (or omitted with Accept application/json) to perplexity-agent or an openai-compatible node with apiType responses
+- **Input:** The upstream answer to the translated request, which always carries stream true
+- **Output:** A chat.completion body
+- **Rules:**
+  - The request translator always sends stream true, so the upstream answers with Responses SSE
+  - The provider is not forceStream, so the answer goes to the plain non-streaming handler, which parses text/event-stream with the chat-completions SSE parser
+  - Responses events carry no choices, so the parsed body has content empty, finish_reason stop, a generated id, and no usage; it is returned as is (no openai-responses to openai non-streaming translation exists)
+- **Errors:** `PROVIDER_UNAVAILABLE` (the SSE body has no data line (502 Invalid SSE response for non-streaming request))
+- **AIGate required behavior:** A non-streaming client receives the model answer: text, reasoning, tool calls, usage, and the finish reason
+
 ### Deciding the client's wire format
 
 - **id:** `routing.source-format-detection` · **module:** `routing`
@@ -3307,6 +3336,43 @@ Every item below is a capability AIGate must have. Derived from tracing
   - thinking is deleted silently when the last message is not from the user
 - **AIGate required behavior:** Every OpenAI field is either mapped (stop to stop_sequences, top_p, max_completion_tokens, tool_choice none to none) or refused with a clear error; the client's own system prompt and cache markers are kept, and requested reasoning is never removed silently
 
+### OpenAI chat completions request to an OpenAI Responses API request (openaiToOpenAIResponsesRequest)
+
+- **id:** `translator.openai-to-responses-request` · **module:** `routing`
+- **Trigger:** A chat request routed to a provider whose format is openai-responses, or to an openai-compatible node with apiType responses
+- **Input:** An OpenAI chat completions body
+- **Output:** A Responses body: model, input[], instructions, tools, sampling, stream true, store false
+- **Rules:**
+  - stream is always true and store is always false, whatever the client asked
+  - The first system or developer message becomes instructions (text parts joined with newlines); later system messages are dropped; with none, instructions is an empty string
+  - user text parts become input_text and assistant text parts output_text inside a message item; image_url becomes input_image with its url and detail (auto when absent); any other part type is serialized to JSON text
+  - An assistant message whose content is empty is not sent as a message item; its tool_calls become function_call items (call_id clamped to 64 characters, or call_<now>_<seq> when empty; name trimmed and cut to 128 characters; nameless calls skipped; arguments kept when they parse as JSON, else {})
+  - A tool message becomes function_call_output with a string output (array content: each part text, or its JSON, concatenated)
+  - An assistant message carrying reasoning_content or encrypted_content is preceded by a reasoning input item
+  - Function tools become { type: function, name (trimmed, cut to 128, nameless dropped), description (string), parameters (an object schema always gets properties), strict }
+  - temperature, top_p, service_tier, prompt_cache_key, and reasoning are copied; max_output_tokens comes from max_output_tokens, then max_completion_tokens, then max_tokens; reasoning_effort becomes reasoning { effort, summary: auto }
+  - Every other field is dropped silently: tool_choice, stop, response_format, parallel_tool_calls, user, seed, n, logprobs
+  - A body that already has input[] is passed through with model and stream true
+- **Streaming:** yes
+- **AIGate required behavior:** Every client field is carried or refused: tool_choice, response_format, parallel_tool_calls, and user map to Responses; every system message reaches instructions; a part or argument that cannot be carried is an error naming it
+
+### OpenAI Responses SSE events to OpenAI chat completion chunks (openaiResponsesToOpenAIResponse)
+
+- **id:** `translator.responses-to-openai-stream` · **module:** `routing`
+- **Trigger:** A streaming answer from an openai-responses provider to an OpenAI chat client
+- **Input:** Responses SSE events
+- **Output:** chat.completion.chunk events
+- **Rules:**
+  - The chunk id is a new chatcmpl-<now>; the upstream response id is not used
+  - response.output_text.delta becomes a content delta; response.reasoning_summary_text.delta becomes a reasoning_content delta
+  - response.output_item.added for a function_call or custom_tool_call opens a tool call (id = call_id, name) at the next index, keyed by the item id so parallel calls stay apart; argument deltas (function_call_arguments.delta, custom_tool_call_input.delta) are routed by item_id, else to the last call; an output_item.done with arguments and no earlier deltas sends them once
+  - response.completed or response.done ends the answer: usage (input_tokens includes cached tokens, cached from input_tokens_details.cached_tokens) and finish_reason tool_calls when any tool call was opened, else stop
+  - An error or response.failed event carrying an error becomes a content delta [Error] <message> with finish_reason stop
+  - A stream that ends without response.completed still gets a final chunk with finish_reason stop or tool_calls
+  - response.incomplete, refusal deltas, and every other event are ignored
+- **Streaming:** yes
+- **AIGate required behavior:** An upstream error is an error, a cut-off stream is a failure (fallback.partial-stream-failure), an incomplete answer ends with length, and a refusal is reported
+
 ## Translation / language functionality
 
 ### Supported-locale catalog and the DEFAULT_LOCALE fallback
@@ -3775,6 +3841,7 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `routing.responses-compact-lane` | A compact request goes to .../responses/compact and a normal request to .../responses | The URL is built before the flag is read, from state left by the previous request on a shared singleton | The first compact request hits the normal endpoint and the following normal codex request (any user) hits /compact; under concurrency the mapping is arbitrary |
 | `routing.ollama-lane-transform` | Upstream errors surface to Ollama clients with an error status, and non-streaming requests return the answer | Status is always 200 and anything that is not an OpenAI SSE data: line is discarded | Ollama clients see empty successful answers for every error and for every stream:false request |
 | `routing.forced-stream-json-collapse` | The collapsed answer carries what the stream carried (reasoning too), a stream that stops early is an error as on the streaming path, a malformed event is reported, and the buffer is bounded | reasoning_content is dropped when there is content, a cut-off stream is a complete 200 with finish_reason stop, malformed lines vanish, and the body is buffered without limit | Non-streaming clients silently lose reasoning and receive truncated answers as finished ones |
+| `routing.responses-non-stream-answer` | A non-streaming client receives the model answer: text, reasoning, tool calls, usage, and the finish reason | The client receives an empty assistant message with finish_reason stop | Every non-streaming request to a Responses provider silently loses its answer |
 | `tokensaver.pxpipe-master-optout-bug` | x-9router-token-saver: off disables every token-saver stage, including PXPIPE, for that request | PXPIPE runs whenever settings.pxpipeEnabled is true, regardless of the per-request opt-out header — only RTK, headroom, caveman and ponytail honor it | A client that opts out to keep its exact payload intact (e.g. to preserve verbatim tool output for debugging, or because it distrusts lossy image conversion) can still have its request body silently rewritten into PNG image blocks by PXPIPE, changing token accounting and provider-visible content the client explicitly asked to avoid |
 | `usage.history-write-dedup-transaction` | Every completed request that calls saveRequestUsage produces its own usageHistory row | A request whose ISO-millisecond timestamp, provider, model, connectionId, apiKey, promptTokens and completionTokens all match the most recently matching prior row is treated as a duplicate: no new row is inserted, no usageDaily counts are added, no lifetime counter increment happens — only the endpoint column may be backfilled | Genuinely distinct requests that happen to land in the same millisecond with identical provider/model/account/token counts (e.g. rapid retries, fixed-size embeddings calls) are silently undercounted in usageHistory, usageDaily aggregates, byModel/byAccount stats and the lifetime request counter |
 | `usage.history-route-returns-aggregate-not-rows` | A route named /api/usage/history returns per-request usage history rows — the sibling getUsageHistory(filter) function (provider/model/date-range filterable) appears purpose-built to back exactly this route | It calls getUsageStats() with no period, returning the same aggregated shape as /api/usage/stats?period=all; getUsageHistory() is never invoked by any route or other code in the checkout | AIGate would misdesign a 'usage history' endpoint contract by assuming per-row data if this were ported literally; the working, filter-capable raw-row query exists in source but is unreachable from the API surface |
@@ -3790,6 +3857,8 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `translator.openai-to-claude-request` | Every OpenAI field is either mapped (stop to stop_sequences, top_p, max_completion_tokens, tool_choice none to none) or refused with a clear error; the client's own system prompt and cache markers are kept, and requested reasoning is never removed silently | stop, top_p and other fields are dropped, max_completion_tokens is ignored, none becomes auto, a Claude Code identity line is injected into every system prompt, cache markers are replaced, and thinking is deleted when the last message is not from the user | Requests behave differently from what the client asked (no stop sequences, forced tool use possible, a changed system prompt), with no error to explain it |
 | `translator.claude-to-openai-response` | A mid-stream error reaches the client as an error; non-streaming and streaming map stop reasons and usage the same way; reasoning goes only to reasoning_content; text is returned as the model wrote it | Mid-stream error events are dropped, non-streaming passes max_tokens/refusal through raw and drops cache usage, empty think tags appear in content, and json fences are stripped from all claude providers | A failed stream looks like a normal short answer, clients see non-OpenAI finish reasons and wrong cache accounting, and model output is altered |
 | `provider.codebuddy-request-quirks` | The system prompt reaches the model as the client sent it; a content-filter refusal is reported | codebuddy-cn silently replaces long or agent-like system prompts with a one-line neutral prompt | Coding agents lose their tool and behavior instructions without any error |
+| `translator.openai-to-responses-request` | Every client field is carried or refused: tool_choice, response_format, parallel_tool_calls, and user map to Responses; every system message reaches instructions; a part or argument that cannot be carried is an error naming it | tool_choice, stop, response_format and more are dropped; only the first system message is kept; audio and files become JSON text; bad arguments become {}; long names are cut | Forced tools, JSON mode, stop sequences, and later instructions silently stop working on Responses providers |
+| `translator.responses-to-openai-stream` | An upstream error is an error, a cut-off stream is a failure (fallback.partial-stream-failure), an incomplete answer ends with length, and a refusal is reported | Errors become assistant text with finish stop, a cut-off stream looks complete, incomplete answers end with stop, and refusals vanish | Clients take failures and truncated answers for finished ones |
 | `clitools.write-not-atomic` | Given every one of these writes targets the user's own IDE/CLI configuration file (not 9router's own data), and one of the affected routes' own comment explicitly promises 'Backup old fields and write new settings', a crash mid-write should not be able to corrupt or truncate that file — either via a temp-file-then-rename swap (the exact pattern already implemented in this codebase at src/lib/mitmAliasCache.js:15-21 for 9router's own alias cache) or an actual on-disk backup copy. | All 13 write-capable cli-tools routes call fs.writeFile(path, content) directly on the final path with no temp file, no rename, and no backup copy anywhere on disk. The 'backup' language in the claude-settings POST comment refers only to merging the previously-read JSON object in memory before the single overwrite call — nothing is preserved outside process memory. | A crash, OOM kill, disk-full error, or power loss during any of these writes can truncate or corrupt the user's real tool config (e.g. ~/.claude/settings.json, ~/.codex/config.toml, ~/.openclaw/openclaw.json). Because every route's read path treats an unparseable file as simply 'no config', the damage is silent: the next status check reports the tool as unconfigured, and the next Apply starts from empty, permanently discarding whatever unrelated settings that file held before 9router wrote to it. |
 | `clitools.copilot-settings-array-upsert` | Like every other cli-tools GET handler (claude, codex, cline, droid, kilo, etc.), Copilot's GET should reflect a real detection check — a `where`/`which` lookup or a marker-file probe — before reporting installed: true, so the dashboard only shows Copilot as available on a machine that actually has it. | copilot-settings/route.js's GET performs no detection at all: it reads chatLanguageModels.json (which may not exist, in which case config is null) and always returns installed: true regardless. | The dashboard's Copilot integration card (and any 'all installed tools' summary the UI derives from installed flags) will show Copilot as installed on any machine, even one with no VS Code and no Copilot extension, inviting the user to Apply — which just writes a file nobody will ever read. |
 | `clitools.deepseek-tui-full-overwrite` | Like every other tool's Apply/Reset in this set (codex, droid, opencode, openclaw, grok-build, hermes, jcode, kilo, cline, cowork all read-merge-write or perform a targeted key removal), DeepSeek TUI's POST should merge 9router's fields into whatever config.toml already contains, and DELETE should remove only what 9router added — preserving any other DeepSeek TUI settings the user configured. | Both POST and DELETE build a fixed, hand-written TOML string from scratch and write it directly, completely replacing the file's prior contents regardless of what else was in it (POST never even calls the file's own readConfigToml() result; DELETE writes a hardcoded 2-line default). | The first time a user clicks Apply or Reset for DeepSeek TUI in the 9router dashboard, any other settings they had configured directly in ~/.deepseek/config.toml (other providers, TUI preferences, anything not related to 9router) are silently and irrecoverably destroyed. |

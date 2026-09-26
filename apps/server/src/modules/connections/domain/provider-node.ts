@@ -7,6 +7,9 @@ const MAX_URL = 2048;
 const MAX_PREFIX = 200;
 export const NODE_TYPES = ["openai-compatible", "anthropic-compatible"] as const;
 export type NodeType = (typeof NODE_TYPES)[number];
+// connection.provider-node-api-type: the OpenAI API an openai-compatible node speaks.
+export const API_TYPES = ["chat", "responses"] as const;
+export type ApiType = (typeof API_TYPES)[number];
 // The 9router defaults when a custom provider names no base URL (user decisions 2026-09-26: keep 9router behavior).
 export const DEFAULT_BASE_URLS: Readonly<Record<NodeType, string>> = {
   "openai-compatible": "https://api.openai.com/v1",
@@ -16,6 +19,7 @@ const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 export interface NodeFields {
   type: NodeType;
+  apiType: ApiType;
   name: string;
   prefix: string;
   baseUrl: string;
@@ -24,6 +28,7 @@ export type NodeChanges = Partial<Omit<NodeFields, "type">>;
 
 const fail = (message: string): { ok: false; message: string } => ({ ok: false, message });
 const isNodeType = (value: unknown): value is NodeType => NODE_TYPES.some((type) => type === value);
+const isApiType = (value: unknown): value is ApiType => API_TYPES.some((apiType) => apiType === value);
 
 function parseName(value: unknown): Parsed<string> {
   const name = typeof value === "string" ? value.trim() : "";
@@ -66,12 +71,17 @@ function stored(type: NodeType, base: string): string {
 function asBody(input: unknown): Parsed<Record<string, unknown>> {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return fail("Body must be a JSON object");
   const body = Object.fromEntries(Object.entries(input));
-  const unknown = Object.keys(body).find((key) => !["type", "name", "prefix", "baseUrl"].includes(key));
+  const unknown = Object.keys(body).find((key) => !["type", "apiType", "name", "prefix", "baseUrl"].includes(key));
   return unknown === undefined ? { ok: true, value: body } : fail(`${unknown} is not a field of a custom provider`);
 }
 
 function parseFields(body: Record<string, unknown>, type: NodeType): Parsed<NodeChanges> {
   const changes: NodeChanges = {};
+  if (body.apiType !== undefined) {
+    if (type !== "openai-compatible") return fail("apiType applies only to OpenAI-compatible providers");
+    if (!isApiType(body.apiType)) return fail(`apiType must be ${API_TYPES.join(" or ")}`);
+    changes.apiType = body.apiType;
+  }
   const parsers = { name: parseName, prefix: parsePrefix, baseUrl: parseBaseUrl } as const;
   for (const field of ["name", "prefix", "baseUrl"] as const) {
     if (body[field] === undefined) continue;
@@ -89,7 +99,7 @@ export function parseNodeChanges(input: unknown, type: NodeType): Parsed<NodeCha
   if (body.value.type !== undefined) return fail("type cannot be changed; add a new custom provider instead");
   const parsed = parseFields(body.value, type);
   if (!parsed.ok) return parsed;
-  return Object.keys(parsed.value).length > 0 ? parsed : fail("Send at least one of name, prefix, baseUrl");
+  return Object.keys(parsed.value).length > 0 ? parsed : fail("Send at least one of name, prefix, baseUrl, apiType");
 }
 
 export function parseNewNode(input: unknown): Parsed<NodeFields> {
@@ -99,8 +109,9 @@ export function parseNewNode(input: unknown): Parsed<NodeFields> {
   if (!isNodeType(type)) return fail(`type must be ${NODE_TYPES.join(" or ")}`);
   const parsed = parseFields(body.value, type);
   if (!parsed.ok) return parsed;
-  const { name, prefix, baseUrl } = parsed.value;
+  const { name, prefix, baseUrl, apiType } = parsed.value;
   if (name === undefined) return fail(`name must be 1-${MAX_NAME} characters`);
   if (prefix === undefined) return fail("prefix is required");
-  return { ok: true, value: { type, name, prefix, baseUrl: baseUrl ?? stored(type, DEFAULT_BASE_URLS[type]) } };
+  // 9router refuses a missing apiType; AIGate keeps chat, the only API before SP14c, so older clients still work.
+  return { ok: true, value: { type, apiType: apiType ?? "chat", name, prefix, baseUrl: baseUrl ?? stored(type, DEFAULT_BASE_URLS[type]) } };
 }

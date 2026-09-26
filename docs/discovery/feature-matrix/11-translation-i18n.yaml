@@ -881,3 +881,99 @@
     expected: "The system prompt reaches the model as the client sent it; a content-filter refusal is reported"
     actual: "codebuddy-cn silently replaces long or agent-like system prompts with a one-line neutral prompt"
     impact: "Coding agents lose their tool and behavior instructions without any error"
+
+# 2026-09-26 SP14c: the openai-responses provider family (perplexity-agent, Responses custom nodes).
+- id: translator.openai-to-responses-request
+  group: Translation
+  feature: Request translation
+  subFeature: "OpenAI chat completions request to an OpenAI Responses API request (openaiToOpenAIResponsesRequest)"
+  trigger: "A chat request routed to a provider whose format is openai-responses, or to an openai-compatible node with apiType responses"
+  input: "An OpenAI chat completions body"
+  output: "A Responses body: model, input[], instructions, tools, sampling, stream true, store false"
+  businessRules:
+    - "stream is always true and store is always false, whatever the client asked"
+    - "The first system or developer message becomes instructions (text parts joined with newlines); later system messages are dropped; with none, instructions is an empty string"
+    - "user text parts become input_text and assistant text parts output_text inside a message item; image_url becomes input_image with its url and detail (auto when absent); any other part type is serialized to JSON text"
+    - "An assistant message whose content is empty is not sent as a message item; its tool_calls become function_call items (call_id clamped to 64 characters, or call_<now>_<seq> when empty; name trimmed and cut to 128 characters; nameless calls skipped; arguments kept when they parse as JSON, else {})"
+    - "A tool message becomes function_call_output with a string output (array content: each part text, or its JSON, concatenated)"
+    - "An assistant message carrying reasoning_content or encrypted_content is preceded by a reasoning input item"
+    - "Function tools become { type: function, name (trimmed, cut to 128, nameless dropped), description (string), parameters (an object schema always gets properties), strict }"
+    - "temperature, top_p, service_tier, prompt_cache_key, and reasoning are copied; max_output_tokens comes from max_output_tokens, then max_completion_tokens, then max_tokens; reasoning_effort becomes reasoning { effort, summary: auto }"
+    - "Every other field is dropped silently: tool_choice, stop, response_format, parallel_tool_calls, user, seed, n, logprobs"
+    - "A body that already has input[] is passed through with model and stream true"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.request-translation"]
+  providerInteraction: "POST <chatUrl> (…/v1/responses) with Authorization Bearer"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A client that forces a tool with tool_choice, or asks for JSON with response_format, gets a free-form answer with no error"
+    - "A second system message (for example a tool policy appended by an agent) never reaches the model"
+  evidence:
+    - { file: open-sse/translator/request/openai-responses.js, line: 321, note: "openaiToOpenAIResponsesRequest" }
+    - { file: open-sse/translator/request/openai-responses.js, line: 337, note: "stream true, store false" }
+    - { file: open-sse/translator/request/openai-responses.js, line: 349, note: "first system/developer message only becomes instructions" }
+    - { file: open-sse/translator/request/openai-responses.js, line: 381, note: "unknown part types serialized as text" }
+    - { file: open-sse/translator/request/openai-responses.js, line: 403, note: "nameless tool calls skipped, name cut to 128" }
+    - { file: open-sse/translator/formats/responsesApi.js, line: 34, note: "call_id clamp to 64 or generated" }
+    - { file: open-sse/translator/formats/responsesApi.js, line: 42, note: "arguments: valid JSON kept, else {}" }
+    - { file: open-sse/translator/formats/responsesApi.js, line: 60, note: "function_call_output output coerced to a string" }
+    - { file: open-sse/translator/request/openai-responses.js, line: 430, note: "tools: name cut, parameters normalized" }
+    - { file: open-sse/translator/request/openai-responses.js, line: 448, note: "copied fields; everything else dropped" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Every client field is carried or refused: tool_choice, response_format, parallel_tool_calls, and user map to Responses; every system message reaches instructions; a part or argument that cannot be carried is an error naming it"
+    actual: "tool_choice, stop, response_format and more are dropped; only the first system message is kept; audio and files become JSON text; bad arguments become {}; long names are cut"
+    impact: "Forced tools, JSON mode, stop sequences, and later instructions silently stop working on Responses providers"
+
+- id: translator.responses-to-openai-stream
+  group: Translation
+  feature: Response translation
+  subFeature: "OpenAI Responses SSE events to OpenAI chat completion chunks (openaiResponsesToOpenAIResponse)"
+  trigger: "A streaming answer from an openai-responses provider to an OpenAI chat client"
+  input: "Responses SSE events"
+  output: "chat.completion.chunk events"
+  businessRules:
+    - "The chunk id is a new chatcmpl-<now>; the upstream response id is not used"
+    - "response.output_text.delta becomes a content delta; response.reasoning_summary_text.delta becomes a reasoning_content delta"
+    - "response.output_item.added for a function_call or custom_tool_call opens a tool call (id = call_id, name) at the next index, keyed by the item id so parallel calls stay apart; argument deltas (function_call_arguments.delta, custom_tool_call_input.delta) are routed by item_id, else to the last call; an output_item.done with arguments and no earlier deltas sends them once"
+    - "response.completed or response.done ends the answer: usage (input_tokens includes cached tokens, cached from input_tokens_details.cached_tokens) and finish_reason tool_calls when any tool call was opened, else stop"
+    - "An error or response.failed event carrying an error becomes a content delta [Error] <message> with finish_reason stop"
+    - "A stream that ends without response.completed still gets a final chunk with finish_reason stop or tool_calls"
+    - "response.incomplete, refusal deltas, and every other event are ignored"
+  state: { reads: [], writes: [], runtimeOnly: ["per-stream tool index map"] }
+  dependencies: ["translator.openai-to-responses-request"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "An answer cut by max_output_tokens ends with finish_reason stop, so a client cannot tell it was truncated"
+    - "An upstream failure mid-stream reaches the client as assistant text followed by a normal stop"
+  evidence:
+    - { file: open-sse/translator/response/openai-responses.js, line: 462, note: "openaiResponsesToOpenAIResponse" }
+    - { file: open-sse/translator/response/openai-responses.js, line: 492, note: "chatcmpl-<now> id" }
+    - { file: open-sse/translator/response/openai-responses.js, line: 506, note: "output_text.delta → content" }
+    - { file: open-sse/translator/response/openai-responses.js, line: 526, note: "tool call opened at added, keyed by item id" }
+    - { file: open-sse/translator/response/openai-responses.js, line: 554, note: "argument deltas routed by item_id" }
+    - { file: open-sse/translator/response/openai-responses.js, line: 571, note: "done with arguments sent once" }
+    - { file: open-sse/translator/response/openai-responses.js, line: 589, note: "completed: usage and finish_reason" }
+    - { file: open-sse/translator/response/openai-responses.js, line: 625, note: "error / response.failed → [Error] text, finish stop" }
+    - { file: open-sse/translator/response/openai-responses.js, line: 645, note: "reasoning summary delta → reasoning_content" }
+    - { file: open-sse/translator/response/openai-responses.js, line: 463, note: "flush without completed still sends a finish chunk" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "An upstream error is an error, a cut-off stream is a failure (fallback.partial-stream-failure), an incomplete answer ends with length, and a refusal is reported"
+    actual: "Errors become assistant text with finish stop, a cut-off stream looks complete, incomplete answers end with stop, and refusals vanish"
+    impact: "Clients take failures and truncated answers for finished ones"

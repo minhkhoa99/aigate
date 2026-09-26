@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Button, ConfirmDialog, Field, Input, PageHeading, Panel, Pill, StateBlock } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
-import { useConnections, useCreateNode, useDeleteNode, useProviderNodes, useProviders, useUpdateNode, type NodeType, type ProviderNode } from "./api";
+import { useConnections, useCreateNode, useDeleteNode, useProviderNodes, useProviders, useUpdateNode, type ApiType, type NodeType, type ProviderNode } from "./api";
 import { unreachable } from "./node-rules";
 
 // docs/contracts/custom-providers.md: user-defined OpenAI- or Anthropic-compatible endpoints, reached as "<prefix>/<model>".
@@ -11,7 +11,7 @@ import { unreachable } from "./node-rules";
 const PROTOCOLS: Readonly<Record<NodeType, { label: string; hint: string; placeholder: string; test: string }>> = {
   "openai-compatible": {
     label: "OpenAI compatible",
-    hint: "The URL before /chat/completions; empty means https://api.openai.com/v1. https, or http to this machine only.",
+    hint: "The URL before /chat/completions or /responses; empty means https://api.openai.com/v1. https, or http to this machine only.",
     placeholder: "https://api.example.com/v1",
     test: "Add its API key; AIGate tests it at <base URL>/models",
   },
@@ -24,6 +24,10 @@ const PROTOCOLS: Readonly<Record<NodeType, { label: string; hint: string; placeh
   },
 };
 const typeParam = (value: string | null): NodeType => (value === "anthropic-compatible" ? value : "openai-compatible");
+// connection.provider-node-api-type: which OpenAI API an OpenAI-compatible provider speaks.
+const API_TYPES: Readonly<Record<ApiType, string>> = { chat: "Chat completions (/chat/completions)", responses: "Responses (/responses)" };
+const apiTypeParam = (value: string): ApiType | undefined => (value === "chat" || value === "responses" ? value : undefined);
+const protocolLabel = (node: ProviderNode) => `${PROTOCOLS[node.type].label}${node.apiType === "responses" ? " · Responses" : ""}`;
 
 const text = (form: HTMLFormElement, name: string) => {
   const value = new FormData(form).get(name);
@@ -44,7 +48,7 @@ export function CustomProviders() {
     {nodes.isPending ? <StateBlock state="loading" />
       : nodes.isError ? <StateBlock state="error" code={toProblem(nodes.error).code} action={<Button onClick={() => void nodes.refetch()}>Retry</Button>} />
       : nodes.data.length === 0 ? <div className="catalog-empty">No custom providers yet. Add an OpenAI compatible endpoint, such as a local model server, or an Anthropic compatible gateway.</div>
-      : <div className="catalog-grid">{nodes.data.map((node) => <div className="catalog-card" key={node.id}><span className="catalog-glyph" aria-hidden="true">{node.name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{node.name}</strong><small><code>{node.prefix}/…</code> · {PROTOCOLS[node.type].label}</small><small title={node.baseUrl} style={{ overflowWrap: "anywhere" }}>{node.baseUrl}</small>
+      : <div className="catalog-grid">{nodes.data.map((node) => <div className="catalog-card" key={node.id}><span className="catalog-glyph" aria-hidden="true">{node.name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{node.name}</strong><small><code>{node.prefix}/…</code> · {protocolLabel(node)}</small><small title={node.baseUrl} style={{ overflowWrap: "anywhere" }}>{node.baseUrl}</small>
         {(() => { const reason = unreachable(node, nodes.data, reserved); return reason && <><Pill tone="warning">Unreachable</Pill><small>{reason}</small></>; })()}
         {connected.has(node.id) ? <Pill tone="healthy">Connected</Pill> : <a className="button button-ghost" href={connectHref(node.id)}>Connect</a>}
         <a className="button button-ghost" href={`/providers/new?id=${encodeURIComponent(node.id)}`}>Edit</a><Button variant="ghost" onClick={() => setRemoving(node)}>Delete</Button></span></div>)}</div>}
@@ -65,7 +69,8 @@ function NodeForm({ node, type, onType }: { node?: ProviderNode; type: NodeType;
     event.preventDefault();
     const baseUrl = text(event.currentTarget, "baseUrl");
     // An empty base URL is left out, so the server applies the 9router default.
-    const fields = { name: text(event.currentTarget, "name"), prefix: text(event.currentTarget, "prefix"), ...(baseUrl ? { baseUrl } : {}) };
+    const apiType = type === "openai-compatible" ? apiTypeParam(text(event.currentTarget, "apiType")) : undefined;
+    const fields = { name: text(event.currentTarget, "name"), prefix: text(event.currentTarget, "prefix"), ...(baseUrl ? { baseUrl } : {}), ...(apiType ? { apiType } : {}) };
     // A new provider goes straight to its API key; an edit applies to the existing connection at once.
     if (!node) create.mutate({ ...fields, type }, { onSuccess: (created) => window.location.assign(connectHref(created.id)), onError: fail });
     else update.mutate({ id: node.id, ...fields }, { onSuccess: () => window.location.assign("/providers"), onError: fail });
@@ -74,6 +79,7 @@ function NodeForm({ node, type, onType }: { node?: ProviderNode; type: NodeType;
     <Field label="Provider name"><Input name="name" required maxLength={64} defaultValue={node?.name} placeholder="e.g. Local LLM" /></Field>
     <Field label="Prefix" hint={'Requests name a model as "<prefix>/<model>", e.g. local/llama-3. A built-in provider id, a prefix already in use, or one containing "/" is saved but unreachable.'}><Input name="prefix" required maxLength={200} defaultValue={node?.prefix} placeholder="local" /></Field>
     <Field label="Protocol" hint={node ? "The protocol cannot be changed; add a new custom provider instead." : undefined}><select className="input" name="type" value={type} onChange={(event) => onType?.(typeParam(event.target.value))} disabled={Boolean(node)}>{Object.entries(PROTOCOLS).map(([value, p]) => <option key={value} value={value}>{p.label}</option>)}</select></Field>
+    {type === "openai-compatible" && <Field label="API" hint="Responses uses the OpenAI Responses API at <base URL>/responses. Changing it applies to the next request."><select className="input" name="apiType" defaultValue={node?.apiType ?? "chat"}>{Object.entries(API_TYPES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>}
     <Field label="Base URL" hint={PROTOCOLS[type].hint}><Input name="baseUrl" maxLength={2048} defaultValue={node?.baseUrl} placeholder={PROTOCOLS[type].placeholder} /></Field>
     <div className="row"><Link className="button" to="/providers">Cancel</Link><Button type="submit" variant="primary" disabled={pending}>{pending ? "Saving…" : node ? "Save changes" : "Save and add API key"}</Button></div>
   </div></form>;

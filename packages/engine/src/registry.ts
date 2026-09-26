@@ -47,7 +47,7 @@ export interface ProviderDescriptor {
   readonly anthropicNode?: { readonly official: boolean };
 }
 
-export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic"] as const;
+export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic", "openai-responses"] as const;
 export type ProviderProtocol = (typeof PROVIDER_PROTOCOLS)[number];
 
 // Why a catalog provider can or cannot be connected (the UI shows the reason).

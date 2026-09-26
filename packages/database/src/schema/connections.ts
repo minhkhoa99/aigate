@@ -31,6 +31,8 @@ export const providerConnections = sqliteTable(
 export const providerNodes = sqliteTable("provider_nodes", {
   id: text("id").primaryKey(),
   type: text("type", { enum: ["openai-compatible", "anthropic-compatible"] }).notNull().default("openai-compatible"),
+  // SP14c: the OpenAI API an openai-compatible node speaks; unused (left "chat") for anthropic-compatible nodes.
+  apiType: text("api_type", { enum: ["chat", "responses"] }).notNull().default("chat"),
   name: text("name").notNull(),
   prefix: text("prefix").notNull(),
   baseUrl: text("base_url").notNull(),

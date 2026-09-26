@@ -4,12 +4,14 @@ import { asc, count, eq, sql } from "drizzle-orm";
 import { providerConnections, providerNodes, type DatabaseHandle } from "@aigate/database";
 import { ANTHROPIC_VERSION, CATALOG, type ProviderDescriptor } from "@aigate/engine";
 import { DATABASE } from "../../../database.provider.js";
-import { MAX_NODES, type NodeChanges, type NodeFields, type NodeType } from "../domain/provider-node.js";
+import { MAX_NODES, type ApiType, type NodeChanges, type NodeFields, type NodeType } from "../domain/provider-node.js";
 
 // docs/contracts/custom-providers.md.
 export interface NodeView {
   id: string;
   type: NodeType;
+  // null for an anthropic-compatible node.
+  apiType: ApiType | null;
   name: string;
   prefix: string;
   baseUrl: string;
@@ -18,9 +20,11 @@ export interface NodeView {
 }
 
 const n = providerNodes;
-const columns = { id: n.id, type: n.type, name: n.name, prefix: n.prefix, baseUrl: n.baseUrl, createdAt: n.createdAt, updatedAt: n.updatedAt };
-type Row = Omit<NodeView, "createdAt" | "updatedAt"> & { createdAt: Date; updatedAt: Date };
-const toView = (row: Row): NodeView => ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() });
+const columns = { id: n.id, type: n.type, apiType: n.apiType, name: n.name, prefix: n.prefix, baseUrl: n.baseUrl, createdAt: n.createdAt, updatedAt: n.updatedAt };
+type Row = Omit<NodeView, "apiType" | "createdAt" | "updatedAt"> & { apiType: ApiType; createdAt: Date; updatedAt: Date };
+const toView = (row: Row): NodeView => ({
+  ...row, apiType: row.type === "openai-compatible" ? row.apiType : null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+});
 
 // Every catalog id and alias, connectable or not: they always win over a custom prefix at /v1, as in 9router.
 const RESERVED = new Set(CATALOG.flatMap((p) => [p.id, ...p.aliases]));
@@ -32,7 +36,12 @@ export function nodeDescriptor(node: NodeView): ProviderDescriptor {
   const base = node.baseUrl.replace(/\/$/, "");
   const shared = { id: node.id, name: node.name, modelsUrl: `${base}/models`, aliases: [], models: [] };
   if (node.type === "openai-compatible") {
-    return { ...shared, protocol: "openai-compatible", chatUrl: `${base}/chat/completions`, headers: {}, auth: { kind: "api-key", header: "authorization", scheme: "bearer" } };
+    // connection.provider-node-api-type: the stored apiType picks the endpoint and the adapter.
+    const responses = node.apiType === "responses";
+    return {
+      ...shared, protocol: responses ? "openai-responses" : "openai-compatible", chatUrl: `${base}${responses ? "/responses" : "/chat/completions"}`,
+      headers: {}, auth: { kind: "api-key", header: "authorization", scheme: "bearer" },
+    };
   }
   // connection.anthropic-compatible-node: 9router calls a host official when the URL merely contains api.anthropic.com.
   return {
@@ -69,7 +78,9 @@ export class ProviderNodesRepository {
       const total = await tx.select({ n: count() }).from(n).get();
       if ((total?.n ?? 0) >= MAX_NODES) return "limit";
       const now = new Date();
-      const [row] = await tx.insert(n).values({ id: `${fields.type}-${randomBytes(6).toString("hex")}`, ...fields, createdAt: now, updatedAt: now })
+      // 9router ids: openai-compatible-<apiType>-<id> (not renamed when apiType changes), anthropic-compatible-<id>.
+      const kind = fields.type === "openai-compatible" ? `${fields.type}-${fields.apiType}` : fields.type;
+      const [row] = await tx.insert(n).values({ id: `${kind}-${randomBytes(6).toString("hex")}`, ...fields, createdAt: now, updatedAt: now })
         .returning(columns);
       if (!row) throw new Error("insert returned no row");
       return toView(row);

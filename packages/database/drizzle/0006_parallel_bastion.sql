@@ -1,0 +1,1 @@
+ALTER TABLE `provider_nodes` ADD `api_type` text DEFAULT 'chat' NOT NULL;

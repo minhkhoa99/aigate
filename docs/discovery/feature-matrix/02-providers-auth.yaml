@@ -1658,3 +1658,44 @@
     expected: "An API-key request carries only the betas it needs; the official host is decided by hostname; the connection test calls <baseUrl>/messages and reports 404 or 5xx as not verified"
     actual: "claude-* models get the Claude Code OAuth and redact-thinking betas with an API key; a substring decides the official host; the test calls <baseUrl>/v1/messages and counts any status but 401/403 as valid"
     impact: "Thinking text can come back redacted, a look-alike gateway URL skips the Bearer header, and a wrong base URL or dead endpoint tests as a working key"
+
+# 2026-09-26 SP14c: OpenAI-compatible custom provider nodes with apiType responses.
+- id: connection.provider-node-api-type
+  group: Providers
+  feature: Custom provider nodes
+  subFeature: "apiType chat or responses on an OpenAI-compatible node: create, update, id, and the request URL"
+  trigger: "POST or PUT /api/provider-nodes for an openai-compatible node; a /v1 request to such a node"
+  input: "{ apiType: chat | responses } with the node fields"
+  output: "The node with apiType; requests to <baseUrl>/chat/completions or <baseUrl>/responses"
+  businessRules:
+    - "An openai-compatible node needs apiType chat or responses on create and on update (400 Invalid OpenAI compatible API type)"
+    - "The id embeds the apiType at creation (openai-compatible-<apiType>-<id>) and is not renamed when apiType changes"
+    - "Update changes apiType, and the next request uses the new one (the stored apiType wins; the id substring is only a fallback for legacy nodes)"
+    - "apiType responses sends the Responses request to <baseUrl without one trailing />/responses with the openai-responses translators; chat keeps /chat/completions"
+    - "apiType is ignored for anthropic-compatible nodes"
+    - "The connection test is GET <baseUrl>/models for both apiTypes"
+  state:
+    reads: ["providerNodes"]
+    writes: ["providerNodes (apiType)"]
+    runtimeOnly: []
+  dependencies: ["connection.provider-node-create-list", "connection.provider-node-update-delete", "translator.openai-to-responses-request", "translator.responses-to-openai-stream"]
+  providerInteraction: "POST <baseUrl>/responses"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "apiType missing or not chat/responses on an openai-compatible node", partial: false }
+  sideEffects: []
+  persistence: ["providerNodes.apiType"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A node created as chat and switched to responses keeps an id that says chat"
+  evidence:
+    - { file: src/app/api/provider-nodes/route.js, line: 49, note: "apiType must be chat or responses" }
+    - { file: src/app/api/provider-nodes/route.js, line: 54, note: "id = openai-compatible-<apiType>-<generated>" }
+    - { file: "src/app/api/provider-nodes/[id]/route.js", line: 25, note: "update requires apiType for openai-compatible nodes" }
+    - { file: "src/app/api/provider-nodes/[id]/route.js", line: 58, note: "update stores the new apiType" }
+    - { file: open-sse/services/provider.js, line: 27, note: "stored apiType wins, id substring is the legacy fallback" }
+    - { file: open-sse/executors/default.js, line: 113, note: "/responses or /chat/completions by apiType" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]
