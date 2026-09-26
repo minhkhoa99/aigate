@@ -12,5 +12,8 @@ export function registerV1Routes(fastify: FastifyInstance, lane: ChatLane): void
     errorHandler: (error: Parameters<ChatLane["bodyError"]>[0], _request: unknown, reply: Parameters<ChatLane["bodyError"]>[1]) => lane.bodyError(error, reply),
   };
   fastify.post("/v1/chat/completions", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.chat(request, reply));
+  // docs/contracts/protocol-anthropic.md: Anthropic clients (Claude Code, the Anthropic SDK).
+  fastify.post("/v1/messages", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.messages(request, reply));
+  fastify.post("/v1/messages/count_tokens", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.countTokens(request, reply));
   fastify.get("/v1/models", common, (_request, reply) => lane.models(reply));
 }

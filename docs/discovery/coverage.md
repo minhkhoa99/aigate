@@ -1,6 +1,6 @@
 # Discovery coverage
 
-Entries: 312
+Entries: 314
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
@@ -19,7 +19,7 @@ Entries: 312
 - connections: 55
 - identity: 11
 - media: 15
-- routing: 101
+- routing: 103
 - settings: 10
 - tooling: 45
 - transport: 14
@@ -28,8 +28,8 @@ Entries: 312
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 16
-- REFERENCE_BEHAVIOR: 265
-- SUSPECTED_BUG: 59
+- REFERENCE_BEHAVIOR: 267
+- SUSPECTED_BUG: 61
 
 ## Missing — pages
 

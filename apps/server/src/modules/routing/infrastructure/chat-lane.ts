@@ -4,9 +4,10 @@ import type { ServerResponse } from "node:http";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import {
-  assertModelSupports, builtinRegistry, createAdapter, EngineError, OpenAIChatStreamEncoder, parseOpenAIChatRequest, toOpenAIChatCompletion,
-  toOpenAIError, UnsupportedFeatureError, withConnection, type AIProviderPort, type CanonicalRequest, type Credential, type ExecCtx, type HttpTransportPort, type ProviderDescriptor,
-  type StreamChunk,
+  anthropicClientGetsMessage, anthropicRequestFor, AnthropicStreamEncoder, assertModelSupports, builtinRegistry, createAdapter, EngineError,
+  estimateAnthropicInputTokens, OpenAIChatStreamEncoder, parseAnthropicMessagesRequest, parseOpenAIChatRequest, toAnthropicMessage, toOpenAIChatCompletion,
+  toOpenAIError, UnsupportedFeatureError, withConnection, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential, type ExecCtx,
+  type HttpTransportPort, type ProviderDescriptor, type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { extractApiKey } from "../../apikeys/domain/api-key.js";
@@ -78,6 +79,59 @@ interface Target {
   credential: Credential;
 }
 
+interface Ids {
+  created: number;
+  fallbackId: string;
+  requestId: string;
+}
+
+interface StreamEncoder {
+  encode(chunk: StreamChunk): string;
+  end(): string;
+  fail(error: unknown): string;
+}
+
+// A client protocol on the lane: how its body becomes CIP, and how the answer goes back. Errors stay OpenAI-shaped
+// for every protocol (9router, kept by user decision 2026-09-27).
+interface ClientProtocol {
+  parse(body: unknown, accept: string | undefined): ParsedClientRequest;
+}
+
+interface ParsedClientRequest {
+  readonly request: CanonicalRequest;
+  // The request the resolved provider receives (the model already resolved).
+  prepare(request: CanonicalRequest, provider: ProviderDescriptor): CanonicalRequest;
+  respond(response: CanonicalResponse, provider: ProviderDescriptor, ids: Ids): unknown;
+  encoder(provider: ProviderDescriptor, ids: Ids & { model: string }): StreamEncoder;
+}
+
+// docs/contracts/protocol-openai.md
+const OPENAI_CHAT: ClientProtocol = {
+  parse(body) {
+    const { request, includeUsage } = parseOpenAIChatRequest(body);
+    return {
+      request,
+      prepare: (upstream) => upstream,
+      respond: (response, _provider, ids) => toOpenAIChatCompletion(response, ids),
+      encoder: (_provider, ids) => new OpenAIChatStreamEncoder({ ...ids, includeUsage }),
+    };
+  },
+};
+
+// docs/contracts/protocol-anthropic.md
+const ANTHROPIC_MESSAGES: ClientProtocol = {
+  parse(body, accept) {
+    const parsed = parseAnthropicMessagesRequest(body, accept);
+    const messageId = (ids: Ids) => `msg_${ids.requestId.replaceAll("-", "")}`;
+    return {
+      request: parsed.request,
+      prepare: (upstream, provider) => anthropicRequestFor({ request: upstream, anthropicOnly: parsed.anthropicOnly }, provider),
+      respond: (response, provider, ids) => (anthropicClientGetsMessage(provider) ? toAnthropicMessage(response, messageId(ids)) : toOpenAIChatCompletion(response, ids)),
+      encoder: (_provider, ids) => new AnthropicStreamEncoder({ fallbackId: messageId(ids), model: ids.model }),
+    };
+  },
+};
+
 @Injectable()
 export class ChatLane {
   private readonly logger = new Logger("ChatLane");
@@ -98,7 +152,21 @@ export class ChatLane {
     return failure ? this.fail(reply, failure) : undefined;
   }
 
-  async chat(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  chat(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    return this.serve(request, reply, OPENAI_CHAT);
+  }
+
+  // POST /v1/messages: Anthropic clients (Claude Code, the Anthropic SDK).
+  messages(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    return this.serve(request, reply, ANTHROPIC_MESSAGES);
+  }
+
+  // POST /v1/messages/count_tokens (routing.count-tokens-estimate): a local estimate, no provider is called.
+  countTokens(request: FastifyRequest, reply: FastifyReply): FastifyReply {
+    return reply.header("cache-control", "no-store").send({ input_tokens: estimateAnthropicInputTokens(request.body) });
+  }
+
+  private async serve(request: FastifyRequest, reply: FastifyReply, protocol: ClientProtocol): Promise<void> {
     const requestId = randomUUID();
     const client = new AbortController();
     reply.raw.once("close", () => {
@@ -111,17 +179,19 @@ export class ChatLane {
       if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
         throw new GatewayError(415, "invalid_request_error", "unsupported_media_type", "Send the body as JSON with Content-Type: application/json.");
       }
-      const { request: parsed, includeUsage } = parseOpenAIChatRequest(request.body);
-      const target = await this.resolve(parsed);
+      const accept = request.headers.accept;
+      const parsed = protocol.parse(request.body, typeof accept === "string" ? accept : undefined);
+      const resolved = await this.resolve(parsed.request);
+      const target = { ...resolved, request: parsed.prepare(resolved.request, resolved.provider) };
       const adapter = createAdapter(target.provider, this.transport);
       const ids = { created: Math.floor(Date.now() / 1000), fallbackId: `chatcmpl-${requestId.replaceAll("-", "")}`, requestId };
-      if (!parsed.stream) {
+      if (!target.request.stream) {
         const ctx: ExecCtx = { signal: AbortSignal.any([client.signal, budget.signal]), requestId };
         const response = await adapter.execute(target.request, target.credential, ctx);
-        reply.code(200).header("cache-control", "no-store").send(toOpenAIChatCompletion(response, ids));
+        reply.code(200).header("cache-control", "no-store").send(parsed.respond(response, target.provider, ids));
         return;
       }
-      await this.stream(reply, adapter, target, { ...ids, includeUsage }, client, budget.signal);
+      await this.stream(reply, adapter, target, parsed.encoder(target.provider, { ...ids, model: target.request.model }), ids.requestId, client, budget.signal);
     } catch (error) {
       if (client.signal.aborted) {
         // Nobody is left to answer; the upstream call was already cancelled through the shared signal.
@@ -222,25 +292,23 @@ export class ChatLane {
 
   // Headers are sent only after the first chunk, so a failure before it is a normal JSON error.
   private async stream(
-    reply: FastifyReply, adapter: AIProviderPort, target: Target,
-    ids: { created: number; fallbackId: string; requestId: string; includeUsage: boolean }, client: AbortController, budget: AbortSignal,
+    reply: FastifyReply, adapter: AIProviderPort, target: Target, encoder: StreamEncoder, requestId: string, client: AbortController, budget: AbortSignal,
   ): Promise<void> {
     const idle = new AbortController();
-    const ctx: ExecCtx = { signal: AbortSignal.any([client.signal, budget, idle.signal]), requestId: ids.requestId };
+    const ctx: ExecCtx = { signal: AbortSignal.any([client.signal, budget, idle.signal]), requestId };
     const iterator = adapter.stream(target.request, target.credential, ctx)[Symbol.asyncIterator]();
     const next = () => this.nextWithin(iterator, idle, target.provider.name);
     let step = await next();
     reply.hijack();
     const raw = reply.raw;
     raw.on("error", () => client.abort(new ClientGone()));
-    raw.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache", "x-accel-buffering": "no", "x-request-id": ids.requestId });
-    const encoder = new OpenAIChatStreamEncoder({ ...ids, model: target.request.model });
+    raw.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache", "x-accel-buffering": "no", "x-request-id": requestId });
     try {
       for (; !step.done; step = await next()) await write(raw, encoder.encode(step.value), client.signal);
       await write(raw, encoder.end(), client.signal);
     } catch (error) {
       if (!client.signal.aborted) {
-        this.logUnexpected(error, ids.requestId);
+        this.logUnexpected(error, requestId);
         // Mid-stream failure: one error event and no [DONE] (fallback.partial-stream-failure).
         await write(raw, encoder.fail(error), client.signal).catch(() => undefined);
       }

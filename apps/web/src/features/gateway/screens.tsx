@@ -12,6 +12,8 @@ const READINESS: Record<ChatReadiness, { tone: "healthy" | "warning"; label: str
   "check-connection": { tone: "warning", label: "Check connection", hint: "A provider is connected, but its key has not passed a test yet." },
 };
 const SAMPLE_BODY = JSON.stringify({ model: "openai/gpt-4.1-mini", messages: [{ role: "user", content: "Hello" }] });
+// docs/contracts/protocol-anthropic.md: the same models through the Anthropic Messages protocol.
+const ANTHROPIC_BODY = JSON.stringify({ model: "openai/gpt-4.1-mini", max_tokens: 256, stream: false, messages: [{ role: "user", content: "Hello" }] });
 
 export function EndpointKeys() {
   const [showCreate, setShowCreate] = useState(false);
@@ -30,6 +32,7 @@ export function EndpointKeys() {
   const readiness = useChatReadiness();
   const state = readiness.data ? READINESS[readiness.data] : undefined;
   const curl = `curl ${baseUrl}/chat/completions -H "Authorization: Bearer <your AIGate key>" -H "Content-Type: application/json" -d '${SAMPLE_BODY}'`;
+  const anthropicCurl = `curl ${baseUrl}/messages -H "x-api-key: <your AIGate key>" -H "Content-Type: application/json" -d '${ANTHROPIC_BODY}'`;
   const closeCreate = () => { setShowCreate(false); setCreated(null); createKey.reset(); };
 
   const submitCreate = (event: FormEvent<HTMLFormElement>) => {
@@ -40,13 +43,15 @@ export function EndpointKeys() {
 
   return <>
     <PageHeading eyebrow="Gateway / Endpoint & Keys" title="Gateway endpoints" description="Configure your client base URL and manage access tokens." />
-    <Panel title="Base URL" detail="Use this URL in OpenAI-compatible clients." action={state ? <Pill tone={state.tone}>{state.label}</Pill> : <Pill>{readiness.isError ? "Status unavailable" : "Checking…"}</Pill>}>
+    <Panel title="Base URL" detail="Use this URL in OpenAI-compatible and Anthropic clients." action={state ? <Pill tone={state.tone}>{state.label}</Pill> : <Pill>{readiness.isError ? "Status unavailable" : "Checking…"}</Pill>}>
       {state?.hint && <Warning>{state.hint} <a href="/providers/connections">Open Connections</a></Warning>}
       <CopyField label="OpenAI compatible endpoint" value={baseUrl} />
-      <div className="endpoint-examples"><span>OpenAI</span></div>
-      <p className="muted">Anthropic, Gemini, and Codex formats arrive with SP15. List models at <code>/v1/models</code>, or send <code>provider/model</code> such as <code>openai/gpt-4.1-mini</code>.</p>
+      <div className="endpoint-examples"><span>OpenAI</span><span>Anthropic</span></div>
+      <p className="muted">OpenAI clients call <code>/v1/chat/completions</code>; Anthropic clients (Claude Code, the Anthropic SDK) call <code>/v1/messages</code> with the key in <code>x-api-key</code>. Gemini and Codex formats arrive with SP15b/SP15c. List models at <code>/v1/models</code>, or send <code>provider/model</code> such as <code>openai/gpt-4.1-mini</code>.</p>
       <CopyField label="Terminal example" value={`export OPENAI_BASE_URL=${baseUrl}`} />
       <CopyField label="Test request" value={curl} />
+      <CopyField label="Claude Code" value={`export ANTHROPIC_BASE_URL=${window.location.origin} ANTHROPIC_API_KEY=<your AIGate key>`} />
+      <CopyField label="Anthropic test request" value={anthropicCurl} />
     </Panel>
     <Panel title="API keys" detail="Manage scoped gateway tokens for upstream client authentication." className="section-gap panel-flush" action={<Button variant="primary" onClick={() => setShowCreate(true)}>+ Create key</Button>}>
       {keys.isPending ? <StateBlock state="loading" />

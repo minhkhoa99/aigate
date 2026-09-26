@@ -3437,6 +3437,27 @@ Every item below is a capability AIGate must have. Derived from tracing
 
 ## Translation
 
+### Anthropic Messages client request to the OpenAI pivot (claudeToOpenAIRequest), or near passthrough to an Anthropic provider
+
+- **id:** `translator.claude-client-request` · **module:** `routing`
+- **Trigger:** POST /v1/messages from an Anthropic client (Claude Code, Anthropic SDK)
+- **Input:** An Anthropic Messages body
+- **Output:** An OpenAI chat body for non-Claude targets; the Claude body, lightly prepared, for Claude targets
+- **Rules:**
+  - Claude target (anthropic, anthropic-compatible): the conversion is skipped; the body keeps thinking blocks and signatures, cache_control, documents, top_k, metadata and every other field
+  - Other targets: model = upstream id; max_tokens = adjustMaxTokens (default 64000; at least 32000 when tools are present; budget_tokens + 1024 when max_tokens <= budget_tokens; capped at 64000); temperature copied
+  - system: a string, or blocks reduced to their text joined with a newline; a leading 'x-anthropic-billing-header:' line is removed; cache_control lost
+  - A role:'system' message inside messages becomes a user message '<instructions>\n<text>\n</instructions>' (all targets)
+  - text → text; image with base64 source → image_url data URI; image by URL or file → dropped; tool_use → tool_calls (arguments = JSON of input); tool_result → a tool message (text parts joined with a newline, else JSON of the content), is_error dropped, images moved to the following user turn after '[Image from tool result <id>]'; thinking, redacted_thinking, document, search_result, server_tool_use and web_search_tool_result blocks → dropped
+  - A tool call without a tool message right after it gets a '[No response received]' tool message
+  - tools → functions { name, description: String(description or ''), parameters: input_schema or { type: object, properties: {} } }; a server tool's type is ignored
+  - tool_choice: auto → auto, any → required, tool → { function: { name } }, anything else (none) → auto
+  - stop_sequences, top_p, top_k, metadata, disable_parallel_tool_use, service_tier and other fields are not carried to the pivot
+  - thinking { budget_tokens } is captured as intent and re-applied to the target (an OpenAI target gets reasoning_effort from the budget level); thinking is removed when the last message is not from the user
+- **Streaming:** yes
+- **Errors:** `INVALID_REQUEST` (the body is not valid JSON or has no model)
+- **AIGate required behavior:** stop_sequences, top_p, is_error, URL images, and tool_choice none reach a provider that can carry them
+
 ### Anthropic Messages response (JSON and SSE) to OpenAI chat completions, and upstream error handling
 
 - **id:** `translator.claude-to-openai-response` · **module:** `routing`
@@ -3521,6 +3542,24 @@ Every item below is a capability AIGate must have. Derived from tracing
   - A stream that ends without a done line gets no finish chunk and no error
 - **Streaming:** yes
 - **AIGate required behavior:** An error line fails the answer, and a stream without its done line is a failure (fallback.partial-stream-failure)
+
+### OpenAI pivot answer to the Anthropic Messages client: SSE events and the non-streaming message
+
+- **id:** `translator.openai-to-claude-client-response` · **module:** `routing`
+- **Trigger:** An answer for an Anthropic client
+- **Input:** OpenAI chat.completion chunks or body
+- **Output:** Anthropic SSE events or a message object
+- **Rules:**
+  - Stream events are 'event: <type>\ndata: <json>' frames: message_start (id without 'chatcmpl-', else msg_<ms>; usage 0/0), content_block_start/delta/stop for thinking (thinking_delta), text (text_delta) and tool_use (input_json_delta), message_delta { stop_reason, stop_sequence: null, usage }, message_stop; no ping, no [DONE]
+  - Tool blocks open only on a chunk that carries the call id; arguments are buffered and sent as one input_json_delta at the finish; Read tool arguments are sanitized (limit/offset numbers, limit ≤ 2000, pages only for .pdf)
+  - No signature_delta is sent
+  - Stop reasons: stop → end_turn, length → max_tokens, tool_calls → tool_use, content_filter → refusal, anything else → end_turn
+  - Usage on message_delta: input_tokens = prompt − cached − cache creation, output_tokens, cache_read_input_tokens, cache_creation_input_tokens, plus 2000 added to input_tokens (or an estimate with estimated:true); a usage chunk after the finish is ignored
+  - Non-streaming: a message object { id, type: message, role: assistant, model, content (thinking, text, tool_use; else one empty text), stop_reason, stop_sequence: null, usage (+2000) } only when the target is openai (not forced to stream) or Claude (passthrough); otherwise the OpenAI chat.completion is returned
+  - An omitted stream streams unless Accept is application/json without text/event-stream
+  - Errors are OpenAI-shaped { error: { message, type, code } }; a mid-stream abort is 'event: error' with { type: error, error: { message, type, code } }; an in-band upstream error chunk is dropped
+- **Streaming:** yes
+- **AIGate required behavior:** Real usage, tool arguments streamed as they come, thinking signatures kept, a message object for every non-streaming answer, Anthropic error shapes
 
 ### OpenAI chat completions request to Anthropic Messages request
 
@@ -4156,6 +4195,8 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `translator.cloudflare-content-flatten` | A part the endpoint cannot take is refused with a clear error | Images, audio and files are silently replaced by empty strings | Vision requests get answers about text the user did not send alone |
 | `translator.openai-to-commandcode-request` | Fields the envelope cannot carry are refused, max_completion_tokens is honored, developer stays system, tool names and bad arguments are not invented | They are dropped, 64000 and 0.3 are sent instead, developer becomes user, toolName is empty, bad arguments become {} | Silent loss of client controls and instructions |
 | `translator.commandcode-to-openai-response` | Every line is read, [DONE] ends the stream, a mid-stream error keeps its message, a cut-off fails, error finishes fail, usage keeps cache and reasoning tokens | Lines can be lost, [DONE] is missing, the error text is replaced, cut-offs and error finishes look complete, usage details are dropped | Truncated answers and failures reported as success |
+| `translator.claude-client-request` | stop_sequences, top_p, is_error, URL images, and tool_choice none reach a provider that can carry them | They are dropped, and none becomes auto | Client controls silently ignored |
+| `translator.openai-to-claude-client-response` | Real usage, tool arguments streamed as they come, thinking signatures kept, a message object for every non-streaming answer, Anthropic error shapes | 2000 extra input tokens or estimates, arguments only at the end, no signature_delta, chat.completion for some providers, OpenAI error shapes | Wrong token accounting, slower tool rendering, lost thinking continuity, SDK parse failures |
 | `clitools.write-not-atomic` | Given every one of these writes targets the user's own IDE/CLI configuration file (not 9router's own data), and one of the affected routes' own comment explicitly promises 'Backup old fields and write new settings', a crash mid-write should not be able to corrupt or truncate that file — either via a temp-file-then-rename swap (the exact pattern already implemented in this codebase at src/lib/mitmAliasCache.js:15-21 for 9router's own alias cache) or an actual on-disk backup copy. | All 13 write-capable cli-tools routes call fs.writeFile(path, content) directly on the final path with no temp file, no rename, and no backup copy anywhere on disk. The 'backup' language in the claude-settings POST comment refers only to merging the previously-read JSON object in memory before the single overwrite call — nothing is preserved outside process memory. | A crash, OOM kill, disk-full error, or power loss during any of these writes can truncate or corrupt the user's real tool config (e.g. ~/.claude/settings.json, ~/.codex/config.toml, ~/.openclaw/openclaw.json). Because every route's read path treats an unparseable file as simply 'no config', the damage is silent: the next status check reports the tool as unconfigured, and the next Apply starts from empty, permanently discarding whatever unrelated settings that file held before 9router wrote to it. |
 | `clitools.copilot-settings-array-upsert` | Like every other cli-tools GET handler (claude, codex, cline, droid, kilo, etc.), Copilot's GET should reflect a real detection check — a `where`/`which` lookup or a marker-file probe — before reporting installed: true, so the dashboard only shows Copilot as available on a machine that actually has it. | copilot-settings/route.js's GET performs no detection at all: it reads chatLanguageModels.json (which may not exist, in which case config is null) and always returns installed: true regardless. | The dashboard's Copilot integration card (and any 'all installed tools' summary the UI derives from installed flags) will show Copilot as installed on any machine, even one with no VS Code and no Copilot extension, inviting the user to Apply — which just writes a file nobody will ever read. |
 | `clitools.deepseek-tui-full-overwrite` | Like every other tool's Apply/Reset in this set (codex, droid, opencode, openclaw, grok-build, hermes, jcode, kilo, cline, cowork all read-merge-write or perform a targeted key removal), DeepSeek TUI's POST should merge 9router's fields into whatever config.toml already contains, and DELETE should remove only what 9router added — preserving any other DeepSeek TUI settings the user configured. | Both POST and DELETE build a fixed, hand-written TOML string from scratch and write it directly, completely replacing the file's prior contents regardless of what else was in it (POST never even calls the file's own readConfigToml() result; DELETE writes a hardcoded 2-line default). | The first time a user clicks Apply or Reset for DeepSeek TUI in the 9router dashboard, any other settings they had configured directly in ~/.deepseek/config.toml (other providers, TUI preferences, anything not related to 9router) are silently and irrecoverably destroyed. |

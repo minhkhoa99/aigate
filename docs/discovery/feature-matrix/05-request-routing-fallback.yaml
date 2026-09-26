@@ -1433,7 +1433,7 @@
     - { file: src/app/api/v1/messages/count_tokens/route.js, line: 69, note: "Math.ceil(totalChars / 4)" }
     - { file: src/app/api/v1/messages/count_tokens/route.js, line: 80, note: "invalid JSON -> 400" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: routing.v1-root-alias

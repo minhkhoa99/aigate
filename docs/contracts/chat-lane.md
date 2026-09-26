@@ -1,6 +1,6 @@
 # Chat lane contract (M1 SP12)
 
-Scope, per spec §9: `POST /v1/chat/completions` on the OpenAI protocol, through **one** provider (OpenAI) and **one** API-key connection, with streaming, backpressure, and cancellation. `GET /v1/models` lists the models that can be called.
+Scope, per spec §9: `POST /v1/chat/completions` on the OpenAI protocol, through **one** provider (OpenAI) and **one** API-key connection, with streaming, backpressure, and cancellation. `GET /v1/models` lists the models that can be called. Since SP15 the same lane also serves Anthropic clients at `POST /v1/messages` and `POST /v1/messages/count_tokens` (`protocol-anthropic.md`): a client protocol object decides how the body becomes CIP, how the request is prepared for the resolved provider, and how the answer and the stream go back; errors stay OpenAI-shaped for every protocol.
 
 It glues together what earlier SPs built:
 - the API-key gate (SP6)

@@ -1341,3 +1341,100 @@
     actual: "Lines can be lost, [DONE] is missing, the error text is replaced, cut-offs and error finishes look complete, usage details are dropped"
     impact: "Truncated answers and failures reported as success"
 
+
+# 2026-09-27 SP15: the Anthropic Messages client protocol (/v1/messages).
+- id: translator.claude-client-request
+  group: Translation
+  feature: Request translation
+  subFeature: "Anthropic Messages client request to the OpenAI pivot (claudeToOpenAIRequest), or near passthrough to an Anthropic provider"
+  trigger: "POST /v1/messages from an Anthropic client (Claude Code, Anthropic SDK)"
+  input: "An Anthropic Messages body"
+  output: "An OpenAI chat body for non-Claude targets; the Claude body, lightly prepared, for Claude targets"
+  businessRules:
+    - "Claude target (anthropic, anthropic-compatible): the conversion is skipped; the body keeps thinking blocks and signatures, cache_control, documents, top_k, metadata and every other field"
+    - "Other targets: model = upstream id; max_tokens = adjustMaxTokens (default 64000; at least 32000 when tools are present; budget_tokens + 1024 when max_tokens <= budget_tokens; capped at 64000); temperature copied"
+    - "system: a string, or blocks reduced to their text joined with a newline; a leading 'x-anthropic-billing-header:' line is removed; cache_control lost"
+    - "A role:'system' message inside messages becomes a user message '<instructions>\\n<text>\\n</instructions>' (all targets)"
+    - "text → text; image with base64 source → image_url data URI; image by URL or file → dropped; tool_use → tool_calls (arguments = JSON of input); tool_result → a tool message (text parts joined with a newline, else JSON of the content), is_error dropped, images moved to the following user turn after '[Image from tool result <id>]'; thinking, redacted_thinking, document, search_result, server_tool_use and web_search_tool_result blocks → dropped"
+    - "A tool call without a tool message right after it gets a '[No response received]' tool message"
+    - "tools → functions { name, description: String(description or ''), parameters: input_schema or { type: object, properties: {} } }; a server tool's type is ignored"
+    - "tool_choice: auto → auto, any → required, tool → { function: { name } }, anything else (none) → auto"
+    - "stop_sequences, top_p, top_k, metadata, disable_parallel_tool_use, service_tier and other fields are not carried to the pivot"
+    - "thinking { budget_tokens } is captured as intent and re-applied to the target (an OpenAI target gets reasoning_effort from the budget level); thinking is removed when the last message is not from the user"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.source-format-detection", "translator.openai-to-claude-client-response"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "the body is not valid JSON or has no model", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A Claude Code conversation with thinking history reaches an OpenAI-compatible provider without its thinking blocks"
+  evidence:
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 14, note: "claudeToOpenAIRequest" }
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 144, note: "mid-conversation system → <instructions>" }
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 166, note: "block conversion" }
+    - { file: open-sse/translator/request/claude-to-openai.js, line: 273, note: "tool_choice, none → auto" }
+    - { file: open-sse/translator/formats/maxTokens.js, line: 12, note: "adjustMaxTokens" }
+    - { file: open-sse/translator/index.js, line: 84, note: "same format: conversion skipped" }
+    - { file: open-sse/services/provider.js, line: 170, note: "normalizeThinkingConfig" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "stop_sequences, top_p, is_error, URL images, and tool_choice none reach a provider that can carry them"
+    actual: "They are dropped, and none becomes auto"
+    impact: "Client controls silently ignored"
+
+- id: translator.openai-to-claude-client-response
+  group: Translation
+  feature: Response translation
+  subFeature: "OpenAI pivot answer to the Anthropic Messages client: SSE events and the non-streaming message"
+  trigger: "An answer for an Anthropic client"
+  input: "OpenAI chat.completion chunks or body"
+  output: "Anthropic SSE events or a message object"
+  businessRules:
+    - "Stream events are 'event: <type>\\ndata: <json>' frames: message_start (id without 'chatcmpl-', else msg_<ms>; usage 0/0), content_block_start/delta/stop for thinking (thinking_delta), text (text_delta) and tool_use (input_json_delta), message_delta { stop_reason, stop_sequence: null, usage }, message_stop; no ping, no [DONE]"
+    - "Tool blocks open only on a chunk that carries the call id; arguments are buffered and sent as one input_json_delta at the finish; Read tool arguments are sanitized (limit/offset numbers, limit ≤ 2000, pages only for .pdf)"
+    - "No signature_delta is sent"
+    - "Stop reasons: stop → end_turn, length → max_tokens, tool_calls → tool_use, content_filter → refusal, anything else → end_turn"
+    - "Usage on message_delta: input_tokens = prompt − cached − cache creation, output_tokens, cache_read_input_tokens, cache_creation_input_tokens, plus 2000 added to input_tokens (or an estimate with estimated:true); a usage chunk after the finish is ignored"
+    - "Non-streaming: a message object { id, type: message, role: assistant, model, content (thinking, text, tool_use; else one empty text), stop_reason, stop_sequence: null, usage (+2000) } only when the target is openai (not forced to stream) or Claude (passthrough); otherwise the OpenAI chat.completion is returned"
+    - "An omitted stream streams unless Accept is application/json without text/event-stream"
+    - "Errors are OpenAI-shaped { error: { message, type, code } }; a mid-stream abort is 'event: error' with { type: error, error: { message, type, code } }; an in-band upstream error chunk is dropped"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["translator.claude-client-request"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["tool arguments reach the client only at the end"]
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A non-streaming Claude client with a Gemini or stream-only provider receives an OpenAI chat.completion"
+  evidence:
+    - { file: open-sse/translator/response/openai-to-claude.js, line: 71, note: "stream translation" }
+    - { file: open-sse/translator/response/openai-to-claude.js, line: 13, note: "Read argument sanitizer" }
+    - { file: open-sse/translator/concerns/finishReason.js, line: 55, note: "claude stop reasons" }
+    - { file: open-sse/utils/usageTracking.js, line: 21, note: "2000-token buffer" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 26, note: "openAICompletionToClaudeMessage" }
+    - { file: open-sse/handlers/chatCore/nonStreamingHandler.js, line: 150, note: "message only for an openai target" }
+    - { file: open-sse/handlers/chatCore.js, line: 134, note: "stream = body.stream !== false" }
+    - { file: open-sse/utils/streamHelpers.js, line: 139, note: "event: error for Claude clients" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Real usage, tool arguments streamed as they come, thinking signatures kept, a message object for every non-streaming answer, Anthropic error shapes"
+    actual: "2000 extra input tokens or estimates, arguments only at the end, no signature_delta, chat.completion for some providers, OpenAI error shapes"
+    impact: "Wrong token accounting, slower tool rendering, lost thinking continuity, SDK parse failures"
