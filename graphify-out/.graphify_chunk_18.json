@@ -1,0 +1,438 @@
+{
+  "nodes": [
+    {
+      "id": "provider_gemini_contract",
+      "label": "Gemini provider contract (M2 SP14e)",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": "gemini via generateContent. User decision 2026-09-26: keep 9router request drops and answer mapping; correct the tool-schema cleaner."
+    },
+    {
+      "id": "sp_sp14e",
+      "label": "SP14e — Gemini adapter, thought signatures, corrected tool-schema cleaner (53 connectable)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "sp_sp14f",
+      "label": "SP14f — vertex/vertex-partner, qoder, commandcode, per-account URLs (azure, cloudflare-ai)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next"
+    },
+    {
+      "id": "decision_sp14e_keep",
+      "label": "User decision 2026-09-26: SP14e keeps 9router's Gemini request drops and answer mapping; only the schema cleaner is corrected",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "11_translation_i18n_translator_openai_to_gemini_request",
+      "label": "translator.openai-to-gemini-request",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "11_translation_i18n_translator_gemini_to_openai_response",
+      "label": "translator.gemini-to-openai-response",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "gemini_adapter",
+      "label": "GeminiAdapter — CIP <-> generateContent / streamGenerateContent?alt=sse (x-goog-api-key, safety off, thinking level/budget, 400 key test = invalid)",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "gemini_schema_cleaner",
+      "label": "cleanGeminiSchema() — corrected: walks schema positions only, no invented reason parameter, depth 64",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "gemini_signature_cache",
+      "label": "Thought-signature cache (in memory, 1 h, 2000, same family) and the borrowed 9router signature on the first call",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "cip_image_delta_finish_override",
+      "label": "CIP image_delta chunk (delta.images) and vendorExtensions.openai.finish_reason honoured by the OpenAI renderer",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "sp14e_tests",
+      "label": "SP14e tests: engine gemini-adapter.test.mjs (10), server gemini-lane.test.mjs; 67 mutations, 3 dead-code removals",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "api_ui_map_row_sp14e",
+      "label": "API_UI_MAP row: SP14e Gemini adapter (no new screen; Key rejected on a 400)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    }
+  ],
+  "edges": [
+    {
+      "source": "sp_sp14d",
+      "target": "sp_sp14e",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14e",
+      "target": "sp_sp14f",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14",
+      "target": "sp_sp14f",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14e",
+      "target": "provider_gemini_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14e",
+      "target": "decision_sp14e_keep",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14e_keep",
+      "target": "11_translation_i18n_translator_openai_to_gemini_request",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp14e_keep",
+      "target": "11_translation_i18n_translator_gemini_to_openai_response",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_gemini_contract",
+      "target": "gemini_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_gemini_contract",
+      "target": "gemini_schema_cleaner",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_gemini_contract",
+      "target": "gemini_signature_cache",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_gemini_contract",
+      "target": "cip_image_delta_finish_override",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_adapter",
+      "target": "adapter_openai_compatible",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_adapter",
+      "target": "gemini_schema_cleaner",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_adapter",
+      "target": "gemini_signature_cache",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_adapter",
+      "target": "cip_image_delta_finish_override",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "create_adapter",
+      "target": "gemini_adapter",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "provider_protocols",
+      "target": "gemini_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "builtin_registry_catalog",
+      "target": "gemini_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/catalog-providers.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_adapter",
+      "target": "11_translation_i18n_translator_openai_to_gemini_request",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_adapter",
+      "target": "11_translation_i18n_translator_gemini_to_openai_response",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "cip_image_delta_finish_override",
+      "target": "protocol_stream_encoder",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "cip_image_delta_finish_override",
+      "target": "concept_cip",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp14e_tests",
+      "target": "gemini_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14e",
+      "target": "sp14e_tests",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_doc",
+      "target": "api_ui_map_row_sp14e",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp14e",
+      "target": "gemini_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp14e",
+      "target": "api_ui_map_row_sp14e",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "sp14e_gemini_family",
+      "label": "Gemini family: adapter, schema cleaner, signature cache, CIP image chunk and finish override",
+      "nodes": [
+        "gemini_adapter",
+        "gemini_schema_cleaner",
+        "gemini_signature_cache",
+        "cip_image_delta_finish_override",
+        "create_adapter"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-gemini.md"
+    }
+  ]
+}
