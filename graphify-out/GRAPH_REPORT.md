@@ -1,55 +1,49 @@
 # Graph Report - docs  (2026-09-26)
 
 ## Corpus Check
-- 26 files · ~57,143 words
+- 27 files · ~58,923 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 706 nodes · 1848 edges · 35 communities
+- 717 nodes · 1874 edges · 29 communities
 - Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 261 edges (avg confidence: 0.87)
 - Token cost: 574,916 input · 0 output
 
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_Overview, Network & Console Screens|Overview, Network & Console Screens]]
-- [[_COMMUNITY_Screens, Architecture & Credential Checks|Screens, Architecture & Credential Checks]]
-- [[_COMMUNITY_Discovery Outputs & Behavioral Questions|Discovery Outputs & Behavioral Questions]]
-- [[_COMMUNITY_Error Taxonomy, Parity & Governance|Error Taxonomy, Parity & Governance]]
-- [[_COMMUNITY_Connections & Secret Storage (SP11, SP14d host)|Connections & Secret Storage (SP11, SP14d host)]]
-- [[_COMMUNITY_API Key Generation & UI Errors|API Key Generation & UI Errors]]
-- [[_COMMUNITY_Machine Identity & Settings Export|Machine Identity & Settings Export]]
-- [[_COMMUNITY_Catalog Registry & Model Listing (SP13)|Catalog Registry & Model Listing (SP13)]]
-- [[_COMMUNITY_API Key Enforcement & Model Resolution|API Key Enforcement & Model Resolution]]
-- [[_COMMUNITY_API-UI Map & Project Map|API-UI Map & Project Map]]
-- [[_COMMUNITY_API Key Lifecycle|API Key Lifecycle]]
-- [[_COMMUNITY_Login, Sessions & Password|Login, Sessions & Password]]
-- [[_COMMUNITY_Transport Retry & Redaction|Transport Retry & Redaction]]
-- [[_COMMUNITY_Settings API|Settings API]]
-- [[_COMMUNITY_Error Classification & Upstream Errors|Error Classification & Upstream Errors]]
-- [[_COMMUNITY_Architecture & Monorepo|Architecture & Monorepo]]
-- [[_COMMUNITY_Anthropic Adapter & Anthropic Nodes (SP14a, SP14b)|Anthropic Adapter & Anthropic Nodes (SP14a, SP14b)]]
-- [[_COMMUNITY_Custom Provider Nodes & apiType (SP13b, SP14c)|Custom Provider Nodes & apiType (SP13b, SP14c)]]
-- [[_COMMUNITY_Capabilities|Capabilities]]
-- [[_COMMUNITY_Protocol Translation (SP10)|Protocol Translation (SP10)]]
-- [[_COMMUNITY_Provider Nodes API & Errors|Provider Nodes API & Errors]]
-- [[_COMMUNITY_Ollama Adapter & ollama-local (SP14d)|Ollama Adapter & ollama-local (SP14d)]]
-- [[_COMMUNITY_Onboarding & Setup Errors|Onboarding & Setup Errors]]
-- [[_COMMUNITY_UI Ownership & Wiring Rules|UI Ownership & Wiring Rules]]
-- [[_COMMUNITY_Non-Streaming Response & Stream Mode|Non-Streaming Response & Stream Mode]]
-- [[_COMMUNITY_OpenAI Responses Adapter (SP14c)|OpenAI Responses Adapter (SP14c)]]
-- [[_COMMUNITY_UI Error Codes (Transport & Connections)|UI Error Codes (Transport & Connections)]]
-- [[_COMMUNITY_Stream-Only Providers & CodeBuddy (SP14b)|Stream-Only Providers & CodeBuddy (SP14b)]]
-- [[_COMMUNITY_Streaming Pipeline & SSE Reader|Streaming Pipeline & SSE Reader]]
-- [[_COMMUNITY_Chat API v1 & Endpoint Screen|Chat API /v1 & Endpoint Screen]]
-- [[_COMMUNITY_Partial Stream Failure|Partial Stream Failure]]
-- [[_COMMUNITY_Client Cancellation & Backpressure|Client Cancellation & Backpressure]]
-- [[_COMMUNITY_Retry Helper & Lint Rules|Retry Helper & Lint Rules]]
-- [[_COMMUNITY_Skills & Milestone M0|Skills & Milestone M0]]
-- [[_COMMUNITY_Lean Code Rules|Lean Code Rules]]
+- [[_COMMUNITY_API keys, identity and settings behavior|API keys, identity and settings behavior]]
+- [[_COMMUNITY_Dashboard screens and overviewtraffic APIs|Dashboard screens and overview/traffic APIs]]
+- [[_COMMUNITY_Endpoint lanes, credential test, and preview screens|Endpoint lanes, credential test, and preview screens]]
+- [[_COMMUNITY_Catalog capabilities, model registry, and combos|Catalog capabilities, model registry, and combos]]
+- [[_COMMUNITY_Error classification, parity harness, and governance docs|Error classification, parity harness, and governance docs]]
+- [[_COMMUNITY_Provider connections CRUD and connection tests|Provider connections CRUD and connection tests]]
+- [[_COMMUNITY_Custom provider nodes (OpenAIAnthropic, apiType)|Custom provider nodes (OpenAI/Anthropic, apiType)]]
+- [[_COMMUNITY_Request translation, format detection, and JSON helpers|Request translation, format detection, and JSON helpers]]
+- [[_COMMUNITY_Provider catalog API, adapter headers, ollama-local host|Provider catalog API, adapter headers, ollama-local host]]
+- [[_COMMUNITY_Anthropic and Ollama adapters and their translators|Anthropic and Ollama adapters and their translators]]
+- [[_COMMUNITY_Anthropic-compatible nodes and stream-only providers|Anthropic-compatible nodes and stream-only providers]]
+- [[_COMMUNITY_Chat lane routing and model resolution|Chat lane routing and model resolution]]
+- [[_COMMUNITY_Transport, retry budget, and upstream error redaction|Transport, retry budget, and upstream error redaction]]
+- [[_COMMUNITY_Gemini adapter, schema cleaner, and signatures (SP14e)|Gemini adapter, schema cleaner, and signatures (SP14e)]]
+- [[_COMMUNITY_Registry extraction and catalog build|Registry extraction and catalog build]]
+- [[_COMMUNITY_OpenAI-compatible adapter and bounded SSE|OpenAI-compatible adapter and bounded SSE]]
+- [[_COMMUNITY_Spec phases, golden scenarios, and constraints|Spec phases, golden scenarios, and constraints]]
+- [[_COMMUNITY_Streaming, disconnects, and CIP|Streaming, disconnects, and CIP]]
+- [[_COMMUNITY_Behavioral questions, definition of done, matrix template|Behavioral questions, definition of done, matrix template]]
+- [[_COMMUNITY_Milestone M-1 discovery tasks and matrix files|Milestone M-1 discovery tasks and matrix files]]
+- [[_COMMUNITY_Discovery inventory, gaps, quota and usage tracing|Discovery inventory, gaps, quota and usage tracing]]
+- [[_COMMUNITY_Non-streaming answers and 9router findings|Non-streaming answers and 9router findings]]
+- [[_COMMUNITY_OpenAI Responses adapter (SP14c)|OpenAI Responses adapter (SP14c)]]
+- [[_COMMUNITY_Core principles and generated capabilities|Core principles and generated capabilities]]
+- [[_COMMUNITY_Discovery coverage tooling and exit gate|Discovery coverage tooling and exit gate]]
+- [[_COMMUNITY_Latency and bounded-workload rules|Latency and bounded-workload rules]]
+- [[_COMMUNITY_Proxy chain, timeouts, and idle stream timeout|Proxy chain, timeouts, and idle stream timeout]]
+- [[_COMMUNITY_Partial stream failure|Partial stream failure]]
+- [[_COMMUNITY_Code quality rules|Code quality rules]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `Identity and API keys contract (M1 SP6)` - 37 edges
 2. `Bounded context: routing (core)` - 35 edges
-3. `OpenAICompatibleAdapter (AIProviderPort for openai-compatible)` - 33 edges
+3. `OpenAICompatibleAdapter (AIProviderPort for openai-compatible)` - 34 edges
 4. `Feature Matrix — mandatory 17-column artifact` - 27 edges
 5. `Milestone M-1 · Discovery` - 27 edges
 6. `Bounded context: connections` - 26 edges
@@ -65,10 +59,10 @@
   docs/superpowers/specs/2026-09-22-aigate-design.md → docs/design/API_UI_MAP.md
 - `MITM — /network/mitm` --semantically_similar_to--> `Settings · Developer (/settings/developer)`  [INFERRED] [semantically similar]
   docs/superpowers/specs/2026-09-22-aigate-design.md → docs/design/stitch-briefs.md
-- `Decision (user, 2026-09-25): onboarding is one step (set password, open dashboard)` --references--> `Onboarding — /welcome`  [INFERRED]
-  docs/PROGRESS_HANDOFF.md → docs/superpowers/specs/2026-09-22-aigate-design.md
 - `Feature group — MCP (API with no UI, found during spec work)` --conceptually_related_to--> `The 23 feature groups required by behavioral.md §5`  [AMBIGUOUS]
   docs/superpowers/plans/2026-09-22-m1-discovery.md → docs/governance/behavioral.md
+- `Rule 4 — Every workload must be BOUNDED` --semantically_similar_to--> `§16 Do not inherit performance issues; all large workloads bounded`  [INFERRED] [semantically similar]
+  docs/governance/rules.md → docs/governance/behavioral.md
 
 ## Import Cycles
 - None detected.
@@ -101,146 +95,123 @@
 - **Anthropic-compatible custom providers: storage, descriptor, adapter headers, connection test, UI** — provider_nodes_type_column, anthropic_node_descriptor, anthropic_node_betas, anthropic_node_connection_test, node_rules_unreachable, anthropic_adapter [EXTRACTED 1.00]
 - **OpenAI Responses family: adapter, non-stream read, 9router stream, apiType custom providers** — openai_responses_adapter, responses_non_stream_read, responses_stream_9router, provider_nodes_api_type_column, create_adapter [EXTRACTED 1.00]
 - **Ollama family: adapter, NDJSON reader, per-connection host and optional key, connections UI** — ollama_adapter, read_json_lines, connection_base_url, screen_connections_ollama_host, create_adapter [EXTRACTED 1.00]
+- **Gemini family: adapter, schema cleaner, signature cache, CIP image chunk and finish override** — gemini_adapter, gemini_schema_cleaner, gemini_signature_cache, cip_image_delta_finish_override, create_adapter [EXTRACTED 1.00]
 
-## Communities (35 total, 0 thin omitted)
+## Communities (29 total, 0 thin omitted)
 
-### Community 0 - "Overview, Network & Console Screens"
+### Community 0 - "API keys, identity and settings behavior"
 Cohesion: 0.05
-Nodes (96): settings.outbound-proxy-live-apply, settings.proxy-test-outbound-probe, usage.write-not-synchronous, GET /overview/summary, SSE /events/requests, /traffic/console → Console (Developer mode only), /integrations/* → CliTools, CliToolDetail, Skills, Mcp, /network/* → ProxyPools, DeployWizard, Tunnel, Mitm (+88 more)
+Nodes (108): apikey.delete-key, apikey.generate-key, apikey.legacy-format-unenforced, apikey.list-keys, apikey.update-key-status, apikey.validate-lookup, endpoint.enforce-require-api-key, identity.auth-status-disclosure (+100 more)
 
-### Community 1 - "Screens, Architecture & Credential Checks"
-Cohesion: 0.07
-Nodes (75): validateCredential(): one call; valid:false only for AUTH_ERROR / QUOTA_EXHAUSTED, /providers/media* → MediaProviders, /providers/quota → Quota; custom provider form; multi-account, /gateway/routing*, /gateway/token-saver → Routing, ComboCreate, TokenSaver, /settings/auth OIDC and SAML tabs, docs/discovery/gaps.md (Gap register), §10 New architecture independent of 9router (API/Application/Domain/Ports/Infra), §9 Build an explicit domain model (Provider, Quota, RoutingPolicy…) (+67 more)
-
-### Community 2 - "Discovery Outputs & Behavioral Questions"
+### Community 1 - "Dashboard screens and overview/traffic APIs"
 Cohesion: 0.06
-Nodes (59): docs/capabilities.md (GENERATED capability specification), docs/discovery/coverage.md, docs/discovery/inventory.json, §30 The 12 pre-implementation questions, §3 The 20 behavioral questions (trigger…edge cases), §8 Business rule beats old implementation, §2 Core principles — never port, rename, or translate 9router line by line, §29 Definition of Done — 13 checklist items, no self-declared DONE (+51 more)
+Nodes (89): GET /overview/summary, SSE /events/requests, /traffic/console → Console (Developer mode only), /integrations/* → CliTools, CliToolDetail, Skills, Mcp, /network/* → ProxyPools, DeployWizard, Tunnel, Mitm, / → Overview, /traffic/usage, /traffic/requests* → Usage, Requests, RequestDetail, Audit finding: Console shown in sidebar regardless of Developer mode (+81 more)
 
-### Community 3 - "Error Taxonomy, Parity & Governance"
+### Community 2 - "Endpoint lanes, credential test, and preview screens"
 Cohesion: 0.07
-Nodes (51): Status → ErrorCode by status + error.code/type only (never message text), API_UI_MAP row: M0 SP3 parity harness, No UI, Branding sweep to the bottom of the stack, capabilities.md — parity coverage denominator, Definition of Done — 13 items, not self-awarded, AIGate domain model (Provider, Credential, RoutingPolicy, AccountLock, …), Error taxonomy (8 ErrorCodes), IMPLEMENTATION_ACCIDENT — debt not inherited from 9router (+43 more)
+Nodes (75): endpoint.rewrite-lanes, validateCredential(): one call; valid:false only for AUTH_ERROR / QUOTA_EXHAUSTED, /providers/media* → MediaProviders, /providers/quota → Quota; custom provider form; multi-account, /gateway/routing*, /gateway/token-saver → Routing, ComboCreate, TokenSaver, §10 New architecture independent of 9router (API/Application/Domain/Ports/Infra), §9 Build an explicit domain model (Provider, Quota, RoutingPolicy…), §5 Feature discovery — inventory every group, do not trust the UI menu (+67 more)
 
-### Community 4 - "Connections & Secret Storage (SP11, SP14d host)"
-Cohesion: 0.09
-Nodes (39): catalog.connection-detail-crud, catalog.connection-listing, connection.client-listing-sanitized, connection.test-single-connection, connection.create-dedup-and-priority-assignment, connection.delete-and-reorder, connection.storage-shape-json-blob, GET /api/providers/:id (chatUrl + models; 404 NOT_FOUND) (+31 more)
+### Community 3 - "Catalog capabilities, model registry, and combos"
+Cohesion: 0.05
+Nodes (74): endpoint.extract-header-order, catalog.capability-refine-additive-only, catalog.capability-tier-fallback, catalog.capability-vision-pattern-order, catalog.model-registry-global, combo.detect-required-capabilities, usage.write-not-synchronous, API ↔ UI map (docs/design/API_UI_MAP.md) (+66 more)
 
-### Community 5 - "API Key Generation & UI Errors"
-Cohesion: 0.19
-Nodes (21): apikey.generate-key, apikey.list-keys, DELETE /api/keys/:id, UI error code: INVALID_REQUEST (400), UI error code: LIMIT_REACHED (409), UI error code: NOT_FOUND (404), UI error code: UNAUTHENTICATED (401), GET /api/keys (+13 more)
+### Community 4 - "Error classification, parity harness, and governance docs"
+Cohesion: 0.06
+Nodes (53): fallback.error-classification, Status → ErrorCode by status + error.code/type only (never message text), API_UI_MAP row: M0 SP3 parity harness, No UI, 9router as Behavioral Source of Truth (not a template to port), Branding sweep to the bottom of the stack, capabilities.md — parity coverage denominator, Definition of Done — 13 items, not self-awarded, Error taxonomy (8 ErrorCodes) (+45 more)
 
-### Community 6 - "Machine Identity & Settings Export"
-Cohesion: 0.22
-Nodes (21): identity.machine-id-derivation, settings.database-export-import, /settings/general → SettingsGeneral, Audit finding: login-callback / deploy-wizard / authflow-modals are showcases, not routes, §7 Trace the behavior — never conclude from a function name, The Tracing Protocol (6 steps, applied by Tasks 6–18), Bounded context: apikeys, Bounded context: identity (+13 more)
+### Community 5 - "Provider connections CRUD and connection tests"
+Cohesion: 0.08
+Nodes (46): catalog.connection-detail-crud, catalog.connection-listing, connection.client-listing-sanitized, connection.test-single-connection, connection.create-dedup-and-priority-assignment, connection.delete-and-reorder, connection.storage-shape-json-blob, DELETE /api/connections/:id (+38 more)
 
-### Community 7 - "Catalog Registry & Model Listing (SP13)"
+### Community 6 - "Custom provider nodes (OpenAI/Anthropic, apiType)"
+Cohesion: 0.18
+Nodes (21): connection.provider-node-api-type, connection.provider-node-create-list, connection.provider-node-repo-storage, connection.provider-node-update-delete, connection.provider-node-validate-partial-ssrf (stays traced: no validate route), DELETE /api/provider-nodes/:id (cascades the connection), GET /api/provider-nodes, PATCH /api/provider-nodes/:id (+13 more)
+
+### Community 7 - "Request translation, format detection, and JSON helpers"
 Cohesion: 0.16
-Nodes (20): catalog.registry-build, catalog.registry-entry-shape, Adapter: catalog headers first, key last; raw or Bearer scheme; chatUrl/modelsUrl called directly, ListedModel { id, descriptor? } — getModels never invents limits (≤1000 ids), builtinRegistry built from CATALOG (41 connectable providers), apps/server/test/catalog.test.mjs (catalog API) + chat-lane resolution tests, CatalogController — GET /api/providers, GET /api/providers/:id, CATALOG — providers.generated.ts (121 providers, 935 models; never hand-edited) (+12 more)
+Nodes (19): routing.request-translation, routing.source-format-detection, routing.stream-mode-decision, translator.pivot-loss, translator.tool-id-normalization, src/json.ts — shared JSON narrowing (isRecord, record, text, list, parseJson), CIP gains image detail and tool strict (OpenAI → OpenAI trip keeps them), toOpenAIChatCompletion() — CanonicalResponse → chat.completion JSON (+11 more)
 
-### Community 8 - "API Key Enforcement & Model Resolution"
-Cohesion: 0.14
-Nodes (19): endpoint.enforce-require-api-key, catalog.model-listing-live-override, fallback.accounts-exhausted-response, routing.client-disconnect-propagation, routing.lane-entry-routes, routing.model-resolution, routing.request-preflight, Chat lane contract (M1 SP12) (+11 more)
-
-### Community 9 - "API-UI Map & Project Map"
-Cohesion: 0.17
-Nodes (19): API ↔ UI map (docs/design/API_UI_MAP.md), docs/PROJECT_MAP.md (generated U-project ownership map), API_UI_MAP row: SP7 packages/engine, No UI, API_UI_MAP row: SP8 transport, No UI, API_UI_MAP row: SP9 OpenAICompatibleAdapter, No UI, Rule: an SP with no HTTP API records "No UI" in its row, Port law — a port exists only with a real second implementation or a mandatory I/O fake boundary, docs/parity/m1-gate-report.md — M1 gate: tier 1 11/11, golden 10 pass + 3 deferred, tier 2 waits for a key, coverage 11/284 (+11 more)
-
-### Community 10 - "API Key Lifecycle"
-Cohesion: 0.16
-Nodes (18): apikey.delete-key, apikey.legacy-format-unenforced, apikey.update-key-status, apikey.validate-lookup, endpoint.rewrite-lanes, identity.auth-status-disclosure, identity.reset-password-local-only, settings.patch-password-change (+10 more)
-
-### Community 11 - "Login, Sessions & Password"
-Cohesion: 0.21
-Nodes (17): identity.password-login-lockout, identity.session-cookie-lifecycle, UI error code: INVALID_CREDENTIALS (401), UI error code: RATE_LIMITED (429), UI error code: SETUP_REQUIRED (409), useChangePassword (features/settings/api.ts), useLogin (features/settings/api.ts), useLogout (features/settings/api.ts) (+9 more)
-
-### Community 12 - "Transport Retry & Redaction"
+### Community 8 - "Provider catalog API, adapter headers, ollama-local host"
 Cohesion: 0.15
-Nodes (17): fallback.executor-retry-budget, transport.test.mjs: adapter streams end to end over DirectTransport, In-place retry: 502/503/504 + unreachable host, ≤3 attempts via withRetry, before first chunk, ErrorCode: PROVIDER_UNAVAILABLE, DirectTransport (direct branch implementation), Failure: body larger than maxBytes in readBoundedText, Upstream answers 4xx or 5xx, Failure: malformed URL or non-https (http only to localhost/127.0.0.1/[::1]) (+9 more)
+Nodes (18): connection.ollama-local-host, Adapter: catalog headers first, key last; raw or Bearer scheme; chatUrl/modelsUrl called directly, GET /api/providers/:id (chatUrl + models; 404 NOT_FOUND), GET /api/providers (all 121, connectable + reason), API_UI_MAP row: SP14a AnthropicAdapter — no new screen; /providers pills follow connectable, API_UI_MAP row: SP14d Ollama adapter and ollama-local connections, /providers → LlmProviders (catalog from GET /api/providers; Connected / Coming later pills), builtinRegistry built from CATALOG (41 connectable providers) (+10 more)
 
-### Community 13 - "Settings API"
-Cohesion: 0.23
-Nodes (16): settings.combo-rotation-reset, settings.defaults-and-merge, settings.get-secret-stripping, settings.hot-path-read-no-cache, settings.patch-protected-keys, GET /api/settings, usePatchSettings (features/settings/api.ts), useRequireApiKey (features/gateway/api.ts) (+8 more)
-
-### Community 14 - "Error Classification & Upstream Errors"
+### Community 9 - "Anthropic and Ollama adapters and their translators"
 Cohesion: 0.18
-Nodes (15): fallback.error-classification, fallback.upstream-error-result, routing.default-executor-openai-fallback, Upstream message ≤300 chars, credential redacted, HTML pages dropped; bad API key → AUTH_ERROR before I/O, OpenAICompatibleAdapter (AIProviderPort for openai-compatible), packages/engine/test/openai-adapter.test.mjs (15 tests, fake transport, SSE split every 3 bytes; 16 mutations caught), Refused before I/O: video, media by URL, assistant thinking, tool_result.isError, budgetTokens, foreign vendorExtensions, TokenUsage normalized: inputTokens excludes cache reads, outputTokens includes reasoning (+7 more)
+Nodes (18): provider.anthropic-auth-and-headers, translator.claude-to-openai-response, translator.ollama-to-openai-response, translator.openai-to-claude-request, translator.openai-to-ollama-request, AnthropicAdapter — CIP <-> Messages (max_tokens rules, thinking budgets, tool_use, SSE events), packages/engine/test/anthropic-adapter.test.mjs (10) + apps/server/test/anthropic-lane.test.mjs (4); 23 mutations caught, Deviations not ported: stop/top_p kept, none stays none, no Claude Code line, stream errors fail, same stop/usage mapping, 403 invalid (+10 more)
 
-### Community 15 - "Architecture & Monorepo"
+### Community 10 - "Anthropic-compatible nodes and stream-only providers"
+Cohesion: 0.16
+Nodes (16): connection.anthropic-compatible-node, routing.forced-stream-json-collapse, provider.codebuddy-request-quirks, Claude Code anthropic-beta list for claude-* models on an Anthropic node (claude-code flag only on the official host), Anthropic node connection test: POST <base>/v1/messages, claude-3-haiku, only 401/403 invalid (9router), API_UI_MAP row: SP14b stream-only providers (no new screen) and the protocol select on /providers/new, CodeBuddy quirks: reasoningSummary (cn, intl), neutralAgentPrompt (cn) via EXECUTOR_QUIRKS, User decision 2026-09-26: SP14b keeps 9router on every suspected bug asked (+8 more)
+
+### Community 11 - "Chat lane routing and model resolution"
 Cohesion: 0.18
-Nodes (15): GET /health, 9router as Behavioral Source of Truth (not a template to port), Feature-based frontend structure with import boundaries, Hexagonal architecture, granularity = bounded context, Monorepo layout (apps/server, apps/web, apps/cli, packages/engine, contracts, database, tools), Open decisions not settled by this spec, AIGate Design Spec (2026-09-22), Decision 3 (user, 2026-09-25): sessions stored in the database, not a JWT (+7 more)
+Nodes (15): catalog.model-listing-live-override, fallback.accounts-exhausted-response, routing.lane-entry-routes, routing.model-resolution, routing.request-preflight, Chat lane contract (M1 SP12), Keyless mode serves this machine only (loopback socket, Host, Origin) → 403 api_key_required, Model resolution: provider/model (any id) or a bare catalog id; 404 model_not_found / no_active_connection (+7 more)
 
-### Community 16 - "Anthropic Adapter & Anthropic Nodes (SP14a, SP14b)"
+### Community 12 - "Transport, retry budget, and upstream error redaction"
+Cohesion: 0.16
+Nodes (15): fallback.executor-retry-budget, transport.test.mjs: adapter streams end to end over DirectTransport, Upstream message ≤300 chars, credential redacted, HTML pages dropped; bad API key → AUTH_ERROR before I/O, In-place retry: 502/503/504 + unreachable host, ≤3 attempts via withRetry, before first chunk, ErrorCode: PROVIDER_UNAVAILABLE, DirectTransport (direct branch implementation), Upstream answers 4xx or 5xx, Failure: connection refused, DNS failure, TLS failure (+7 more)
+
+### Community 13 - "Gemini adapter, schema cleaner, and signatures (SP14e)"
 Cohesion: 0.23
-Nodes (14): connection.anthropic-compatible-node, provider.anthropic-auth-and-headers, translator.claude-to-openai-response, translator.openai-to-claude-request, AnthropicAdapter — CIP <-> Messages (max_tokens rules, thinking budgets, tool_use, SSE events), packages/engine/test/anthropic-adapter.test.mjs (10) + apps/server/test/anthropic-lane.test.mjs (4); 23 mutations caught, Deviations not ported: stop/top_p kept, none stays none, no Claude Code line, stream errors fail, same stop/usage mapping, 403 invalid, Claude Code anthropic-beta list for claude-* models on an Anthropic node (claude-code flag only on the official host) (+6 more)
+Nodes (15): translator.gemini-to-openai-response, translator.openai-to-gemini-request, API_UI_MAP row: SP14e Gemini adapter (no new screen; Key rejected on a 400), CIP image_delta chunk (delta.images) and vendorExtensions.openai.finish_reason honoured by the OpenAI renderer, User decision 2026-09-26: SP14e keeps 9router's Gemini request drops and answer mapping; only the schema cleaner is corrected, GeminiAdapter — CIP <-> generateContent / streamGenerateContent?alt=sse (x-goog-api-key, safety off, thinking level/budget, 400 key test = invalid), cleanGeminiSchema() — corrected: walks schema positions only, no invented reason parameter, depth 64, Thought-signature cache (in memory, 1 h, 2000, same family) and the borrowed 9router signature on the first call (+7 more)
 
-### Community 17 - "Custom Provider Nodes & apiType (SP13b, SP14c)"
-Cohesion: 0.22
-Nodes (14): connection.provider-node-api-type, connection.provider-node-create-list, connection.provider-node-repo-storage, connection.provider-node-update-delete, connection.provider-node-validate-partial-ssrf (stays traced: no validate route), /v1: <prefix>/<model> reaches a custom provider after built-in ids, aliases, and catalog prefixes, Custom providers contract (M2 SP13b), provider-node domain rules — prefix token, base URL normalize (strip /chat/completions), https or loopback http (+6 more)
-
-### Community 18 - "Capabilities"
-Cohesion: 0.26
-Nodes (14): catalog.capability-refine-additive-only, catalog.capability-tier-fallback, catalog.capability-vision-pattern-order, catalog.model-registry-global, combo.detect-required-capabilities, assertModelSupports() — MODEL_UNAVAILABLE / INVALID_REQUEST, Engine contract (M1 SP7), defineRegistry() / builtinRegistry (single openai entry, 4 chat models) (+6 more)
-
-### Community 19 - "Protocol Translation (SP10)"
-Cohesion: 0.20
-Nodes (14): routing.request-translation, routing.source-format-detection, translator.pivot-loss, translator.tool-id-normalization, src/json.ts — shared JSON narrowing (isRecord, record, text, list, parseJson), CIP gains image detail and tool strict (OpenAI → OpenAI trip keeps them), toOpenAIChatCompletion() — CanonicalResponse → chat.completion JSON, OpenAI Chat Completions protocol adapter contract (M1 SP10) (+6 more)
-
-### Community 20 - "Provider Nodes API & Errors"
-Cohesion: 0.20
-Nodes (14): DELETE /api/provider-nodes/:id (cascades the connection), GET /api/provider-nodes, PATCH /api/provider-nodes/:id, POST /api/provider-nodes, UI error code: NODE_LIMIT (409), UI error code: PREFIX_RESERVED (409), UI error code: PREFIX_TAKEN (409), useProviderNodes / useCreateNode / useUpdateNode / useDeleteNode (features/providers/api.ts) (+6 more)
-
-### Community 21 - "Ollama Adapter & ollama-local (SP14d)"
+### Community 14 - "Registry extraction and catalog build"
 Cohesion: 0.21
-Nodes (13): connection.ollama-local-host, translator.ollama-to-openai-response, translator.openai-to-ollama-request, API_UI_MAP row: SP14d Ollama adapter and ollama-local connections, User decision 2026-09-26: SP14d corrects the ollama request drops and the stream error/cut-off handling; gemini deferred, Fix: HttpProviderAdapter.clean no longer splits messages on an empty key (found by the ollama lane test), OllamaAdapter — CIP <-> /api/chat JSON and NDJSON (options, format, think; error lines and cut-offs fail), Ollama provider contract (M2 SP14d) (+5 more)
+Nodes (12): catalog.registry-build, catalog.registry-entry-shape, ListedModel { id, descriptor? } — getModels never invents limits (≤1000 ids), CATALOG — providers.generated.ts (121 providers, 935 models; never hand-edited), CatalogProvider / CatalogModel / validateCatalog (packages/engine/src/catalog/schema.ts), Registry extraction contract (M0 SP4), tools/extract (deleted in SP13b; restorable from git d2783c1) — wrote the catalog from 9router, tools/extract verify (deleted in SP13b with the tool) (+4 more)
 
-### Community 22 - "Onboarding & Setup Errors"
+### Community 15 - "OpenAI-compatible adapter and bounded SSE"
 Cohesion: 0.23
-Nodes (13): UI error code: ALREADY_SET_UP (409), UI error code: NOT_LOCAL (403), useSetup (features/settings/api.ts), POST /api/auth/setup, /welcome → Onboarding (one step), AIGATE_INITIAL_PASSWORD (first password at boot), Decision 2 (user, 2026-09-25): first password set from the local machine; no default password, Decision 4 (user, 2026-09-25): requireLogin = false exempts local clients only (+5 more)
+Nodes (12): routing.default-executor-openai-fallback, routing.streaming-pipeline, OpenAICompatibleAdapter (AIProviderPort for openai-compatible), readSseData() — bounded SSE reader (1 Mi chars per line/event, cancels body), packages/engine/test/openai-adapter.test.mjs (15 tests, fake transport, SSE split every 3 bytes; 16 mutations caught), Refused before I/O: video, media by URL, assistant thinking, tool_result.isError, budgetTokens, foreign vendorExtensions, TokenUsage normalized: inputTokens excludes cache reads, outputTokens includes reasoning, UnsupportedFeatureError (+4 more)
 
-### Community 23 - "UI Ownership & Wiring Rules"
-Cohesion: 0.26
-Nodes (12): API_UI_MAP row: M0 SP4 tools/extract + CATALOG, No UI yet (SP13 serves /providers), Rule: an API is done only when its UI screen is wired in the same SP, Decision: CLAUDE.md requires wiring the screen in the same SP as its API, AIGate progress handoff (docs/PROGRESS_HANDOFF.md), Gap: M0 SP3 (parity harness) and SP4 (tools/extract) never built, Task board (PROGRESS_HANDOFF), SP4 — tools/extract: 9router registry data → AIGate schema, Decision (user): build the Stitch UI before connecting application logic (+4 more)
-
-### Community 24 - "Non-Streaming Response & Stream Mode"
+### Community 16 - "Spec phases, golden scenarios, and constraints"
 Cohesion: 0.24
-Nodes (10): routing.non-streaming-response, routing.stream-mode-decision, CIP ↔ chat completions mapping (max_completion_tokens, tool messages, data: URLs), Finding: 9router 0.5.55 errors carry only { message } with its node id and the raw upstream body, Finding: omitted stream on 9router 0.5.55 → JSON body sent as text/event-stream + bare [DONE] (unparsable), Finding: 9router adds 2000 tokens to reported prompt/total usage (addBufferToUsage) — SUSPECTED_BUG, tools/parity/src/scenarios.mjs DEVIATIONS — intentional differences from 9router, each with entry, label, reason, tools/parity/tapes — 11 tapes from 9router 0.5.55 (JSON, stream, tool calls, omitted stream, 400/401/429/500, cut stream) (+2 more)
+Nodes (12): §30 The 12 pre-implementation questions, §25 Golden scenarios (13 critical flows), Phase model A→F (Discovery, Behavior Extraction, Contract, Design, Implementation, Parity Verification), §24 Characterization/contract tests prove old ≈ new at contract level, Constraint — no Phase C contracts during discovery, Constraint — no AIGate product code in M-1 (only tools/discovery and docs), Phase A — Discovery, Phase B — Behavior Extraction (+4 more)
 
-### Community 25 - "OpenAI Responses Adapter (SP14c)"
-Cohesion: 0.24
-Nodes (10): routing.responses-non-stream-answer, translator.openai-to-responses-request, translator.responses-to-openai-stream, API_UI_MAP row: SP14c Responses adapter (no new screen for perplexity-agent) and the API select on /providers/new, User decision 2026-09-26: SP14c corrects the non-stream answer, keeps 9router request drops and stream error handling, OpenAIResponsesAdapter — CIP <-> Responses API (extends OpenAICompatibleAdapter; 9router request and stream, corrected non-stream), OpenAI Responses provider contract (M2 SP14c), PROVIDER_PROTOCOLS: openai-compatible | anthropic; descriptor quirks (+2 more)
+### Community 17 - "Streaming, disconnects, and CIP"
+Cohesion: 0.20
+Nodes (11): routing.client-disconnect-propagation, §18 Streaming is first-class (TTFT, cancellation, backpressure), Backpressure: a false write() waits for drain; the upstream read pauses with it, One ExecCtx signal: client disconnect + 600 s budget (TIMEOUT) + idle watchdog, Canonical Internal Protocol (CIP), vendorExtensions — typed carry-through field, ExecCtx (one shared client-cancel + deadline signal), Feature group: Translation / language functionality (+3 more)
 
-### Community 26 - "UI Error Codes (Transport & Connections)"
+### Community 18 - "Behavioral questions, definition of done, matrix template"
+Cohesion: 0.18
+Nodes (11): §3 The 20 behavioral questions (trigger…edge cases), §8 Business rule beats old implementation, §29 Definition of Done — 13 checklist items, no self-declared DONE, §19 Fallback as explicit policy with classified errors, §28 Per-feature process: DISCOVER→TRACE→DOCUMENT→…→REVIEW, Feature Matrix entry template (null never "" or "N/A"), Canonical error classification codes (8 values), parityStatus lifecycle (not-started → traced → contracted → implemented → verified) (+3 more)
+
+### Community 19 - "Milestone M-1 discovery tasks and matrix files"
 Cohesion: 0.33
-Nodes (10): UI error code: BAD_RESPONSE, UI error code: CREDENTIAL_UNREADABLE (409), UI error code: HTTP_5xx, UI error code: NETWORK_ERROR, UI error code: any other code (fallback), UI error code: TIMEOUT, shared/errors.test.mjs, shared/api.ts — same-origin JSON client, ApiError with stable code, 10 s timeout (+2 more)
+Nodes (11): 07-token-saver.yaml, 10-proxy-pools.yaml, Milestone M-1 · Discovery, Rule 10 — Cache only with a reason: key, TTL, invalidation, max size, Task 1 — Discovery tooling workspace, Task 2 — Feature Matrix schema and validator, Task 3 — Inventory extractor, Task 4 — Coverage checker (+3 more)
 
-### Community 27 - "Stream-Only Providers & CodeBuddy (SP14b)"
-Cohesion: 0.31
-Nodes (9): routing.forced-stream-json-collapse, provider.codebuddy-request-quirks, API_UI_MAP row: SP14b stream-only providers (no new screen) and the protocol select on /providers/new, CodeBuddy quirks: reasoningSummary (cn, intl), neutralAgentPrompt (cn) via EXECUTOR_QUIRKS, User decision 2026-09-26: SP14b keeps 9router on every suspected bug asked, User decision 2026-09-26 (second ask): the stream-only collapse buffer is unbounded like 9router, SP14b — Anthropic-compatible custom providers, stream-only providers (49 connectable), OpenAICompatibleAdapter.execute collapse: stream:true upstream, SSE folded into one answer (reasoning dropped with content, cut-off = complete, no size limit) (+1 more)
+### Community 20 - "Discovery inventory, gaps, quota and usage tracing"
+Cohesion: 0.22
+Nodes (10): docs/discovery/gaps.md (Gap register), docs/discovery/inventory.json, §21 Quota must be understood fully, not copied from the UI tracker, §22 Usage fields to trace per request (tokens, cost, latency, fallback attempts), 13-console-remote.yaml, Rule 6 — Database discipline (N+1, pagination, no query in loop), Rule 8 — Every resource has an explicit lifecycle, Task 13 — Trace Usage, Quota Tracker (+2 more)
 
-### Community 28 - "Streaming Pipeline & SSE Reader"
-Cohesion: 0.25
-Nodes (8): routing.streaming-pipeline, transport.proxy-priority-chain, readSseData() — bounded SSE reader (1 Mi chars per line/event, cancels body), Idle timeout between chunks (AIGATE_STREAM_IDLE_TIMEOUT_MS, default 300 s) → TIMEOUT error event, readJsonLines() — bounded NDJSON reader (1 MiB per line, blank lines skipped), Deferred: streaming idle timeout (gap between chunks) with SP12, HttpRequest (requires timeoutMs), Rule: every call states timeoutMs (1 to 600000 ms), bounding headers and body inside ctx.signal
+### Community 21 - "Non-streaming answers and 9router findings"
+Cohesion: 0.28
+Nodes (9): fallback.upstream-error-result, routing.non-streaming-response, CIP ↔ chat completions mapping (max_completion_tokens, tool messages, data: URLs), Finding: 9router 0.5.55 errors carry only { message } with its node id and the raw upstream body, Finding: omitted stream on 9router 0.5.55 → JSON body sent as text/event-stream + bare [DONE] (unparsable), Finding: 9router adds 2000 tokens to reported prompt/total usage (addBufferToUsage) — SUSPECTED_BUG, tools/parity/src/scenarios.mjs DEVIATIONS — intentional differences from 9router, each with entry, label, reason, tools/parity/tapes — 11 tapes from 9router 0.5.55 (JSON, stream, tool calls, omitted stream, 400/401/429/500, cut stream) (+1 more)
 
-### Community 29 - "Chat API /v1 & Endpoint Screen"
-Cohesion: 0.53
-Nodes (6): endpoint.extract-header-order, API_UI_MAP row: SP10 OpenAI Chat protocol, No UI, /gateway/endpoint readiness pill (Ready / Connect a provider / Check connection) + curl test, POST /v1/chat/completions + GET /v1/models (/v1 Chat API), extractApiKey() (Authorization: Bearer first, then x-api-key), SP12 — routing: chat lane + Fastify raw streaming, backpressure, cancellation
+### Community 22 - "OpenAI Responses adapter (SP14c)"
+Cohesion: 0.28
+Nodes (9): routing.responses-non-stream-answer, translator.openai-to-responses-request, translator.responses-to-openai-stream, API_UI_MAP row: SP14c Responses adapter (no new screen for perplexity-agent) and the API select on /providers/new, User decision 2026-09-26: SP14c corrects the non-stream answer, keeps 9router request drops and stream error handling, OpenAIResponsesAdapter — CIP <-> Responses API (extends OpenAICompatibleAdapter; 9router request and stream, corrected non-stream), OpenAI Responses provider contract (M2 SP14c), Non-streaming Responses answer: stream false, output[] read (reasoning, text, refusal, tool calls, incomplete, failed, usage) (+1 more)
 
-### Community 30 - "Partial Stream Failure"
-Cohesion: 0.53
-Nodes (6): fallback.partial-stream-failure, Truncated stream or error event → PROVIDER_UNAVAILABLE with details.partial, Stream headers only after the first chunk: earlier failures are real JSON statuses, Golden scenario: partial stream failure, OpenAIChatStreamEncoder — StreamChunk → OpenAI SSE; fail() = error event, no [DONE], Usage chunk after the finish chunk, only with stream_options.include_usage
+### Community 23 - "Core principles and generated capabilities"
+Cohesion: 0.22
+Nodes (9): docs/capabilities.md (GENERATED capability specification), §2 Core principles — never port, rename, or translate 9router line by line, §14 Feature parity is not code parity, Final principle — 9router says WHAT, never HOW, §1 Goal — build a NEW AI gateway, 9router is reference only, §27 Separate BUSINESS REQUIREMENT from IMPLEMENTATION ACCIDENT, IMPLEMENTATION_ACCIDENT label, 9router checkout (read-only behavioral reference at E:/9router) (+1 more)
 
-### Community 31 - "Client Cancellation & Backpressure"
+### Community 24 - "Discovery coverage tooling and exit gate"
+Cohesion: 0.39
+Nodes (9): docs/discovery/coverage.md, Evidence with file:line — traced is a test, not a self-declaration, Fixed inventory counts (154 routes, 28 pages, 123 providers, 29 executors, 48 translators, 11 repos, 14 OAuth routes), cli.ts — validate | inventory | coverage | capabilities, coverage.ts — matrix vs inventory coverage report, gate.test.ts — M-1 exit gate test, inventory.ts — 9router surface scanner, paths.ts — 9router/repo root resolution (+1 more)
+
+### Community 25 - "Latency and bounded-workload rules"
+Cohesion: 0.29
+Nodes (7): §17 Latency — clean architecture must not add hot-path I/O, §16 Do not inherit performance issues; all large workloads bounded, Constraint — every filesystem scan uses fast-glob with an explicit ignore list, Rule 4 — Every workload must be BOUNDED, Rule 11 — Review questions beyond "does it run?" (10x/100x traffic, unbounded work), Rule 5 — Low latency: parallelize independent awaits, only when bounded, Rule 3 — Optimize performance at design time, not micro-optimization
+
+### Community 26 - "Proxy chain, timeouts, and idle stream timeout"
 Cohesion: 0.40
-Nodes (6): §18 Streaming is first-class (TTFT, cancellation, backpressure), Backpressure: a false write() waits for drain; the upstream read pauses with it, One ExecCtx signal: client disconnect + 600 s budget (TIMEOUT) + idle watchdog, ExecCtx (one shared client-cancel + deadline signal), Golden scenario: client cancellation, Failure: caller ctx.signal aborts (client left, budget spent)
+Nodes (5): transport.proxy-priority-chain, Idle timeout between chunks (AIGATE_STREAM_IDLE_TIMEOUT_MS, default 300 s) → TIMEOUT error event, Deferred: streaming idle timeout (gap between chunks) with SP12, HttpRequest (requires timeoutMs), Rule: every call states timeoutMs (1 to 600000 ms), bounding headers and body inside ctx.signal
 
-### Community 32 - "Retry Helper & Lint Rules"
-Cohesion: 0.53
-Nodes (6): withRetry() — bounded retry helper (≤10 attempts, capped backoff, abortable), tools/lint/check.test.mjs (lint:check 13/13), Lint rule aigate/fetch-through-transport, Lint rule aigate/fetch-timeout (accepts AbortSignal.any([..., AbortSignal.timeout(n)])), Lint rule aigate/retry-through-helper, SP0.1 — Mechanical lint/CI suite (§11.2)
+### Community 27 - "Partial stream failure"
+Cohesion: 0.83
+Nodes (4): fallback.partial-stream-failure, Truncated stream or error event → PROVIDER_UNAVAILABLE with details.partial, Stream headers only after the first chunk: earlier failures are real JSON statuses, Golden scenario: partial stream failure
 
-### Community 33 - "Skills & Milestone M0"
-Cohesion: 0.40
-Nodes (5): Split: machines block mechanics, skills teach judgement, Iron law: no skill without a failing test first (RED → GREEN → REFACTOR), UI performance constraints, Skill: writing-lean-bounded-code, SP0 — 2 skills + mechanical lint suite
-
-### Community 34 - "Lean Code Rules"
+### Community 28 - "Code quality rules"
 Cohesion: 0.50
 Nodes (4): §15 Code quality — shortest CLEAR implementation, not shortest possible, Rule 1 — Write LEAN code, no over-engineering, Rule 2 — Code must be maintainable, no magic values or hidden side effects, Rule 12 — Priority order: Correctness → Simplicity → Maintainability → Predictable resources → Latency → Throughput → Optimization
 
@@ -273,7 +244,7 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `Open decision (user confirmation pending): scan every message + system prompt for required capabilities` and `detectRequiredCapabilities()`?**
   _Edge tagged AMBIGUOUS (relation: rationale_for) - confidence is low._
-- **Why does `Bounded context: routing (core)` connect `Screens, Architecture & Credential Checks` to `Overview, Network & Console Screens`, `Discovery Outputs & Behavioral Questions`, `Error Taxonomy, Parity & Governance`, `Machine Identity & Settings Export`, `API Key Enforcement & Model Resolution`, `API-UI Map & Project Map`, `API Key Lifecycle`, `Settings API`, `Error Classification & Upstream Errors`, `Protocol Translation (SP10)`, `Ollama Adapter & ollama-local (SP14d)`, `Chat API /v1 & Endpoint Screen`?**
-  _High betweenness centrality (0.118) - this node is a cross-community bridge._
-- **Why does `Task board (PROGRESS_HANDOFF)` connect `UI Ownership & Wiring Rules` to `Skills & Milestone M0`, `Discovery Outputs & Behavioral Questions`, `Screens, Architecture & Credential Checks`, `Error Taxonomy, Parity & Governance`, `API Key Generation & UI Errors`, `Machine Identity & Settings Export`, `Catalog Registry & Model Listing (SP13)`, `API-UI Map & Project Map`, `Architecture & Monorepo`, `Protocol Translation (SP10)`, `Chat API /v1 & Endpoint Screen`?**
-  _High betweenness centrality (0.104) - this node is a cross-community bridge._
+- **Why does `Bounded context: routing (core)` connect `Endpoint lanes, credential test, and preview screens` to `API keys, identity and settings behavior`, `Dashboard screens and overview/traffic APIs`, `Catalog capabilities, model registry, and combos`, `Error classification, parity harness, and governance docs`, `Request translation, format detection, and JSON helpers`, `Gemini adapter, schema cleaner, and signatures (SP14e)`, `Streaming, disconnects, and CIP`, `Milestone M-1 discovery tasks and matrix files`?**
+  _High betweenness centrality (0.119) - this node is a cross-community bridge._
+- **Why does `Task board (PROGRESS_HANDOFF)` connect `Catalog capabilities, model registry, and combos` to `API keys, identity and settings behavior`, `Endpoint lanes, credential test, and preview screens`, `Error classification, parity harness, and governance docs`, `Request translation, format detection, and JSON helpers`, `Provider catalog API, adapter headers, ollama-local host`, `Milestone M-1 discovery tasks and matrix files`?**
+  _High betweenness centrality (0.102) - this node is a cross-community bridge._
