@@ -70,8 +70,8 @@ const connectionsKey = ["connections"] as const;
 export const useConnections = () => useQuery({ queryKey: connectionsKey, queryFn: () => api<Connection[]>("/api/connections") });
 // The catalog is built into the server, so it only changes with an AIGate upgrade.
 export const useProviders = () => useQuery({ queryKey: ["providers"], queryFn: () => api<ProviderSummary[]>("/api/providers"), staleTime: Infinity });
-export const useProvider = (id: string) =>
-  useQuery({ queryKey: ["providers", id], queryFn: () => api<ProviderDetailView>(`/api/providers/${encodeURIComponent(id)}`), staleTime: Infinity });
+export const useProvider = (id: string, enabled = true) =>
+  useQuery({ queryKey: ["providers", id], queryFn: () => api<ProviderDetailView>(`/api/providers/${encodeURIComponent(id)}`), staleTime: Infinity, enabled });
 
 function useConnectionMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
   const client = useQueryClient();
@@ -92,6 +92,28 @@ export const useUpdateConnection = () =>
 export const useDeleteConnection = () => useConnectionMutation((id: string) => apiVoid(path(id), "DELETE"));
 export const useTestConnection = () =>
   useConnectionMutation((id: string) => api<Connection>(`${path(id)}/test`, { method: "POST", timeoutMs: TEST_TIMEOUT_MS }));
+
+// docs/contracts/custom-models.md: the connection's live model list, the operator's custom models, and the model test.
+export interface ListedModel { id: string; inCatalog: boolean }
+export interface CustomModel { provider: string; id: string; createdAt: string }
+export interface ModelProbe { ok: boolean; latencyMs: number; status: number; error: string | null; note?: string }
+
+const customKey = (provider: string) => ["custom-models", provider] as const;
+const customPath = (params: Record<string, string>) => `/api/models/custom?${new URLSearchParams(params).toString()}`;
+// The server allows 15 s for a model test; the client waits a little longer.
+const PROBE_TIMEOUT_MS = 20_000;
+
+export const fetchConnectionModels = (id: string) => api<{ models: ListedModel[] }>(`${path(id)}/models`, { timeoutMs: TEST_TIMEOUT_MS }).then((r) => r.models);
+export const useCustomModels = (provider: string) =>
+  useQuery({ queryKey: customKey(provider), queryFn: () => api<{ models: CustomModel[] }>(customPath({ provider })).then((r) => r.models) });
+function useCustomMutation<T, V>(provider: string, mutationFn: (variables: V) => Promise<T>) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn, onSettled: () => client.invalidateQueries({ queryKey: customKey(provider) }) });
+}
+export const useAddCustomModels = (provider: string) =>
+  useCustomMutation(provider, (ids: string[]) => api<{ success: true; added: number }>("/api/models/custom", { method: "POST", body: { provider, ids } }));
+export const useDeleteCustomModel = (provider: string) => useCustomMutation(provider, (id: string) => apiVoid(customPath({ provider, id }), "DELETE"));
+export const testModel = (model: string) => api<ModelProbe>("/api/models/test", { method: "POST", body: { model }, timeoutMs: PROBE_TIMEOUT_MS });
 
 // docs/contracts/oauth.md: the sign-in steps. The server allows 30 s for each step that calls the provider.
 const OAUTH_TIMEOUT_MS = 35_000;

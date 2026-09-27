@@ -58,7 +58,7 @@ Rule 3 replaces "the first provider that declares it". With 41 providers, `glm-5
 | Screen | Wired |
 |---|---|
 | `/providers` → `LlmProviders` | The catalog comes from `GET /api/providers`. `service` and hidden entries are excluded, since they belong to the media screens. Cards are grouped by category (OAuth, Free Tier, API Key, Web account). Pills show "Connected", "Coming later" (the reason as the card title), or nothing when the provider can be connected. An unknown category goes to "Other providers" instead of being dropped. |
-| `/providers/detail?provider=…` → `ProviderDetail` | Data from `GET /api/providers/:id`. The connection panel, or the reason it is not connectable. A models table: id, kind, context window, max output (or "not declared"), capabilities. |
+| `/providers/detail?provider=…` → `ProviderDetail` | Data from `GET /api/providers/:id`. The connection panel, or the reason it is not connectable. Since SP16a the Models panel of `custom-models.md`: the catalog models (name, the `/v1` id to copy and test, kind, context window, max output or "not declared", capabilities), the added models, a Model ID field, and Import from /models. A custom provider id opens its own detail page with the same panel. |
 | `Connections` Add modal | Lists the connectable providers. A `?provider=` that is not connectable shows its reason. |
 
 The static `features/providers/catalog.ts` stays for the media screens (SP23).

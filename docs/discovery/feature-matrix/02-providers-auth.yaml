@@ -1089,7 +1089,7 @@
     - { file: "src/app/api/providers/[id]/models/route.js", line: 451, note: "isOpenAICompatibleProvider branch: baseUrl required or 400" }
     - { file: "src/app/api/providers/[id]/models/route.js", line: 525, note: "config-driven dispatch: customResolver, else static config.url/headers/authHeader" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: connection.test-single-connection

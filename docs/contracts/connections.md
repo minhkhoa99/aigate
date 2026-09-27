@@ -58,6 +58,7 @@ Every response is `Cache-Control: no-store`. The view is `{ id, provider, provid
 | `PATCH /api/connections/:id` | any of `{ name, apiKey, isActive, baseUrl, deployment, apiVersion, organization, accountId }` (`""` or `null` clears a field; a required one cannot be cleared) | 200 `View` | 400 `INVALID_REQUEST`; 404 `NOT_FOUND` |
 | `DELETE /api/connections/:id` | — | 204 | 404 `NOT_FOUND` |
 | `POST /api/connections/:id/test` | — | 200 `View`, with the new `testStatus` | 404 `NOT_FOUND`; 409 `CREDENTIAL_UNREADABLE` |
+| `GET /api/connections/:id/models` (SP16a) | — | 200 `{ provider, connectionId, models: [{ id, inCatalog }] }` from the upstream (`custom-models.md`) | 404 `NOT_FOUND`; 409 `CREDENTIAL_UNREADABLE`; 502 `MODELS_FETCH_FAILED` |
 
 Validation:
 - `apiKey` is trimmed, then must be 8–4096 printable ASCII characters with no spaces. A value starting with `{` is a Google Cloud JSON credential (at most 16384 characters): only vertex and vertex-partner take one, and it must be a complete service_account or authorized_user JSON; otherwise 400 `apiKey is not a usable Google Cloud credential: …` (`provider-vertex.md`, SP14f). It may be left out (or `""`) only for a provider whose auth is optional (ollama-local, SP14d); elsewhere that is 400 naming `apiKey`.

@@ -4,7 +4,8 @@ import { Button, ConfirmDialog, Field, Input, Metric, Modal, PageHeading, Panel,
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
 import { mediaGroups } from "./catalog";
-import { CustomProviderForm, CustomProviders } from "./custom";
+import { CustomProviderDetail, CustomProviderForm, CustomProviders } from "./custom";
+import { ProviderModels } from "./models";
 import {
   useConnections, useCreateConnection, useDeleteConnection, useProvider, useProviderNodes, useProviders, useTestConnection, useUpdateConnection, type Connection, type ConnectionField,
   type ProviderDetailView,
@@ -73,25 +74,24 @@ function ProviderConnection({ provider }: { provider: ProviderDetailView }) {
   return <div className="list-row"><div><strong>{connection.name}</strong><small>{connection.authType === "oauth" ? <>Signed in{connection.email && <> as <code>{connection.email}</code></>}</> : <>Key <code>{connection.keyHint}</code></>} · {connection.lastTestedAt ? `tested ${new Date(connection.lastTestedAt).toLocaleString()}` : "not tested yet"}</small></div><Pill tone={pill.tone}>{pill.label}</Pill><a className="button" href="/providers/connections">Manage</a></div>;
 }
 
-const limit = (value: number | null) => (value === null ? <span className="muted">not declared</span> : value.toLocaleString());
-const capabilityList = (capabilities: Record<string, boolean>) => Object.keys(capabilities).filter((name) => capabilities[name]).join(", ") || "—";
-
 function CatalogProvider({ providerId }: { providerId: string }) {
-  const detail = useProvider(providerId);
+  // A custom provider has its own detail page (docs/contracts/custom-models.md); the catalog is asked only otherwise.
+  const nodes = useProviderNodes();
+  const node = nodes.data?.find((n) => n.id === providerId);
+  const detail = useProvider(providerId, !nodes.isPending && !node);
+  if (nodes.isPending) return <StateBlock state="loading" />;
+  if (node) return <CustomProviderDetail node={node} />;
   if (detail.isPending) return <StateBlock state="loading" />;
   if (detail.isError) {
     const problem = toProblem(detail.error);
-    if (problem.code === "NOT_FOUND") return <><PageHeading eyebrow="Providers / Catalog" title="Provider not found" description={`"${providerId}" is not in the provider catalog.`} /><Link className="button" to="/providers">Back to providers</Link></>;
+    if (problem.code === "NOT_FOUND") return <><PageHeading eyebrow="Providers / Catalog" title="Provider not found" description={`"${providerId}" is not in the provider catalog or a custom provider.`} /><Link className="button" to="/providers">Back to providers</Link></>;
     return <StateBlock state="error" code={problem.code} action={<Button onClick={() => void detail.refetch()}>Retry</Button>} />;
   }
   const provider = detail.data;
   const group = groupOf(provider.category);
   return <><PageHeading eyebrow={`Providers / ${group.title}`} title={provider.name} description="Connection status, credentials, and the models this provider offers." />
     <div className="grid grid-2"><Panel title="Provider type"><Pill tone="info">{group.title}</Pill><p className="muted">Built-in catalog entry · ID <code>{provider.id}</code></p>{provider.chatUrl && <p className="muted" style={{ overflowWrap: "anywhere" }}>Endpoint <code>{provider.chatUrl}</code></p>}</Panel><Panel title="Connection"><ProviderConnection provider={provider} /></Panel></div>
-    <Panel title="Models" detail={`${provider.models.length} in the catalog. A provider may serve more; "<provider>/<model>" reaches any of them.`} className="section-gap panel-flush">
-      <Table empty="The catalog lists no models for this provider." columns={["Model", "Kind", "Context window", "Max output", "Capabilities"]}
-        rows={provider.models.map((m) => [<div><strong>{m.name}</strong>{m.name !== m.id && <small className="muted"> <code>{m.id}</code></small>}</div>, m.kind, limit(m.contextWindow), limit(m.maxOutputTokens), capabilityList(m.capabilities)])} />
-    </Panel>
+    <ProviderModels providerId={provider.id} prefix={provider.id} catalog={provider.models} />
   </>;
 }
 

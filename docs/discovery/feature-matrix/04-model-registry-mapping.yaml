@@ -440,8 +440,90 @@
     - { file: src/app/api/models/custom/route.js, line: 11, note: "for (const key of Object.keys(CAPACITY_META)) — the actual whitelist loop" }
     - { file: src/app/api/models/route.js, line: 62, note: "custom model caps spread last, overriding the heuristic caps" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
+
+- id: catalog.compatible-models-import-ui
+  group: Model registry
+  feature: Model catalog
+  subFeature: "Provider detail 'Available Models' — add a model id by hand, or 'Import from /models' every id the connection's upstream lists, each shown as <prefix>/<id> with Copy, Test and Delete"
+  trigger: "Operator clicks Add or 'Import from /models' on a provider detail page (custom OpenAI/Anthropic-compatible nodes; cline/clinepass and qoder get their own import button; other built-ins only a manual 'Add Model' modal)"
+  input: "Model ID text, or none for the import (the first active connection of the provider is used)"
+  output: "customModels rows for the provider; the list re-renders with the full id to copy"
+  businessRules:
+    - "handleImport picks connections.find(isActive !== false) — the first active connection — and calls GET /api/providers/{connectionId}/models (catalog.provider-models-live-fetch)"
+    - "Every returned model (id, else name, else model) not already in the provider's custom or alias rows is added with one POST /api/models/custom per id, sequentially; no selection step — a reseller listing hundreds of ids adds all of them"
+    - "An empty list alerts 'No models returned from /models.'; nothing new alerts 'No new models were added.'; a non-OK answer alerts data.error, which for compatible nodes is only 'Failed to fetch models: <status>' (the upstream body is logged, not shown)"
+    - "Manual Add rejects an id already in the list client-side ('Model already exists for this provider.') and otherwise POSTs it unchecked — no format or length validation on either side"
+    - "The import button is disabled with 'Add a connection to enable importing models.' when the provider has no active connection"
+    - "The compatible-node fetch has no timeout and sends the stored key as Bearer (OpenAI) or as both x-api-key and Bearer (Anthropic)"
+  state:
+    reads: ["providerConnections", "customModels KV", "modelAliases KV"]
+    writes: ["customModels KV (via catalog.model-custom-registration)"]
+    runtimeOnly: []
+  dependencies: ["catalog.provider-models-live-fetch", "catalog.model-custom-registration", "catalog.model-connectivity-test"]
+  providerInteraction: "GET <baseUrl>/models (compatible) or the provider's models endpoint, with the connection's credential, from the server"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "compatible node without a base URL (400)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "upstream /models answers non-OK — status passed through, body hidden", partial: false }
+  sideEffects: ["One customModels write per imported id"]
+  persistence: ["customModels KV rows"]
+  performanceConcerns:
+    - "N sequential POSTs for N imported ids"
+  behavior: { streaming: false, cancellation: null, concurrency: "the import loop is sequential; a second click is ignored while importing" }
+  edgeCases:
+    - "Built-in providers other than cline/clinepass/qoder have no import button even though GET /api/providers/{id}/models serves ~40 of them"
+  evidence:
+    - { file: "src/app/(dashboard)/dashboard/providers/[id]/CompatibleModelsSection.js", line: 106, note: "handleAdd: duplicate check client-side only, then onAddCustomModel(modelId)" }
+    - { file: "src/app/(dashboard)/dashboard/providers/[id]/CompatibleModelsSection.js", line: 127, note: "first active connection" }
+    - { file: "src/app/(dashboard)/dashboard/providers/[id]/CompatibleModelsSection.js", line: 144, note: "sequential add of every id not present" }
+    - { file: "src/app/(dashboard)/dashboard/providers/[id]/CompatibleModelsSection.js", line: 190, note: "'Add a connection to enable importing models.'" }
+    - { file: "src/app/(dashboard)/dashboard/providers/[id]/page.js", line: 643, note: "handleImportClineModels — the built-in import, same loop" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 537, note: "compatible fetch: no timeout" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 548, note: "error body logged; the client gets only the status" }
+  newModule: catalog
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "The operator sees why a fetch failed, a slow host cannot hang the request, and ids are validated"
+    actual: "Only 'Failed to fetch models: <status>' is shown, the compatible fetch has no timeout, and any string is stored as a model id"
+    impact: "A 401 with the provider's reason reads as a bare number; a hung host hangs the import; a pasted URL or blank-padded id becomes an unroutable model row"
+
+- id: catalog.custom-models-orphan-on-node-delete
+  group: Model registry
+  feature: Model catalog
+  subFeature: "Deleting a custom provider node leaves its customModels rows behind"
+  trigger: "DELETE /api/provider-nodes/{id}"
+  input: "node id"
+  output: "{ success: true }"
+  businessRules:
+    - "The route deletes the node's connections (deleteProviderConnectionsByProvider) and the node (deleteProviderNode); customModels rows keyed by the node id stay"
+  state:
+    reads: ["providerNodes"]
+    writes: ["providerNodes", "providerConnections"]
+    runtimeOnly: []
+  dependencies: ["catalog.model-custom-registration", "connection.provider-node-update-delete"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["customModels KV rows of the deleted node remain"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "/v1/models' no-connection branch walks every customModels row, so a deleted node's models can still be listed under its old prefix"
+  evidence:
+    - { file: "src/app/api/provider-nodes/[id]/route.js", line: 93, note: "deleteProviderConnectionsByProvider(id)" }
+    - { file: "src/app/api/provider-nodes/[id]/route.js", line: 94, note: "deleteProviderNode(id) — no customModels cleanup" }
+    - { file: src/app/api/v1/models/route.js, line: 352, note: "every customModels row is listed by its providerAlias" }
+  newModule: catalog
+  parityStatus: implemented
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A node's models go with the node"
+    actual: "They stay in the KV table"
+    impact: "Dead rows grow, and /v1/models can list models of a provider that no longer exists"
 
 - id: catalog.model-live-vendor-fetch-ui-only
   group: Model registry
@@ -560,7 +642,7 @@
     - { file: src/app/api/models/test/ping.js, line: 196, note: "soft-pass: finish_reason==='length' with empty content but present reasoning is still ok:true" }
     - { file: src/app/api/models/test/ping.js, line: 49, note: "x-9r-cli-token machine-id header added alongside the real API key for internal auth" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.v1-single-model-lookup

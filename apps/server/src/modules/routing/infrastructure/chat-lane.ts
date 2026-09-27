@@ -9,10 +9,11 @@ import {
   parseAnthropicMessagesRequest, parseGeminiGenerateRequest, parseGeminiPath, parseOpenAIChatRequest, parseOpenAIResponsesRequest,
   responsesClientGetsObject, responsesRequestFor, ResponsesStreamEncoder, toAnthropicMessage, toGeminiResponse, toOpenAIChatCompletion, toOpenAIError,
   toResponsesObject, UnsupportedFeatureError, withConnection, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential,
-  type ExecCtx, type GeminiRoute, type HttpTransportPort, type ProviderDescriptor, type StreamChunk,
+  type ExecCtx, type GeminiRoute, type HttpTransportPort, type OpenAIError, type ProviderDescriptor, type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { extractApiKey } from "../../apikeys/domain/api-key.js";
+import { CustomModelsRepository } from "../../catalog/infrastructure/custom-models.repo.js";
 import { ApiKeysRepository } from "../../apikeys/infrastructure/api-keys.repo.js";
 import { ConnectionsRepository, type StoredCredential } from "../../connections/infrastructure/connections.repo.js";
 import { TokenRefresher } from "../../connections/infrastructure/token-refresher.js";
@@ -33,6 +34,17 @@ export interface ChatLimits {
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000;
 export const DEFAULT_REFRESH_RETRY_DELAY_MS = 1_000;
 const REQUEST_BUDGET_MS = 600_000;
+// catalog.model-connectivity-test: 9router's 15 s per probe.
+const PROBE_TIMEOUT_MS = 15_000;
+
+// POST /api/models/test (docs/contracts/custom-models.md).
+export interface ModelProbe {
+  ok: boolean;
+  latencyMs: number;
+  status: number;
+  error: string | null;
+  note?: string;
+}
 
 // A failure AIGate itself decides, already in OpenAI terms.
 class GatewayError extends Error {
@@ -54,7 +66,7 @@ class ClientGone extends Error {
   }
 }
 
-function errorOf(error: unknown): { status: number; body: unknown } {
+function errorOf(error: unknown): OpenAIError {
   if (error instanceof GatewayError) {
     return { status: error.status, body: { error: { message: error.message, type: error.type, code: error.code, param: null } } };
   }
@@ -195,6 +207,7 @@ export class ChatLane {
     private readonly keys: ApiKeysRepository,
     private readonly connections: ConnectionsRepository,
     private readonly nodes: ProviderNodesRepository,
+    private readonly customModels: CustomModelsRepository,
     private readonly refresher: TokenRefresher,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
     @Inject(CHAT_LIMITS) private readonly limits: ChatLimits,
@@ -289,16 +302,7 @@ export class ChatLane {
         }
         await this.stream(reply, adapter, { ...target, credential }, parsed.encoder(target.provider, { ...ids, model: target.request.model }), ids.requestId, client, budget.signal);
       };
-      try {
-        await run(target.credential);
-      } catch (error) {
-        // oauth.refresh-lifecycle (9router, kept): a 401/403 before the first byte refreshes the connection's token, for
-        // every provider, and the request is sent once more with the new token.
-        if (!upstreamAuthFailure(error) || reply.sent || client.signal.aborted) throw error;
-        const token = await this.refresher.reactive(target.provider.id, target.connection, this.limits.refreshRetryDelayMs);
-        if (!token) throw error;
-        await run({ kind: "api-key", apiKey: token });
-      }
+      await this.withRefresh(target, run, () => !reply.sent && !client.signal.aborted);
     } catch (error) {
       if (client.signal.aborted) {
         // Nobody is left to answer; the upstream call was already cancelled through the shared signal.
@@ -314,11 +318,61 @@ export class ChatLane {
     }
   }
 
+  // Each provider with an active connection: its catalog chat models, then its custom models (docs/contracts/custom-models.md);
+  // a custom provider lists its custom models under its prefix.
   async models(reply: FastifyReply): Promise<FastifyReply> {
     const active = await this.connections.activeProviders();
-    const data = builtinRegistry.providers.filter((p) => active.has(p.id)).flatMap((p) =>
-      p.models.filter((m) => m.kind === "chat").map((m) => ({ id: `${p.id}/${m.id}`, object: "model", created: 0, owned_by: p.id })));
+    const builtins = builtinRegistry.providers.filter((p) => active.has(p.id));
+    const nodes = (await this.nodes.list()).filter((node) => active.has(node.id) && !isReservedPrefix(node.prefix));
+    const custom = await this.customModels.byProvider([...builtins.map((p) => p.id), ...nodes.map((node) => node.id)]);
+    const entry = (owner: string, id: string) => ({ id: `${owner}/${id}`, object: "model", created: 0, owned_by: owner });
+    const data = [
+      ...builtins.flatMap((p) => [
+        ...p.models.filter((m) => m.kind === "chat").map((m) => m.id),
+        ...(custom.get(p.id) ?? []).filter((id) => builtinRegistry.model(p.id, id) === undefined),
+      ].map((id) => entry(p.id, id))),
+      ...nodes.flatMap((node) => (custom.get(node.id) ?? []).map((id) => entry(node.prefix, id))),
+    ];
     return reply.header("cache-control", "no-store").send({ object: "list", data });
+  }
+
+  // catalog.model-connectivity-test (docs/contracts/custom-models.md): one real chat request through the /v1 resolution and
+  // adapter, without the key gate (the dashboard session stands in for it; 9router calls its own /v1 with a key).
+  async probe(model: string): Promise<ModelProbe> {
+    const started = Date.now();
+    const requestId = randomUUID();
+    const budget = deadline(PROBE_TIMEOUT_MS, `The model did not answer within ${PROBE_TIMEOUT_MS / 1000} s`);
+    try {
+      // max_tokens 1024: reasoning models spend the budget thinking before they answer (9router #3010).
+      const { request } = parseOpenAIChatRequest({ model, max_tokens: 1024, stream: false, messages: [{ role: "user", content: "hi" }] });
+      const target = await this.resolve(request);
+      const adapter = createAdapter(target.provider, this.transport);
+      const response = await this.withRefresh(target, (credential) => adapter.execute(target.request, credential, { signal: budget.signal, requestId }), () => true);
+      const answered = response.content.some((part) => part.type === "text" && part.text.trim() !== "");
+      const reasoned = response.content.some((part) => part.type === "thinking" && part.text !== "");
+      const note = response.stopReason === "max_tokens" && !answered && reasoned ? { note: "reasoning-only response (length-limited)" } : {};
+      return { ok: true, latencyMs: Date.now() - started, status: 200, error: null, ...note };
+    } catch (error) {
+      if (!(error instanceof GatewayError || error instanceof EngineError || error instanceof SecretUnreadableError)) this.logUnexpected(error, requestId);
+      const { status, body } = errorOf(error);
+      const { message } = body.error;
+      return { ok: false, latencyMs: Date.now() - started, status, error: `HTTP ${status}: ${message.slice(0, 500)}` };
+    } finally {
+      budget.clear();
+    }
+  }
+
+  // oauth.refresh-lifecycle (9router, kept): a 401/403 before the first byte refreshes the connection's token, for every
+  // provider, and the request is sent once more with the new token.
+  private async withRefresh<T>(target: Target, run: (credential: Credential) => Promise<T>, canRetry: () => boolean): Promise<T> {
+    try {
+      return await run(target.credential);
+    } catch (error) {
+      if (!upstreamAuthFailure(error) || !canRetry()) throw error;
+      const token = await this.refresher.reactive(target.provider.id, target.connection, this.limits.refreshRetryDelayMs);
+      if (!token) throw error;
+      return run({ kind: "api-key", apiKey: token });
+    }
   }
 
   // Route error handler: body parsing failures, in the OpenAI shape.

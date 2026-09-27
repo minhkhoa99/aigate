@@ -26,6 +26,8 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   // docs/contracts/oauth.md: the provider refused the sign-in; its own words follow.
   OAUTH_FAILED: (body) => typeof body.message === "string" ? `The sign-in failed: ${body.message}` : "The sign-in failed. Try again.",
   CREDENTIAL_UNREADABLE: "The saved key can no longer be decrypted, because the secret key file changed. Use Replace key to enter it again.",
+  // docs/contracts/custom-models.md: 9router's words, the upstream status only (kept by user decision).
+  MODELS_FETCH_FAILED: (body) => typeof body.message === "string" ? `${body.message}. Test the connection to see why.` : "Failed to fetch models. Test the connection to see why.",
   // docs/contracts/custom-providers.md.
   NODE_LIMIT: "You have reached the maximum of 100 custom providers. Delete one you no longer use.",
 };

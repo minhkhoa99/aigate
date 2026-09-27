@@ -1211,6 +1211,32 @@ Every item below is a capability AIGate must have. Derived from tracing
 
 ## Model registry
 
+### Provider detail 'Available Models' — add a model id by hand, or 'Import from /models' every id the connection's upstream lists, each shown as <prefix>/<id> with Copy, Test and Delete
+
+- **id:** `catalog.compatible-models-import-ui` · **module:** `catalog`
+- **Trigger:** Operator clicks Add or 'Import from /models' on a provider detail page (custom OpenAI/Anthropic-compatible nodes; cline/clinepass and qoder get their own import button; other built-ins only a manual 'Add Model' modal)
+- **Input:** Model ID text, or none for the import (the first active connection of the provider is used)
+- **Output:** customModels rows for the provider; the list re-renders with the full id to copy
+- **Rules:**
+  - handleImport picks connections.find(isActive !== false) — the first active connection — and calls GET /api/providers/{connectionId}/models (catalog.provider-models-live-fetch)
+  - Every returned model (id, else name, else model) not already in the provider's custom or alias rows is added with one POST /api/models/custom per id, sequentially; no selection step — a reseller listing hundreds of ids adds all of them
+  - An empty list alerts 'No models returned from /models.'; nothing new alerts 'No new models were added.'; a non-OK answer alerts data.error, which for compatible nodes is only 'Failed to fetch models: <status>' (the upstream body is logged, not shown)
+  - Manual Add rejects an id already in the list client-side ('Model already exists for this provider.') and otherwise POSTs it unchecked — no format or length validation on either side
+  - The import button is disabled with 'Add a connection to enable importing models.' when the provider has no active connection
+  - The compatible-node fetch has no timeout and sends the stored key as Bearer (OpenAI) or as both x-api-key and Bearer (Anthropic)
+- **Errors:** `INVALID_REQUEST` (compatible node without a base URL (400)), `PROVIDER_UNAVAILABLE` (upstream /models answers non-OK — status passed through, body hidden)
+- **AIGate required behavior:** The operator sees why a fetch failed, a slow host cannot hang the request, and ids are validated
+
+### Deleting a custom provider node leaves its customModels rows behind
+
+- **id:** `catalog.custom-models-orphan-on-node-delete` · **module:** `catalog`
+- **Trigger:** DELETE /api/provider-nodes/{id}
+- **Input:** node id
+- **Output:** { success: true }
+- **Rules:**
+  - The route deletes the node's connections (deleteProviderConnectionsByProvider) and the node (deleteProviderNode); customModels rows keyed by the node id stay
+- **AIGate required behavior:** A node's models go with the node
+
 ### /api/models/availability — dashboard-facing, model-centric aggregation of per-connection cooldown/unavailable locks, plus a manual clear-cooldown action
 
 - **id:** `catalog.model-availability-lock-state` · **module:** `catalog`
@@ -4342,6 +4368,8 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `account.concurrent-refresh-race` | Two concurrent requests hitting an expired/rejected token on the same connection should converge on one valid refreshed token — either serialized so the second reuses the first's fresh token, or each refresh is independently idempotent regardless of which refreshToken value it started from | No per-connection lock exists around either the proactive (checkAndRefreshToken) or reactive (chatCore.js 401/403) refresh call; each concurrent request refreshes using its own in-memory refreshToken snapshot with no coordination with other in-flight requests for the same connection | For providers with single-use rotating refresh tokens (the code names xAI and grok-cli explicitly), a burst of concurrent requests around token-expiry time causes all but the first refresh to fail with invalid_grant, which can further trigger markAccountUnavailable and lock the connection out even though it was just successfully refreshed by a sibling request |
 | `catalog.alias-disabled-model-bypass` | A model marked disabled in the dashboard should be rejected if a request targets it — directly or via an alias — mirroring how it disappears from every model-listing endpoint ("disable" implies block, not just hide) | The chat/routing path never reads the disabledModels table at all; only the discovery endpoints (/api/models, /v1/models) filter by it, so a disabled model keeps working for any client that already knows its id, or that reaches it through an alias or combo | The 'disable' control only removes discoverability, not access — a compliance or cost-control use case ('stop routing to this expensive/broken model') is not actually enforced, silently, with no error surfaced to the operator who disabled it |
 | `catalog.alias-dual-convention-collision` | Both endpoints described as setting 'the alias for a model' should write the same KV shape so a value set through either surface is visible to the other, and to actual chat routing | The two routes call the same setModelAlias(alias, model) primitive with swapped argument order, so /api/models/alias produces routable aliases (key=alias) while /api/models produces display-only rows (key=modelId) in the same table — each is invisible to the other's reader | An alias set via the main /api/models list page's inline rename never actually works as a callable alias in a chat request (resolveModelAliasFromMap won't find it), while a routable alias created via the dedicated alias-management endpoint never appears as that model's display label in the main list — two silently disconnected features sharing one KV namespace |
+| `catalog.compatible-models-import-ui` | The operator sees why a fetch failed, a slow host cannot hang the request, and ids are validated | Only 'Failed to fetch models: <status>' is shown, the compatible fetch has no timeout, and any string is stored as a model id | A 401 with the provider's reason reads as a bare number; a hung host hangs the import; a pasted URL or blank-padded id becomes an unroutable model row |
+| `catalog.custom-models-orphan-on-node-delete` | A node's models go with the node | They stay in the KV table | Dead rows grow, and /v1/models can list models of a provider that no longer exists |
 | `catalog.ollama-tags-listing` | The model names an Ollama-compatible client discovers via GET /api/tags are names it can actually use in a subsequent chat request on the Ollama lane (POST /v1/api/chat, routing.ollama-lane-transform) — a discovery endpoint's contract is that its results are usable | The two fixture names (llama3.2, qwen2.5) do not correspond to any configured provider model, alias, or custom model anywhere in the codebase — they exist purely to make the discovery probe return a non-empty, plausible-looking body | An Ollama-compatible client that follows the normal discover-then-select flow (list /api/tags, pick a name, chat with it) will pick a model id that fails to resolve on the actual chat request, rather than one of the real configured/aliased models the operator set up |
 | `routing.stream-mode-decision` | An omitted stream flag means non-streaming, as in the OpenAI and Anthropic APIs this endpoint emulates | stream = body.stream !== false, so undefined means streaming; only an Accept: application/json header turns it off | Clients that omit stream and do not send Accept: application/json get an SSE body where they expected one JSON object and fail to parse it |
 | `routing.default-executor-openai-fallback` | A provider id with no transport config is rejected (or an embedding-only node is refused on the chat lane) before any upstream call | DefaultExecutor silently adopts PROVIDERS.openai and posts the request, with the node's credential, to api.openai.com | Credential disclosure to OpenAI and a confusing 401 that locks the node's account; the request never reaches the node the user configured |

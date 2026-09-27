@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import {
-  BadRequestException, Body, ConflictException, Controller, Delete, Get, Header, HttpCode, HttpStatus, Inject, NotFoundException, Param, Patch, Post,
+  BadRequestException, Body, ConflictException, Controller, Delete, Get, Header, HttpCode, HttpException, HttpStatus, Inject, NotFoundException, Param, Patch, Post,
 } from "@nestjs/common";
-import { builtinRegistry, CATALOG, createAdapter, EngineError, parseGoogleCredential, withConnection, type HttpTransportPort, type ProviderDescriptor } from "@aigate/engine";
+import {
+  builtinRegistry, CATALOG, createAdapter, EngineError, parseGoogleCredential, withConnection, type AIProviderPort, type HttpTransportPort, type ProviderDescriptor,
+} from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
 import { DATA_FIELD_NAMES, isJsonCredential, parseChanges, parseNewConnection, type ConnectionChanges } from "../domain/connection.js";
@@ -153,6 +155,37 @@ export class ConnectionsController {
   @HttpCode(HttpStatus.OK)
   @Header("Cache-Control", "no-store")
   async test(@Param("id") id: string): Promise<Named> {
+    const { stored, provider, fresh } = await this.credential(id);
+    const outcome = await runTest(withConnection(provider, fresh), this.transport, fresh.apiKey);
+    // After a refresh the sealed token changed, so the result is recorded against the new one.
+    const sealed = fresh === stored ? stored.sealed : (await this.connections.readKey(id))?.sealed ?? stored.sealed;
+    const view = await this.connections.recordTest(id, sealed, outcome);
+    if (!view) throw notFound();
+    return this.withName(view);
+  }
+
+  // catalog.provider-models-live-fetch (docs/contracts/custom-models.md): the ids the connection's upstream lists.
+  @Get(":id/models")
+  @Header("Cache-Control", "no-store")
+  async models(@Param("id") id: string) {
+    const { provider, fresh } = await this.credential(id);
+    const ctx = { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID() };
+    let listed: Awaited<ReturnType<AIProviderPort["getModels"]>>;
+    try {
+      listed = await createAdapter(withConnection(provider, fresh), this.transport).getModels({ kind: "api-key", apiKey: fresh.apiKey }, ctx);
+    } catch (error) {
+      // Kept from 9router (user decision 2026-09-27): only the upstream status, not its reason, and "Failed to fetch
+      // models" for anything else. 502, not the upstream status, so that a provider's 401 does not read as the dashboard
+      // session ending.
+      const status = error instanceof EngineError ? error.details.status : undefined;
+      throw new HttpException({ code: "MODELS_FETCH_FAILED", message: typeof status === "number" ? `Failed to fetch models: ${status}` : "Failed to fetch models" }, HttpStatus.BAD_GATEWAY);
+    }
+    return { provider: provider.id, connectionId: id, models: listed.map((m) => ({ id: m.id, inCatalog: builtinRegistry.model(provider.id, m.id) !== undefined })) };
+  }
+
+  // The connection's key and provider; an oauth token about to expire is refreshed first, as 9router does
+  // (oauth.refresh-lifecycle).
+  private async credential(id: string) {
     let stored: Awaited<ReturnType<ConnectionsRepository["readKey"]>>;
     try {
       stored = await this.connections.readKey(id);
@@ -165,13 +198,6 @@ export class ConnectionsController {
     if (!stored) throw notFound();
     const provider = await this.provider(stored.provider);
     if (!provider) throw notSupported(stored.provider);
-    // oauth.refresh-lifecycle: a token about to expire is refreshed before the test, as 9router does.
-    const fresh = await this.refresher.fresh(provider.id, stored);
-    const outcome = await runTest(withConnection(provider, fresh), this.transport, fresh.apiKey);
-    // After a refresh the sealed token changed, so the result is recorded against the new one.
-    const sealed = fresh === stored ? stored.sealed : (await this.connections.readKey(id))?.sealed ?? stored.sealed;
-    const view = await this.connections.recordTest(id, sealed, outcome);
-    if (!view) throw notFound();
-    return this.withName(view);
+    return { stored, provider, fresh: await this.refresher.fresh(provider.id, stored) };
   }
 }

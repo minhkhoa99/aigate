@@ -4,7 +4,9 @@ import { Button, ConfirmDialog, Field, Input, PageHeading, Panel, Pill, StateBlo
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
 import { useConnections, useCreateNode, useDeleteNode, useProviderNodes, useProviders, useUpdateNode, type ApiType, type NodeType, type ProviderNode } from "./api";
+import { ProviderModels } from "./models";
 import { unreachable } from "./node-rules";
+import { statusPill } from "./test-result";
 
 // docs/contracts/custom-providers.md: user-defined OpenAI- or Anthropic-compatible endpoints, reached as "<prefix>/<model>".
 
@@ -34,6 +36,23 @@ const text = (form: HTMLFormElement, name: string) => {
   return typeof value === "string" ? value.trim() : "";
 };
 const connectHref = (id: string) => `/providers/connections?provider=${encodeURIComponent(id)}`;
+const detailHref = (id: string) => `/providers/detail?provider=${encodeURIComponent(id)}`;
+
+// docs/contracts/custom-models.md: a custom provider declares no models, so the ones to call are imported from its
+// /models or added by hand.
+export function CustomProviderDetail({ node }: { node: ProviderNode }) {
+  const connections = useConnections();
+  const connection = connections.data?.find((c) => c.provider === node.id);
+  const pill = connection && statusPill(connection);
+  return <><PageHeading eyebrow="Providers / Custom" title={node.name} description={`Called on /v1 as ${node.prefix}/<model>.`} action={<a className="button" href={`/providers/new?id=${encodeURIComponent(node.id)}`}>Edit</a>} />
+    <div className="grid grid-2"><Panel title="Provider type"><Pill tone="info">{protocolLabel(node)}</Pill><p className="muted">Custom provider · prefix <code>{node.prefix}</code></p><p className="muted" style={{ overflowWrap: "anywhere" }}>Base URL <code>{node.baseUrl}</code></p></Panel>
+      <Panel title="Connection">{connections.isPending ? <StateBlock state="loading" />
+        : connections.isError ? <StateBlock state="error" code={toProblem(connections.error).code} action={<Button onClick={() => void connections.refetch()}>Retry</Button>} />
+        : connection && pill ? <div className="list-row"><div><strong>{connection.name}</strong><small>Key <code>{connection.keyHint}</code></small></div><Pill tone={pill.tone}>{pill.label}</Pill><a className="button" href="/providers/connections">Manage</a></div>
+        : <div className="state-block"><strong>Not connected</strong><p>Add its API key to import its models and route requests.</p><a className="button button-primary" href={connectHref(node.id)}>Add connection</a></div>}</Panel></div>
+    <ProviderModels providerId={node.id} prefix={node.prefix} catalog={[]} />
+  </>;
+}
 
 export function CustomProviders() {
   const nodes = useProviderNodes();
@@ -51,6 +70,7 @@ export function CustomProviders() {
       : <div className="catalog-grid">{nodes.data.map((node) => <div className="catalog-card" key={node.id}><span className="catalog-glyph" aria-hidden="true">{node.name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{node.name}</strong><small><code>{node.prefix}/…</code> · {protocolLabel(node)}</small><small title={node.baseUrl} style={{ overflowWrap: "anywhere" }}>{node.baseUrl}</small>
         {(() => { const reason = unreachable(node, nodes.data, reserved); return reason && <><Pill tone="warning">Unreachable</Pill><small>{reason}</small></>; })()}
         {connected.has(node.id) ? <Pill tone="healthy">Connected</Pill> : <a className="button button-ghost" href={connectHref(node.id)}>Connect</a>}
+        <a className="button button-ghost" href={detailHref(node.id)}>Models</a>
         <a className="button button-ghost" href={`/providers/new?id=${encodeURIComponent(node.id)}`}>Edit</a><Button variant="ghost" onClick={() => setRemoving(node)}>Delete</Button></span></div>)}</div>}
     {removing && <ConfirmDialog name={removing.name} detail={connected.has(removing.id) ? "Its connection and saved API key are deleted too." : undefined} onClose={() => setRemoving(null)} onConfirm={() => remove.mutate(removing.id, {
       onSuccess: () => { setRemoving(null); showToast({ tone: "success", message: `Deleted ${removing.name}.` }); },
