@@ -103,13 +103,26 @@ function assistantBlock(part: ContentPart): Json {
   }
 }
 
+// A mark on a whole message (an OpenAI Chat client's) is a breakpoint at its end: Messages marks blocks, so the last text
+// carries it, inside a tool result too.
+function withMessageMark(parts: readonly ContentPart[], marked: boolean): readonly ContentPart[] {
+  if (!marked) return parts;
+  const last = parts.findLastIndex((part) => part.type === "text" || part.type === "tool_result");
+  return parts.map((part, i) => {
+    if (i !== last) return part;
+    if (part.type === "text") return { ...part, cacheControl: "ephemeral" };
+    return part.type === "tool_result" ? { ...part, content: withMessageMark(part.content, true) } : part;
+  });
+}
+
 // user and tool turns are user turns; same-role turns merge, and a user turn lists its tool results first.
 function toMessages(request: CanonicalRequest): Json[] {
   const turns: { role: "user" | "assistant"; content: Json[] }[] = [];
   for (const message of request.messages) {
     if (message.content.length === 0) continue;
     const role = message.role === "assistant" ? "assistant" : "user";
-    const blocks = message.content.map((part) => (role === "assistant" ? assistantBlock(part) : userBlock(part)));
+    const content = withMessageMark(message.content, message.cacheControl !== undefined);
+    const blocks = content.map((part) => (role === "assistant" ? assistantBlock(part) : userBlock(part)));
     const last = turns.at(-1);
     if (last?.role === role) last.content.push(...blocks);
     else turns.push({ role, content: blocks });
@@ -351,7 +364,7 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
       messages: toMessages(request),
       stream,
       ...(request.system && request.system.length > 0 ? {
-        system: request.system.map((part) => {
+        system: withMessageMark(request.system, request.systemCacheControl !== undefined).map((part) => {
           if (part.type !== "text") throw unsupported(`${part.type} in the system prompt`);
           return textBlock(part);
         }),

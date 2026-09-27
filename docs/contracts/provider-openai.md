@@ -38,7 +38,7 @@ Scope, per spec §9: one `AIProviderPort` for the `openai-compatible` protocol f
 | `vendorExtensions.openai` | merged into the body first, so modelled fields win | any other namespace |
 
 - The adapter throws `UnsupportedFeatureError` before any I/O and never drops a field silently (spec §3.1). Routing (SP12) decides if another candidate can take the request.
-- `cacheControl` is the one exception. It is a hint, and OpenAI caches prompt prefixes automatically, so leaving it out does not change the answer.
+- `cacheControl` is the one exception. It is a hint, and OpenAI caches prompt prefixes automatically, so leaving it out does not change the answer. Since 2026-09-27, as 9router: a message's mark is sent on the message (`cache_control: { type: "ephemeral" }`) to every provider, and a text part's mark only with the `preserveCacheControl` quirk (the alicode family); see `protocol-openai.md`.
 - A single text part is sent as a string; anything else is sent as a part array.
 - `execute()` always sends `stream: false`. `stream()` always sends `stream: true` with `stream_options.include_usage`.
 

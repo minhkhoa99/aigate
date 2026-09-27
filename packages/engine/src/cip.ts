@@ -23,6 +23,9 @@ export type ContentPart =
 export interface CanonicalMessage {
   readonly role: "user" | "assistant" | "tool";
   readonly content: readonly ContentPart[];
+  // A cache mark on the whole message (OpenAI Chat clients): OpenAI-compatible providers get it on the message, as
+  // 9router sends it; Anthropic puts it on the message's last text (docs/contracts/protocol-openai.md).
+  readonly cacheControl?: "ephemeral";
 }
 
 export interface ToolDefinition {
@@ -39,6 +42,8 @@ export type ToolChoice = "auto" | "none" | "required" | { readonly name: string 
 export interface CanonicalRequest {
   readonly model: string;
   readonly system?: readonly ContentPart[];
+  // The system messages' own cache mark, kept like CanonicalMessage.cacheControl.
+  readonly systemCacheControl?: "ephemeral";
   readonly messages: readonly CanonicalMessage[];
   readonly tools?: readonly ToolDefinition[];
   readonly toolChoice?: ToolChoice;

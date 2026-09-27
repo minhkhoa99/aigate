@@ -1,12 +1,12 @@
 # Discovery coverage
 
-Entries: 327
+Entries: 328
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
 | routes | 166/166 |  |
 | pages | 6/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +14 |
-| providers | 21/124 | alicode, alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu … +95 |
+| providers | 22/124 | alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu, bazaarlink … +94 |
 | executors | 16/31 | devin-cli, gemini-cli, github, grok-cli, grok-web, iflow, mimo-free, opencode … +7 |
 | translators | 44/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js |
 | repos | 11/11 |  |
@@ -19,7 +19,7 @@ Entries: 327
 - connections: 62
 - identity: 11
 - media: 15
-- routing: 107
+- routing: 108
 - settings: 10
 - tooling: 45
 - transport: 14
@@ -28,8 +28,8 @@ Entries: 327
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 17
-- REFERENCE_BEHAVIOR: 279
-- SUSPECTED_BUG: 71
+- REFERENCE_BEHAVIOR: 280
+- SUSPECTED_BUG: 72
 
 ## Missing — pages
 
@@ -58,7 +58,6 @@ Entries: 327
 
 ## Missing — providers
 
-- alicode
 - alicode-intl
 - alims-intl
 - alitp-intl

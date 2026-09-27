@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  AnthropicAdapter, builtinRegistry, EngineError, OpenAIChatStreamEncoder, OpenAICompatibleAdapter, parseOpenAIChatRequest, toOpenAIChatCompletion,
+  AnthropicAdapter, builtinRegistry, createAdapter, EngineError, OpenAIChatStreamEncoder, OpenAICompatibleAdapter, parseOpenAIChatRequest, toOpenAIChatCompletion,
   toOpenAIError, UnsupportedFeatureError,
 } from "../dist/index.js";
 
@@ -267,10 +267,12 @@ test("an upstream stream relays to the client as OpenAI SSE, and a cut-off strea
 });
 
 // Cline, Kilo Code and OpenRouter-style clients mark cache breakpoints with cache_control on messages and text parts.
-test("cache_control on a message or text part becomes a CIP cache mark: Anthropic gets it, OpenAI-compatible does not", async () => {
+// As 9router (user decision 2026-09-27): a message's mark goes on the message to every OpenAI-compatible provider, a text
+// part's only with preserveCacheControl (the alicode family); Anthropic gets both on blocks.
+test("cache_control: message marks stay on the message, part marks only for preserveCacheControl, Anthropic on blocks", async () => {
   const mark = { type: "ephemeral" };
   const client = {
-    model: "claude-sonnet-4-5",
+    model: "m",
     max_tokens: 10,
     messages: [
       { role: "system", content: "rules", cache_control: mark },
@@ -282,33 +284,54 @@ test("cache_control on a message or text part becomes a CIP cache mark: Anthropi
     ],
   };
   const { request } = parseOpenAIChatRequest(client);
-  assert.deepEqual(request.system, [{ type: "text", text: "rules", cacheControl: "ephemeral" }], "a string content is marked");
-  assert.deepEqual(request.messages[0].content, [{ type: "text", text: "a" }, { type: "text", text: "b", cacheControl: "ephemeral" }], "a part keeps its own mark; ttl is dropped");
-  assert.deepEqual(request.messages[1].content, [{ type: "text", text: "c" }, { type: "text", text: "d", cacheControl: "ephemeral" }], "a message mark goes on its last text part");
-  assert.deepEqual(request.messages[2].content.map((p) => p.type), ["tool_call"], "no text part: nothing to mark");
-  assert.deepEqual(request.messages[3].content[0].content, [{ type: "text", text: "out", cacheControl: "ephemeral" }]);
-  assert.deepEqual(request.messages[4].content, [{ type: "text", text: "e" }]);
+  assert.deepEqual([request.system, request.systemCacheControl], [[{ type: "text", text: "rules" }], "ephemeral"]);
+  assert.deepEqual(request.messages[0], { role: "user", content: [{ type: "text", text: "a" }, { type: "text", text: "b", cacheControl: "ephemeral" }] }, "a part keeps its own mark; ttl is dropped");
+  assert.deepEqual(request.messages.map((m) => m.cacheControl), [undefined, "ephemeral", "ephemeral", "ephemeral", undefined]);
   for (const [bad, param] of [
     [{ ...client, messages: [{ role: "user", content: "x", cache_control: { type: "persistent" } }] }, "messages[0].cache_control.type"],
     [{ ...client, messages: [user([{ type: "text", text: "x", cache_control: "yes" }])] }, "messages[0].content[0].cache_control"],
   ]) assert.throws(() => parseOpenAIChatRequest(bad), invalidAt(param), param);
 
-  const sent = [];
-  const transport = { async send(req) {
-    sent.push(JSON.parse(req.body));
-    return { status: 200, headers: { "content-type": "application/json" }, body: streamOf(JSON.stringify({ id: "x", model: "m", choices: [{ message: { content: "ok" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1 } })) };
-  } };
-  await new OpenAICompatibleAdapter(openai, transport).execute(request, credential, ctx);
-  assert.ok(!JSON.stringify(sent[0]).includes("cache_control"), "an OpenAI-compatible upstream gets no cache_control");
+  const reply = (value) => ({ status: 200, headers: { "content-type": "application/json" }, body: streamOf(JSON.stringify(value)) });
+  const chat = { id: "x", model: "m", choices: [{ message: { content: "ok" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1 } };
+  const sendTo = async (provider) => {
+    const sent = [];
+    await createAdapter(provider, { async send(req) { sent.push(JSON.parse(req.body)); return reply(chat); } }).execute(request, credential, ctx);
+    return sent[0].messages;
+  };
+  const plain = await sendTo(openai);
+  assert.deepEqual(plain, [
+    { role: "system", content: "rules", cache_control: mark },
+    { role: "user", content: [{ type: "text", text: "a" }, { type: "text", text: "b" }] },
+    { role: "assistant", content: [{ type: "text", text: "c" }, { type: "text", text: "d" }], cache_control: mark },
+    { role: "assistant", content: null, tool_calls: [{ id: "t1", type: "function", function: { name: "f", arguments: "{}" } }], cache_control: mark },
+    { role: "tool", tool_call_id: "t1", content: "out", cache_control: mark },
+    { role: "user", content: "e" },
+  ], "every OpenAI-compatible provider: message marks kept, part marks dropped");
+  for (const id of ["alicode", "alicode-intl", "alims-intl", "alitp-intl"]) {
+    const kept = await sendTo(builtinRegistry.provider(id));
+    assert.deepEqual(kept[1].content, [{ type: "text", text: "a" }, { type: "text", text: "b", cache_control: mark }], `${id} keeps a part's mark`);
+    assert.deepEqual(kept[0], { role: "system", content: "rules", cache_control: mark }, `${id}: a message mark stays on the message`);
+  }
+  const lone = parseOpenAIChatRequest({ ...client, messages: [user([{ type: "text", text: "solo", cache_control: mark }])] }).request;
+  const loneSent = [];
+  await createAdapter(builtinRegistry.provider("alicode"), { async send(req) { loneSent.push(JSON.parse(req.body)); return reply(chat); } }).execute(lone, credential, ctx);
+  assert.deepEqual(loneSent[0].messages[0].content, [{ type: "text", text: "solo", cache_control: mark }], "a marked single part is not flattened to a string");
+  const said = parseOpenAIChatRequest({ ...client, messages: [user("q"), { role: "assistant", content: [{ type: "text", text: "said", cache_control: mark }] }, user("r")] }).request;
+  loneSent.length = 0;
+  await createAdapter(builtinRegistry.provider("alicode"), { async send(req) { loneSent.push(JSON.parse(req.body)); return reply(chat); } }).execute(said, credential, ctx);
+  assert.deepEqual(loneSent[0].messages[1].content, [{ type: "text", text: "said", cache_control: mark }], "an assistant part keeps its mark too");
 
   const anthropicSent = [];
   const anthropicTransport = { async send(req) {
     anthropicSent.push(JSON.parse(req.body));
-    return { status: 200, headers: { "content-type": "application/json" }, body: streamOf(JSON.stringify({ id: "msg", model: "m", content: [{ type: "text", text: "ok" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } })) };
+    return reply({ id: "msg", model: "m", content: [{ type: "text", text: "ok" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } });
   } };
   await new AnthropicAdapter(builtinRegistry.provider("anthropic"), anthropicTransport).execute(request, credential, ctx);
   const body = anthropicSent[0];
-  assert.deepEqual(body.system, [{ type: "text", text: "rules", cache_control: mark }]);
+  assert.deepEqual(body.system, [{ type: "text", text: "rules", cache_control: mark }], "a message mark goes on the last text block");
   assert.deepEqual(body.messages[0].content[1], { type: "text", text: "b", cache_control: mark });
-  assert.equal(JSON.stringify(body).split("cache_control").length - 1, 4, "system, the user part, the assistant text, the tool result");
+  assert.deepEqual(body.messages[1].content[1], { type: "text", text: "d", cache_control: mark });
+  assert.deepEqual(body.messages[2].content[0].content, [{ type: "text", text: "out", cache_control: mark }], "inside a tool result");
+  assert.equal(JSON.stringify(body).split("cache_control").length - 1, 4, "the tool-call-only turn has no text to mark");
 });

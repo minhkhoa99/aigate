@@ -95,8 +95,9 @@ export function mediaSource(url: string, param: string): MediaSource {
 }
 
 // cache_control ({ type: "ephemeral" }, as OpenRouter and Anthropic-minded clients send it) on a text part or a message:
-// a cache breakpoint, kept as CIP cacheControl. Anthropic providers receive it; for others it is a hint and is left out
-// (docs/contracts/protocol-openai.md). A ttl is not modelled and is dropped with it.
+// a cache breakpoint, kept as CIP cacheControl. As in 9router, OpenAI-compatible providers get a message's mark, and a
+// text part's only with the preserveCacheControl quirk (alicode family); Anthropic providers get both
+// (docs/contracts/protocol-openai.md). A ttl is not modelled and is dropped.
 function cacheMark(value: unknown, param: string): boolean {
   if (!present(value)) return false;
   if (object(value, param).type !== "ephemeral") throw invalid(`${param}.type`, "must be ephemeral");
@@ -108,12 +109,9 @@ function textPart(part: Json, param: string): ContentPart {
   return cacheMark(part.cache_control, `${param}.cache_control`) ? { type: "text", text, cacheControl: "ephemeral" } : { type: "text", text };
 }
 
-// A message-level mark is a breakpoint at the end of that message: its last text part carries it.
-function markLast(parts: ContentPart[], mark: boolean): ContentPart[] {
-  if (!mark) return parts;
-  const last = parts.findLastIndex((part) => part.type === "text");
-  return parts.map((part, i) => (i === last && part.type === "text" ? { ...part, cacheControl: "ephemeral" } : part));
-}
+// A mark on the whole message stays on the message (CanonicalMessage.cacheControl), as 9router forwards it.
+const messageMark = (message: Json, param: string): { cacheControl?: "ephemeral" } =>
+  (cacheMark(message.cache_control, `${param}.cache_control`) ? { cacheControl: "ephemeral" } : {});
 
 function textParts(value: unknown, param: string, role: string): ContentPart[] {
   if (typeof value === "string") return [{ type: "text", text: value }];
@@ -174,10 +172,11 @@ function toolCalls(value: unknown, param: string): ContentPart[] {
   });
 }
 
-function toMessages(value: unknown): { system: ContentPart[]; messages: CanonicalMessage[] } {
+function toMessages(value: unknown): { system: ContentPart[]; systemMarked: boolean; messages: CanonicalMessage[] } {
   const raw = array(value, "messages", MAX_MESSAGES);
   if (raw.length === 0) throw invalid("messages", "must not be empty");
   const system: ContentPart[] = [];
+  let systemMarked = false;
   const messages: CanonicalMessage[] = [];
   for (let i = 0; i < raw.length; i++) {
     const param = `messages[${i}]`;
@@ -189,7 +188,8 @@ function toMessages(value: unknown): { system: ContentPart[]; messages: Canonica
         onlyKeys(message, ["role", "content", "name", "cache_control"], param);
         // CIP has one system prompt in front; a later one has no position to keep.
         if (messages.length > 0) throw unsupported("a system message after the conversation started");
-        system.push(...markLast(textParts(message.content, `${param}.content`, "system"), cacheMark(message.cache_control, `${param}.cache_control`)));
+        system.push(...textParts(message.content, `${param}.content`, "system"));
+        systemMarked = cacheMark(message.cache_control, `${param}.cache_control`) || systemMarked;
         break;
       case "user": {
         onlyKeys(message, ["role", "content", "name", "cache_control"], param);
@@ -197,7 +197,7 @@ function toMessages(value: unknown): { system: ContentPart[]; messages: Canonica
         const parts = typeof content === "string"
           ? [{ type: "text" as const, text: content }]
           : array(content, `${param}.content`, MAX_PARTS).map((part, j) => userPart(part, `${param}.content[${j}]`));
-        messages.push({ role: "user", content: markLast(parts, cacheMark(message.cache_control, `${param}.cache_control`)) });
+        messages.push({ role: "user", content: parts, ...messageMark(message, param) });
         break;
       }
       case "assistant": {
@@ -210,21 +210,21 @@ function toMessages(value: unknown): { system: ContentPart[]; messages: Canonica
           ...(present(message.tool_calls) ? toolCalls(message.tool_calls, `${param}.tool_calls`) : []),
         ];
         if (parts.length === 0) throw invalid(param, "needs content or tool_calls");
-        messages.push({ role: "assistant", content: markLast(parts, cacheMark(message.cache_control, `${param}.cache_control`)) });
+        messages.push({ role: "assistant", content: parts, ...messageMark(message, param) });
         break;
       }
       case "tool": {
         onlyKeys(message, ["role", "content", "tool_call_id", "cache_control"], param);
         const toolCallId = string(message.tool_call_id, `${param}.tool_call_id`);
-        const content = markLast(textParts(message.content, `${param}.content`, "tool"), cacheMark(message.cache_control, `${param}.cache_control`));
-        messages.push({ role: "tool", content: [{ type: "tool_result", toolCallId, content }] });
+        const content = textParts(message.content, `${param}.content`, "tool");
+        messages.push({ role: "tool", content: [{ type: "tool_result", toolCallId, content }], ...messageMark(message, param) });
         break;
       }
       case "function": throw unsupported("the legacy function role (use tool)");
       default: throw invalid(`${param}.role`, "must be system, developer, user, assistant, or tool");
     }
   }
-  return { system, messages };
+  return { system, systemMarked, messages };
 }
 
 function toolName(value: unknown, param: string): string {
@@ -274,7 +274,7 @@ export function parseOpenAIChatRequest(body: unknown): OpenAIChatInput {
   const input = object(body, "body");
   const model = string(input.model, "model");
   if (!MODEL.test(model)) throw invalid("model", "must be 1 to 256 printable characters");
-  const { system, messages } = toMessages(input.messages);
+  const { system, systemMarked, messages } = toMessages(input.messages);
   // An omitted flag is non-streaming, as in the OpenAI API (routing.stream-mode-decision).
   const stream = optionalBoolean(input.stream, "stream") ?? false;
   const streamOptions = present(input.stream_options) ? object(input.stream_options, "stream_options") : {};
@@ -304,6 +304,7 @@ export function parseOpenAIChatRequest(body: unknown): OpenAIChatInput {
       messages,
       stream,
       ...(system.length > 0 ? { system } : {}),
+      ...(systemMarked ? { systemCacheControl: "ephemeral" as const } : {}),
       ...(present(input.tools) ? { tools: toTools(input.tools) } : {}),
       ...(present(input.tool_choice) ? { toolChoice: toToolChoice(input.tool_choice) } : {}),
       ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),

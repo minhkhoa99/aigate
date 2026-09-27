@@ -42,18 +42,24 @@ export function mediaUrl(source: MediaSource): string {
   return source.kind === "url" ? source.url : `data:${source.mediaType};base64,${source.data}`;
 }
 
-// A single text part goes as a plain string, which every compatible server accepts.
+// A single plain text part goes as a plain string, which every compatible server accepts.
 function compact(parts: readonly Json[]): string | readonly Json[] {
   const only = parts.length === 1 ? parts[0] : undefined;
-  return only?.type === "text" && typeof only.text === "string" ? only.text : parts;
+  return only?.type === "text" && typeof only.text === "string" && only.cache_control === undefined ? only.text : parts;
 }
 
-// Text is the only content a system prompt or tool result can carry here; cacheControl is a hint
-// OpenAI does not need (it caches prefixes itself), so it is the one field left out.
-function textParts(parts: readonly ContentPart[], where: string): Json[] {
+// 9router's filterToOpenAIFormat (kept by user decision 2026-09-27): a message's cache mark goes on the message for every
+// provider; a text part's only with the preserveCacheControl quirk (the alicode family).
+const EPHEMERAL = { type: "ephemeral" };
+const messageMark = (message: { cacheControl?: "ephemeral" }): Json => (message.cacheControl ? { cache_control: EPHEMERAL } : {});
+const textJson = (part: { text: string; cacheControl?: "ephemeral" }, keepCache: boolean): Json =>
+  ({ type: "text", text: part.text, ...(keepCache && part.cacheControl ? { cache_control: EPHEMERAL } : {}) });
+
+// Text is the only content a system prompt or tool result can carry here.
+function textParts(parts: readonly ContentPart[], where: string, keepCache: boolean): Json[] {
   return parts.map((part) => {
     if (part.type !== "text") throw unsupported(`${part.type} in ${where}`);
-    return { type: "text", text: part.text };
+    return textJson(part, keepCache);
   });
 }
 
@@ -75,13 +81,13 @@ export function userPart(part: ContentPart): Json {
 
 // Reasoning in the history goes back as reasoning_content, its signature as encrypted_content (9router's
 // translator.responses-client-request; only a Responses client sends reasoning history here).
-function assistantMessage(parts: readonly ContentPart[]): Json {
+function assistantMessage(parts: readonly ContentPart[], keepCache: boolean): Json {
   const texts: Json[] = [];
   const toolCalls: Json[] = [];
   let reasoning = "";
   let signature: string | undefined;
   for (const part of parts) {
-    if (part.type === "text") texts.push({ type: "text", text: part.text });
+    if (part.type === "text") texts.push(textJson(part, keepCache));
     else if (part.type === "tool_call") toolCalls.push({ id: part.id, type: "function", function: { name: part.name, arguments: part.arguments } });
     else if (part.type === "thinking" && !part.redacted) {
       reasoning += part.text;
@@ -97,9 +103,11 @@ function assistantMessage(parts: readonly ContentPart[]): Json {
   };
 }
 
-function toMessages(request: CanonicalRequest): Json[] {
+function toMessages(request: CanonicalRequest, keepCache: boolean): Json[] {
   const out: Json[] = [];
-  if (request.system && request.system.length > 0) out.push({ role: "system", content: compact(textParts(request.system, "the system prompt")) });
+  if (request.system && request.system.length > 0) {
+    out.push({ role: "system", content: compact(textParts(request.system, "the system prompt", keepCache)), ...messageMark({ cacheControl: request.systemCacheControl }) });
+  }
   for (const message of request.messages) {
     const rest: ContentPart[] = [];
     // A tool result becomes its own `tool` message, wherever the client put it.
@@ -109,11 +117,11 @@ function toMessages(request: CanonicalRequest): Json[] {
         continue;
       }
       if (part.isError) throw unsupported("a tool_result with isError");
-      out.push({ role: "tool", tool_call_id: part.toolCallId, content: compact(textParts(part.content, "a tool result")) });
+      out.push({ role: "tool", tool_call_id: part.toolCallId, content: compact(textParts(part.content, "a tool result", keepCache)), ...messageMark(message) });
     }
     if (rest.length === 0) continue;
-    if (message.role === "assistant") out.push(assistantMessage(rest));
-    else if (message.role === "user") out.push({ role: "user", content: compact(rest.map(userPart)) });
+    if (message.role === "assistant") out.push({ ...assistantMessage(rest, keepCache), ...messageMark(message) });
+    else if (message.role === "user") out.push({ role: "user", content: compact(rest.map((part) => (part.type === "text" ? textJson(part, keepCache) : userPart(part)))), ...messageMark(message) });
     else throw unsupported("content other than tool_result in a tool message");
   }
   return out;
@@ -192,7 +200,7 @@ function toBody(request: CanonicalRequest, stream: boolean, quirks: readonly str
   const extensions = request.vendorExtensions ?? {};
   for (const namespace of Object.keys(extensions)) if (namespace !== "openai") throw unsupported(`vendorExtensions.${namespace}`);
   // Extensions go first, so a modelled field always wins over a passthrough one.
-  const body: Json = { ...extensions.openai, model: request.model, messages: toMessages(request), stream };
+  const body: Json = { ...extensions.openai, model: request.model, messages: toMessages(request, quirks.includes("preserveCacheControl")), stream };
   if (stream) body.stream_options = { include_usage: true };
   if (request.tools && request.tools.length > 0) {
     body.tools = request.tools.map((tool) => ({

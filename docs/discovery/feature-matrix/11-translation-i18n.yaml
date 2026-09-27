@@ -134,6 +134,44 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
+- id: translator.openai-cache-control-filter
+  group: Translation / language functionality
+  feature: OpenAI pivot
+  subFeature: "filterToOpenAIFormat: what happens to a client's cache_control on the way to an OpenAI-format provider"
+  trigger: "Any request whose target format is OpenAI (every OpenAI-compatible provider, custom OpenAI-compatible nodes)"
+  input: "body.messages with cache_control on a message or on content blocks"
+  output: "The same messages, cleaned to OpenAI format"
+  businessRules:
+    - "A message object is spread as it is, so a message-level cache_control reaches every OpenAI-format provider"
+    - "stripBlock removes cache_control (and signature) from every content block unless the provider's registry entry has quirks.preserveCacheControl (alicode, alicode-intl, alims-intl, alitp-intl: DashScope explicit caching), which keeps the block's cache_control object as it is"
+    - "A Claude client's block marks never reach this filter: claude-to-openai.js does not copy them"
+  state:
+    reads: ["PROVIDERS registry quirks"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["translator.pivot-loss"]
+  providerInteraction: "The cleaned body is sent to the provider"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A strict OpenAI-compatible host may refuse the unknown message-level field"
+  evidence:
+    - { file: open-sse/translator/formats/openai.js, line: 10, note: "filterToOpenAIFormat(body, opts): preserveCacheControl option" }
+    - { file: open-sse/translator/formats/openai.js, line: 15, note: "stripBlock drops cache_control unless keepCache" }
+    - { file: open-sse/translator/index.js, line: 126, note: "called for every OpenAI target with PROVIDERS[provider].quirks.preserveCacheControl" }
+    - { file: open-sse/providers/registry/alicode.js, line: 19, note: "quirks: { preserveCacheControl: true }" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Message and block marks are treated alike: both kept, or both removed, for a given provider"
+    actual: "A message mark reaches every OpenAI-format provider while block marks are removed except for the alicode family"
+    impact: "Caching intent survives or vanishes depending on where the client put the mark; a strict host may reject the message-level field"
+
 - id: translator.pivot-loss
   group: Translation / language functionality
   feature: OpenAI pivot
