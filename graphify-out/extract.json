@@ -9736,7 +9736,7 @@
     },
     {
       "id": "sp_sp16b2",
-      "label": "SP16b2 — OAuth github (Copilot)",
+      "label": "SP16b2 - OAuth github (Copilot, 65 connectable)",
       "file_type": "document",
       "source_file": "docs/PROGRESS_HANDOFF.md",
       "source_location": null,
@@ -9744,7 +9744,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "status": "next",
+      "status": "done",
       "rationale": null
     },
     {
@@ -9796,7 +9796,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "status": "traced",
+      "status": "implemented",
       "rationale": null
     },
     {
@@ -9906,6 +9906,110 @@
     {
       "id": "sp16b_tests",
       "label": "SP16b tests (claude-codex.test.mjs, claude-codex-lane.test.mjs, 48 mutations)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": null
+    },
+    {
+      "id": "sp_sp16c",
+      "label": "SP16c - OAuth gemini-cli and antigravity",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "next",
+      "rationale": null
+    },
+    {
+      "id": "decision_sp16b2",
+      "label": "SP16b2 user decision (do not ask, port 9router as is)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": "User 2026-09-27: do not ask about suspected bugs, port 9router's behavior; label them in the matrix and contract."
+    },
+    {
+      "id": "github_oauth_flow",
+      "label": "github device-code sign-in, Copilot token exchange and refresh",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": null
+    },
+    {
+      "id": "github_adapter",
+      "label": "GithubAdapter (Copilot /chat/completions, /responses, /v1/messages)",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": null
+    },
+    {
+      "id": "collect_module",
+      "label": "adapters/collect.ts (stream collected into one response)",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": null
+    },
+    {
+      "id": "copilot_chat_body",
+      "label": "copilotChatBody (Copilot part and parameter rules)",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": null
+    },
+    {
+      "id": "api_ui_map_row_sp16b2",
+      "label": "API_UI_MAP SP16b2 row (device sign-in slow_down)",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": null
+    },
+    {
+      "id": "sp16b2_tests",
+      "label": "SP16b2 tests (github-copilot engine tests, github lane test)",
       "file_type": "document",
       "source_file": "docs/PROGRESS_HANDOFF.md",
       "source_location": null,
@@ -31885,6 +31989,216 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1,
       "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16b2",
+      "target": "sp_sp16c",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16b2",
+      "target": "oauth_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16b2",
+      "target": "decision_sp16b2",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16b2",
+      "target": "sp16b2_tests",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16b2",
+      "target": "api_ui_map_row_sp16b2",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp16b2",
+      "target": "02_providers_auth_provider_github_copilot_oauth",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "oauth_contract",
+      "target": "github_oauth_flow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "oauth_contract",
+      "target": "github_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "github_oauth_flow",
+      "target": "engine_oauth_module",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "github_oauth_flow",
+      "target": "02_providers_auth_provider_github_copilot_oauth",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "github_adapter",
+      "target": "02_providers_auth_provider_github_copilot_oauth",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "github_adapter",
+      "target": "collect_module",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "github_adapter",
+      "target": "copilot_chat_body",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "github_adapter",
+      "target": "claude_code_module",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "token_refresher",
+      "target": "github_oauth_flow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "oauth_controller",
+      "target": "github_oauth_flow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "screen_connections_signin",
+      "target": "github_oauth_flow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_doc",
+      "target": "api_ui_map_row_sp16b2",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp16b2",
+      "target": "screen_connections_signin",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp16b2_tests",
+      "target": "github_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp16b2_tests",
+      "target": "github_oauth_flow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
       "source_location": null,
       "weight": 1
     }
