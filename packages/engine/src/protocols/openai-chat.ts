@@ -94,13 +94,34 @@ export function mediaSource(url: string, param: string): MediaSource {
   throw invalid(param, "must be an http(s) URL or a base64 data: URL");
 }
 
+// cache_control ({ type: "ephemeral" }, as OpenRouter and Anthropic-minded clients send it) on a text part or a message:
+// a cache breakpoint, kept as CIP cacheControl. Anthropic providers receive it; for others it is a hint and is left out
+// (docs/contracts/protocol-openai.md). A ttl is not modelled and is dropped with it.
+function cacheMark(value: unknown, param: string): boolean {
+  if (!present(value)) return false;
+  if (object(value, param).type !== "ephemeral") throw invalid(`${param}.type`, "must be ephemeral");
+  return true;
+}
+
+function textPart(part: Json, param: string): ContentPart {
+  const text = string(part.text, `${param}.text`);
+  return cacheMark(part.cache_control, `${param}.cache_control`) ? { type: "text", text, cacheControl: "ephemeral" } : { type: "text", text };
+}
+
+// A message-level mark is a breakpoint at the end of that message: its last text part carries it.
+function markLast(parts: ContentPart[], mark: boolean): ContentPart[] {
+  if (!mark) return parts;
+  const last = parts.findLastIndex((part) => part.type === "text");
+  return parts.map((part, i) => (i === last && part.type === "text" ? { ...part, cacheControl: "ephemeral" } : part));
+}
+
 function textParts(value: unknown, param: string, role: string): ContentPart[] {
   if (typeof value === "string") return [{ type: "text", text: value }];
   return array(value, param, MAX_PARTS).map((entry, i) => {
     const part = object(entry, `${param}[${i}]`);
     if (part.type !== "text") throw unknownType(part.type, `${param}[${i}]`, `parts in ${role} messages`);
-    onlyKeys(part, ["type", "text"], `${param}[${i}]`);
-    return { type: "text", text: string(part.text, `${param}[${i}].text`) };
+    onlyKeys(part, ["type", "text", "cache_control"], `${param}[${i}]`);
+    return textPart(part, `${param}[${i}]`);
   });
 }
 
@@ -108,8 +129,8 @@ function userPart(entry: unknown, param: string): ContentPart {
   const part = object(entry, param);
   switch (part.type) {
     case "text":
-      onlyKeys(part, ["type", "text"], param);
-      return { type: "text", text: string(part.text, `${param}.text`) };
+      onlyKeys(part, ["type", "text", "cache_control"], param);
+      return textPart(part, param);
     case "image_url": {
       onlyKeys(part, ["type", "image_url"], param);
       const image = object(part.image_url, `${param}.image_url`);
@@ -165,22 +186,22 @@ function toMessages(value: unknown): { system: ContentPart[]; messages: Canonica
     switch (message.role) {
       case "system":
       case "developer":
-        onlyKeys(message, ["role", "content", "name"], param);
+        onlyKeys(message, ["role", "content", "name", "cache_control"], param);
         // CIP has one system prompt in front; a later one has no position to keep.
         if (messages.length > 0) throw unsupported("a system message after the conversation started");
-        system.push(...textParts(message.content, `${param}.content`, "system"));
+        system.push(...markLast(textParts(message.content, `${param}.content`, "system"), cacheMark(message.cache_control, `${param}.cache_control`)));
         break;
       case "user": {
-        onlyKeys(message, ["role", "content", "name"], param);
+        onlyKeys(message, ["role", "content", "name", "cache_control"], param);
         const content = message.content;
         const parts = typeof content === "string"
           ? [{ type: "text" as const, text: content }]
           : array(content, `${param}.content`, MAX_PARTS).map((part, j) => userPart(part, `${param}.content[${j}]`));
-        messages.push({ role: "user", content: parts });
+        messages.push({ role: "user", content: markLast(parts, cacheMark(message.cache_control, `${param}.cache_control`)) });
         break;
       }
       case "assistant": {
-        onlyKeys(message, ["role", "content", "tool_calls", "refusal", "name", "audio", "function_call"], param);
+        onlyKeys(message, ["role", "content", "tool_calls", "refusal", "name", "audio", "function_call", "cache_control"], param);
         if (present(message.refusal)) throw unsupported("an assistant refusal");
         if (present(message.audio)) throw unsupported("assistant audio");
         if (present(message.function_call)) throw unsupported("the legacy function_call field (use tool_calls)");
@@ -189,13 +210,14 @@ function toMessages(value: unknown): { system: ContentPart[]; messages: Canonica
           ...(present(message.tool_calls) ? toolCalls(message.tool_calls, `${param}.tool_calls`) : []),
         ];
         if (parts.length === 0) throw invalid(param, "needs content or tool_calls");
-        messages.push({ role: "assistant", content: parts });
+        messages.push({ role: "assistant", content: markLast(parts, cacheMark(message.cache_control, `${param}.cache_control`)) });
         break;
       }
       case "tool": {
-        onlyKeys(message, ["role", "content", "tool_call_id"], param);
+        onlyKeys(message, ["role", "content", "tool_call_id", "cache_control"], param);
         const toolCallId = string(message.tool_call_id, `${param}.tool_call_id`);
-        messages.push({ role: "tool", content: [{ type: "tool_result", toolCallId, content: textParts(message.content, `${param}.content`, "tool") }] });
+        const content = markLast(textParts(message.content, `${param}.content`, "tool"), cacheMark(message.cache_control, `${param}.cache_control`));
+        messages.push({ role: "tool", content: [{ type: "tool_result", toolCallId, content }] });
         break;
       }
       case "function": throw unsupported("the legacy function role (use tool)");

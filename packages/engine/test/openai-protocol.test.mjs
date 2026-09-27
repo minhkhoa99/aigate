@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  builtinRegistry, EngineError, OpenAIChatStreamEncoder, OpenAICompatibleAdapter, parseOpenAIChatRequest, toOpenAIChatCompletion,
+  AnthropicAdapter, builtinRegistry, EngineError, OpenAIChatStreamEncoder, OpenAICompatibleAdapter, parseOpenAIChatRequest, toOpenAIChatCompletion,
   toOpenAIError, UnsupportedFeatureError,
 } from "../dist/index.js";
 
@@ -264,4 +264,51 @@ test("an upstream stream relays to the client as OpenAI SSE, and a cut-off strea
   const cut = await relay(upstream([{ id: "c", model: "gpt-4.1", choices: [{ delta: { content: "A" } }] }]));
   assert.equal(cut.at(-1).error.code, "provider_unavailable");
   assert.ok(!cut.includes("[DONE]"));
+});
+
+// Cline, Kilo Code and OpenRouter-style clients mark cache breakpoints with cache_control on messages and text parts.
+test("cache_control on a message or text part becomes a CIP cache mark: Anthropic gets it, OpenAI-compatible does not", async () => {
+  const mark = { type: "ephemeral" };
+  const client = {
+    model: "claude-sonnet-4-5",
+    max_tokens: 10,
+    messages: [
+      { role: "system", content: "rules", cache_control: mark },
+      user([{ type: "text", text: "a" }, { type: "text", text: "b", cache_control: { ...mark, ttl: "1h" } }]),
+      { role: "assistant", content: [{ type: "text", text: "c" }, { type: "text", text: "d" }], cache_control: mark },
+      { role: "assistant", content: null, tool_calls: [{ id: "t1", type: "function", function: { name: "f", arguments: "{}" } }], cache_control: mark },
+      { role: "tool", tool_call_id: "t1", content: "out", cache_control: mark },
+      user("e"),
+    ],
+  };
+  const { request } = parseOpenAIChatRequest(client);
+  assert.deepEqual(request.system, [{ type: "text", text: "rules", cacheControl: "ephemeral" }], "a string content is marked");
+  assert.deepEqual(request.messages[0].content, [{ type: "text", text: "a" }, { type: "text", text: "b", cacheControl: "ephemeral" }], "a part keeps its own mark; ttl is dropped");
+  assert.deepEqual(request.messages[1].content, [{ type: "text", text: "c" }, { type: "text", text: "d", cacheControl: "ephemeral" }], "a message mark goes on its last text part");
+  assert.deepEqual(request.messages[2].content.map((p) => p.type), ["tool_call"], "no text part: nothing to mark");
+  assert.deepEqual(request.messages[3].content[0].content, [{ type: "text", text: "out", cacheControl: "ephemeral" }]);
+  assert.deepEqual(request.messages[4].content, [{ type: "text", text: "e" }]);
+  for (const [bad, param] of [
+    [{ ...client, messages: [{ role: "user", content: "x", cache_control: { type: "persistent" } }] }, "messages[0].cache_control.type"],
+    [{ ...client, messages: [user([{ type: "text", text: "x", cache_control: "yes" }])] }, "messages[0].content[0].cache_control"],
+  ]) assert.throws(() => parseOpenAIChatRequest(bad), invalidAt(param), param);
+
+  const sent = [];
+  const transport = { async send(req) {
+    sent.push(JSON.parse(req.body));
+    return { status: 200, headers: { "content-type": "application/json" }, body: streamOf(JSON.stringify({ id: "x", model: "m", choices: [{ message: { content: "ok" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1 } })) };
+  } };
+  await new OpenAICompatibleAdapter(openai, transport).execute(request, credential, ctx);
+  assert.ok(!JSON.stringify(sent[0]).includes("cache_control"), "an OpenAI-compatible upstream gets no cache_control");
+
+  const anthropicSent = [];
+  const anthropicTransport = { async send(req) {
+    anthropicSent.push(JSON.parse(req.body));
+    return { status: 200, headers: { "content-type": "application/json" }, body: streamOf(JSON.stringify({ id: "msg", model: "m", content: [{ type: "text", text: "ok" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } })) };
+  } };
+  await new AnthropicAdapter(builtinRegistry.provider("anthropic"), anthropicTransport).execute(request, credential, ctx);
+  const body = anthropicSent[0];
+  assert.deepEqual(body.system, [{ type: "text", text: "rules", cache_control: mark }]);
+  assert.deepEqual(body.messages[0].content[1], { type: "text", text: "b", cache_control: mark });
+  assert.equal(JSON.stringify(body).split("cache_control").length - 1, 4, "system, the user part, the assistant text, the tool result");
 });
