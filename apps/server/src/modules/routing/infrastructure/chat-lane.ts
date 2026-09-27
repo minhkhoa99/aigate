@@ -5,8 +5,9 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import {
   anthropicClientGetsMessage, anthropicRequestFor, AnthropicStreamEncoder, assertModelSupports, builtinRegistry, createAdapter, EngineError,
-  estimateAnthropicInputTokens, OpenAIChatStreamEncoder, parseAnthropicMessagesRequest, parseOpenAIChatRequest, toAnthropicMessage, toOpenAIChatCompletion,
-  toOpenAIError, UnsupportedFeatureError, withConnection, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential, type ExecCtx,
+  estimateAnthropicInputTokens, OpenAIChatStreamEncoder, parseAnthropicMessagesRequest, parseOpenAIChatRequest, parseOpenAIResponsesRequest,
+  responsesClientGetsObject, responsesRequestFor, ResponsesStreamEncoder, toAnthropicMessage, toOpenAIChatCompletion, toOpenAIError, toResponsesObject,
+  UnsupportedFeatureError, withConnection, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential, type ExecCtx,
   type HttpTransportPort, type ProviderDescriptor, type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
@@ -132,6 +133,25 @@ const ANTHROPIC_MESSAGES: ClientProtocol = {
   },
 };
 
+// docs/contracts/protocol-responses.md
+const OPENAI_RESPONSES: ClientProtocol = {
+  parse(body, accept) {
+    const parsed = parseOpenAIResponsesRequest(body, accept);
+    return {
+      request: parsed.request,
+      prepare: (upstream, provider) => responsesRequestFor(parsed, upstream, provider),
+      respond: (response, provider, ids) => (responsesClientGetsObject(provider) ? toResponsesObject(response, ids, parsed.customTools) : toOpenAIChatCompletion(response, ids)),
+      encoder: (provider, ids) => new ResponsesStreamEncoder({ ...ids, customTools: parsed.customTools, deferCompleted: provider.protocol === "openai-compatible" }),
+    };
+  },
+};
+
+// routing.responses-compact-lane: the same lane with _compact set in the body, which only a Responses provider or a
+// chat body carries upstream (9router, kept).
+const OPENAI_RESPONSES_COMPACT: ClientProtocol = {
+  parse: (body, accept) => OPENAI_RESPONSES.parse(typeof body === "object" && body !== null && !Array.isArray(body) ? { ...body, _compact: true } : body, accept),
+};
+
 @Injectable()
 export class ChatLane {
   private readonly logger = new Logger("ChatLane");
@@ -159,6 +179,15 @@ export class ChatLane {
   // POST /v1/messages: Anthropic clients (Claude Code, the Anthropic SDK).
   messages(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     return this.serve(request, reply, ANTHROPIC_MESSAGES);
+  }
+
+  // POST /v1/responses (and /responses, /codex/*): Responses clients (Codex CLI, the OpenAI SDK).
+  responses(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    return this.serve(request, reply, OPENAI_RESPONSES);
+  }
+
+  responsesCompact(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    return this.serve(request, reply, OPENAI_RESPONSES_COMPACT);
   }
 
   // POST /v1/messages/count_tokens (routing.count-tokens-estimate): a local estimate, no provider is called.

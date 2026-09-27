@@ -170,7 +170,7 @@ function toToolChoice(value: unknown): { choice?: ToolChoice; serialTools: boole
 }
 
 // An omitted stream streams, unless the client only accepts JSON (9router chatCore, kept).
-function streams(flag: unknown, accept: string | undefined): boolean {
+export function streamRequested(flag: unknown, accept: string | undefined): boolean {
   const jsonOnly = accept !== undefined && accept.includes("application/json") && !accept.includes("text/event-stream");
   return flag === true || (flag !== false && !jsonOnly);
 }
@@ -221,7 +221,7 @@ export function parseAnthropicMessagesRequest(input: unknown, accept?: string): 
   const request: CanonicalRequest = {
     model,
     messages: fillMissingResults(messages),
-    stream: streams(input.stream, accept),
+    stream: streamRequested(input.stream, accept),
     ...(system.length > 0 ? { system } : {}),
     ...(tools.length > 0 ? { tools } : {}),
     ...(choice ? { toolChoice: choice } : {}),

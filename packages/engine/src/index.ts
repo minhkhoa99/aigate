@@ -17,6 +17,7 @@ export { CommandCodeAdapter } from "./adapters/commandcode.js";
 export { createAdapter } from "./adapters/index.js";
 export * from "./protocols/openai-chat.js";
 export * from "./protocols/anthropic-messages.js";
+export * from "./protocols/openai-responses.js";
 export type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, HttpResponse, HttpTransportPort, ListedModel } from "./ports.js";
 export { ANTHROPIC_VERSION, builtinRegistry, toDescriptor, unsupportedReason } from "./builtin-registry.js";
 export * from "./catalog/schema.js";

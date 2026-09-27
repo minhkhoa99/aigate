@@ -1354,7 +1354,7 @@
     - { file: open-sse/executors/codex.js, line: 224, note: "buildUrl reads this._isCompact" }
     - { file: open-sse/executors/base.js, line: 128, note: "buildUrl is called before transformRequest (line 129)" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "A compact request goes to .../responses/compact and a normal request to .../responses"

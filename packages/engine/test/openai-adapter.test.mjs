@@ -108,6 +108,15 @@ test("catalog headers go on every request, but never replace the key; a raw sche
   assert.deepEqual([transport.calls[1].headers["x-api-key"], transport.calls[1].headers["x-title"], transport.calls[1].headers.authorization], [SECRET, "AIGate", undefined]);
 });
 
+test("reasoning history goes back as reasoning_content, its signature as encrypted_content (a Responses client's pivot)", async () => {
+  const transport = fakeTransport(json(200, ok), json(200, ok));
+  const turn = (content) => ({ ...hello, messages: [{ role: "user", content: [{ type: "text", text: "q" }] }, { role: "assistant", content }] });
+  await new OpenAICompatibleAdapter(openai, transport).execute(turn([{ type: "thinking", text: "a" }, { type: "thinking", text: "b", signature: "S" }, { type: "text", text: "ok" }]), credential, ctx());
+  assert.deepEqual(JSON.parse(transport.calls[0].body).messages[1], { role: "assistant", content: "ok", reasoning_content: "ab", encrypted_content: "S" });
+  await new OpenAICompatibleAdapter(openai, transport).execute(turn([{ type: "thinking", text: "c" }]), credential, ctx());
+  assert.deepEqual(JSON.parse(transport.calls[1].body).messages[1], { role: "assistant", content: null, reasoning_content: "c" });
+});
+
 test("a feature OpenAI cannot carry is refused before any I/O", async () => {
   const user = (part) => ({ ...hello, messages: [{ role: "user", content: [part] }] });
   const cases = [
@@ -117,7 +126,7 @@ test("a feature OpenAI cannot carry is refused before any I/O", async () => {
     user({ type: "file", mediaType: "application/pdf", source: { kind: "url", url: "https://x/f.pdf" } }),
     user({ type: "tool_result", toolCallId: "c", content: [{ type: "text", text: "boom" }], isError: true }),
     user({ type: "tool_result", toolCallId: "c", content: [{ type: "image", source: { kind: "url", url: "https://x/i.png" } }] }),
-    { ...hello, messages: [{ role: "assistant", content: [{ type: "thinking", text: "hmm" }] }] },
+    { ...hello, messages: [{ role: "assistant", content: [{ type: "thinking", text: "hmm", redacted: true }] }] },
     { ...hello, system: [{ type: "image", source: { kind: "url", url: "https://x/i.png" } }] },
     { ...hello, reasoning: { budgetTokens: 1000 } },
     { ...hello, vendorExtensions: { anthropic: { top_k: 5 } } },

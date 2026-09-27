@@ -74,8 +74,10 @@ function toTools(tools: readonly ToolDefinition[]): Json[] {
 }
 
 function toBody(request: CanonicalRequest, stream: boolean): Json {
-  if (request.reasoning?.budgetTokens !== undefined) throw unsupported("reasoning.budgetTokens");
   const extensions = request.vendorExtensions ?? {};
+  // translator.responses-client-request: a Responses client's body reaches a Responses provider unchanged (9router).
+  if (extensions.responses) return { ...extensions.responses, model: request.model, stream };
+  if (request.reasoning?.budgetTokens !== undefined) throw unsupported("reasoning.budgetTokens");
   for (const namespace of Object.keys(extensions)) if (namespace !== "openai") throw unsupported(`vendorExtensions.${namespace}`);
   const openai = extensions.openai ?? {};
   // CIP keeps the leading system messages as one prompt, so all of them become instructions (9router keeps the first).

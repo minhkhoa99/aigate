@@ -15,5 +15,10 @@ export function registerV1Routes(fastify: FastifyInstance, lane: ChatLane): void
   // docs/contracts/protocol-anthropic.md: Anthropic clients (Claude Code, the Anthropic SDK).
   fastify.post("/v1/messages", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.messages(request, reply));
   fastify.post("/v1/messages/count_tokens", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.countTokens(request, reply));
+  // docs/contracts/protocol-responses.md: Responses clients; /responses and /codex/* are 9router's aliases (endpoint.rewrite-lanes).
+  for (const path of ["/v1/responses", "/responses", "/codex", "/codex/*"]) {
+    fastify.post(path, { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.responses(request, reply));
+  }
+  fastify.post("/v1/responses/compact", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.responsesCompact(request, reply));
   fastify.get("/v1/models", common, (_request, reply) => lane.models(reply));
 }

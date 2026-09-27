@@ -82,7 +82,7 @@ function unknownType(type: unknown, param: string, what: string): Error {
 // ---- inbound ----
 
 // Split at the first comma; the payload itself is never scanned.
-function mediaSource(url: string, param: string): MediaSource {
+export function mediaSource(url: string, param: string): MediaSource {
   if (url.startsWith("data:")) {
     const comma = url.indexOf(",");
     const header = comma > 0 && comma <= MAX_DATA_URL_HEADER ? url.slice(5, comma) : "";

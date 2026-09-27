@@ -73,15 +73,28 @@ export function userPart(part: ContentPart): Json {
   }
 }
 
+// Reasoning in the history goes back as reasoning_content, its signature as encrypted_content (9router's
+// translator.responses-client-request; only a Responses client sends reasoning history here).
 function assistantMessage(parts: readonly ContentPart[]): Json {
   const texts: Json[] = [];
   const toolCalls: Json[] = [];
+  let reasoning = "";
+  let signature: string | undefined;
   for (const part of parts) {
     if (part.type === "text") texts.push({ type: "text", text: part.text });
     else if (part.type === "tool_call") toolCalls.push({ id: part.id, type: "function", function: { name: part.name, arguments: part.arguments } });
-    else throw unsupported(`${part.type} in an assistant message`);
+    else if (part.type === "thinking" && !part.redacted) {
+      reasoning += part.text;
+      signature = part.signature ?? signature;
+    } else throw unsupported(`${part.type === "thinking" ? "redacted thinking" : part.type} in an assistant message`);
   }
-  return { role: "assistant", content: texts.length > 0 ? compact(texts) : null, ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}) };
+  return {
+    role: "assistant",
+    content: texts.length > 0 ? compact(texts) : null,
+    ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+    ...(reasoning ? { reasoning_content: reasoning } : {}),
+    ...(signature ? { encrypted_content: signature } : {}),
+  };
 }
 
 function toMessages(request: CanonicalRequest): Json[] {
