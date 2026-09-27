@@ -58,6 +58,7 @@ Nguồn: `docs/superpowers/specs/2026-09-22-aigate-design.md` (spec — thắng 
 | **Connections: Host field and optional key for Ollama Local; row shows host, no key, Edit** | — | — | — | — | — | — |
 | **Connections: sign-in in Add connection (popup, paste, device code), Signed-in rows, Sign in again; /callback relay** | — | — | — | — | — | — |
 | **Console — /traffic/console (dev only)** | U11 | tooling | console_log | color_tokens, type_scale | — | console_visibility |
+| **CustomProviderDetail page** | — | — | — | — | — | — |
 | **/providers/new → CustomProviderForm (create; ?id= edit); save → Add connection modal preselected** | — | — | — | — | — | — |
 | **/providers → Custom providers section (features/providers/custom.tsx): Connect, Edit, Delete** | — | — | — | — | — | — |
 | **Relay deploy wizard (3 steps)** | U9 | transport | proxy_pools | secret_field, state_error | — | happy_path_only, showcase_screens |
@@ -73,6 +74,7 @@ Nguồn: `docs/superpowers/specs/2026-09-22-aigate-design.md` (spec — thắng 
 | **Onboarding — /welcome** | U2 | identity, connections, apikeys | — | state_loading | authflow | sidebar_drift |
 | **Overview — /** | U8 | usage, connections, catalog | quota_tracker | metric_card, health_dot, copy_field, state_empty | — | sidebar_drift, happy_path_only, console_visibility |
 | **Provider detail (/providers/:id)** | U4 | catalog, connections | model_registry, model_mapping | status_pill | llm_providers | — |
+| **Models panel (models.tsx): Use as, Copy, Test, Import dialog** | — | — | — | — | — | — |
 | **Proxy Pools — /network/proxy-pools** | U9 | transport | proxy_pools | warning_banner, status_pill | — | happy_path_only |
 | **Quota — /providers/quota** | U7 | usage | quota_tracker | color_tokens | overview | happy_path_only |
 | **Request detail (/traffic/requests/:id)** | U7 | usage | — | copy_field, no_credential_rule | — | credential_scan_pass |

@@ -159,6 +159,13 @@
       "output_tokens": 0,
       "files": 4,
       "mode": "SP16 chunk 25: hand-authored, no LLM extraction"
+    },
+    {
+      "date": "2026-09-27T10:46:37.745171+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "SP16a chunk 26: model import, custom models, model test"
     }
   ],
   "total_input_tokens": 574916,
