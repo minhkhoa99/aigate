@@ -4,12 +4,15 @@ import { AnthropicAdapter } from "./anthropic.js";
 import { CommandCodeAdapter } from "./commandcode.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
 import { GeminiAdapter } from "./gemini.js";
+import { GithubAdapter } from "./github.js";
 import { OllamaAdapter } from "./ollama.js";
 import { OpenAIResponsesAdapter } from "./openai-responses.js";
 import { VertexAdapter, VertexPartnerAdapter } from "./vertex.js";
 
 // Adapters are chosen by protocol family, never per vendor (spec §4.2).
 export function createAdapter(provider: ProviderDescriptor, transport: HttpTransportPort): AIProviderPort {
+  // provider.github-copilot-oauth: Copilot routes each model to one of three families (9router GithubExecutor).
+  if (provider.quirks?.includes("copilot")) return new GithubAdapter(provider, transport);
   switch (provider.protocol) {
     case "anthropic": return new AnthropicAdapter(provider, transport);
     case "openai-responses": return new OpenAIResponsesAdapter(provider, transport);

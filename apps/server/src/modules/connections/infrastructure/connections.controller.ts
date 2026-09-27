@@ -3,7 +3,8 @@ import {
   BadRequestException, Body, ConflictException, Controller, Delete, Get, Header, HttpCode, HttpException, HttpStatus, Inject, NotFoundException, Param, Patch, Post,
 } from "@nestjs/common";
 import {
-  builtinRegistry, CATALOG, createAdapter, EngineError, parseGoogleCredential, withConnection, type AIProviderPort, type HttpTransportPort, type ProviderDescriptor,
+  builtinRegistry, CATALOG, createAdapter, EngineError, OAUTH_PROVIDERS, parseGoogleCredential, withConnection, type AIProviderPort, type CredentialStatus,
+  type HttpTransportPort, type OAuthIO, type ProviderDescriptor,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
@@ -156,7 +157,11 @@ export class ConnectionsController {
   @Header("Cache-Control", "no-store")
   async test(@Param("id") id: string): Promise<Named> {
     const { stored, provider, fresh } = await this.credential(id);
-    const outcome = provider.testByExpiry ? this.expiryTest(provider, stored, fresh) : await runTest(withConnection(provider, fresh), this.transport, fresh.apiKey);
+    const flowTest = OAUTH_PROVIDERS[provider.id]?.test;
+    const refreshToken = fresh.oauth?.refreshToken;
+    const outcome = provider.testByExpiry ? this.expiryTest(provider, stored, fresh)
+      : flowTest && refreshToken ? await this.flowTest((io) => flowTest(refreshToken, io))
+      : await runTest(withConnection(provider, fresh), this.transport, fresh.apiKey);
     // After a refresh the sealed token changed, so the result is recorded against the new one.
     const sealed = fresh === stored ? stored.sealed : (await this.connections.readKey(id))?.sealed ?? stored.sealed;
     const view = await this.connections.recordTest(id, sealed, outcome);
@@ -181,6 +186,18 @@ export class ConnectionsController {
       throw new HttpException({ code: "MODELS_FETCH_FAILED", message: typeof status === "number" ? `Failed to fetch models: ${status}` : "Failed to fetch models" }, HttpStatus.BAD_GATEWAY);
     }
     return { provider: provider.id, connectionId: id, models: listed.map((m) => ({ id: m.id, inCatalog: builtinRegistry.model(provider.id, m.id) !== undefined })) };
+  }
+
+  // provider.github-copilot-oauth (kept from 9router): the provider's own test (github: GET /user with the GitHub token).
+  private async flowTest(test: (io: OAuthIO) => Promise<CredentialStatus>): Promise<TestOutcome> {
+    try {
+      const status = await test({ transport: this.transport, ctx: { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID() } });
+      if (status.valid) return { testStatus: "active", lastError: null, lastErrorCode: null };
+      return { testStatus: "invalid", lastError: status.message, lastErrorCode: status.code };
+    } catch (error) {
+      if (error instanceof EngineError) return { testStatus: "unreachable", lastError: error.message, lastErrorCode: error.code };
+      throw error;
+    }
   }
 
   // provider.claude-oauth (kept from 9router): no request, only the expiry. A token due for refresh is valid when the

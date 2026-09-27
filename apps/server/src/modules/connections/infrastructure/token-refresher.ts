@@ -98,7 +98,9 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
   // One connection at a time; the query is bounded to 100 rows.
   private async background(): Promise<void> {
     try {
-      for (const row of await this.connections.oauthExpiring(new Date(Date.now() + BACKGROUND_LEAD_MS))) {
+      // provider.github-copilot-oauth: a provider that opts out (github's short Copilot token) is left to the other refreshes.
+      const rows = (await this.connections.oauthExpiring(new Date(Date.now() + BACKGROUND_LEAD_MS))).filter((row) => OAUTH_PROVIDERS[row.provider]?.background !== false);
+      for (const row of rows) {
         await this.locked(row.id, row.provider, row.refreshToken);
       }
     } catch (error) {

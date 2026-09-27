@@ -5,7 +5,7 @@ import { isRecord, parseJson, record, text, type Json } from "../json.js";
 import type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, ListedModel } from "../ports.js";
 import { MODEL_ID } from "../registry.js";
 import { readSseData } from "../sse.js";
-import { claudeCodeBody } from "./claude-code.js";
+import { claudeCodeBody, copilotMessagesBody } from "./claude-code.js";
 import { count, HttpProviderAdapter, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
 
 // AIProviderPort for the Anthropic Messages family (docs/contracts/provider-anthropic.md).
@@ -408,8 +408,11 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
   private async chat(request: CanonicalRequest, credential: Credential, stream: boolean): Promise<{ http: HttpRequest; names: ReadonlyMap<string, string> }> {
     const timeoutMs = stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS;
     const body = this.body(request, stream);
+    const ceiling = this.known.get(request.model)?.maxOutputTokens ?? null;
+    // provider.github-copilot-oauth: Copilot's /v1/messages gets 9router's preparation for a provider that is not claude.
+    if (this.provider.quirks?.includes("copilotMessages")) return { http: this.post(copilotMessagesBody(body, ceiling), credential, timeoutMs, stream), names: NO_NAMES };
     if (!this.claudeCode) return { http: this.post(body, credential, timeoutMs, stream), names: NO_NAMES };
-    const prepared = await claudeCodeBody(body, credential.apiKey, credential.sessionId, this.known.get(request.model)?.maxOutputTokens ?? null);
+    const prepared = await claudeCodeBody(body, credential.apiKey, credential.sessionId, ceiling);
     return { http: this.post(prepared.body, credential, timeoutMs, stream), names: prepared.names };
   }
 

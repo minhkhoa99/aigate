@@ -75,7 +75,7 @@ function fixToolUseOrdering(messages: readonly Json[]): Json[] {
   return merged;
 }
 
-function prepareMessages(raw: readonly Json[], thinkingOn: boolean): Json[] {
+function prepareMessages(raw: readonly Json[], thinkingOn: boolean, claude: boolean): Json[] {
   const kept = raw.flatMap((message, i) => {
     const content = list(message.content).map((block) => withoutCache(record(block)));
     const finalAssistant = i === raw.length - 1 && message.role === "assistant";
@@ -94,6 +94,11 @@ function prepareMessages(raw: readonly Json[], thinkingOn: boolean): Json[] {
       if (last >= 0) content[last] = { ...content[last], cache_control: EPHEMERAL };
       marked = true;
     }
+    // Other providers keep their thinking blocks as they are (9router handlesThinkingBlocks is false for them).
+    if (!claude) {
+      message.content = content;
+      continue;
+    }
     // Only signed thinking survives; a turn with a tool call gets a placeholder when thinking is on and none survived.
     const signed = content.filter((block) => !isThinking(block) || isClaudeSignature(block.signature));
     if (thinkingEnabled && !signed.some(isThinking) && signed.some((block) => block.type === "tool_use")) {
@@ -104,9 +109,27 @@ function prepareMessages(raw: readonly Json[], thinkingOn: boolean): Json[] {
   return messages;
 }
 
-// 9router's prepareClaudeRequest for provider "claude". The client's cache marks give way to 9router's: 1 h on the last
-// system block and tool, 5 min on the last assistant block.
-function prepare(body: Json, ceiling: number | null): Json {
+// A tool result's images move out of it into the same user turn (other Anthropic-shaped hosts drop them inside a result).
+function hoistToolResultImages(messages: Json[]): Json[] {
+  return messages.map((message) => {
+    if (message.role !== "user" || !Array.isArray(message.content)) return message;
+    const hoisted: Json[] = [];
+    const content = message.content.map(record).map((block) => {
+      if (block.type !== "tool_result" || !Array.isArray(block.content)) return block;
+      const inner = block.content.map(record);
+      const images = inner.filter((part) => part.type === "image");
+      if (images.length === 0) return block;
+      const rest = inner.filter((part) => part.type !== "image");
+      hoisted.push({ type: "text", text: `[Image from tool result ${text(block.tool_use_id) ?? ""}]` }, ...images);
+      return { ...block, content: rest.length > 0 ? rest : [{ type: "text", text: "(image attached below)" }] };
+    });
+    return hoisted.length > 0 ? { ...message, content: [...content, ...hoisted] } : message;
+  });
+}
+
+// 9router's prepareClaudeRequest, for provider "claude" or (claude false) another provider on a Messages endpoint. The
+// client's cache marks give way to 9router's: 1 h on the last system block and tool, 5 min on the last assistant block.
+function prepare(body: Json, ceiling: number | null, claude = true): Json {
   const out: Json = { ...body };
   if (typeof out.max_tokens === "number") {
     const cap = ceiling ?? DEFAULT_MAX_TOKENS;
@@ -123,9 +146,16 @@ function prepare(body: Json, ceiling: number | null): Json {
     const system = out.system.map(record);
     out.system = system.map((block, i) => (i === system.length - 1 ? { ...withoutCache(block), cache_control: ONE_HOUR } : withoutCache(block)));
   }
-  if (Array.isArray(out.messages)) out.messages = prepareMessages(out.messages.map(record), record(out.thinking).type === "enabled");
+  if (Array.isArray(out.messages)) out.messages = prepareMessages(out.messages.map(record), record(out.thinking).type === "enabled", claude);
   if (Array.isArray(out.tools)) {
-    const tools = out.tools.map(record);
+    // Other providers lose typed server tools, and function-shaped ones are folded into the Messages shape.
+    const tools = out.tools.map(record).flatMap((tool): Json[] => {
+      if (claude) return [tool];
+      if (tool.type && tool.type !== "function") return [];
+      const fn = record(tool.function);
+      if (tool.function) return [{ name: fn.name, description: fn.description, input_schema: fn.parameters }];
+      return [Object.fromEntries(Object.entries(tool).filter(([key]) => key !== "type"))];
+    });
     // A deferred tool cannot carry a cache mark, so the last one that can gets it.
     const anchor = tools.findLastIndex((tool) => tool.defer_loading !== true);
     out.tools = tools.map((tool, i) => (i === anchor ? { ...withoutCache(tool), cache_control: ONE_HOUR } : withoutCache(tool)));
@@ -134,8 +164,13 @@ function prepare(body: Json, ceiling: number | null): Json {
       delete out.tool_choice;
     }
   }
+  if (!claude && Array.isArray(out.messages)) out.messages = hoistToolResultImages(out.messages.map(record));
   return out;
 }
+
+// provider.github-copilot-oauth: Copilot's /v1/messages gets 9router's prepareClaudeRequest for a provider that is not
+// claude (no thinking rules, no cloaking).
+export const copilotMessagesBody = (body: Json, ceiling: number | null): Json => prepare(body, ceiling, false);
 
 // A UUID-v4-shaped id derived from a seed (stable per account).
 async function derivedUuid(seed: string): Promise<string> {

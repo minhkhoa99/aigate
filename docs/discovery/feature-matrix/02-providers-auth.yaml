@@ -2485,7 +2485,7 @@
     - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 52, note: "github test: GET /user" }
     - { file: "src/app/api/providers/[id]/models/route.js", line: 217, note: "github model listing with the stored Copilot token" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
   suspicion:
     expected: "A missing Copilot subscription fails the sign-in, the model list refreshes an expired Copilot token, poll errors stop polling, and the Claude route gets the same parameter rules"

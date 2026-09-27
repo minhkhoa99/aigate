@@ -173,9 +173,33 @@ function kimchiBody(body: Json): void {
   if (Array.isArray(body.tools)) body.tools = body.tools.map((tool: unknown) => withoutKeys(tool, ["cache_control"]));
 }
 
+// provider.github-copilot-oauth (kept from 9router): Copilot's /chat/completions takes only text and image_url parts, so
+// other parts go as text, empty text parts go, and a message left with none has null content; the token limit is
+// max_tokens except for gpt-5 and o1/o3/o4 models (AIGate cannot tell which name the client used); reasoning_effort none
+// is dropped; gpt-5.4 loses temperature.
+function copilotChatBody(body: Json): void {
+  body.messages = list(body.messages).map(record).map((message) => {
+    if (!Array.isArray(message.content)) return message;
+    const content = message.content.map(record).map((part) => {
+      if (part.type === "text" || part.type === "image_url") return part;
+      const value = part.text || part.content || JSON.stringify(part);
+      return { type: "text", text: typeof value === "string" ? value : JSON.stringify(value) };
+    }).filter((part) => part.text !== "");
+    return { ...message, content: content.length > 0 ? content : null };
+  });
+  const model = text(body.model) ?? "";
+  if (!/gpt-5|o[134]-/i.test(model) && body.max_completion_tokens !== undefined) {
+    body.max_tokens = body.max_completion_tokens;
+    delete body.max_completion_tokens;
+  }
+  if (body.reasoning_effort === "none") delete body.reasoning_effort;
+  if (/gpt-5\.4/i.test(model)) delete body.temperature;
+}
+
 // What the 9router CodeBuddy executors change in the finished body.
 function applyQuirks(body: Json, quirks: readonly string[]): void {
   if (quirks.includes("kimchi")) kimchiBody(body);
+  if (quirks.includes("copilotChat")) copilotChatBody(body);
   if (quirks.includes("reasoningSummary")) {
     const effort = body.reasoning_effort;
     if (effort === "none" || effort === "off") delete body.reasoning_effort;

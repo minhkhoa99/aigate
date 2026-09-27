@@ -145,3 +145,40 @@ test("codex: a token whose last refresh is more than 8 days old is due, whatever
     assert.equal(refresher.due("cline", { id: "c", apiKey: "k" }), false, "an API key is never due");
     await app.close();
   }));
+
+test("github: device sign-in (slow_down passed through), the Copilot token as bearer, a 401 renews it from the GitHub token, the test reads /user", () =>
+  withTempDb(async (file) => {
+    const inSeconds = (s) => Math.floor(Date.now() / 1000) + s;
+    const upstream = fakeUpstream(
+      json(200, { device_code: "dc", user_code: "ABCD-1234", verification_uri: "https://github.com/login/device", expires_in: 900, interval: 5 }),
+      json(200, { error: "slow_down" }),
+      json(200, { access_token: "gho_1" }),
+      json(200, { token: "tid=1", expires_at: inSeconds(1500) }),
+      json(200, { id: 7, login: "ada", email: "ada@x.dev" }),
+      json(401, { error: { message: "expired" } }),
+      json(200, { token: "tid=2", expires_at: inSeconds(1500) }),
+      json(200, { id: "c", model: "gpt-5.4", choices: [{ message: { content: "ok" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1 } }),
+      json(200, { login: "ada" }),
+    );
+    const { app, call, dash, key } = await ready(file, upstream, { refreshRetryDelayMs: 0 });
+    const device = (await dash({ url: "/api/oauth/github/device-code" })).json();
+    assert.deepEqual([device.user_code, device.verification_uri_complete], ["ABCD-1234", "https://github.com/login/device"]);
+    const slow = (await dash({ method: "POST", url: "/api/oauth/github/poll", body: { deviceCode: device.device_code } })).json();
+    assert.deepEqual(slow, { success: false, error: "slow_down", pending: true });
+    const approved = (await dash({ method: "POST", url: "/api/oauth/github/poll", body: { deviceCode: device.device_code } })).json();
+    assert.equal(approved.success, true);
+    const connection = (await dash({ url: "/api/connections" })).json().find((c) => c.provider === "github");
+    assert.deepEqual([connection.name, connection.email, connection.authType], ["ada", "ada@x.dev", "oauth"]);
+
+    const chat = await call({ method: "POST", url: "/v1/chat/completions", headers: { authorization: `Bearer ${key}` }, body: { model: "github/gpt-5.4", messages: [{ role: "user", content: "hi" }] } });
+    assert.equal(chat.statusCode, 200);
+    assert.deepEqual([upstream.calls[5].request.url, upstream.calls[5].request.headers.authorization], ["https://api.githubcopilot.com/chat/completions", "Bearer tid=1"]);
+    assert.deepEqual([upstream.calls[6].request.url, upstream.calls[6].request.headers.authorization], ["https://api.github.com/copilot_internal/v2/token", "token gho_1"], "a 401 renews the Copilot token");
+    assert.equal(upstream.calls[7].request.headers.authorization, "Bearer tid=2");
+    const tested = (await dash({ method: "POST", url: `/api/connections/${connection.id}/test` })).json();
+    assert.equal(tested.testStatus, "active");
+    assert.deepEqual([upstream.calls[8].request.url, upstream.calls[8].request.headers.authorization], ["https://api.github.com/user", "Bearer gho_1"], "the test uses the GitHub token");
+    await app.get(TokenRefresher)["background"]();
+    assert.equal(upstream.calls.length, 9, "the background loop leaves the short Copilot token alone");
+    await app.close();
+  }));

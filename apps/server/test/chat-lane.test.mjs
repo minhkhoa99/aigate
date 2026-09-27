@@ -63,7 +63,7 @@ test("model resolution: bare catalog id, provider prefix, unknown model, no acti
       assert.deepEqual([res.statusCode, res.json().error.code], [404, "no_active_connection"], model);
       assert.match(res.json().error.message, /DeepSeek/);
     }
-    const blocked = await chat({ ...hello, model: "github/gpt-5.4" });
+    const blocked = await chat({ ...hello, model: "grok-cli/grok-4" });
     assert.deepEqual([blocked.statusCode, blocked.json().error.code], [400, "provider_not_supported"]);
     assert.match(blocked.json().error.message, /Needs OAuth sign-in/);
     // Once connected, the alias routes to the provider's own chat URL with its own key.

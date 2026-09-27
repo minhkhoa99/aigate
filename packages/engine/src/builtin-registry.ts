@@ -46,6 +46,8 @@ const EXECUTOR_QUIRKS: Readonly<Record<string, readonly string[]>> = {
   // CodexExecutor body, URL and model list.
   claude: ["claudeCode"],
   codex: ["codex"],
+  // provider.github-copilot-oauth (SP16b2, kept as 9router): the GithubExecutor routes.
+  github: ["copilot"],
 };
 // provider.clinepass-headers-envelope: the Cline client headers, naming AIGate (user decision 2026-09-26; 9router names
 // itself). ponytail: AIGate has no release version yet; 0.1.0 until it does.

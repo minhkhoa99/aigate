@@ -85,7 +85,8 @@ export class OAuthController {
         const view = await this.save(descriptor, result.tokens);
         return { success: true, connection: { id: view.id, provider: view.provider } };
       }
-      if (result.status === "pending") return { success: false, error: "authorization_pending", pending: true };
+      // provider.github-copilot-oauth: GitHub asks to slow down; the dashboard then polls 5 s slower (9router).
+      if (result.status === "pending") return { success: false, error: result.slowDown ? "slow_down" : "authorization_pending", pending: true };
       return { success: false, error: result.error, errorDescription: result.description ?? null, pending: false };
     }
     throw invalid(`Unknown sign-in step "${action}"`);

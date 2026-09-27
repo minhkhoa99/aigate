@@ -1,7 +1,7 @@
 import { EngineError } from "./errors.js";
 import { readBoundedText } from "./http.js";
 import { isRecord, parseJson, record, text } from "./json.js";
-import type { ExecCtx, HttpTransportPort } from "./ports.js";
+import type { CredentialStatus, ExecCtx, HttpTransportPort } from "./ports.js";
 
 // OAuth sign-in and refresh for the SP16 and SP16b providers (docs/contracts/oauth.md). Kept as 9router has them (user decisions
 // 2026-09-27): cline, clinepass (whose tokens the ClinePass API rejects, #2333), gitlab (PKCE with the operator's own
@@ -31,7 +31,7 @@ export interface DeviceCode {
 
 export type PollResult =
   | { readonly status: "approved"; readonly tokens: OAuthTokens }
-  | { readonly status: "pending" }
+  | { readonly status: "pending"; readonly slowDown?: boolean }
   | { readonly status: "error"; readonly error: string; readonly description?: string };
 
 // Provider meta sent by the dashboard (gitlab: baseUrl, clientId, clientSecret).
@@ -56,6 +56,10 @@ export interface OAuthProvider {
   // one (9router's refreshLeadMs and maxRefreshAgeMs).
   readonly refreshLeadMs?: number;
   readonly maxRefreshAgeMs?: number;
+  // false: the 5-minute background loop leaves this provider alone (github: the Copilot token is short-lived).
+  readonly background?: boolean;
+  // A provider-specific connection test on the refresh token (github: GET /user with the GitHub token).
+  test?(refreshToken: string, io: OAuthIO): Promise<CredentialStatus>;
 }
 
 const TIMEOUT_MS = 15_000;
@@ -360,7 +364,126 @@ const codex: OAuthProvider = {
   },
 };
 
-export const OAUTH_PROVIDERS: Readonly<Record<string, OAuthProvider>> = { cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi, claude, codex };
+// ---- github (provider.github-copilot-oauth), kept as 9router has it (user decision 2026-09-27: keep 9router) ----
+
+const GITHUB_CLIENT_ID = "Iv1.b507a08c87ecfe98";
+const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
+const COPILOT_TOKEN_URL = "https://api.github.com/copilot_internal/v2/token";
+const FORM_HEADERS = { "content-type": "application/x-www-form-urlencoded", accept: "application/json" };
+// The sign-in reads the Copilot token and the user as 9router's postExchange; later refreshes use its executor's headers.
+const SIGN_IN_HEADERS = { accept: "application/json", "x-github-api-version": "2022-11-28", "user-agent": "GitHubCopilotChat/0.26.7" };
+const REFRESH_HEADERS = {
+  "user-agent": "GitHubCopilotChat/0.38.0", "editor-version": "vscode/1.110.0", "editor-plugin-version": "copilot-chat/0.38.0", accept: "application/json", "x-github-api-version": "2025-04-01",
+};
+
+// AIGate seals the Copilot token as the connection's access token and the GitHub token (with GitHub's own refresh token,
+// when it sends one) as its refresh token, so every token stays encrypted (9router keeps them in plain connection data).
+const packGithub = (github: string, refresh?: string): string => JSON.stringify({ github, ...(refresh ? { refresh } : {}) });
+function unpackGithub(value: string): { github: string; refresh?: string } {
+  const parsed = record(parseJson(value));
+  const github = text(parsed.github);
+  const refresh = text(parsed.refresh);
+  return github ? { github, ...(refresh ? { refresh } : {}) } : { github: value };
+}
+
+// Copilot's expires_at is unix seconds (milliseconds and ISO strings are read too, as 9router does).
+function secondsFrom(expiresAt: unknown): number | undefined {
+  if (typeof expiresAt === "number") return Math.floor(((expiresAt < 1e12 ? expiresAt * 1000 : expiresAt) - Date.now()) / 1000);
+  return secondsUntil(expiresAt);
+}
+
+async function copilotToken(io: OAuthIO, headers: Readonly<Record<string, string>>): Promise<{ token: string; expiresIn?: number } | undefined> {
+  const answer = await call(io, "GET", COPILOT_TOKEN_URL, headers);
+  if (!answer.ok) return undefined;
+  const data = record(parseJson(answer.text));
+  const token = text(data.token);
+  const expiresIn = secondsFrom(data.expires_at);
+  return token ? { token, ...(expiresIn !== undefined ? { expiresIn } : {}) } : undefined;
+}
+
+// 9router's postExchange: a failed Copilot or user read is ignored, so the GitHub token itself becomes the access token.
+async function githubTokens(root: Record<string, unknown>, github: string, io: OAuthIO): Promise<OAuthTokens> {
+  const read = async (url: string) => {
+    try {
+      const answer = await call(io, "GET", url, { ...SIGN_IN_HEADERS, authorization: `Bearer ${github}` });
+      return answer.ok ? record(parseJson(answer.text)) : {};
+    } catch {
+      return {};
+    }
+  };
+  const copilot = await read(COPILOT_TOKEN_URL);
+  const user = await read("https://api.github.com/user");
+  const token = text(copilot.token);
+  const expiresIn = token ? secondsFrom(copilot.expires_at) : typeof root.expires_in === "number" ? root.expires_in : undefined;
+  const email = text(user.email);
+  const displayName = text(user.login) || text(user.name);
+  return {
+    accessToken: token ?? github,
+    refreshToken: packGithub(github, text(root.refresh_token)),
+    ...(expiresIn !== undefined ? { expiresIn } : {}),
+    ...(email ? { email } : {}),
+    ...(displayName ? { displayName } : {}),
+    data: strings({ githubUserId: user.id === undefined ? undefined : String(user.id), githubLogin: user.login, githubName: user.name, githubEmail: user.email }),
+  };
+}
+
+const github: OAuthProvider = {
+  flow: "device_code",
+  // The Copilot token lives about 30 minutes; the background loop leaves it to the proactive and reactive refreshes.
+  background: false,
+  async deviceCode(io) {
+    const answer = await call(io, "POST", "https://github.com/login/device/code", FORM_HEADERS, new URLSearchParams({ client_id: GITHUB_CLIENT_ID, scope: "read:user" }).toString());
+    if (!answer.ok) throw failed("github", `Device code request failed: ${answer.text}`);
+    const data = record(parseJson(answer.text));
+    const deviceCode = text(data.device_code);
+    const userCode = text(data.user_code);
+    const uri = text(data.verification_uri);
+    if (!deviceCode || !userCode || !uri) throw failed("github", "GitHub returned no device code");
+    return {
+      device_code: deviceCode, user_code: userCode, verification_uri: uri, verification_uri_complete: text(data.verification_uri_complete) ?? uri,
+      expires_in: typeof data.expires_in === "number" ? data.expires_in : 900, interval: typeof data.interval === "number" ? data.interval : 5,
+    };
+  },
+  async poll(deviceCode, io) {
+    const answer = await call(io, "POST", GITHUB_TOKEN_URL, FORM_HEADERS,
+      new URLSearchParams({ client_id: GITHUB_CLIENT_ID, device_code: deviceCode, grant_type: "urn:ietf:params:oauth:grant-type:device_code" }).toString());
+    const root = parseJson(answer.text);
+    if (!isRecord(root)) throw failed("github", `GitHub answered ${answer.status}: ${answer.text.slice(0, 200)}`);
+    const token = text(root.access_token);
+    if (token) return { status: "approved", tokens: await githubTokens(root, token, io) };
+    const error = text(root.error) ?? "poll_failed";
+    if (error === "authorization_pending") return { status: "pending" };
+    if (error === "slow_down") return { status: "pending", slowDown: true };
+    const description = text(root.error_description);
+    return { status: "error", error, ...(description ? { description } : {}) };
+  },
+  // 9router refreshCredentials: a new Copilot token from the GitHub token; when that fails, GitHub's refresh token (if
+  // any) renews the GitHub token first.
+  async refresh(packed, io) {
+    const { github: token, refresh } = unpackGithub(packed);
+    const copilot = await copilotToken(io, { ...REFRESH_HEADERS, authorization: `token ${token}` });
+    if (copilot) return { accessToken: copilot.token, refreshToken: packed, ...(copilot.expiresIn !== undefined ? { expiresIn: copilot.expiresIn } : {}), data: {} };
+    if (!refresh) return null;
+    const answer = await call(io, "POST", GITHUB_TOKEN_URL, FORM_HEADERS, new URLSearchParams({ grant_type: "refresh_token", refresh_token: refresh, client_id: GITHUB_CLIENT_ID }).toString());
+    const renewed = answer.ok ? record(parseJson(answer.text)) : {};
+    const next = text(renewed.access_token);
+    if (!next) return null;
+    const repacked = packGithub(next, text(renewed.refresh_token) || refresh);
+    const fresh = await copilotToken(io, { ...REFRESH_HEADERS, authorization: `token ${next}` });
+    if (fresh) return { accessToken: fresh.token, refreshToken: repacked, ...(fresh.expiresIn !== undefined ? { expiresIn: fresh.expiresIn } : {}), data: {} };
+    // No Copilot token: the renewed GitHub token is sent as the bearer, as 9router falls back to it.
+    return { accessToken: next, refreshToken: repacked, ...(typeof renewed.expires_in === "number" ? { expiresIn: renewed.expires_in } : {}), data: {} };
+  },
+  // 9router's test: GET /user with the GitHub token (its User-Agent names 9Router; AIGate names itself).
+  async test(packed, io) {
+    const answer = await call(io, "GET", "https://api.github.com/user", { authorization: `Bearer ${unpackGithub(packed).github}`, "user-agent": "AIGate", accept: "application/vnd.github+json" });
+    if (answer.ok) return { valid: true };
+    const message = answer.status === 401 ? "Token invalid or revoked" : answer.status === 403 ? "Access denied" : `API returned ${answer.status}`;
+    return { valid: false, code: answer.status === 401 || answer.status === 403 ? "AUTH_ERROR" : "PROVIDER_UNAVAILABLE", message };
+  },
+};
+
+export const OAUTH_PROVIDERS: Readonly<Record<string, OAuthProvider>> = { cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi, claude, codex, github };
 
 // Cline OAuth access tokens are WorkOS JWTs sent as "workos:<jwt>"; a ClinePass API key (not a JWT) goes as is.
 // A token already prefixed does not start with "eyJ", so it passes as is.

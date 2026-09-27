@@ -132,11 +132,14 @@ function DeviceSignIn({ provider, onDone }: { provider: ProviderSummary; onDone:
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 
-  // Polls at the provider's interval until the code is approved, refused, or expired.
+  // Polls at the provider's interval until the code is approved, refused, or expired. As 9router's dialog: only
+  // expired_token and access_denied stop it (other errors keep polling until the code expires), and slow_down adds 5 s
+  // to the interval, at most 30 s.
   useEffect(() => {
     if (!device) return undefined;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let interval = device.interval;
     const deadline = Date.now() + device.expires_in * 1000;
     const tick = async () => {
       if (stopped) return;
@@ -150,14 +153,15 @@ function DeviceSignIn({ provider, onDone }: { provider: ProviderSummary; onDone:
           doneRef.current();
           return;
         }
-        if (!answer.pending) { setProblem(`${provider.name} refused the sign-in: ${answer.errorDescription ?? answer.error}.`); return; }
+        if (answer.error === "expired_token" || answer.error === "access_denied") { setProblem(`${provider.name} refused the sign-in: ${answer.errorDescription ?? answer.error}.`); return; }
+        if (answer.error === "slow_down") interval = Math.min(interval + 5, 30);
       } catch (error) {
         if (!stopped) showToast({ tone: "error", ...toProblem(error) });
         return;
       }
-      timer = setTimeout(() => void tick(), device.interval * 1000);
+      timer = setTimeout(() => void tick(), interval * 1000);
     };
-    timer = setTimeout(() => void tick(), device.interval * 1000);
+    timer = setTimeout(() => void tick(), interval * 1000);
     return () => { stopped = true; clearTimeout(timer); };
   }, [device, provider.id, provider.name, client, showToast]);
 
