@@ -59,11 +59,13 @@ export type ConnectionData = { [K in keyof typeof data]: string | null };
 export interface OAuthState {
   refreshToken: string | undefined;
   expiresAt: Date | null;
+  // SP16b: codex refreshes a token whose last refresh is 8 days old (9router maxRefreshAgeMs).
+  lastRefreshAt: Date | null;
 }
 // The key (or access token) routing and the connection test use, with the row it came from.
 export type StoredCredential = { id: string; apiKey: string; oauth?: OAuthState } & ConnectionData;
 
-const secret = { id: t.id, sealed: t.apiKeySealed, authType: t.authType, refreshSealed: t.refreshTokenSealed, expiresAt: t.expiresAt, ...data };
+const secret = { id: t.id, sealed: t.apiKeySealed, authType: t.authType, refreshSealed: t.refreshTokenSealed, expiresAt: t.expiresAt, lastRefreshAt: t.lastRefreshAt, ...data };
 
 const toView = (row: Row): ConnectionView => ({
   ...row,
@@ -128,7 +130,7 @@ export class ConnectionsRepository {
 
   // oauth.token-storage: create the oauth connection, or refresh the tokens of the same account's connection. The read
   // and the write share one transaction; no network I/O happens inside it.
-  saveOAuth(input: { provider: string; name: string; tokens: OAuthTokens; organization?: string }): Promise<ConnectionView | "conflict"> {
+  saveOAuth(input: { provider: string; name: string; tokens: OAuthTokens; organization?: string; accountId?: string }): Promise<ConnectionView | "conflict"> {
     return this.database.db.transaction(async (tx) => {
       const existing = await tx.select({ id: t.id, authType: t.authType, email: t.email, oauthData: t.oauthData }).from(t).where(eq(t.provider, input.provider)).get();
       if (existing && !sameAccount(existing, input.tokens)) return "conflict";
@@ -139,6 +141,8 @@ export class ConnectionsRepository {
         apiKeySealed: this.cipher.seal(tokens.accessToken, sealContext(id)), keyHint: keyHint(tokens.accessToken), authType: "oauth" as const,
         refreshTokenSealed: tokens.refreshToken ? this.cipher.seal(tokens.refreshToken, refreshContext(id)) : null,
         expiresAt: expiry(now, tokens.expiresIn), email: tokens.email ?? null, oauthData: JSON.stringify(tokens.data), organization: input.organization ?? null,
+        // A sign-in counts as a refresh (9router stamps lastRefreshAt on the codex sign-in).
+        accountId: input.accountId ?? null, lastRefreshAt: now,
         isActive: true, testStatus: "active" as const, lastError: null, lastErrorCode: null, lastTestedAt: null, updatedAt: now,
       };
       const [row] = existing
@@ -209,9 +213,10 @@ export class ConnectionsRepository {
     return row ? toView(row) : this.get(id);
   }
 
-  private open(row: { id: string; sealed: string; authType: AuthType; refreshSealed: string | null; expiresAt: Date | null } & ConnectionData): StoredCredential {
-    const { id, sealed, authType, refreshSealed, expiresAt, ...rest } = row;
-    const oauth = authType === "oauth" ? { oauth: { refreshToken: refreshSealed ? this.cipher.open(refreshSealed, refreshContext(id)) : undefined, expiresAt } } : {};
+  private open(row: { id: string; sealed: string; authType: AuthType; refreshSealed: string | null; expiresAt: Date | null; lastRefreshAt: Date | null } & ConnectionData): StoredCredential {
+    const { id, sealed, authType, refreshSealed, expiresAt, lastRefreshAt, ...rest } = row;
+    const refreshToken = refreshSealed ? this.cipher.open(refreshSealed, refreshContext(id)) : undefined;
+    const oauth = authType === "oauth" ? { oauth: { refreshToken, expiresAt, lastRefreshAt } } : {};
     return { id, apiKey: this.cipher.open(sealed, sealContext(id)), ...oauth, ...rest };
   }
 }

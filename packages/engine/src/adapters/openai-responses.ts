@@ -2,9 +2,11 @@ import { UnsupportedFeatureError, type CanonicalRequest, type CanonicalResponse,
 import { EngineError } from "../errors.js";
 import { readBoundedText } from "../http.js";
 import { isRecord, list, parseJson, record, text, type Json } from "../json.js";
-import type { AIProviderPort, Credential, ExecCtx, HttpRequest } from "../ports.js";
+import type { AIProviderPort, Credential, ExecCtx, HttpRequest, ListedModel } from "../ports.js";
+import { MODEL_ID } from "../registry.js";
 import { readSseData } from "../sse.js";
-import { count, RETRY } from "./http-adapter.js";
+import { codexBody, codexModelIds, codexUrl } from "./codex.js";
+import { count, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
 import { mediaUrl, OpenAICompatibleAdapter, userPart } from "./openai-compatible.js";
 
 // AIProviderPort for the openai-responses family (docs/contracts/provider-openai-responses.md). The request and
@@ -111,10 +113,47 @@ function usageOf(value: unknown): TokenUsage {
 }
 
 const INCOMPLETE = new Map<string, StopReason>([["max_output_tokens", "max_tokens"], ["content_filter", "content_filter"]]);
+// provider.codex-oauth (kept from 9router): the model list names client version 0.144.6.
+const CODEX_MODELS_URL = "https://chatgpt.com/backend-api/codex/models?client_version=0.144.6";
+const MAX_LISTED_MODELS = 1_000;
+
+// A stream folded into one answer, for a provider that only streams (routing.forced-stream-json-collapse).
+async function collected(chunks: AsyncIterable<StreamChunk>, fallbackModel: string): Promise<CanonicalResponse> {
+  let id = "";
+  let model = fallbackModel;
+  let answer = "";
+  let thinking = "";
+  let signature: string | undefined;
+  let usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+  let stopReason: StopReason = "end_turn";
+  const calls: { id: string; name: string; arguments: string }[] = [];
+  for await (const chunk of chunks) {
+    if (chunk.type === "start") {
+      id = chunk.id;
+      model = chunk.model || model;
+    } else if (chunk.type === "text_delta") answer += chunk.text;
+    else if (chunk.type === "thinking_delta") {
+      thinking += chunk.text;
+      signature = chunk.signature ?? signature;
+    } else if (chunk.type === "tool_call_delta") {
+      const call = calls[chunk.index] ?? { id: "", name: "", arguments: "" };
+      calls[chunk.index] = { id: chunk.id ?? call.id, name: chunk.name ?? call.name, arguments: call.arguments + chunk.argumentsDelta };
+    } else if (chunk.type === "usage") usage = chunk.usage;
+    else if (chunk.type === "stop") stopReason = chunk.stopReason;
+  }
+  const content: ContentPart[] = [
+    ...(thinking ? [{ type: "thinking" as const, text: thinking, ...(signature ? { signature } : {}) }] : []),
+    ...(answer ? [{ type: "text" as const, text: answer }] : []),
+    ...calls.filter(Boolean).map((call) => ({ type: "tool_call" as const, ...call })),
+  ];
+  return { id, model, content, stopReason, usage };
+}
 
 export class OpenAIResponsesAdapter extends OpenAICompatibleAdapter implements AIProviderPort {
   // Correct, unlike 9router (routing.responses-non-stream-answer): stream false, and the Responses object is read.
   override async execute(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): Promise<CanonicalResponse> {
+    // provider.codex-oauth: codex only streams, so the stream is collapsed into the answer.
+    if (this.codex) return collected(this.stream(request, credential, ctx), request.model);
     const response = await this.send(this.responses(request, credential, false), credential, ctx, RETRY.maxAttempts);
     const root = parseJson(await readBoundedText(response.body));
     if (!isRecord(root) || !Array.isArray(root.output)) throw this.invalid("a response without an output array");
@@ -231,12 +270,36 @@ export class OpenAIResponsesAdapter extends OpenAICompatibleAdapter implements A
     yield end();
   }
 
+  // provider.codex-oauth: the codex model list, read as 9router reads it (0.144.6, originator, no account id).
+  override async getModels(credential: Credential, ctx: ExecCtx): Promise<readonly ListedModel[]> {
+    if (!this.codex) return super.getModels(credential, ctx);
+    const headers = { "content-type": "application/json", accept: "application/json", authorization: `Bearer ${credential.apiKey}`, originator: "codex_cli_rs" };
+    const response = await this.send({ method: "GET", url: CODEX_MODELS_URL, headers, timeoutMs: METADATA_TIMEOUT_MS }, credential, ctx, RETRY.maxAttempts);
+    const ids = codexModelIds(parseJson(await readBoundedText(response.body)));
+    return ids.filter((id) => MODEL_ID.test(id)).slice(0, MAX_LISTED_MODELS).map((id) => {
+      const descriptor = this.known.get(id);
+      return descriptor ? { id, descriptor } : { id };
+    });
+  }
+
+  private get codex(): boolean {
+    return this.provider.quirks?.includes("codex") ?? false;
+  }
+
   private responses(request: CanonicalRequest, credential: Credential, stream: boolean): HttpRequest {
-    const base = this.request("POST", this.provider.chatUrl, credential, stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS);
+    const timeoutMs = stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS;
+    const body = toBody(request, stream);
+    if (this.codex) {
+      // provider.codex-oauth: 9router's CodexExecutor body and headers; the session is the connection's.
+      const session = credential.sessionId ?? "default";
+      const base = this.request("POST", codexUrl(this.provider.chatUrl, body), credential, timeoutMs);
+      return { ...base, headers: { ...base.headers, "content-type": "application/json", accept: "text/event-stream", session_id: session }, body: JSON.stringify(codexBody(body, session)) };
+    }
+    const base = this.request("POST", this.provider.chatUrl, credential, timeoutMs);
     return {
       ...base,
       headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json" },
-      body: JSON.stringify(toBody(request, stream)),
+      body: JSON.stringify(body),
     };
   }
 }

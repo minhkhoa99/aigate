@@ -8,6 +8,8 @@ export * from "./http.js";
 export * from "./sse.js";
 export { OpenAICompatibleAdapter } from "./adapters/openai-compatible.js";
 export { AnthropicAdapter } from "./adapters/anthropic.js";
+export { CLAUDE_CODE_PROMPT, isClaudeSignature, withClaudeCodePrompt } from "./adapters/claude-code.js";
+export { codexBody, codexModelIds } from "./adapters/codex.js";
 export { OpenAIResponsesAdapter } from "./adapters/openai-responses.js";
 export { OllamaAdapter } from "./adapters/ollama.js";
 export { GeminiAdapter } from "./adapters/gemini.js";

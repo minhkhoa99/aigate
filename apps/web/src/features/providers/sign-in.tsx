@@ -44,7 +44,9 @@ function BrowserSignIn({ provider, onDone }: { provider: ProviderSummary; onDone
   // postMessage and the channel can both deliver one callback; only the first is exchanged.
   const handled = useRef(false);
   // provider.gitlab-duo-oauth: GitLab signs in with the operator's own OAuth application.
-  const needsApp = provider.signIn === "authorization_code_pkce";
+  const needsApp = provider.id === "gitlab";
+  // provider.codex-oauth: a provider that returns only to its CLI's address (codex: localhost:1455) cannot reach /callback.
+  const elsewhere = session !== null && !session.redirectUri.startsWith(`${window.location.origin}/`);
 
   const finish = (current: Session, data: CallbackData) => {
     if (handled.current) return;
@@ -111,8 +113,10 @@ function BrowserSignIn({ provider, onDone }: { provider: ProviderSummary; onDone
       <Button type="submit" variant="primary" disabled={starting || exchange.isPending}>{starting ? "Opening…" : session ? `Sign in to ${provider.name} again` : `Sign in with ${provider.name}`}</Button>
     </form>
     {session && <form onSubmit={submitPasted} className="stack">
-      <p className="muted">Finish in the window that opened. If it does not come back here (for example on a remote dashboard), paste the address of the page it ended on.</p>
-      <Field label="Callback URL or code"><Input name="callback" maxLength={8192} autoComplete="off" placeholder={`${window.location.origin}/callback?code=…`} /></Field>
+      <p className="muted">{elsewhere
+        ? <>{provider.name} returns to <code>{session.redirectUri}</code>, which this dashboard cannot receive. After you sign in, the window shows a page that cannot load: copy its full address and paste it here.</>
+        : "Finish in the window that opened. If it does not come back here (for example on a remote dashboard), paste the address of the page it ended on, or the code it shows."}</p>
+      <Field label="Callback URL or code"><Input name="callback" maxLength={8192} autoComplete="off" placeholder={`${session.redirectUri}?code=…`} /></Field>
       <Button type="submit" disabled={exchange.isPending}>{exchange.isPending ? "Signing in…" : "Finish sign-in"}</Button>
     </form>}
     {problem && <Warning tone="danger">{problem}</Warning>}

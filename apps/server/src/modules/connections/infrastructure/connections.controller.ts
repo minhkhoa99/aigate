@@ -8,7 +8,7 @@ import {
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
 import { DATA_FIELD_NAMES, isJsonCredential, parseChanges, parseNewConnection, type ConnectionChanges } from "../domain/connection.js";
-import { ConnectionsRepository, type ConnectionView, type TestOutcome } from "./connections.repo.js";
+import { ConnectionsRepository, type ConnectionView, type StoredCredential, type TestOutcome } from "./connections.repo.js";
 import { nodeDescriptor, ProviderNodesRepository } from "./provider-nodes.repo.js";
 import { TokenRefresher } from "./token-refresher.js";
 
@@ -156,7 +156,7 @@ export class ConnectionsController {
   @Header("Cache-Control", "no-store")
   async test(@Param("id") id: string): Promise<Named> {
     const { stored, provider, fresh } = await this.credential(id);
-    const outcome = await runTest(withConnection(provider, fresh), this.transport, fresh.apiKey);
+    const outcome = provider.testByExpiry ? this.expiryTest(provider, stored, fresh) : await runTest(withConnection(provider, fresh), this.transport, fresh.apiKey);
     // After a refresh the sealed token changed, so the result is recorded against the new one.
     const sealed = fresh === stored ? stored.sealed : (await this.connections.readKey(id))?.sealed ?? stored.sealed;
     const view = await this.connections.recordTest(id, sealed, outcome);
@@ -181,6 +181,14 @@ export class ConnectionsController {
       throw new HttpException({ code: "MODELS_FETCH_FAILED", message: typeof status === "number" ? `Failed to fetch models: ${status}` : "Failed to fetch models" }, HttpStatus.BAD_GATEWAY);
     }
     return { provider: provider.id, connectionId: id, models: listed.map((m) => ({ id: m.id, inCatalog: builtinRegistry.model(provider.id, m.id) !== undefined })) };
+  }
+
+  // provider.claude-oauth (kept from 9router): no request, only the expiry. A token due for refresh is valid when the
+  // refresh (already tried by credential()) gave a new one.
+  private expiryTest(provider: ProviderDescriptor, stored: StoredCredential, fresh: StoredCredential): TestOutcome {
+    if (!this.refresher.due(provider.id, stored) || fresh !== stored) return { testStatus: "active", lastError: null, lastErrorCode: null };
+    const lastError = stored.oauth?.refreshToken ? "Token expired and refresh failed" : "Token expired";
+    return { testStatus: "invalid", lastError, lastErrorCode: "AUTH_ERROR" };
   }
 
   // The connection's key and provider; an oauth token about to expire is refreshed first, as 9router does

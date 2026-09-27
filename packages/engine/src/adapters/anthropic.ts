@@ -5,6 +5,7 @@ import { isRecord, parseJson, record, text, type Json } from "../json.js";
 import type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest, ListedModel } from "../ports.js";
 import { MODEL_ID } from "../registry.js";
 import { readSseData } from "../sse.js";
+import { claudeCodeBody } from "./claude-code.js";
 import { count, HttpProviderAdapter, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
 
 // AIProviderPort for the Anthropic Messages family (docs/contracts/provider-anthropic.md).
@@ -36,9 +37,10 @@ const NODE_BETAS = [
 const HEAVY_AGENT_BETAS = ["advanced-tool-use-2025-11-20", "effort-2025-11-24"];
 const NODE_TEST_MODEL = "claude-3-haiku-20240307";
 
-function nodeBetas(body: Json, official: boolean): string | undefined {
+// provider.claude-oauth: the claude provider sends the list whatever the model (9router selectAnthropicBeta).
+function nodeBetas(body: Json, official: boolean, anyModel = false): string | undefined {
   const model = text(body.model) ?? "";
-  if (!model.startsWith("claude-")) return undefined;
+  if (!anyModel && !model.startsWith("claude-")) return undefined;
   const summarized = record(body.thinking).display === "summarized";
   const flags = NODE_BETAS.filter((flag) => (official || flag !== CLAUDE_CODE_BETA) && !(summarized && flag === REDACT_THINKING_BETA));
   if (/^claude-(opus|sonnet)/.test(model)) flags.push(...HEAVY_AGENT_BETAS);
@@ -46,6 +48,7 @@ function nodeBetas(body: Json, official: boolean): string | undefined {
 }
 
 const unsupported = (feature: string) => new UnsupportedFeatureError(feature, TARGET);
+const NO_NAMES: ReadonlyMap<string, string> = new Map();
 
 // ---- CIP -> Messages ----
 
@@ -91,14 +94,16 @@ function userBlock(part: ContentPart): Json {
   }
 }
 
-function assistantBlock(part: ContentPart): Json {
+// lenient (the claude provider): unsigned thinking goes out with an empty signature, and claudeCodeBody drops it, as
+// 9router keeps only signed thinking for claude.
+function assistantBlock(part: ContentPart, lenient: boolean): Json {
   switch (part.type) {
     case "text": return textBlock(part);
     case "tool_call": return { type: "tool_use", id: part.id, name: part.name, input: toolInput(part.arguments) };
     case "thinking":
       if (part.redacted) return { type: "redacted_thinking", data: part.text };
-      if (part.signature === undefined) throw unsupported("thinking without a signature");
-      return { type: "thinking", thinking: part.text, signature: part.signature };
+      if (part.signature === undefined && !lenient) throw unsupported("thinking without a signature");
+      return { type: "thinking", thinking: part.text, signature: part.signature ?? "" };
     default: throw unsupported(`${part.type} in an assistant message`);
   }
 }
@@ -116,13 +121,13 @@ function withMessageMark(parts: readonly ContentPart[], marked: boolean): readon
 }
 
 // user and tool turns are user turns; same-role turns merge, and a user turn lists its tool results first.
-function toMessages(request: CanonicalRequest): Json[] {
+function toMessages(request: CanonicalRequest, lenient: boolean): Json[] {
   const turns: { role: "user" | "assistant"; content: Json[] }[] = [];
   for (const message of request.messages) {
     if (message.content.length === 0) continue;
     const role = message.role === "assistant" ? "assistant" : "user";
     const content = withMessageMark(message.content, message.cacheControl !== undefined);
-    const blocks = content.map((part) => (role === "assistant" ? assistantBlock(part) : userBlock(part)));
+    const blocks = content.map((part) => (role === "assistant" ? assistantBlock(part, lenient) : userBlock(part)));
     const last = turns.at(-1);
     if (last?.role === role) last.content.push(...blocks);
     else turns.push({ role, content: blocks });
@@ -177,10 +182,11 @@ function stopReasonOf(reason: unknown, sawToolCall: boolean): StopReason {
 
 export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderPort {
   async execute(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): Promise<CanonicalResponse> {
-    const response = await this.send(this.chat(request, credential, false), credential, ctx, RETRY.maxAttempts);
+    const { http, names } = await this.chat(request, credential, false);
+    const response = await this.send(http, credential, ctx, RETRY.maxAttempts);
     const root = parseJson(await readBoundedText(response.body));
     if (!isRecord(root) || !Array.isArray(root.content)) throw this.invalid("a message without a content array");
-    const content = root.content.map((entry) => this.part(record(entry)));
+    const content = root.content.map((entry) => this.part(record(entry), names));
     return {
       id: text(root.id) ?? "",
       model: text(root.model) ?? request.model,
@@ -192,7 +198,8 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
 
   // Errors before the first chunk are thrown from the first next(); the caller may fall back only then.
   async *stream(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): AsyncGenerator<StreamChunk> {
-    const response = await this.send(this.chat(request, credential, true), credential, ctx, RETRY.maxAttempts);
+    const { http, names } = await this.chat(request, credential, true);
+    const response = await this.send(http, credential, ctx, RETRY.maxAttempts);
     if (!response.body || !(response.headers["content-type"] ?? "").includes("text/event-stream")) {
       await response.body?.cancel();
       throw this.invalid("a non-SSE response to a streaming request");
@@ -224,7 +231,7 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
         const reason = record(event.delta).stop_reason;
         if (reason !== undefined && reason !== null) stopReason = reason;
       } else if (type === "content_block_start" || type === "content_block_delta") {
-        yield* this.blockEvent(type, event, toolIndex);
+        yield* this.blockEvent(type, event, toolIndex, names);
       }
       // content_block_stop and event types added later carry nothing to forward.
     }
@@ -238,7 +245,15 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
   }
 
   async getModels(credential: Credential, ctx: ExecCtx): Promise<readonly ListedModel[]> {
-    const response = await this.send(this.request("GET", this.provider.modelsUrl, credential, METADATA_TIMEOUT_MS), credential, ctx, RETRY.maxAttempts);
+    // provider.claude-oauth (kept from 9router): the claude model list sends the OAuth token as x-api-key, with only the
+    // version header.
+    const request = this.claudeCode
+      ? {
+        method: "GET" as const, url: this.provider.modelsUrl, timeoutMs: METADATA_TIMEOUT_MS,
+        headers: { "anthropic-version": this.provider.headers["anthropic-version"] ?? "2023-06-01", "content-type": "application/json", "x-api-key": credential.apiKey },
+      }
+      : this.request("GET", this.provider.modelsUrl, credential, METADATA_TIMEOUT_MS);
+    const response = await this.send(request, credential, ctx, RETRY.maxAttempts);
     const data = record(parseJson(await readBoundedText(response.body))).data;
     if (!Array.isArray(data)) throw this.invalid("a model list without a data array");
     const listed: ListedModel[] = [];
@@ -273,7 +288,7 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
     }
   }
 
-  private *blockEvent(type: string, event: Record<string, unknown>, toolIndex: Map<number, number>): Generator<StreamChunk> {
+  private *blockEvent(type: string, event: Record<string, unknown>, toolIndex: Map<number, number>, names: ReadonlyMap<string, string>): Generator<StreamChunk> {
     const index = event.index;
     if (typeof index !== "number" || !Number.isInteger(index) || index < 0) throw this.invalid("a content block without an index", true);
     if (type === "content_block_start") {
@@ -286,7 +301,7 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
         const name = text(block.name);
         if (!id || !name) throw this.invalid("a tool call without an id or name", true);
         toolIndex.set(index, toolIndex.size);
-        yield { type: "tool_call_delta", index: toolIndex.size - 1, id, name, argumentsDelta: "" };
+        yield { type: "tool_call_delta", index: toolIndex.size - 1, id, name: names.get(name) ?? name, argumentsDelta: "" };
       }
       const initial = text(block.text);
       if (kind === "text" && initial) yield { type: "text_delta", index: 0, text: initial };
@@ -319,7 +334,7 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
     }
   }
 
-  private part(block: Record<string, unknown>): ContentPart {
+  private part(block: Record<string, unknown>, names: ReadonlyMap<string, string>): ContentPart {
     switch (block.type) {
       case "text": return { type: "text", text: text(block.text) ?? "" };
       case "thinking": {
@@ -331,7 +346,7 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
         const id = text(block.id);
         const name = text(block.name);
         if (!id || !name) throw this.invalid("a tool call without an id or name");
-        return { type: "tool_call", id, name, arguments: JSON.stringify(block.input ?? {}) };
+        return { type: "tool_call", id, name: names.get(name) ?? name, arguments: JSON.stringify(block.input ?? {}) };
       }
       default: throw this.invalid(`an unsupported content block "${text(block.type) ?? ""}"`);
     }
@@ -361,7 +376,7 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
       ...extensions.anthropic,
       model: request.model,
       max_tokens: maxTokens,
-      messages: toMessages(request),
+      messages: toMessages(request, this.claudeCode),
       stream,
       ...(request.system && request.system.length > 0 ? {
         system: withMessageMark(request.system, request.systemCacheControl !== undefined).map((part) => {
@@ -384,14 +399,25 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
     };
   }
 
-  private chat(request: CanonicalRequest, credential: Credential, stream: boolean): HttpRequest {
-    return this.post(this.body(request, stream), credential, stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS, stream);
+  // provider.claude-oauth: the claude provider (claudeCode quirk) gets 9router's preparation and, for an OAuth token,
+  // cloaking; names gives the cloaked tool names back.
+  private get claudeCode(): boolean {
+    return this.provider.quirks?.includes("claudeCode") ?? false;
+  }
+
+  private async chat(request: CanonicalRequest, credential: Credential, stream: boolean): Promise<{ http: HttpRequest; names: ReadonlyMap<string, string> }> {
+    const timeoutMs = stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS;
+    const body = this.body(request, stream);
+    if (!this.claudeCode) return { http: this.post(body, credential, timeoutMs, stream), names: NO_NAMES };
+    const prepared = await claudeCodeBody(body, credential.apiKey, credential.sessionId, this.known.get(request.model)?.maxOutputTokens ?? null);
+    return { http: this.post(prepared.body, credential, timeoutMs, stream), names: prepared.names };
   }
 
   private post(body: Json, credential: Credential, timeoutMs: number, stream: boolean): HttpRequest {
-    const base = this.request("POST", this.provider.chatUrl, credential, timeoutMs);
+    // provider.claude-oauth: 9router posts the claude provider to <chatUrl>?beta=true.
+    const base = this.request("POST", this.claudeCode ? `${this.provider.chatUrl}?beta=true` : this.provider.chatUrl, credential, timeoutMs);
     const node = this.provider.anthropicNode;
-    const beta = node ? nodeBetas(body, node.official) : undefined;
+    const beta = this.claudeCode ? nodeBetas(body, true, true) : node ? nodeBetas(body, node.official) : undefined;
     return {
       ...base,
       headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json", ...(beta ? { "anthropic-beta": beta } : {}) },

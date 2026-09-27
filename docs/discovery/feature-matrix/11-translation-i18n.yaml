@@ -523,7 +523,7 @@
     - { file: open-sse/utils/claudeCloaking.js, line: 132, note: "CC_DECOY_TOOLS list, ~20 entries marked 'currently unavailable'" }
     - { file: open-sse/utils/claudeCloaking.js, line: 165, note: "applyCloaking: fabricated billing header + fake user_id, gated on sk-ant-oat" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: translator.playground-pipeline-debug

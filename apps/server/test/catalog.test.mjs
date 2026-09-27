@@ -21,10 +21,12 @@ test("the provider catalog lists every provider with its connectable status, beh
     });
     const kilo = list.find((p) => p.id === "kilocode");
     assert.deepEqual([kilo.connectable, kilo.signIn, kilo.signInOnly], [true, "device_code", true], "SP16: a sign-in provider");
+    const github = list.find((p) => p.id === "github");
+    assert.deepEqual([github.connectable, github.reason], [false, "Needs OAuth sign-in (SP16)"]);
     const claude = list.find((p) => p.id === "claude");
-    assert.deepEqual([claude.connectable, claude.reason], [false, "Needs OAuth sign-in (SP16)"]);
+    assert.deepEqual([claude.connectable, claude.signIn, claude.signInOnly], [true, "authorization_code_pkce", true], "SP16b: claude signs in");
     assert.ok(list.every((p) => p.connectable === (p.reason === null)), "a reason exactly when not connectable");
-    assert.equal(list.filter((p) => p.connectable).length, 62);
+    assert.equal(list.filter((p) => p.connectable).length, 64);
     await app.close();
   }));
 
@@ -40,7 +42,7 @@ test("a provider detail carries its models, with limits the runtime trusts", () 
     assert.deepEqual([model.kind, model.contextWindow], ["chat", 1000000]);
     const tencent = (await call({ url: "/api/providers/tencent", cookie })).json();
     assert.ok(tencent.models.every((m) => m.maxOutputTokens === null || m.contextWindow === null || m.maxOutputTokens <= m.contextWindow));
-    const blocked = (await call({ url: "/api/providers/claude", cookie })).json();
+    const blocked = (await call({ url: "/api/providers/github", cookie })).json();
     assert.ok(blocked.models.length > 0, "a provider that cannot be connected still shows its models");
     assert.ok(blocked.models.every((m) => m.kind !== "llm"), "one kind vocabulary for the UI");
     const missing = await call({ url: "/api/providers/no-such-provider", cookie });

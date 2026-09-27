@@ -8,7 +8,7 @@ import {
   estimateAnthropicInputTokens, geminiModelList, GeminiStreamEncoder, geminiTtsRequest, isGeminiTtsRequest, OpenAIChatStreamEncoder,
   parseAnthropicMessagesRequest, parseGeminiGenerateRequest, parseGeminiPath, parseOpenAIChatRequest, parseOpenAIResponsesRequest,
   responsesClientGetsObject, responsesRequestFor, ResponsesStreamEncoder, toAnthropicMessage, toGeminiResponse, toOpenAIChatCompletion, toOpenAIError,
-  toResponsesObject, UnsupportedFeatureError, withConnection, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential,
+  toResponsesObject, UnsupportedFeatureError, withClaudeCodePrompt, withConnection, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential,
   type ExecCtx, type GeminiRoute, type HttpTransportPort, type OpenAIError, type ProviderDescriptor, type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
@@ -190,6 +190,9 @@ function googleKey(request: GeminiRequest): string | undefined {
   return (typeof header === "string" && header) || (typeof query === "string" && query) || undefined;
 }
 
+const claudeCodePrompt = (request: CanonicalRequest, provider: ProviderDescriptor): CanonicalRequest =>
+  (provider.quirks?.includes("claudeCode") ? withClaudeCodePrompt(request) : request);
+
 const MISSING_KEY = "Missing API key. Send Authorization: Bearer <key>, using a key from AIGate: Gateway → Endpoint & Keys.";
 
 // routing.responses-compact-lane: the same lane with _compact set in the body, which only a Responses provider or a
@@ -290,7 +293,9 @@ export class ChatLane {
       const accept = request.headers.accept;
       const parsed = protocol.parse(request.body, typeof accept === "string" ? accept : undefined);
       const resolved = await this.resolve(parsed.request);
-      const target = { ...resolved, request: parsed.prepare(resolved.request, resolved.provider) };
+      const prepared = parsed.prepare(resolved.request, resolved.provider);
+      // provider.claude-oauth (kept from 9router): a non-Claude client's request to claude gets the Claude Code prompt.
+      const target = { ...resolved, request: protocol === ANTHROPIC_MESSAGES ? prepared : claudeCodePrompt(prepared, resolved.provider) };
       const adapter = createAdapter(target.provider, this.transport);
       const ids = { created: Math.floor(Date.now() / 1000), fallbackId: `chatcmpl-${requestId.replaceAll("-", "")}`, requestId };
       const run = async (credential: Credential): Promise<void> => {
@@ -345,7 +350,8 @@ export class ChatLane {
     try {
       // max_tokens 1024: reasoning models spend the budget thinking before they answer (9router #3010).
       const { request } = parseOpenAIChatRequest({ model, max_tokens: 1024, stream: false, messages: [{ role: "user", content: "hi" }] });
-      const target = await this.resolve(request);
+      const resolved = await this.resolve(request);
+      const target = { ...resolved, request: claudeCodePrompt(resolved.request, resolved.provider) };
       const adapter = createAdapter(target.provider, this.transport);
       const response = await this.withRefresh(target, (credential) => adapter.execute(target.request, credential, { signal: budget.signal, requestId }), () => true);
       const answered = response.content.some((part) => part.type === "text" && part.text.trim() !== "");
@@ -371,7 +377,7 @@ export class ChatLane {
       if (!upstreamAuthFailure(error) || !canRetry()) throw error;
       const token = await this.refresher.reactive(target.provider.id, target.connection, this.limits.refreshRetryDelayMs);
       if (!token) throw error;
-      return run({ kind: "api-key", apiKey: token });
+      return run({ ...target.credential, apiKey: token });
     }
   }
 
@@ -481,7 +487,8 @@ export class ChatLane {
     // oauth.refresh-lifecycle: an oauth token about to expire is refreshed first.
     const stored = await this.refresher.fresh(provider.id, current);
     // connection.ollama-local-host: a connection may point the provider at its own host.
-    return { provider: withConnection(provider, stored), request: upstream, credential: { kind: "api-key", apiKey: stored.apiKey }, connection: stored };
+    // The connection id is the session id claude and codex send (9router derives one per connection).
+    return { provider: withConnection(provider, stored), request: upstream, credential: { kind: "api-key", apiKey: stored.apiKey, sessionId: stored.id }, connection: stored };
   }
 
   private modelNotFound(ref: string): GatewayError {

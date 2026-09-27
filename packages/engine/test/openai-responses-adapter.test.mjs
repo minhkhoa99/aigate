@@ -55,12 +55,13 @@ const reply = {
   usage: { input_tokens: 100, input_tokens_details: { cached_tokens: 40 }, output_tokens: 20, output_tokens_details: { reasoning_tokens: 5 } },
 };
 
-test("perplexity-agent is connectable through the Responses adapter; codex and grok-cli wait for OAuth", () => {
+test("perplexity-agent is connectable through the Responses adapter; codex signs in (SP16b), grok-cli waits for OAuth", () => {
   assert.equal(pplx.protocol, "openai-responses");
   assert.equal(pplx.chatUrl, "https://api.perplexity.ai/v1/responses");
   assert.ok(createAdapter(pplx, fakeTransport()) instanceof OpenAIResponsesAdapter);
-  assert.equal(builtinRegistry.providers.length, 62);
-  assert.deepEqual(builtinRegistry.status("codex"), { connectable: false, reason: "Needs OAuth sign-in (SP16)" });
+  assert.equal(builtinRegistry.providers.length, 64);
+  assert.equal(builtinRegistry.provider("codex").oauth, "authorization_code_pkce");
+  assert.deepEqual(builtinRegistry.status("grok-cli"), { connectable: false, reason: "Needs OAuth sign-in (SP16)" });
 });
 
 test("execute sends 9router's Responses request with stream false and reads the Responses object", async () => {

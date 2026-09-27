@@ -35,10 +35,12 @@ export interface HttpTransportPort {
   send(request: HttpRequest, ctx: ExecCtx): Promise<HttpResponse>;
 }
 
-// M1 credentials are API keys only (SP11: one api-key account). OAuth arrives in SP16.
+// An API key or an OAuth access token (SP16 keeps both as "api-key").
 export interface Credential {
   readonly kind: "api-key";
   readonly apiKey: string;
+  // A session id stable per connection (SP16b: claude's metadata.user_id, codex's session_id and prompt_cache_key).
+  readonly sessionId?: string;
 }
 
 // One id from an upstream model list. `descriptor` is the registry entry when the id is known; an

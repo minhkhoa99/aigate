@@ -42,6 +42,10 @@ const EXECUTOR_QUIRKS: Readonly<Record<string, readonly string[]>> = {
   clinepass: ["clineAuth"],
   // provider.kimchi-browser-token: the KimchiExecutor body adjustments, for both sign-ins.
   kimchi: ["kimchi"],
+  // provider.claude-oauth / provider.codex-oauth (SP16b, kept as 9router): prepareClaudeRequest and cloaking; the
+  // CodexExecutor body, URL and model list.
+  claude: ["claudeCode"],
+  codex: ["codex"],
 };
 // provider.clinepass-headers-envelope: the Cline client headers, naming AIGate (user decision 2026-09-26; 9router names
 // itself). ponytail: AIGate has no release version yet; 0.1.0 until it does.
@@ -71,6 +75,13 @@ const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Par
   }),
   "cloudflare-ai": (provider) => ({ connectionFields: { required: ["accountId"], optional: [] }, chatProbe: firstModelProbe(provider, [401, 403, 404]) }),
   clinepass: (provider) => ({ chatProbe: firstModelProbe(provider, [401, 403]) }),
+  // provider.claude-oauth (kept from 9router): the OAuth token goes as Bearer, and the test only reads its expiry.
+  claude: () => ({ auth: { kind: "api-key", header: "authorization", scheme: "bearer" }, testByExpiry: true }),
+  // provider.codex-oauth (kept from 9router): the account id header, and the test's empty Responses call (400 is valid).
+  codex: () => ({
+    accountIdHeader: "chatgpt-account-id",
+    chatProbe: { model: "gpt-5.3-codex", body: { model: "gpt-5.3-codex", input: [], stream: false, store: false }, invalidStatuses: [401] },
+  }),
 };
 const PROTOCOL_REASONS: Readonly<Record<string, string>> = {
   service: "Media and search services come with SP22/SP23",

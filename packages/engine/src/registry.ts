@@ -65,6 +65,10 @@ export interface ProviderDescriptor {
   readonly oauth?: OAuthFlow;
   // The header a connection's organization goes in (provider.kilocode-device-auth); OpenAI-Organization otherwise.
   readonly organizationHeader?: string;
+  // SP16b: the header a signed-in connection's account id goes in (provider.codex-oauth: ChatGPT-Account-ID).
+  readonly accountIdHeader?: string;
+  // SP16b: the connection test reads the stored token expiry and calls nobody (provider.claude-oauth, kept from 9router).
+  readonly testByExpiry?: boolean;
 }
 
 export const CONNECTION_FIELDS = ["baseUrl", "deployment", "apiVersion", "organization", "accountId"] as const;
@@ -80,7 +84,11 @@ export type ProviderProtocol = (typeof PROVIDER_PROTOCOLS)[number];
 export function withConnection(connected: ProviderDescriptor, data: ConnectionData): ProviderDescriptor {
   // The organization header, for azure (a connection field) and kilocode (from the sign-in).
   const organization = data.organization;
-  const provider = organization ? { ...connected, headers: { ...connected.headers, [connected.organizationHeader ?? "openai-organization"]: organization } } : connected;
+  const added = {
+    ...(organization ? { [connected.organizationHeader ?? "openai-organization"]: organization } : {}),
+    ...(connected.accountIdHeader && data.accountId ? { [connected.accountIdHeader]: data.accountId } : {}),
+  };
+  const provider = Object.keys(added).length > 0 ? { ...connected, headers: { ...connected.headers, ...added } } : connected;
   const paths = provider.connectionBaseUrl;
   if (paths) {
     if (!data.baseUrl) return provider;

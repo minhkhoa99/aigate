@@ -3,7 +3,7 @@ import { readBoundedText } from "./http.js";
 import { isRecord, parseJson, record, text } from "./json.js";
 import type { ExecCtx, HttpTransportPort } from "./ports.js";
 
-// OAuth sign-in and refresh for the SP16 providers (docs/contracts/oauth.md). Kept as 9router has them (user decisions
+// OAuth sign-in and refresh for the SP16 and SP16b providers (docs/contracts/oauth.md). Kept as 9router has them (user decisions
 // 2026-09-27): cline, clinepass (whose tokens the ClinePass API rejects, #2333), gitlab (PKCE with the operator's own
 // app), kilocode (device code), kimchi (browser token). Every call goes through the transport port.
 
@@ -50,6 +50,12 @@ export interface OAuthProvider {
   poll?(deviceCode: string, io: OAuthIO): Promise<PollResult>;
   // null when the provider refused the refresh.
   refresh?(refreshToken: string, io: OAuthIO): Promise<OAuthTokens | null>;
+  // A callback the provider accepts only at this address (codex: its CLI's fixed port); the dashboard pastes it back.
+  readonly fixedRedirect?: string;
+  // How long before expiry a proactive refresh runs (5 minutes when unset), and the age of the last refresh that forces
+  // one (9router's refreshLeadMs and maxRefreshAgeMs).
+  readonly refreshLeadMs?: number;
+  readonly maxRefreshAgeMs?: number;
 }
 
 const TIMEOUT_MS = 15_000;
@@ -245,7 +251,116 @@ const kimchi: OAuthProvider = {
   },
 };
 
-export const OAUTH_PROVIDERS: Readonly<Record<string, OAuthProvider>> = { cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi };
+// ---- claude (provider.claude-oauth), kept as 9router has it (user decision 2026-09-27) ----
+
+const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+const CLAUDE_TOKEN_URL = "https://api.anthropic.com/v1/oauth/token";
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
+
+// The token response kept: no profile call, so no email (kept).
+function claudeTokens(root: Record<string, unknown>, previousRefresh?: string): OAuthTokens | undefined {
+  const accessToken = text(root.access_token);
+  if (!accessToken) return undefined;
+  const refreshToken = text(root.refresh_token) || previousRefresh;
+  return {
+    accessToken,
+    ...(refreshToken ? { refreshToken } : {}),
+    ...(typeof root.expires_in === "number" ? { expiresIn: root.expires_in } : {}),
+    data: strings({ scope: root.scope }),
+  };
+}
+
+const claude: OAuthProvider = {
+  flow: "authorization_code_pkce",
+  refreshLeadMs: 4 * HOUR_MS,
+  authUrl: (redirectUri, state, codeChallenge) => `https://claude.ai/oauth/authorize?${new URLSearchParams({
+    code: "true", client_id: CLAUDE_CLIENT_ID, response_type: "code", redirect_uri: redirectUri, scope: "org:create_api_key user:profile user:inference",
+    code_challenge: codeChallenge, code_challenge_method: "S256", state,
+  }).toString()}`,
+  async exchange(code, redirectUri, codeVerifier, meta, io) {
+    // The page shows "code#state"; the state after "#" wins over the one the dashboard sends back.
+    const [authCode = "", codeState = ""] = code.split("#");
+    const answer = await call(io, "POST", CLAUDE_TOKEN_URL, JSON_HEADERS, JSON.stringify({
+      code: authCode, state: codeState || meta.state || "", grant_type: "authorization_code", client_id: CLAUDE_CLIENT_ID, redirect_uri: redirectUri, code_verifier: codeVerifier,
+    }));
+    if (!answer.ok) throw failed("claude", `Token exchange failed: ${answer.text}`);
+    const tokens = claudeTokens(record(parseJson(answer.text)));
+    if (!tokens) throw failed("claude", "Claude returned no access token");
+    return tokens;
+  },
+  // Any failure is a refused refresh (null), as 9router has it (kept).
+  async refresh(refreshToken, io) {
+    const answer = await call(io, "POST", CLAUDE_TOKEN_URL, JSON_HEADERS, JSON.stringify({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: CLAUDE_CLIENT_ID }));
+    return answer.ok ? claudeTokens(record(parseJson(answer.text)), refreshToken) ?? null : null;
+  },
+};
+
+// ---- codex (provider.codex-oauth), kept as 9router has it (user decision 2026-09-27) ----
+
+const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
+const CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token";
+export const CODEX_REDIRECT = "http://localhost:1455/auth/callback";
+
+// A JWT's payload, or an empty record (9router decodeJwtPayload).
+function jwtPayload(token: unknown): Record<string, unknown> {
+  const part = typeof token === "string" ? token.split(".")[1] : undefined;
+  if (!part) return {};
+  try {
+    const binary = atob(part.replace(/-/g, "+").replace(/_/g, "/"));
+    return record(parseJson(new TextDecoder().decode(Uint8Array.from(binary, (char) => char.charCodeAt(0)))));
+  } catch {
+    return {};
+  }
+}
+
+const codex: OAuthProvider = {
+  flow: "authorization_code_pkce",
+  fixedRedirect: CODEX_REDIRECT,
+  refreshLeadMs: 5 * DAY_MS,
+  maxRefreshAgeMs: 8 * DAY_MS,
+  // encodeURIComponent, so the scope's spaces are %20.
+  authUrl: (redirectUri, state, codeChallenge) => `https://auth.openai.com/oauth/authorize?${Object.entries({
+    response_type: "code", client_id: CODEX_CLIENT_ID, redirect_uri: redirectUri, scope: "openid profile email offline_access", code_challenge: codeChallenge,
+    code_challenge_method: "S256", id_token_add_organizations: "true", codex_cli_simplified_flow: "true", originator: "codex_cli_rs", state,
+  }).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join("&")}`,
+  async exchange(code, redirectUri, codeVerifier, _meta, io) {
+    const form = new URLSearchParams({ grant_type: "authorization_code", client_id: CODEX_CLIENT_ID, code, redirect_uri: redirectUri, code_verifier: codeVerifier });
+    const answer = await call(io, "POST", CODEX_TOKEN_URL, { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, form.toString());
+    if (!answer.ok) throw failed("codex", `Token exchange failed: ${answer.text}`);
+    const root = record(parseJson(answer.text));
+    const accessToken = text(root.access_token);
+    if (!accessToken) throw failed("codex", "Codex returned no access token");
+    const id = jwtPayload(root.id_token);
+    const auth = record(id["https://api.openai.com/auth"]);
+    const access = jwtPayload(accessToken);
+    const email = text(id.email) || text(access.email) || text(access.preferred_username) || text(access.sub);
+    const refreshToken = text(root.refresh_token);
+    return {
+      accessToken,
+      ...(refreshToken ? { refreshToken } : {}),
+      ...(typeof root.expires_in === "number" ? { expiresIn: root.expires_in } : {}),
+      ...(email ? { email } : {}),
+      data: strings({ chatgptAccountId: text(auth.chatgpt_account_id) || id.account_id, chatgptPlanType: text(auth.chatgpt_plan_type) || id.plan_type }),
+    };
+  },
+  // The refreshed id_token is not read, so the account id and plan stay as signed in (kept).
+  async refresh(refreshToken, io) {
+    const answer = await call(io, "POST", CODEX_TOKEN_URL, JSON_HEADERS, JSON.stringify({ client_id: CODEX_CLIENT_ID, grant_type: "refresh_token", refresh_token: refreshToken }));
+    if (!answer.ok) return null;
+    const root = record(parseJson(answer.text));
+    const accessToken = text(root.access_token);
+    if (!accessToken) return null;
+    return {
+      accessToken,
+      refreshToken: text(root.refresh_token) || refreshToken,
+      ...(typeof root.expires_in === "number" ? { expiresIn: root.expires_in } : {}),
+      data: {},
+    };
+  },
+};
+
+export const OAUTH_PROVIDERS: Readonly<Record<string, OAuthProvider>> = { cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi, claude, codex };
 
 // Cline OAuth access tokens are WorkOS JWTs sent as "workos:<jwt>"; a ClinePass API key (not a JWT) goes as is.
 // A token already prefixed does not start with "eyJ", so it passes as is.

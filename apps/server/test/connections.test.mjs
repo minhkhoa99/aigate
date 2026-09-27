@@ -76,10 +76,10 @@ test("one connection per provider; unsupported providers and bad bodies name the
     const again = await create(as, { provider: "openai", apiKey: "sk-another-key-1234" });
     assert.equal(again.statusCode, 409);
     assert.equal(again.json().code, "ALREADY_CONNECTED");
-    const unsupported = await create(as, { provider: "claude", apiKey: SECRET });
+    const unsupported = await create(as, { provider: "github", apiKey: SECRET });
     assert.equal(unsupported.statusCode, 400);
     assert.equal(unsupported.json().code, "PROVIDER_NOT_SUPPORTED");
-    assert.match(unsupported.json().message, /claude cannot be connected yet: Needs OAuth sign-in \(SP16\)\.$/, "the catalog reason");
+    assert.match(unsupported.json().message, /github cannot be connected yet: Needs OAuth sign-in \(SP16\)\.$/, "the catalog reason");
     const unknown = await create(as, { provider: "no-such-provider", apiKey: SECRET });
     assert.deepEqual([unknown.statusCode, unknown.json().code], [400, "PROVIDER_NOT_SUPPORTED"]);
     assert.match(unknown.json().message, /not in the catalog/);

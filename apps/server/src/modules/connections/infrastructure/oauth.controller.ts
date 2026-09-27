@@ -42,7 +42,8 @@ export class OAuthController {
     const { flow } = this.provider(id);
     if (action === "authorize") {
       const params = strings(query);
-      const redirectUri = params.redirect_uri ?? DEFAULT_REDIRECT;
+      // provider.codex-oauth: codex accepts only its CLI callback, which the dashboard pastes back.
+      const redirectUri = flow.fixedRedirect ?? params.redirect_uri ?? DEFAULT_REDIRECT;
       // Every other query parameter is provider meta (gitlab: baseUrl, clientId, clientSecret).
       const meta = Object.fromEntries(Object.entries(params).filter(([key]) => key !== "redirect_uri"));
       const pkce = await generatePkce();
@@ -70,7 +71,9 @@ export class OAuthController {
     if (action === "exchange") {
       const { code, redirectUri, codeVerifier } = fields;
       if (!code || !redirectUri || (!codeVerifier && !NO_PKCE.has(descriptor.id)) || !flow.exchange) throw invalid("Missing required fields: code, redirectUri, codeVerifier");
-      const tokens = await flow.exchange(code, redirectUri, codeVerifier ?? "", strings("meta" in body ? body.meta : undefined), this.io()).catch(flowError);
+      // provider.claude-oauth: the state the dashboard sends back, used when the pasted code has none after "#".
+      const meta = { ...strings("meta" in body ? body.meta : undefined), ...(fields.state ? { state: fields.state } : {}) };
+      const tokens = await flow.exchange(code, redirectUri, codeVerifier ?? "", meta, this.io()).catch(flowError);
       const view = await this.save(descriptor, tokens);
       return { success: true, connection: { id: view.id, provider: view.provider, email: view.email, displayName: tokens.displayName ?? null } };
     }
@@ -104,6 +107,8 @@ export class OAuthController {
       provider: descriptor.id, name: tokens.displayName ?? tokens.email ?? descriptor.name, tokens,
       // provider.kilocode-device-auth: the organization goes in X-Kilocode-OrganizationID.
       ...(tokens.data.orgId ? { organization: tokens.data.orgId } : {}),
+      // provider.codex-oauth: the ChatGPT account id goes in ChatGPT-Account-ID.
+      ...(tokens.data.chatgptAccountId ? { accountId: tokens.data.chatgptAccountId } : {}),
     });
     if (saved === "conflict") {
       throw new ConflictException({

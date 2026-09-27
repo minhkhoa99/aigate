@@ -119,7 +119,7 @@ test("kimchi: the browser token is checked against cast.ai; user info names the 
   await assert.rejects(kimchi.exchange("tok", "", "", {}, io(fakeTransport(reply(401, {})))), (e) => e.code === "AUTH_ERROR" && e.message === "Kimchi token validation failed: 401");
 });
 
-test("the registry signs in to the five providers; Cline tokens go as workos:, Kilo Code's organization in its header, Kimchi's body is adjusted", async () => {
+test("the registry signs in to the SP16 providers; Cline tokens go as workos:, Kilo Code's organization in its header, Kimchi's body is adjusted", async () => {
   assert.deepEqual(["cline", "clinepass", "gitlab", "kilocode", "kimchi"].map((id) => builtinRegistry.provider(id).oauth),
     ["authorization_code", "authorization_code", "authorization_code_pkce", "device_code", "browser_token"]);
   assert.equal(builtinRegistry.provider("openai").oauth, undefined);

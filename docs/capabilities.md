@@ -1631,6 +1631,26 @@ Every item below is a capability AIGate must have. Derived from tracing
   - A refresh merges the returned fields into the row and merges providerSpecificData instead of replacing it
   - Tokens are stored in the SQLite row as given
 
+### claude: PKCE sign-in at claude.ai, Messages at api.anthropic.com with Claude Code headers and, for sk-ant-oat tokens, cloaking
+
+- **id:** `provider.claude-oauth` · **module:** `connections`
+- **Trigger:** Dashboard sign-in for Claude Code; any request routed to provider claude
+- **Input:** Authorization code (code#state), PKCE verifier; chat requests in any client format
+- **Output:** An oauth connection { accessToken, refreshToken, expiresIn, scope }; Messages answers
+- **Rules:**
+  - Authorize https://claude.ai/oauth/authorize?code=true&client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e&response_type=code&redirect_uri&scope=org:create_api_key user:profile user:inference&code_challenge&code_challenge_method=S256&state; redirect is the dashboard's own /callback
+  - The pasted code may be code#state; exchange POST https://api.anthropic.com/v1/oauth/token JSON { code, state, grant_type: authorization_code, client_id, redirect_uri, code_verifier }; only accessToken, refreshToken, expiresIn, scope are kept (no email)
+  - Refresh JSON { grant_type: refresh_token, refresh_token, client_id } at the same URL, 4 h before expiry; a failure is null
+  - Requests: POST https://api.anthropic.com/v1/messages?beta=true, Authorization: Bearer <token>, anthropic-version 2023-06-01, an anthropic-beta list chosen per model (claude-code-20250219, oauth-2025-04-20, ...; advanced-tool-use and effort for opus/sonnet), User-Agent claude-cli/2.1.280 (external, sdk-cli), X-App cli, Anthropic-Dangerous-Direct-Browser-Access true, X-Stainless-* headers
+  - OpenAI clients get the system block 'You are Claude Code, Anthropic's official CLI for Claude.' in front; Claude clients do not
+  - For a token containing sk-ant-oat: a billing-header system block (cc_version, cc_entrypoint=sdk-cli, cch=sha256(body)[0:5]), an invented metadata.user_id (device_id, account_uuid, session_id), tool names suffixed _ide plus 20 decoy tools, decloaked in the answer
+  - prepareClaudeRequest replaces the client's cache marks (1h on the last system block and tool, ephemeral on the last assistant block) and keeps only signed thinking blocks
+  - The connection test only checks the stored expiry (refreshing when due); no request is sent
+  - Model listing GET https://api.anthropic.com/v1/models sends the OAuth token in x-api-key
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (token refused or refresh failed)
+- **AIGate required behavior:** Models are listed with the OAuth header, the test checks the token with the provider, a dead refresh token is recognised, and the account is known
+
 ### Cline and ClinePass sign-in, token format, refresh, and request headers
 
 - **id:** `provider.cline-oauth` · **module:** `connections`
@@ -1647,6 +1667,44 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Streaming:** yes
 - **Errors:** `PROVIDER_UNAVAILABLE` (the fallback token exchange fails)
 - **AIGate required behavior:** ClinePass offers only the sign-in that works (its API key)
+
+### codex: PKCE sign-in at auth.openai.com with a fixed 1455 callback, Responses at chatgpt.com/backend-api/codex
+
+- **id:** `provider.codex-oauth` · **module:** `connections`
+- **Trigger:** Dashboard sign-in for OpenAI Codex; any request routed to provider codex
+- **Input:** Authorization code from http://localhost:1455/auth/callback, PKCE verifier
+- **Output:** An oauth connection { accessToken, refreshToken, idToken, email, chatgptAccountId, chatgptPlanType }; Responses answers
+- **Rules:**
+  - Authorize https://auth.openai.com/oauth/authorize with response_type=code, client_id=app_EMoamEEZ73f0CkXaXp7hrann, redirect_uri=http://localhost:1455/auth/callback, scope 'openid profile email offline_access', S256 challenge, id_token_add_organizations=true, codex_cli_simplified_flow=true, originator=codex_cli_rs, state
+  - Exchange POST https://auth.openai.com/oauth/token form-urlencoded { grant_type: authorization_code, client_id, code, redirect_uri, code_verifier }; the id_token gives email, chatgpt_account_id and plan type
+  - 9router listens on 127.0.0.1:1455 for the callback (a paste is the fallback)
+  - Refresh JSON { client_id, grant_type: refresh_token, refresh_token }; invalid_grant and refresh_token_expired/reused/invalidated are unrecoverable; refreshed 5 days before expiry or when the last refresh is 8 days old; the new id_token is not read
+  - Requests: POST https://chatgpt.com/backend-api/codex/responses (.../compact for compaction), Authorization Bearer, originator codex_cli_rs, User-Agent codex_cli_rs/0.154.0, Accept text/event-stream, session_id, ChatGPT-Account-ID
+  - Body: always stream, store false, instructions = the Codex CLI prompt when empty, system -> developer, response item ids removed, reasoning { effort (default low), summary auto }, include reasoning.encrypted_content, sampling and max tokens removed, fast -> priority service tier, then only model, input, instructions, tools, tool_choice, stream, store, reasoning, service_tier, include, prompt_cache_key, client_metadata, text kept
+  - A <model>-review id is sent as <model>; a non-streaming client gets the stream collapsed into one answer
+  - Connection test POST .../codex/responses { model: gpt-5.3-codex, input: [], stream: false, store: false }; 400 counts as valid, 401 as invalid
+  - Model listing GET https://chatgpt.com/backend-api/codex/models?client_version=0.144.6 with originator; each chat model also listed as <id>-review
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (token refused or refresh unrecoverable), `RATE_LIMIT` (usage_limit_reached)
+- **AIGate required behavior:** A compaction request goes to /compact and no other request does; a failed refresh fails the test; account data follows the refreshed id_token; models are listed as the same client version
+
+### github: device-code sign-in, a Copilot token exchanged from the GitHub token, chat at api.githubcopilot.com with VS Code headers, Claude models on /v1/messages and codex models on /responses
+
+- **id:** `provider.github-copilot-oauth` · **module:** `connections`
+- **Trigger:** Dashboard sign-in for GitHub Copilot; any request routed to provider github
+- **Input:** Device code approval
+- **Output:** An oauth connection { accessToken (GitHub), copilotToken, copilotTokenExpiresAt, githubLogin, email }
+- **Rules:**
+  - Device code POST https://github.com/login/device/code form { client_id: Iv1.b507a08c87ecfe98, scope: read:user }; poll https://github.com/login/oauth/access_token { client_id, device_code, grant_type: urn:ietf:params:oauth:grant-type:device_code }; authorization_pending and slow_down are pending
+  - After approval: GET https://api.github.com/copilot_internal/v2/token and GET https://api.github.com/user (Bearer, X-GitHub-Api-Version 2022-11-28, User-Agent GitHubCopilotChat/0.26.7); a failure of either is ignored
+  - The Copilot token (about 30 minutes) is refreshed from the GitHub token 5 minutes before expires_at: GET copilot_internal/v2/token with Authorization: token <gh>, User-Agent GitHubCopilotChat/0.38.0, Editor-Version vscode/1.110.0, Editor-Plugin-Version copilot-chat/0.38.0, x-github-api-version 2025-04-01
+  - Requests send Authorization: Bearer <copilot token or GitHub token>, copilot-integration-id vscode-chat, editor-version vscode/1.110.0, editor-plugin-version copilot-chat/0.38.0, user-agent GitHubCopilotChat/0.38.0, openai-intent conversation-panel, x-github-api-version 2025-04-01, x-request-id, X-Initiator user
+  - A model named *claude* goes to https://api.githubcopilot.com/v1/messages translated to Claude and streamed; a model known to need /responses goes there; otherwise /chat/completions (content reduced to text and image_url; max_tokens -> max_completion_tokens for gpt-5/o-series; reasoning_effort none removed); a 400 'not accessible via the /chat/completions endpoint' or 'The requested model is not supported' moves the model to /responses (remembered in memory)
+  - Connection test GET https://api.github.com/user with the GitHub token
+  - Model listing GET https://api.githubcopilot.com/models with the stored Copilot token, keeping capabilities.type chat and policy.state not disabled
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (Copilot token refused)
+- **AIGate required behavior:** A missing Copilot subscription fails the sign-in, the model list refreshes an expired Copilot token, poll errors stop polling, and the Claude route gets the same parameter rules
 
 ### GitLab Duo OAuth sign-in (PKCE with the operator's own OAuth application) and its chat requests
 
@@ -4377,6 +4435,9 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `oauth.refresh-lifecycle` | One refresh at a time per connection on every path (spec §9 SP16: single-flight); no refresh attempts for a connection that cannot refresh | The reactive path bypasses the lock, and it retries three times with delays even when no refresher exists | Rotating refresh tokens get invalidated under concurrency; every 401 on a non-refreshable connection costs 3 s |
 | `provider.cline-oauth` | ClinePass offers only the sign-in that works (its API key) | ClinePass also offers the Cline OAuth sign-in, whose tokens its API rejects | A ClinePass OAuth connection looks connected and every request fails |
 | `provider.gitlab-duo-oauth` | Chat goes to the connection's GitLab in the Duo Chat format, and the token is refreshed before it expires | An OpenAI body goes to gitlab.com whatever the instance; no refresh | GitLab Duo requests fail, and a working sign-in dies after two hours (9router hides the provider) |
+| `provider.claude-oauth` | Models are listed with the OAuth header, the test checks the token with the provider, a dead refresh token is recognised, and the account is known | The model list sends the token as x-api-key, the test only reads the stored expiry, refresh failures are all null, and no email is stored | Import from /models fails for every claude connection; a revoked token reads as working; the connection has no account name |
+| `provider.codex-oauth` | A compaction request goes to /compact and no other request does; a failed refresh fails the test; account data follows the refreshed id_token; models are listed as the same client version | The URL is built before the request sets the compact flag (on a shared executor), a refresh error object is taken as tokens, the account id and plan never update, and model listing says 0.144.6 | Compaction and normal requests can hit the wrong endpoint; a dead connection tests with 'Bearer undefined'; newer models may be missing |
+| `provider.github-copilot-oauth` | A missing Copilot subscription fails the sign-in, the model list refreshes an expired Copilot token, poll errors stop polling, and the Claude route gets the same parameter rules | A failed Copilot exchange saves a connection without a Copilot token, the model list uses the stored (often expired) token, unknown poll errors keep polling, and the Claude route skips the parameter rules | A connection reads as working but cannot chat; Import from /models fails after 30 minutes; the dialog waits for nothing; Claude models may answer 400 |
 | `account.concurrent-refresh-race` | Two concurrent requests hitting an expired/rejected token on the same connection should converge on one valid refreshed token — either serialized so the second reuses the first's fresh token, or each refresh is independently idempotent regardless of which refreshToken value it started from | No per-connection lock exists around either the proactive (checkAndRefreshToken) or reactive (chatCore.js 401/403) refresh call; each concurrent request refreshes using its own in-memory refreshToken snapshot with no coordination with other in-flight requests for the same connection | For providers with single-use rotating refresh tokens (the code names xAI and grok-cli explicitly), a burst of concurrent requests around token-expiry time causes all but the first refresh to fail with invalid_grant, which can further trigger markAccountUnavailable and lock the connection out even though it was just successfully refreshed by a sibling request |
 | `catalog.alias-disabled-model-bypass` | A model marked disabled in the dashboard should be rejected if a request targets it — directly or via an alias — mirroring how it disappears from every model-listing endpoint ("disable" implies block, not just hide) | The chat/routing path never reads the disabledModels table at all; only the discovery endpoints (/api/models, /v1/models) filter by it, so a disabled model keeps working for any client that already knows its id, or that reaches it through an alias or combo | The 'disable' control only removes discoverability, not access — a compliance or cost-control use case ('stop routing to this expensive/broken model') is not actually enforced, silently, with no error surfaced to the operator who disabled it |
 | `catalog.alias-dual-convention-collision` | Both endpoints described as setting 'the alias for a model' should write the same KV shape so a value set through either surface is visible to the other, and to actual chat routing | The two routes call the same setModelAlias(alias, model) primitive with swapped argument order, so /api/models/alias produces routable aliases (key=alias) while /api/models produces display-only rows (key=modelId) in the same table — each is invisible to the other's reader | An alias set via the main /api/models list page's inline rename never actually works as a callable alias in a chat request (resolveModelAliasFromMap won't find it), while a routable alias created via the dedicated alias-management endpoint never appears as that model's display label in the main list — two silently disconnected features sharing one KV namespace |

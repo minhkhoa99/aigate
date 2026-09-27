@@ -36,13 +36,25 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
     clearInterval(this.timer);
   }
 
-  // Proactive (checkAndRefreshToken): a token that expires within 5 minutes is refreshed before it is used; a failed
-  // refresh leaves the old token.
+  // Proactive (checkAndRefreshToken): a token that expires within the provider's lead (5 minutes unless it names one:
+  // claude 4 h, codex 5 days) or whose last refresh is older than its maximum age (codex 8 days) is refreshed before it is
+  // used; a failed refresh leaves the old token.
   async fresh<T extends StoredCredential>(provider: string, stored: T): Promise<T> {
-    const oauth = stored.oauth;
-    if (!oauth?.refreshToken || !oauth.expiresAt || oauth.expiresAt.getTime() - Date.now() >= LEAD_MS) return stored;
-    const token = await this.locked(stored.id, provider, oauth.refreshToken);
+    const refreshToken = stored.oauth?.refreshToken;
+    if (!refreshToken || !this.due(provider, stored)) return stored;
+    const token = await this.locked(stored.id, provider, refreshToken);
     return token ? { ...stored, apiKey: token } : stored;
+  }
+
+  // 9router shouldRefreshCredentials.
+  due(provider: string, stored: StoredCredential): boolean {
+    const oauth = stored.oauth;
+    if (!oauth) return false;
+    const flow = OAUTH_PROVIDERS[provider];
+    const now = Date.now();
+    const expiring = oauth.expiresAt !== null && oauth.expiresAt.getTime() - now < (flow?.refreshLeadMs ?? LEAD_MS);
+    const stale = flow?.maxRefreshAgeMs !== undefined && (oauth.lastRefreshAt === null || now - oauth.lastRefreshAt.getTime() > flow.maxRefreshAgeMs);
+    return expiring || stale;
   }
 
   // Reactive (refreshWithRetry after a 401/403): three attempts, attempt × delayMs apart, without the lock. A connection

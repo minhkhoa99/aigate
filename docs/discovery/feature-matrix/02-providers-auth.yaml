@@ -2348,3 +2348,146 @@
   newModule: connections
   parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
+
+- id: provider.claude-oauth
+  group: OAuth providers
+  feature: Claude Code subscription sign-in
+  subFeature: "claude: PKCE sign-in at claude.ai, Messages at api.anthropic.com with Claude Code headers and, for sk-ant-oat tokens, cloaking"
+  trigger: "Dashboard sign-in for Claude Code; any request routed to provider claude"
+  input: "Authorization code (code#state), PKCE verifier; chat requests in any client format"
+  output: "An oauth connection { accessToken, refreshToken, expiresIn, scope }; Messages answers"
+  businessRules:
+    - "Authorize https://claude.ai/oauth/authorize?code=true&client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e&response_type=code&redirect_uri&scope=org:create_api_key user:profile user:inference&code_challenge&code_challenge_method=S256&state; redirect is the dashboard's own /callback"
+    - "The pasted code may be code#state; exchange POST https://api.anthropic.com/v1/oauth/token JSON { code, state, grant_type: authorization_code, client_id, redirect_uri, code_verifier }; only accessToken, refreshToken, expiresIn, scope are kept (no email)"
+    - "Refresh JSON { grant_type: refresh_token, refresh_token, client_id } at the same URL, 4 h before expiry; a failure is null"
+    - "Requests: POST https://api.anthropic.com/v1/messages?beta=true, Authorization: Bearer <token>, anthropic-version 2023-06-01, an anthropic-beta list chosen per model (claude-code-20250219, oauth-2025-04-20, ...; advanced-tool-use and effort for opus/sonnet), User-Agent claude-cli/2.1.280 (external, sdk-cli), X-App cli, Anthropic-Dangerous-Direct-Browser-Access true, X-Stainless-* headers"
+    - "OpenAI clients get the system block 'You are Claude Code, Anthropic's official CLI for Claude.' in front; Claude clients do not"
+    - "For a token containing sk-ant-oat: a billing-header system block (cc_version, cc_entrypoint=sdk-cli, cch=sha256(body)[0:5]), an invented metadata.user_id (device_id, account_uuid, session_id), tool names suffixed _ide plus 20 decoy tools, decloaked in the answer"
+    - "prepareClaudeRequest replaces the client's cache marks (1h on the last system block and tool, ephemeral on the last assistant block) and keeps only signed thinking blocks"
+    - "The connection test only checks the stored expiry (refreshing when due); no request is sent"
+    - "Model listing GET https://api.anthropic.com/v1/models sends the OAuth token in x-api-key"
+  state:
+    reads: ["providerConnections (accessToken, refreshToken, expiresAt)"]
+    writes: ["providerConnections on sign-in and refresh"]
+    runtimeOnly: []
+  dependencies: ["oauth.dashboard-flow", "oauth.refresh-lifecycle", "translator.claude-oauth-cloaking", "translator.openai-to-claude-request"]
+  providerInteraction: "claude.ai (authorize), api.anthropic.com (token, messages, models)"
+  fallback: { hasFallback: true, retry: "reactive refresh on 401/403", timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "token refused or refresh failed", partial: false }
+  sideEffects: ["Refresh rotates the refresh token"]
+  persistence: ["providerConnections oauth row"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: "proactive refresh deduplicated; the reactive 401 refresh is not" }
+  edgeCases:
+    - "An sk-ant-oat token saved as an API key goes in x-api-key while cloaking still runs"
+  evidence:
+    - { file: open-sse/providers/registry/claude.js, line: 21, note: "baseUrl, format claude, urlSuffix ?beta=true" }
+    - { file: open-sse/providers/registry/claude.js, line: 67, note: "oauth config: client id, URLs, scopes, refreshLeadMs" }
+    - { file: src/lib/oauth/providers/claude.js, line: 20, note: "code#state split" }
+    - { file: src/lib/oauth/providers/claude.js, line: 52, note: "mapTokens: no identity" }
+    - { file: open-sse/utils/claudeCloaking.js, line: 165, note: "applyCloaking for sk-ant-oat tokens" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 25, note: "claude test: checkExpiry only" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 175, note: "models listing with x-api-key" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Models are listed with the OAuth header, the test checks the token with the provider, a dead refresh token is recognised, and the account is known"
+    actual: "The model list sends the token as x-api-key, the test only reads the stored expiry, refresh failures are all null, and no email is stored"
+    impact: "Import from /models fails for every claude connection; a revoked token reads as working; the connection has no account name"
+
+- id: provider.codex-oauth
+  group: OAuth providers
+  feature: ChatGPT (Codex) subscription sign-in
+  subFeature: "codex: PKCE sign-in at auth.openai.com with a fixed 1455 callback, Responses at chatgpt.com/backend-api/codex"
+  trigger: "Dashboard sign-in for OpenAI Codex; any request routed to provider codex"
+  input: "Authorization code from http://localhost:1455/auth/callback, PKCE verifier"
+  output: "An oauth connection { accessToken, refreshToken, idToken, email, chatgptAccountId, chatgptPlanType }; Responses answers"
+  businessRules:
+    - "Authorize https://auth.openai.com/oauth/authorize with response_type=code, client_id=app_EMoamEEZ73f0CkXaXp7hrann, redirect_uri=http://localhost:1455/auth/callback, scope 'openid profile email offline_access', S256 challenge, id_token_add_organizations=true, codex_cli_simplified_flow=true, originator=codex_cli_rs, state"
+    - "Exchange POST https://auth.openai.com/oauth/token form-urlencoded { grant_type: authorization_code, client_id, code, redirect_uri, code_verifier }; the id_token gives email, chatgpt_account_id and plan type"
+    - "9router listens on 127.0.0.1:1455 for the callback (a paste is the fallback)"
+    - "Refresh JSON { client_id, grant_type: refresh_token, refresh_token }; invalid_grant and refresh_token_expired/reused/invalidated are unrecoverable; refreshed 5 days before expiry or when the last refresh is 8 days old; the new id_token is not read"
+    - "Requests: POST https://chatgpt.com/backend-api/codex/responses (.../compact for compaction), Authorization Bearer, originator codex_cli_rs, User-Agent codex_cli_rs/0.154.0, Accept text/event-stream, session_id, ChatGPT-Account-ID"
+    - "Body: always stream, store false, instructions = the Codex CLI prompt when empty, system -> developer, response item ids removed, reasoning { effort (default low), summary auto }, include reasoning.encrypted_content, sampling and max tokens removed, fast -> priority service tier, then only model, input, instructions, tools, tool_choice, stream, store, reasoning, service_tier, include, prompt_cache_key, client_metadata, text kept"
+    - "A <model>-review id is sent as <model>; a non-streaming client gets the stream collapsed into one answer"
+    - "Connection test POST .../codex/responses { model: gpt-5.3-codex, input: [], stream: false, store: false }; 400 counts as valid, 401 as invalid"
+    - "Model listing GET https://chatgpt.com/backend-api/codex/models?client_version=0.144.6 with originator; each chat model also listed as <id>-review"
+  state:
+    reads: ["providerConnections"]
+    writes: ["providerConnections on sign-in and refresh"]
+    runtimeOnly: ["the 1455 callback listener"]
+  dependencies: ["oauth.dashboard-flow", "oauth.refresh-lifecycle", "routing.forced-stream-json-collapse"]
+  providerInteraction: "auth.openai.com (authorize, token), chatgpt.com (responses, models)"
+  fallback: { hasFallback: true, retry: "reactive refresh on 401/403; overloaded errors retried on the same account", timeout: null, quota: "429 usage_limit_reached parsed into a reset time" }
+  errorCases:
+    - { code: AUTH_ERROR, when: "token refused or refresh unrecoverable", partial: false }
+    - { code: RATE_LIMIT, when: "usage_limit_reached", partial: false }
+  sideEffects: ["Refresh rotates the refresh token"]
+  persistence: ["providerConnections oauth row"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: "a singleton executor keeps the compact flag between requests" }
+  edgeCases:
+    - "Model listing uses client version 0.144.6 while requests say 0.154.0, and sends no account id"
+  evidence:
+    - { file: open-sse/providers/registry/codex.js, line: 38, note: "baseUrl, format openai-responses, forceStream" }
+    - { file: open-sse/providers/registry/codex.js, line: 84, note: "oauth config: client id, URLs, fixed port 1455, extra params" }
+    - { file: src/lib/oauth/providers/codex.js, line: 25, note: "form-urlencoded exchange" }
+    - { file: open-sse/executors/codex.js, line: 232, note: "buildUrl reads _isCompact set later by transformRequest" }
+    - { file: open-sse/executors/codex.js, line: 403, note: "transformRequest" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 26, note: "codex test probe" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 23, note: "CODEX_CLIENT_VERSION 0.144.6" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A compaction request goes to /compact and no other request does; a failed refresh fails the test; account data follows the refreshed id_token; models are listed as the same client version"
+    actual: "The URL is built before the request sets the compact flag (on a shared executor), a refresh error object is taken as tokens, the account id and plan never update, and model listing says 0.144.6"
+    impact: "Compaction and normal requests can hit the wrong endpoint; a dead connection tests with 'Bearer undefined'; newer models may be missing"
+
+- id: provider.github-copilot-oauth
+  group: OAuth providers
+  feature: GitHub Copilot sign-in
+  subFeature: "github: device-code sign-in, a Copilot token exchanged from the GitHub token, chat at api.githubcopilot.com with VS Code headers, Claude models on /v1/messages and codex models on /responses"
+  trigger: "Dashboard sign-in for GitHub Copilot; any request routed to provider github"
+  input: "Device code approval"
+  output: "An oauth connection { accessToken (GitHub), copilotToken, copilotTokenExpiresAt, githubLogin, email }"
+  businessRules:
+    - "Device code POST https://github.com/login/device/code form { client_id: Iv1.b507a08c87ecfe98, scope: read:user }; poll https://github.com/login/oauth/access_token { client_id, device_code, grant_type: urn:ietf:params:oauth:grant-type:device_code }; authorization_pending and slow_down are pending"
+    - "After approval: GET https://api.github.com/copilot_internal/v2/token and GET https://api.github.com/user (Bearer, X-GitHub-Api-Version 2022-11-28, User-Agent GitHubCopilotChat/0.26.7); a failure of either is ignored"
+    - "The Copilot token (about 30 minutes) is refreshed from the GitHub token 5 minutes before expires_at: GET copilot_internal/v2/token with Authorization: token <gh>, User-Agent GitHubCopilotChat/0.38.0, Editor-Version vscode/1.110.0, Editor-Plugin-Version copilot-chat/0.38.0, x-github-api-version 2025-04-01"
+    - "Requests send Authorization: Bearer <copilot token or GitHub token>, copilot-integration-id vscode-chat, editor-version vscode/1.110.0, editor-plugin-version copilot-chat/0.38.0, user-agent GitHubCopilotChat/0.38.0, openai-intent conversation-panel, x-github-api-version 2025-04-01, x-request-id, X-Initiator user"
+    - "A model named *claude* goes to https://api.githubcopilot.com/v1/messages translated to Claude and streamed; a model known to need /responses goes there; otherwise /chat/completions (content reduced to text and image_url; max_tokens -> max_completion_tokens for gpt-5/o-series; reasoning_effort none removed); a 400 'not accessible via the /chat/completions endpoint' or 'The requested model is not supported' moves the model to /responses (remembered in memory)"
+    - "Connection test GET https://api.github.com/user with the GitHub token"
+    - "Model listing GET https://api.githubcopilot.com/models with the stored Copilot token, keeping capabilities.type chat and policy.state not disabled"
+  state:
+    reads: ["providerConnections (accessToken, providerSpecificData.copilotToken)"]
+    writes: ["providerConnections on sign-in and Copilot token refresh"]
+    runtimeOnly: ["knownCodexModels set"]
+  dependencies: ["oauth.dashboard-flow", "oauth.refresh-lifecycle", "translator.openai-to-claude-request"]
+  providerInteraction: "github.com (device flow), api.github.com (Copilot token, user), api.githubcopilot.com (chat, messages, responses, models)"
+  fallback: { hasFallback: true, retry: "reactive refresh of the Copilot token, then the GitHub token; /responses retry on the two 400 texts", timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "Copilot token refused", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections oauth row with the Copilot token"]
+  performanceConcerns: ["each restart forgets which models need /responses"]
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "endpoints.api from the token response is ignored, so enterprise hosts are not reached"
+  evidence:
+    - { file: open-sse/providers/registry/github.js, line: 19, note: "chat, responses and messages URLs" }
+    - { file: open-sse/providers/registry/github.js, line: 75, note: "oauth config: client id, device and token URLs, copilot token URL" }
+    - { file: src/lib/oauth/providers/github.js, line: 55, note: "postExchange: copilot token and user, failures become {}" }
+    - { file: open-sse/services/tokenRefresh/providers.js, line: 468, note: "refreshCopilotToken" }
+    - { file: open-sse/executors/github.js, line: 123, note: "execute: claude -> messages, known codex -> responses, 400 fallback" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 52, note: "github test: GET /user" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 217, note: "github model listing with the stored Copilot token" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A missing Copilot subscription fails the sign-in, the model list refreshes an expired Copilot token, poll errors stop polling, and the Claude route gets the same parameter rules"
+    actual: "A failed Copilot exchange saves a connection without a Copilot token, the model list uses the stored (often expired) token, unknown poll errors keep polling, and the Claude route skips the parameter rules"
+    impact: "A connection reads as working but cannot chat; Import from /models fails after 30 minutes; the dialog waits for nothing; Claude models may answer 400"
