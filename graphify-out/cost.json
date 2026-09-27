@@ -166,6 +166,13 @@
       "output_tokens": 0,
       "files": 4,
       "mode": "SP16a chunk 26: model import, custom models, model test"
+    },
+    {
+      "date": "2026-09-27T14:44:03.957758+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "SP16b chunk 27: OAuth claude and codex, cache_control filter"
     }
   ],
   "total_input_tokens": 574916,
