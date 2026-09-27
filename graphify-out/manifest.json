@@ -35,9 +35,9 @@
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1790470377.300619,
-    "ast_hash": "ac9e7b446a12fd413b8ab2c891efced6",
-    "semantic_hash": "ac9e7b446a12fd413b8ab2c891efced6"
+    "mtime": 1790487536.1682696,
+    "ast_hash": "295bfc3bf9750bb8b20ed1fb908959e0",
+    "semantic_hash": "295bfc3bf9750bb8b20ed1fb908959e0"
   },
   "docs/design/UI_HANDOFF.md": {
     "mtime": 1790304403.8708513,
@@ -60,9 +60,9 @@
     "semantic_hash": "04c0c50e7da7000a83ce1379183f0975"
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1790470397.984456,
-    "ast_hash": "3f06a7696c0678c6c5130411a975c92f",
-    "semantic_hash": "3f06a7696c0678c6c5130411a975c92f"
+    "mtime": 1790487536.3122742,
+    "ast_hash": "3782c449504cb05712b37389da5754aa",
+    "semantic_hash": "3782c449504cb05712b37389da5754aa"
   },
   "docs/contracts/transport.md": {
     "mtime": 1790343138.4076855,
@@ -85,9 +85,9 @@
     "semantic_hash": "9c3a6eea81ff6e614336fc09ea916ab0"
   },
   "docs/contracts/chat-lane.md": {
-    "mtime": 1790470377.2996168,
-    "ast_hash": "4d56e0a5e859735ad6205633d952ce92",
-    "semantic_hash": "4d56e0a5e859735ad6205633d952ce92"
+    "mtime": 1790487536.1677213,
+    "ast_hash": "fd6cf5c69bebf7315be419493aceb7cf",
+    "semantic_hash": "fd6cf5c69bebf7315be419493aceb7cf"
   },
   "docs/contracts/parity.md": {
     "mtime": 1790361488.8968892,
@@ -158,5 +158,10 @@
     "mtime": 1790469577.1878257,
     "ast_hash": "47493ef08bb2e724f498adcd61f4beb3",
     "semantic_hash": "47493ef08bb2e724f498adcd61f4beb3"
+  },
+  "docs/contracts/protocol-gemini.md": {
+    "mtime": 1790487363.5846338,
+    "ast_hash": "d6b7d9191daab2f8d4429ca0b73f08ce",
+    "semantic_hash": "d6b7d9191daab2f8d4429ca0b73f08ce"
   }
 }

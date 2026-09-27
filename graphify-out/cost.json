@@ -145,6 +145,13 @@
       "output_tokens": 0,
       "files": 4,
       "mode": "SP15b chunk 23: hand-authored, no LLM extraction"
+    },
+    {
+      "date": "2026-09-27T05:42:33.170433+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "SP15c chunk 24: hand-authored, no LLM extraction"
     }
   ],
   "total_input_tokens": 574916,
