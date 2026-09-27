@@ -631,7 +631,7 @@
     - { file: src/app/api/v1beta/models/route.js, line: 33, note: "inputTokenLimit/outputTokenLimit hardcoded to 128000/8192 for every model" }
     - { file: src/app/api/v1beta/models/route.js, line: 46, note: "gemini provider gets a second bare models/{id} entry with streamGenerateContent added" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.v1beta-generate-content-dispatch
@@ -671,7 +671,7 @@
     - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 180, note: "validateGeminiNativeClientKey — TTS path's own requireApiKey gate, independent of handleChat's" }
     - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 106, note: "non-TTS path calls handleChat directly with a converted body" }
   newModule: catalog
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: catalog.ollama-tags-listing

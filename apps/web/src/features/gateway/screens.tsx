@@ -16,6 +16,8 @@ const SAMPLE_BODY = JSON.stringify({ model: "openai/gpt-4.1-mini", messages: [{ 
 const ANTHROPIC_BODY = JSON.stringify({ model: "openai/gpt-4.1-mini", max_tokens: 256, stream: false, messages: [{ role: "user", content: "Hello" }] });
 // docs/contracts/protocol-responses.md: the same models through the OpenAI Responses protocol.
 const RESPONSES_BODY = JSON.stringify({ model: "openai/gpt-4.1-mini", stream: false, input: "Hello" });
+// docs/contracts/protocol-gemini.md: the same models through the Gemini generateContent protocol (text only).
+const GEMINI_BODY = JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Hello" }] }] });
 
 export function EndpointKeys() {
   const [showCreate, setShowCreate] = useState(false);
@@ -36,6 +38,7 @@ export function EndpointKeys() {
   const curl = `curl ${baseUrl}/chat/completions -H "Authorization: Bearer <your AIGate key>" -H "Content-Type: application/json" -d '${SAMPLE_BODY}'`;
   const anthropicCurl = `curl ${baseUrl}/messages -H "x-api-key: <your AIGate key>" -H "Content-Type: application/json" -d '${ANTHROPIC_BODY}'`;
   const responsesCurl = `curl ${baseUrl}/responses -H "Authorization: Bearer <your AIGate key>" -H "Content-Type: application/json" -d '${RESPONSES_BODY}'`;
+  const geminiCurl = `curl ${window.location.origin}/v1beta/models/openai/gpt-4.1-mini:generateContent -H "Authorization: Bearer <your AIGate key>" -H "Content-Type: application/json" -d '${GEMINI_BODY}'`;
   const closeCreate = () => { setShowCreate(false); setCreated(null); createKey.reset(); };
 
   const submitCreate = (event: FormEvent<HTMLFormElement>) => {
@@ -49,14 +52,15 @@ export function EndpointKeys() {
     <Panel title="Base URL" detail="Use this URL in OpenAI-compatible, Anthropic, and OpenAI Responses clients." action={state ? <Pill tone={state.tone}>{state.label}</Pill> : <Pill>{readiness.isError ? "Status unavailable" : "Checking…"}</Pill>}>
       {state?.hint && <Warning>{state.hint} <a href="/providers/connections">Open Connections</a></Warning>}
       <CopyField label="OpenAI compatible endpoint" value={baseUrl} />
-      <div className="endpoint-examples"><span>OpenAI</span><span>Anthropic</span><span>Responses</span></div>
-      <p className="muted">OpenAI clients call <code>/v1/chat/completions</code>; Anthropic clients (Claude Code, the Anthropic SDK) call <code>/v1/messages</code> with the key in <code>x-api-key</code>; Responses clients (Codex CLI, the OpenAI SDK) call <code>/v1/responses</code>, also reachable as <code>/responses</code> and <code>/codex/…</code>. The Gemini format arrives with SP15c. List models at <code>/v1/models</code>, or send <code>provider/model</code> such as <code>openai/gpt-4.1-mini</code>.</p>
+      <div className="endpoint-examples"><span>OpenAI</span><span>Anthropic</span><span>Responses</span><span>Gemini</span></div>
+      <p className="muted">OpenAI clients call <code>/v1/chat/completions</code>; Anthropic clients (Claude Code, the Anthropic SDK) call <code>/v1/messages</code> with the key in <code>x-api-key</code>; Responses clients (Codex CLI, the OpenAI SDK) call <code>/v1/responses</code>, also reachable as <code>/responses</code> and <code>/codex/…</code>. Gemini clients call <code>/v1beta/models/provider/model:generateContent</code> (or <code>:streamGenerateContent</code>) with <code>Authorization: Bearer</code>; only text reaches the model, and <code>x-goog-api-key</code> is read only for audio (TTS) requests, which go to Google through your Gemini connection. List models at <code>/v1/models</code>, or send <code>provider/model</code> such as <code>openai/gpt-4.1-mini</code>.</p>
       <CopyField label="Terminal example" value={`export OPENAI_BASE_URL=${baseUrl}`} />
       <CopyField label="Test request" value={curl} />
       <CopyField label="Claude Code" value={`export ANTHROPIC_BASE_URL=${window.location.origin} ANTHROPIC_API_KEY=<your AIGate key>`} />
       <CopyField label="Anthropic test request" value={anthropicCurl} />
       <CopyField label="Codex CLI" value={`OPENAI_BASE_URL=${baseUrl} OPENAI_API_KEY=<your AIGate key> codex -m openai/gpt-4.1-mini`} />
       <CopyField label="Responses test request" value={responsesCurl} />
+      <CopyField label="Gemini test request" value={geminiCurl} />
     </Panel>
     <Panel title="API keys" detail="Manage scoped gateway tokens for upstream client authentication." className="section-gap panel-flush" action={<Button variant="primary" onClick={() => setShowCreate(true)}>+ Create key</Button>}>
       {keys.isPending ? <StateBlock state="loading" />

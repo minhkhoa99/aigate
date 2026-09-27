@@ -3510,6 +3510,25 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **AIGate required behavior:** Every line is read, [DONE] ends the stream, a mid-stream error keeps its message, a cut-off fails, error finishes fail, usage keeps cache and reasoning tokens
 - **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
+### Gemini generateContent client request to the OpenAI chat body (convertGeminiToInternal), then the ordinary chat pipeline
+
+- **id:** `translator.gemini-client-request` · **module:** `routing`
+- **Trigger:** POST /v1beta/models/{model}:generateContent or :streamGenerateContent from a Gemini client (Gemini CLI, the @google/genai SDK)
+- **Input:** The path segments and a Gemini body { contents, systemInstruction, generationConfig, tools, toolConfig, safetySettings, … }
+- **Output:** An OpenAI chat body { model, messages, stream, max_tokens, temperature, top_p } handed to handleChat
+- **Rules:**
+  - Path: two or more segments → provider = the first, model = the second without the action (later segments are ignored); one segment → the model without the action
+  - Action: a path containing ':streamGenerateContent' streams; anything else (':generateContent', ':countTokens', no action) is a non-streaming generation
+  - systemInstruction.parts[].text joined with a newline → one system message (skipped when empty)
+  - Each content → one message: role model → assistant, anything else → user; content = parts[].text joined with a newline, so a part without text (inlineData, fileData, functionCall, functionResponse) contributes an empty string
+  - Only generationConfig.maxOutputTokens → max_tokens, temperature, topP → top_p are carried; tools, toolConfig, safetySettings, cachedContent, stopSequences, responseMimeType, responseSchema, thinkingConfig, topK, candidateCount are dropped
+  - The converted body goes through handleChat like an OpenAI client: key gate (Authorization: Bearer, then x-api-key), model resolution, provider translation
+  - A body that is not JSON answers 500 { error: { message, code: 500 } }
+  - A TTS request (responseModalities AUDIO, or a Gemini TTS model id) is not converted: it is forwarded raw to Google with a gemini connection (catalog.v1beta-generate-content-dispatch)
+- **Streaming:** yes
+- **Errors:** `INTERNAL_ERROR` (the body is not valid JSON (500)), `AUTH_ERROR` (the key is sent as x-goog-api-key or ?key= (the Gemini convention): handleChat does not read them, 401 when Require API key is on)
+- **AIGate required behavior:** Images, function calls and responses, tools, tool config, stop sequences, structured output and thinking settings reach the provider; the Gemini key header is accepted; model ids with '/' and actions other than generation are handled
+
 ### Gemini SSE chunks and generateContent JSON to OpenAI chat completion chunks and body
 
 - **id:** `translator.gemini-to-openai-response` · **module:** `routing`
@@ -3602,6 +3621,25 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Headers: Content-Type application/json, x-command-code-version 0.25.7, x-cli-environment cli, x-session-id random UUID per attempt, Authorization Bearer <key>, Accept text/event-stream
 - **Streaming:** yes
 - **AIGate required behavior:** Fields the envelope cannot carry are refused, max_completion_tokens is honored, developer stays system, tool names and bad arguments are not invented
+
+### OpenAI chat answer back to the Gemini client: SSE chunks (transformOpenAISSEToGeminiSSE) and the GenerateContentResponse (convertOpenAIResponseToGemini)
+
+- **id:** `translator.openai-to-gemini-client-response` · **module:** `routing`
+- **Trigger:** An answer for a Gemini client
+- **Input:** OpenAI chat.completion chunks or body from handleChat
+- **Output:** Gemini SSE chunks or a GenerateContentResponse
+- **Rules:**
+  - Stream frames are 'data: <json>\r\n\r\n' with no event name and no [DONE]; each chunk is { candidates: [{ content: { role: model, parts }, index: 0, finishReason? }], usageMetadata?, modelVersion? }
+  - delta.reasoning_content → a part { text, thought: true }; delta.content → a part { text }; a delta with neither and no finish is skipped; tool_calls deltas are dropped
+  - The finish chunk has parts [{ text: '' }] when it carries no text, finishReason from stop → STOP, length → MAX_TOKENS, tool_calls → STOP, content_filter → SAFETY, anything else → STOP
+  - usageMetadata { promptTokenCount, candidatesTokenCount, totalTokenCount, thoughtsTokenCount? } and modelVersion are added only when the finish chunk itself carries usage; a usage chunk with no choices (OpenAI's trailing usage) is dropped
+  - Each network chunk is split into lines on its own, so a data line split across two reads fails to parse and is dropped
+  - A chunk without choices (an error frame) is dropped; the stream simply ends
+  - An upstream error before the stream answers with the OpenAI error body and status unchanged
+  - Non-streaming: { candidates: [{ content: { role: model, parts: [thought part?, { text: content or '' }] }, finishReason, index: 0 }], modelVersion: model, usageMetadata? }; tool calls are dropped; a body that already has candidates or has no choices is returned as is; an error body keeps its status
+- **Streaming:** yes
+- **AIGate required behavior:** Tool calls reach the client as functionCall parts, streaming usage is reported, a mid-stream error is visible, and no data line is lost
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
 ### OpenAI chat completions request to a Gemini generateContent request (openaiToGeminiBase), thinking config, and the tool-schema cleaner
 
@@ -4242,6 +4280,8 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `translator.openai-to-claude-client-response` | Real usage, tool arguments streamed as they come, thinking signatures kept, a message object for every non-streaming answer, Anthropic error shapes | 2000 extra input tokens or estimates, arguments only at the end, no signature_delta, chat.completion for some providers, OpenAI error shapes | Wrong token accounting, slower tool rendering, lost thinking continuity, SDK parse failures |
 | `translator.responses-client-request` | tool_choice in the chat shape; input_file as a file; hosted tools, previous_response_id, text.format and unknown items refused or carried, not silently lost or leaked | tool_choice { type: function, name } is sent in the Responses shape; input_file is copied raw; hosted tools and unknown items are dropped; text, previous_response_id, truncation and _compact reach chat providers | A forced tool choice or a file fails upstream (400), structured output and conversation state are silently ignored or rejected |
 | `translator.openai-to-responses-client-response` | Distinct output_index per item, response.completed with the output and model, status incomplete for a cut or filtered answer, a response.failed event on a mid-stream error, a response object for every non-streaming answer, real usage on every route | Reasoning, text and the first tool call share output_index 0; response.completed has no output; status is completed (stream) or 'length' (non-stream); a chat error frame and [DONE]; chat.completion for Claude, Gemini, Vertex, Ollama and Command Code; usage lost on pivots | SDK clients mis-assemble or lose the final output, a cut answer looks complete, errors are unreadable to Responses parsers, token accounting is wrong |
+| `translator.gemini-client-request` | Images, function calls and responses, tools, tool config, stop sequences, structured output and thinking settings reach the provider; the Gemini key header is accepted; model ids with '/' and actions other than generation are handled | Only text and three settings survive; x-goog-api-key and ?key= are ignored (401); segments after the second are dropped; :countTokens runs a generation | Gemini CLI and SDK agents lose tools and images, cannot authenticate with their own key convention, and some models cannot be named |
+| `translator.openai-to-gemini-client-response` | Tool calls reach the client as functionCall parts, streaming usage is reported, a mid-stream error is visible, and no data line is lost | Tool calls are dropped, OpenAI's trailing usage is dropped, error frames are dropped silently, and a line split across reads is lost (the last one an implementation accident) | Gemini agents never see tool calls, token accounting is missing, failures look like empty answers |
 | `clitools.write-not-atomic` | Given every one of these writes targets the user's own IDE/CLI configuration file (not 9router's own data), and one of the affected routes' own comment explicitly promises 'Backup old fields and write new settings', a crash mid-write should not be able to corrupt or truncate that file — either via a temp-file-then-rename swap (the exact pattern already implemented in this codebase at src/lib/mitmAliasCache.js:15-21 for 9router's own alias cache) or an actual on-disk backup copy. | All 13 write-capable cli-tools routes call fs.writeFile(path, content) directly on the final path with no temp file, no rename, and no backup copy anywhere on disk. The 'backup' language in the claude-settings POST comment refers only to merging the previously-read JSON object in memory before the single overwrite call — nothing is preserved outside process memory. | A crash, OOM kill, disk-full error, or power loss during any of these writes can truncate or corrupt the user's real tool config (e.g. ~/.claude/settings.json, ~/.codex/config.toml, ~/.openclaw/openclaw.json). Because every route's read path treats an unparseable file as simply 'no config', the damage is silent: the next status check reports the tool as unconfigured, and the next Apply starts from empty, permanently discarding whatever unrelated settings that file held before 9router wrote to it. |
 | `clitools.copilot-settings-array-upsert` | Like every other cli-tools GET handler (claude, codex, cline, droid, kilo, etc.), Copilot's GET should reflect a real detection check — a `where`/`which` lookup or a marker-file probe — before reporting installed: true, so the dashboard only shows Copilot as available on a machine that actually has it. | copilot-settings/route.js's GET performs no detection at all: it reads chatLanguageModels.json (which may not exist, in which case config is null) and always returns installed: true regardless. | The dashboard's Copilot integration card (and any 'all installed tools' summary the UI derives from installed flags) will show Copilot as installed on any machine, even one with no VS Code and no Copilot extension, inviting the user to Apply — which just writes a file nobody will ever read. |
 | `clitools.deepseek-tui-full-overwrite` | Like every other tool's Apply/Reset in this set (codex, droid, opencode, openclaw, grok-build, hermes, jcode, kilo, cline, cowork all read-merge-write or perform a targeted key removal), DeepSeek TUI's POST should merge 9router's fields into whatever config.toml already contains, and DELETE should remove only what 9router added — preserving any other DeepSeek TUI settings the user configured. | Both POST and DELETE build a fixed, hand-written TOML string from scratch and write it directly, completely replacing the file's prior contents regardless of what else was in it (POST never even calls the file's own readConfigToml() result; DELETE writes a hardcoded 2-line default). | The first time a user clicks Apply or Reset for DeepSeek TUI in the 9router dashboard, any other settings they had configured directly in ~/.deepseek/config.toml (other providers, TUI preferences, anything not related to 9router) are silently and irrecoverably destroyed. |

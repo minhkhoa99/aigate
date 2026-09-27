@@ -66,7 +66,7 @@ test("serves the built web app on the same port with an SPA fallback", async () 
     }
     assert.equal((await get("/assets/app.js")).statusCode, 200);
     assert.equal((await get("/health")).json().status, "ok");
-    for (const url of ["/assets/missing.js", "/v1/nope", "/api/nope", "/v1beta/models"]) {
+    for (const url of ["/assets/missing.js", "/v1/nope", "/api/nope", "/v1beta/nope"]) {
       const res = await get(url);
       assert.equal(res.statusCode, 404, url);
       assert.match(res.headers["content-type"], /json/, url);

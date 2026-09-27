@@ -1551,3 +1551,95 @@
     expected: "Distinct output_index per item, response.completed with the output and model, status incomplete for a cut or filtered answer, a response.failed event on a mid-stream error, a response object for every non-streaming answer, real usage on every route"
     actual: "Reasoning, text and the first tool call share output_index 0; response.completed has no output; status is completed (stream) or 'length' (non-stream); a chat error frame and [DONE]; chat.completion for Claude, Gemini, Vertex, Ollama and Command Code; usage lost on pivots"
     impact: "SDK clients mis-assemble or lose the final output, a cut answer looks complete, errors are unreadable to Responses parsers, token accounting is wrong"
+
+- id: translator.gemini-client-request
+  group: Translation
+  feature: Request translation
+  subFeature: "Gemini generateContent client request to the OpenAI chat body (convertGeminiToInternal), then the ordinary chat pipeline"
+  trigger: "POST /v1beta/models/{model}:generateContent or :streamGenerateContent from a Gemini client (Gemini CLI, the @google/genai SDK)"
+  input: "The path segments and a Gemini body { contents, systemInstruction, generationConfig, tools, toolConfig, safetySettings, … }"
+  output: "An OpenAI chat body { model, messages, stream, max_tokens, temperature, top_p } handed to handleChat"
+  businessRules:
+    - "Path: two or more segments → provider = the first, model = the second without the action (later segments are ignored); one segment → the model without the action"
+    - "Action: a path containing ':streamGenerateContent' streams; anything else (':generateContent', ':countTokens', no action) is a non-streaming generation"
+    - "systemInstruction.parts[].text joined with a newline → one system message (skipped when empty)"
+    - "Each content → one message: role model → assistant, anything else → user; content = parts[].text joined with a newline, so a part without text (inlineData, fileData, functionCall, functionResponse) contributes an empty string"
+    - "Only generationConfig.maxOutputTokens → max_tokens, temperature, topP → top_p are carried; tools, toolConfig, safetySettings, cachedContent, stopSequences, responseMimeType, responseSchema, thinkingConfig, topK, candidateCount are dropped"
+    - "The converted body goes through handleChat like an OpenAI client: key gate (Authorization: Bearer, then x-api-key), model resolution, provider translation"
+    - "A body that is not JSON answers 500 { error: { message, code: 500 } }"
+    - "A TTS request (responseModalities AUDIO, or a Gemini TTS model id) is not converted: it is forwarded raw to Google with a gemini connection (catalog.v1beta-generate-content-dispatch)"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["catalog.v1beta-generate-content-dispatch", "endpoint.extract-header-order", "translator.openai-to-gemini-client-response"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "the body is not valid JSON (500)", partial: false }
+    - { code: AUTH_ERROR, when: "the key is sent as x-goog-api-key or ?key= (the Gemini convention): handleChat does not read them, 401 when Require API key is on", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Gemini CLI sends tools and function calls in every agent turn; they are lost, so the model answers as plain chat"
+    - "A model id containing '/' (openrouter/meta-llama/llama-3) loses everything after the second segment"
+  evidence:
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 63, note: "path parsing, provider = path[0], model = path[1]" }
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 94, note: "stream = action === ':streamGenerateContent'" }
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 374, note: "convertGeminiToInternal: text-only messages and three config fields" }
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 118, note: "catch → 500 { error: { message, code: 500 } }" }
+    - { file: src/sse/services/auth.js, line: 342, note: "extractApiKey reads Authorization and x-api-key only" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Images, function calls and responses, tools, tool config, stop sequences, structured output and thinking settings reach the provider; the Gemini key header is accepted; model ids with '/' and actions other than generation are handled"
+    actual: "Only text and three settings survive; x-goog-api-key and ?key= are ignored (401); segments after the second are dropped; :countTokens runs a generation"
+    impact: "Gemini CLI and SDK agents lose tools and images, cannot authenticate with their own key convention, and some models cannot be named"
+
+- id: translator.openai-to-gemini-client-response
+  group: Translation
+  feature: Response translation
+  subFeature: "OpenAI chat answer back to the Gemini client: SSE chunks (transformOpenAISSEToGeminiSSE) and the GenerateContentResponse (convertOpenAIResponseToGemini)"
+  trigger: "An answer for a Gemini client"
+  input: "OpenAI chat.completion chunks or body from handleChat"
+  output: "Gemini SSE chunks or a GenerateContentResponse"
+  businessRules:
+    - "Stream frames are 'data: <json>\\r\\n\\r\\n' with no event name and no [DONE]; each chunk is { candidates: [{ content: { role: model, parts }, index: 0, finishReason? }], usageMetadata?, modelVersion? }"
+    - "delta.reasoning_content → a part { text, thought: true }; delta.content → a part { text }; a delta with neither and no finish is skipped; tool_calls deltas are dropped"
+    - "The finish chunk has parts [{ text: '' }] when it carries no text, finishReason from stop → STOP, length → MAX_TOKENS, tool_calls → STOP, content_filter → SAFETY, anything else → STOP"
+    - "usageMetadata { promptTokenCount, candidatesTokenCount, totalTokenCount, thoughtsTokenCount? } and modelVersion are added only when the finish chunk itself carries usage; a usage chunk with no choices (OpenAI's trailing usage) is dropped"
+    - "Each network chunk is split into lines on its own, so a data line split across two reads fails to parse and is dropped"
+    - "A chunk without choices (an error frame) is dropped; the stream simply ends"
+    - "An upstream error before the stream answers with the OpenAI error body and status unchanged"
+    - "Non-streaming: { candidates: [{ content: { role: model, parts: [thought part?, { text: content or '' }] }, finishReason, index: 0 }], modelVersion: model, usageMetadata? }; tool calls are dropped; a body that already has candidates or has no choices is returned as is; an error body keeps its status"
+  state:
+    reads: []
+    writes: []
+    runtimeOnly: []
+  dependencies: ["translator.gemini-client-request"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A model that calls a tool answers with an empty STOP turn"
+    - "Streaming usage is missing for every OpenAI-compatible provider"
+  evidence:
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 427, note: "transformOpenAISSEToGeminiSSE" }
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 438, note: "per-chunk line split, no carry-over" }
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 457, note: "no choices → skipped (usage-only and error frames)" }
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 407, note: "FINISH_REASON_MAP" }
+    - { file: "src/app/api/v1beta/models/[...path]/route.js", line: 523, note: "convertOpenAIResponseToGemini" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG, IMPLEMENTATION_ACCIDENT]
+  suspicion:
+    expected: "Tool calls reach the client as functionCall parts, streaming usage is reported, a mid-stream error is visible, and no data line is lost"
+    actual: "Tool calls are dropped, OpenAI's trailing usage is dropped, error frames are dropped silently, and a line split across reads is lost (the last one an implementation accident)"
+    impact: "Gemini agents never see tool calls, token accounting is missing, failures look like empty answers"

@@ -5,10 +5,11 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import {
   anthropicClientGetsMessage, anthropicRequestFor, AnthropicStreamEncoder, assertModelSupports, builtinRegistry, createAdapter, EngineError,
-  estimateAnthropicInputTokens, OpenAIChatStreamEncoder, parseAnthropicMessagesRequest, parseOpenAIChatRequest, parseOpenAIResponsesRequest,
-  responsesClientGetsObject, responsesRequestFor, ResponsesStreamEncoder, toAnthropicMessage, toOpenAIChatCompletion, toOpenAIError, toResponsesObject,
-  UnsupportedFeatureError, withConnection, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential, type ExecCtx,
-  type HttpTransportPort, type ProviderDescriptor, type StreamChunk,
+  estimateAnthropicInputTokens, geminiModelList, GeminiStreamEncoder, geminiTtsRequest, isGeminiTtsRequest, OpenAIChatStreamEncoder,
+  parseAnthropicMessagesRequest, parseGeminiGenerateRequest, parseGeminiPath, parseOpenAIChatRequest, parseOpenAIResponsesRequest,
+  responsesClientGetsObject, responsesRequestFor, ResponsesStreamEncoder, toAnthropicMessage, toGeminiResponse, toOpenAIChatCompletion, toOpenAIError,
+  toResponsesObject, UnsupportedFeatureError, withConnection, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential,
+  type ExecCtx, type GeminiRoute, type HttpTransportPort, type ProviderDescriptor, type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { extractApiKey } from "../../apikeys/domain/api-key.js";
@@ -146,6 +147,29 @@ const OPENAI_RESPONSES: ClientProtocol = {
   },
 };
 
+// docs/contracts/protocol-gemini.md: the model and the stream decision come from the URL, the rest of the chat path is the
+// OpenAI one (9router hands the converted body to handleChat).
+const geminiGenerate = (route: GeminiRoute): ClientProtocol => ({
+  parse(body) {
+    return {
+      request: parseGeminiGenerateRequest(body, route),
+      prepare: (upstream) => upstream,
+      respond: (response, _provider, ids) => toGeminiResponse(response, ids, route.model),
+      encoder: (provider, ids) => new GeminiStreamEncoder({ model: ids.model, usageOnFinish: provider.protocol !== "openai-compatible" }),
+    };
+  },
+});
+
+// A Gemini client's own key convention, read only on the TTS passthrough (9router).
+export type GeminiRequest = FastifyRequest<{ Params: { "*": string }; Querystring: Record<string, string | string[] | undefined> }>;
+function googleKey(request: GeminiRequest): string | undefined {
+  const header = request.headers["x-goog-api-key"];
+  const query = request.query.key;
+  return (typeof header === "string" && header) || (typeof query === "string" && query) || undefined;
+}
+
+const MISSING_KEY = "Missing API key. Send Authorization: Bearer <key>, using a key from AIGate: Gateway → Endpoint & Keys.";
+
 // routing.responses-compact-lane: the same lane with _compact set in the body, which only a Responses provider or a
 // chat body carries upstream (9router, kept).
 const OPENAI_RESPONSES_COMPACT: ClientProtocol = {
@@ -168,7 +192,7 @@ export class ChatLane {
   // onRequest hook: runs before the body is read, so an unauthenticated caller costs one lookup at most.
   async authorize(request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply | undefined> {
     const { requireApiKey } = await this.settings.get();
-    const failure = requireApiKey ? await this.checkKey(request) : this.checkLocal(request);
+    const failure = requireApiKey ? await this.checkKey(extractApiKey(request.headers)) : this.checkLocal(request);
     return failure ? this.fail(reply, failure) : undefined;
   }
 
@@ -188,6 +212,37 @@ export class ChatLane {
 
   responsesCompact(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     return this.serve(request, reply, OPENAI_RESPONSES_COMPACT);
+  }
+
+  // onRequest for POST /v1beta/models/*: which key counts depends on the body (the TTS passthrough also reads
+  // x-goog-api-key and ?key=), so here only a request with no key at all is refused; the handler checks the key.
+  async authorizeGemini(request: GeminiRequest, reply: FastifyReply): Promise<FastifyReply | undefined> {
+    const { requireApiKey } = await this.settings.get();
+    if (!requireApiKey) {
+      const failure = this.checkLocal(request);
+      return failure ? this.fail(reply, failure) : undefined;
+    }
+    if (extractApiKey(request.headers) || googleKey(request)) return undefined;
+    return this.fail(reply, new GatewayError(401, "invalid_request_error", "missing_api_key", MISSING_KEY));
+  }
+
+  // GET /v1beta/models (catalog.v1beta-models-listing): the whole catalog, without a key, as in 9router.
+  geminiModels(reply: FastifyReply): FastifyReply {
+    return reply.header("cache-control", "no-store").send(geminiModelList());
+  }
+
+  // POST /v1beta/models/{model}:generateContent | :streamGenerateContent (docs/contracts/protocol-gemini.md).
+  async gemini(request: GeminiRequest, reply: FastifyReply): Promise<void> {
+    const route = parseGeminiPath(request.params["*"]);
+    const { requireApiKey } = await this.settings.get();
+    if (isGeminiTtsRequest(route, request.body)) return this.geminiTts(request, reply, route, requireApiKey);
+    // The chat path reads the key as every /v1 lane does (Authorization, then x-api-key).
+    const failure = requireApiKey ? await this.checkKey(extractApiKey(request.headers)) : undefined;
+    if (failure) {
+      this.fail(reply, failure);
+      return;
+    }
+    return this.serve(request, reply, geminiGenerate(route));
   }
 
   // POST /v1/messages/count_tokens (routing.count-tokens-estimate): a local estimate, no provider is called.
@@ -253,12 +308,48 @@ export class ChatLane {
     return this.fail(reply, new GatewayError(500, "server_error", "internal_error", "Internal error"));
   }
 
-  private async checkKey(request: FastifyRequest): Promise<GatewayError | undefined> {
-    const key = extractApiKey(request.headers);
-    if (!key) {
-      return new GatewayError(401, "invalid_request_error", "missing_api_key",
-        "Missing API key. Send Authorization: Bearer <key>, using a key from AIGate: Gateway → Endpoint & Keys.");
+  // catalog.v1beta-generate-content-dispatch: the TTS body goes to Google unchanged with the gemini connection's key, and
+  // Google's answer (status, body, content type) comes back as it is.
+  private async geminiTts(request: GeminiRequest, reply: FastifyReply, route: GeminiRoute, requireApiKey: boolean): Promise<void> {
+    const requestId = randomUUID();
+    const client = new AbortController();
+    reply.raw.once("close", () => {
+      if (!reply.raw.writableFinished) client.abort(new ClientGone());
+    });
+    try {
+      if (requireApiKey) {
+        // 9router's TTS path reads Authorization: Bearer, then x-goog-api-key, then ?key= (not x-api-key).
+        const auth = request.headers.authorization;
+        const failure = await this.checkKey((typeof auth === "string" && auth.startsWith("Bearer ") ? auth.slice(7) : "") || googleKey(request));
+        if (failure) throw failure;
+      }
+      const stored = await this.connections.activeCredential("gemini");
+      if (stored === undefined) {
+        throw new GatewayError(503, "api_error", "no_active_connection", "Gemini has no active connection for audio output. Add or enable one in AIGate: Providers → Connections.");
+      }
+      const upstream = await this.transport.send(geminiTtsRequest(route, request.query, request.body, stored.apiKey), { signal: client.signal, requestId });
+      reply.hijack();
+      // Only the content type is forwarded: other upstream headers (cookies) must not land on the dashboard's origin.
+      reply.raw.writeHead(upstream.status, { "content-type": upstream.headers["content-type"] ?? "application/json", "x-request-id": requestId });
+      if (upstream.body) {
+        for await (const piece of upstream.body) {
+          if (!reply.raw.write(piece)) await once(reply.raw, "drain", { signal: client.signal });
+        }
+      }
+      reply.raw.end();
+    } catch (error) {
+      if (client.signal.aborted || reply.sent) {
+        reply.raw.destroy();
+        return;
+      }
+      this.logUnexpected(error, requestId);
+      const { status, body } = errorOf(error);
+      reply.code(status).header("cache-control", "no-store").header("x-request-id", requestId).send(body);
     }
+  }
+
+  private async checkKey(key: string | undefined): Promise<GatewayError | undefined> {
+    if (!key) return new GatewayError(401, "invalid_request_error", "missing_api_key", MISSING_KEY);
     if (!(await this.keys.isValid(key))) {
       return new GatewayError(401, "invalid_request_error", "invalid_api_key", "The API key is not valid or was disabled. Check it in AIGate: Gateway → Endpoint & Keys.");
     }
