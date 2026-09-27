@@ -1,3 +1,4 @@
+import type { OAuthFlow } from "./oauth.js";
 // Provider registry schema (spec §2 "schema thiết kế mới"). Entries are static data checked once at
 // load: defineRegistry() rejects a bad entry loudly instead of letting it fail per request. SP13
 // builds the entries from the extracted catalog (builtin-registry.ts; docs/contracts/catalog-providers.md).
@@ -60,6 +61,10 @@ export interface ProviderDescriptor {
   readonly streamOnly?: boolean;
   // An Anthropic-compatible custom provider (connection.anthropic-compatible-node); official = 9router's api.anthropic.com test.
   readonly anthropicNode?: { readonly official: boolean };
+  // SP16 (docs/contracts/oauth.md): the provider can be connected by signing in, with this flow.
+  readonly oauth?: OAuthFlow;
+  // The header a connection's organization goes in (provider.kilocode-device-auth); OpenAI-Organization otherwise.
+  readonly organizationHeader?: string;
 }
 
 export const CONNECTION_FIELDS = ["baseUrl", "deployment", "apiVersion", "organization", "accountId"] as const;
@@ -72,7 +77,10 @@ export type ProviderProtocol = (typeof PROVIDER_PROTOCOLS)[number];
 // The descriptor a connection talks to. ollama-local: its own host, one trailing "/" removed (resolveOllamaLocalHost).
 // azure / cloudflare-ai: the {field} tokens filled from the connection, values URL-encoded (9router encodes nothing),
 // and OpenAI-Organization when the connection has an organization.
-export function withConnection(provider: ProviderDescriptor, data: ConnectionData): ProviderDescriptor {
+export function withConnection(connected: ProviderDescriptor, data: ConnectionData): ProviderDescriptor {
+  // The organization header, for azure (a connection field) and kilocode (from the sign-in).
+  const organization = data.organization;
+  const provider = organization ? { ...connected, headers: { ...connected.headers, [connected.organizationHeader ?? "openai-organization"]: organization } } : connected;
   const paths = provider.connectionBaseUrl;
   if (paths) {
     if (!data.baseUrl) return provider;
@@ -87,11 +95,7 @@ export function withConnection(provider: ProviderDescriptor, data: ConnectionDat
     if (field && value) return field === "baseUrl" ? value.replace(/\/$/, "") : encodeURIComponent(value);
     return (field && fields.defaults?.[field]) || token;
   });
-  const organization = data.organization;
-  return {
-    ...provider, chatUrl: fill(provider.chatUrl), modelsUrl: fill(provider.modelsUrl),
-    ...(organization ? { headers: { ...provider.headers, "openai-organization": organization } } : {}),
-  };
+  return { ...provider, chatUrl: fill(provider.chatUrl), modelsUrl: fill(provider.modelsUrl) };
 }
 
 // Why a catalog provider can or cannot be connected (the UI shows the reason).

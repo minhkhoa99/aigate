@@ -1,5 +1,6 @@
 import { EngineError, type ErrorCode } from "../errors.js";
 import { readBoundedText } from "../http.js";
+import { clineAccessToken } from "../oauth.js";
 import { parseJson, record, text } from "../json.js";
 import type { Credential, ExecCtx, HttpRequest, HttpResponse, HttpTransportPort } from "../ports.js";
 import type { ModelDescriptor, ProviderDescriptor } from "../registry.js";
@@ -56,7 +57,9 @@ export abstract class HttpProviderAdapter {
       throw new EngineError("AUTH_ERROR", `The ${this.provider.name} API key is empty, too long, or has spaces or control characters`, { provider: this.provider.id });
     }
     const { header, scheme } = this.provider.auth;
-    const headers = { ...this.provider.headers, [header]: scheme === "bearer" ? `Bearer ${credential.apiKey}` : credential.apiKey };
+    // provider.cline-oauth: a Cline OAuth token goes as "workos:<jwt>".
+    const key = this.provider.quirks?.includes("clineAuth") ? clineAccessToken(credential.apiKey) : credential.apiKey;
+    const headers = { ...this.provider.headers, [header]: scheme === "bearer" ? `Bearer ${key}` : key };
     // connection.anthropic-compatible-node: 9router also sends the key as Bearer to any gateway but api.anthropic.com.
     if (this.provider.anthropicNode?.official === false) headers.authorization = `Bearer ${credential.apiKey}`;
     return { method, url, headers, timeoutMs };

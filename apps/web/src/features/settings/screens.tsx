@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Button, CopyField, Field, Input, PageHeading, Panel, Pill, SecretField, StateBlock, Tabs, Warning } from "../../shared/ui";
+import { Button, CopyField, Field, Input, PageHeading, Panel, Pill, SecretField, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { isApiError } from "../../shared/api";
 import { toProblem, type Problem } from "../../shared/errors";
 import { useAuthStatus, useChangePassword, useLogin, useLogout, usePatchSettings, useSettings, useSetup } from "./api";
+import { OAUTH_CHANNEL, type CallbackData } from "../providers/sign-in";
 
 const MIN_PASSWORD = 8;
 const MAX_PASSWORD = 256;
@@ -100,8 +101,31 @@ export function Login() {
     <small>Local instance · your data stays on this machine</small></div></div>;
 }
 
+// docs/contracts/oauth.md: the provider's sign-in page returns here; the code goes back to the dashboard window that
+// opened it (postMessage to this origin only), or over a broadcast channel when there is no opener.
+const CALLBACK_FIELDS = [["code", "code"], ["token", "token"], ["state", "state"], ["error", "error"], ["errorDescription", "error_description"]] as const;
+
 export function Callback() {
-  return <div className="standalone"><div className="auth-card"><div className="auth-brand"><span>⌘</span><strong>AIGate</strong></div><h1>Completing sign-in</h1><p>Waiting for the identity provider to return a valid response.</p><StateBlock state="loading" /><Link className="button button-secondary" to="/login">Back to login</Link></div></div>;
+  const [delivered, setDelivered] = useState<boolean | null>(null);
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const data: CallbackData = {};
+    for (const [key, name] of CALLBACK_FIELDS) {
+      const value = query.get(name);
+      if (value) data[key] = value;
+    }
+    if (!data.code && !data.token && !data.error) { setDelivered(false); return undefined; }
+    if (window.opener) window.opener.postMessage({ type: "oauth_callback", data }, window.location.origin);
+    else { const channel = new BroadcastChannel(OAUTH_CHANNEL); channel.postMessage(data); channel.close(); }
+    setDelivered(true);
+    const timer = setTimeout(() => window.close(), 1500);
+    return () => clearTimeout(timer);
+  }, []);
+  return <div className="standalone"><div className="auth-card"><div className="auth-brand"><span>⌘</span><strong>AIGate</strong></div>
+    <h1>{delivered === false ? "Nothing to finish" : "Completing sign-in"}</h1>
+    <p>{delivered === false ? "This page did not receive a sign-in code." : "The dashboard is finishing the sign-in. This window closes by itself; if it stays open, copy its address into the sign-in dialog."}</p>
+    {delivered !== false && <CopyField label="This page's address" value={window.location.href} />}
+    <Link className="button button-secondary" to="/providers/connections">Back to connections</Link></div></div>;
 }
 
 // First run is a single step: set the dashboard password, then open the dashboard. Providers are

@@ -1481,6 +1481,21 @@ Every item below is a capability AIGate must have. Derived from tracing
   - GET on the same route (no body) returns static instructions + a requiredFields schema for the dashboard's manual-entry form — the generic route has no equivalent self-describing GET for a specific credential-pair form
 - **Errors:** `INVALID_REQUEST` (accessToken or machineId missing/not a string), `AUTH_ERROR` (CursorService.validateImportToken rejects the pair)
 
+### The dashboard sign-in flow: GET authorize / device-code, POST exchange / poll on /api/oauth/{provider}/{action}, and the /callback page
+
+- **id:** `oauth.dashboard-flow` · **module:** `connections`
+- **Trigger:** The operator clicks Connect on an OAuth provider in the dashboard
+- **Input:** authorize?redirect_uri=http://localhost:<appPort>/callback[&meta…]; exchange { code, redirectUri, codeVerifier, state, meta }; device-code; poll { deviceCode, codeVerifier, extraData }
+- **Output:** authorize → { authUrl, state, codeVerifier, codeChallenge, redirectUri, flowType }; device-code → { device_code, user_code, verification_uri, expires_in, interval, codeVerifier }; exchange/poll → a saved oauth connection { id, provider, email, displayName } or { success: false, error, pending }
+- **Rules:**
+  - authorize builds the provider's auth URL with a fresh PKCE pair (S256) and state and returns them to the browser; every query parameter other than redirect_uri is provider meta (gitlab: baseUrl, clientId, clientSecret)
+  - The popup lands on /callback, which reads code, token (kimchi), state and error from the query and hands them to the opener by postMessage (trusted origins only), BroadcastChannel or localStorage; a remote dashboard shows the URL for manual copying
+  - exchange requires code and redirectUri, and codeVerifier except for cline, clinepass and kimchi; it exchanges, maps the tokens, and creates (or updates) the connection with authType oauth, expiresAt = now + expiresIn when known, testStatus active
+  - device-code (kilocode, github, kimi, …) returns the provider's user code and verification URL; poll maps authorization_pending and slow_down to { pending: true }, any other error to { success: false, error }, and success to a saved connection
+  - The modal polls at the provider interval, backing off 5 s on slow_down up to 30 s, until expires_in
+- **Errors:** `INVALID_REQUEST` (missing code, redirectUri or codeVerifier (400 Missing required fields); a body that is not JSON (400)), `PROVIDER_UNAVAILABLE` (the provider rejects the exchange (500 with the upstream text as the message))
+- **AIGate required behavior:** The server issues state and the PKCE verifier, keeps them for a short time bound to the dashboard session, and rejects an exchange whose state it did not issue; secrets never travel in URLs
+
 ### The generic /api/oauth/[provider]/[action] route — authorize/device-code/exchange/poll and proxy-session actions shared across most OAuth providers
 
 - **id:** `oauth.generic-provider-action-route` · **module:** `connections`
@@ -1562,6 +1577,91 @@ Every item below is a capability AIGate must have. Derived from tracing
   - This is the exchange counterpart to oauth.kiro-social-authorize — it cannot use the generic route's exchange action because that action expects a standard redirectUri to be supplied and re-validated, while this flow's redirect_uri is the fixed kiro:// callback handled internally inside kiroService.exchangeSocialCode rather than passed per-request
   - provider (google|github) is stored verbatim (capitalized) into providerSpecificData.provider and also as providerSpecificData.authMethod — used later purely as a display/diagnostic label distinguishing which social identity produced this Kiro connection, not as a functional branch in the refresh path (auth.refresh-provider-specific's refreshKiro treats every Kiro connection identically regardless of how it was obtained)
 - **Errors:** `INVALID_REQUEST` (code or codeVerifier missing), `INVALID_REQUEST` (provider is missing or not google/github), `AUTH_ERROR` (kiroService.exchangeSocialCode rejects the code/verifier pair)
+
+### Token refresh: proactive before a request, reactive on 401/403, and the background loop
+
+- **id:** `oauth.refresh-lifecycle` · **module:** `connections`
+- **Trigger:** A chat request on an oauth connection; an upstream 401/403; the 5-minute background timer
+- **Input:** The connection's refreshToken and expiresAt
+- **Output:** Updated tokens saved on the connection, and the request retried once after a reactive refresh
+- **Rules:**
+  - Proactive: before a request, a token that expires within the provider's lead (default 5 min) is refreshed; refreshes of the same connection share one in-flight promise (withCredentialRefreshLock)
+  - Reactive: an upstream 401 or 403 calls the executor's refreshCredentials up to 3 times (1 s, then 2 s apart); a new access token is saved and the request is sent once more; otherwise the 401/403 goes to the client
+  - The reactive path runs for every provider, including those with no refresh (kilocode, kimchi, API-key connections), and does not use the proactive lock
+  - Background: every 5 minutes, every oauth connection that expires within max(provider lead, 30 min) is refreshed
+  - A connection with no refresh token, or a provider without a refresher, is never refreshed; its expiry is left to the upstream 401
+- **Errors:** `AUTH_ERROR` (the refresh fails; the original 401/403 reaches the client)
+- **AIGate required behavior:** One refresh at a time per connection on every path (spec §9 SP16: single-flight); no refresh attempts for a connection that cannot refresh
+
+### How an OAuth connection is stored and updated: tokens, expiry, provider data, and the upsert by account
+
+- **id:** `oauth.token-storage` · **module:** `connections`
+- **Trigger:** A successful exchange or poll, and every token refresh
+- **Input:** Mapped tokens { accessToken, refreshToken, expiresIn, email, displayName, providerSpecificData }
+- **Output:** A providerConnections row with authType oauth
+- **Rules:**
+  - Fields: accessToken, refreshToken, expiresAt (ISO, from expiresIn), expiresIn, idToken, lastRefreshAt, email, displayName, name, priority, isActive, testStatus, providerSpecificData (JSON)
+  - A new oauth login for the same provider updates the existing row when the email matches and, when either side has a username in providerSpecificData, the usernames match too (codex matches on the ChatGPT account id); otherwise it creates a new row named after the email (else 'Account N') with the next priority
+  - A refresh merges the returned fields into the row and merges providerSpecificData instead of replacing it
+  - Tokens are stored in the SQLite row as given
+
+### Cline and ClinePass sign-in, token format, refresh, and request headers
+
+- **id:** `provider.cline-oauth` · **module:** `connections`
+- **Trigger:** Connect Cline (or ClinePass) with OAuth; every request on such a connection
+- **Input:** The /callback query from app.cline.bot
+- **Output:** An oauth connection { accessToken, refreshToken, expiresAt, email, providerSpecificData: { firstName, lastName } }
+- **Rules:**
+  - Authorize URL: https://api.cline.bot/api/v1/auth/authorize?client_type=extension&callback_url=<redirect>&redirect_uri=<redirect> (no PKCE, no state)
+  - The returned code is base64 (padded as needed) of JSON { accessToken, refreshToken, email, firstName, lastName, expiresAt } (text after the last '}' ignored); if it does not decode, POST https://api.cline.bot/api/v1/auth/token { grant_type: authorization_code, code, client_type: extension, redirect_uri } and read data.accessToken / refreshToken / userInfo.email / expiresAt
+  - expiresIn = expiresAt − now in seconds, else 3600
+  - Refresh: POST https://api.cline.bot/api/v1/auth/refresh { refreshToken, grantType: refresh_token, clientType: extension }; read (data or root).accessToken, refreshToken (kept when absent) and expiresAt; the access token is prefixed 'workos:' when it is not already
+  - Requests: Authorization: Bearer <token>, with 'workos:' added to a JWT (eyJ…) token; plus the Cline client headers (HTTP-Referer https://cline.bot, X-Title Cline, User-Agent, X-PLATFORM, X-PLATFORM-VERSION, X-CLIENT-TYPE, X-CLIENT-VERSION, X-CORE-VERSION, X-IS-MULTIROOT) — 9router names itself in them
+  - ClinePass shares the flow; 9router's own registry notes that these extension tokens are rejected by the ClinePass API (HTTP 401, issue #2333)
+- **Streaming:** yes
+- **Errors:** `PROVIDER_UNAVAILABLE` (the fallback token exchange fails)
+- **AIGate required behavior:** ClinePass offers only the sign-in that works (its API key)
+
+### GitLab Duo OAuth sign-in (PKCE with the operator's own OAuth application) and its chat requests
+
+- **id:** `provider.gitlab-duo-oauth` · **module:** `connections`
+- **Trigger:** Connect GitLab Duo (hidden in 9router's provider list)
+- **Input:** meta { baseUrl (default https://gitlab.com), clientId, clientSecret? }
+- **Output:** An oauth connection { accessToken, refreshToken, expiresIn, scope, providerSpecificData: { username, email, name, baseUrl, clientId, authKind: oauth } }
+- **Rules:**
+  - Authorize: <baseUrl>/oauth/authorize?client_id&redirect_uri&response_type=code&state&scope=api read_user&code_challenge&code_challenge_method=S256
+  - Exchange: POST <baseUrl>/oauth/token (form: client_id, grant_type authorization_code, code, redirect_uri, code_verifier, client_secret when given); user info from <baseUrl>/api/v4/user
+  - No refresher exists although GitLab access tokens expire (expires_in, 2 h)
+  - Chat: an OpenAI chat body POSTed to https://gitlab.com/api/v4/chat/completions with Authorization: Bearer — always gitlab.com, whatever baseUrl the connection was made on
+- **AIGate required behavior:** Chat goes to the connection's GitLab in the Duo Chat format, and the token is refreshed before it expires
+
+### Kilo Code device sign-in and the organization header
+
+- **id:** `provider.kilocode-device-auth` · **module:** `connections`
+- **Trigger:** Connect Kilo Code; every request on the connection
+- **Input:** The device code the operator approves at Kilo Code
+- **Output:** An oauth connection { accessToken, email, providerSpecificData: { orgId }? } with no refresh token and no expiry
+- **Rules:**
+  - Device code: POST https://api.kilo.ai/api/device-auth/codes → { code, verificationUrl, expiresIn }; user code = device code = code; interval 3 s; expires_in default 300; 429 → 'Too many pending authorization requests'
+  - Poll: GET https://api.kilo.ai/api/device-auth/codes/<code>: 202 pending, 403 access_denied, 410 expired_token, other non-2xx poll_failed; { status: approved, token } is success
+  - On success GET https://api.kilo.ai/api/profile with the token; organizations[0].id becomes providerSpecificData.orgId (a failure is ignored)
+  - Requests: Authorization: Bearer <token> and X-Kilocode-OrganizationID: <orgId> when known; no refresh (the refresher always returns null)
+- **Streaming:** yes
+- **Errors:** `RATE_LIMIT` (too many pending device codes (429))
+
+### Kimchi browser-token sign-in and the Kimchi request adjustments
+
+- **id:** `provider.kimchi-browser-token` · **module:** `connections`
+- **Trigger:** Connect Kimchi with its browser sign-in; every Kimchi request
+- **Input:** The token Kimchi returns on the /callback URL (?token=), or a pasted token
+- **Output:** An oauth connection { accessToken, email, displayName, providerSpecificData: { authMethod: browser_token, userId, username } } with no refresh
+- **Rules:**
+  - Sign-in URL: https://app.kimchi.dev/cli-auth?callback=<redirect>&state=<state>; the callback carries ?token=
+  - The token is checked with GET https://api.cast.ai/v1/llm/openai/supported-providers (Bearer); a non-2xx fails the sign-in; user info from https://app.kimchi.dev/api/v1/me (failure ignored)
+  - email = user.email, else kimchi-user-<id>; displayName = name or username
+  - Requests (both sign-ins): User-Agent kimchi/0.1.50; the top-level system is merged into the first system message; anthropic_version, anthropic_beta, client_metadata, mcp_servers, stop_sequences, thinking, top_k are dropped; cache_control and signature fields are removed from messages and tools; assistant reasoning_content longer than 8 characters is removed; for Claude/Anthropic models reasoning_effort, reasoning and thinking are dropped
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (the token validation answers non-2xx)
 
 ## Provider account management
 
@@ -4235,6 +4335,10 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `connection.azure-openai-deployment` | A wrong deployment (404) or api-version (400) fails the test, Organization is optional, and a missing endpoint is refused | Only 401/403 fail, the form forces an Organization that is then sent on every request, and a missing endpoint sends the key to api.openai.com | Broken connections look healthy, and an Azure key can leak to another vendor |
 | `provider.clinepass-headers-envelope` | The Test button checks the key | It always fails with 'Provider test not supported', and validate's GET /models passes any key | Working ClinePass connections look broken, and wrong keys look valid when added |
 | `connection.commandcode-key-test` | The Test button checks the key, including an error event in a 200 answer | Test always fails; validate passes an in-band error | Working connections look broken and some bad keys look valid |
+| `oauth.dashboard-flow` | The server issues state and the PKCE verifier, keeps them for a short time bound to the dashboard session, and rejects an exchange whose state it did not issue; secrets never travel in URLs | state and verifier are returned to the browser and trusted back unchecked; gitlab's clientSecret goes in a GET query | A crafted callback can bind a connection to an attacker's account (login CSRF); a client secret lands in logs and history |
+| `oauth.refresh-lifecycle` | One refresh at a time per connection on every path (spec §9 SP16: single-flight); no refresh attempts for a connection that cannot refresh | The reactive path bypasses the lock, and it retries three times with delays even when no refresher exists | Rotating refresh tokens get invalidated under concurrency; every 401 on a non-refreshable connection costs 3 s |
+| `provider.cline-oauth` | ClinePass offers only the sign-in that works (its API key) | ClinePass also offers the Cline OAuth sign-in, whose tokens its API rejects | A ClinePass OAuth connection looks connected and every request fails |
+| `provider.gitlab-duo-oauth` | Chat goes to the connection's GitLab in the Duo Chat format, and the token is refreshed before it expires | An OpenAI body goes to gitlab.com whatever the instance; no refresh | GitLab Duo requests fail, and a working sign-in dies after two hours (9router hides the provider) |
 | `account.concurrent-refresh-race` | Two concurrent requests hitting an expired/rejected token on the same connection should converge on one valid refreshed token — either serialized so the second reuses the first's fresh token, or each refresh is independently idempotent regardless of which refreshToken value it started from | No per-connection lock exists around either the proactive (checkAndRefreshToken) or reactive (chatCore.js 401/403) refresh call; each concurrent request refreshes using its own in-memory refreshToken snapshot with no coordination with other in-flight requests for the same connection | For providers with single-use rotating refresh tokens (the code names xAI and grok-cli explicitly), a burst of concurrent requests around token-expiry time causes all but the first refresh to fail with invalid_grant, which can further trigger markAccountUnavailable and lock the connection out even though it was just successfully refreshed by a sibling request |
 | `catalog.alias-disabled-model-bypass` | A model marked disabled in the dashboard should be rejected if a request targets it — directly or via an alias — mirroring how it disappears from every model-listing endpoint ("disable" implies block, not just hide) | The chat/routing path never reads the disabledModels table at all; only the discovery endpoints (/api/models, /v1/models) filter by it, so a disabled model keeps working for any client that already knows its id, or that reaches it through an alias or combo | The 'disable' control only removes discoverability, not access — a compliance or cost-control use case ('stop routing to this expensive/broken model') is not actually enforced, silently, with no error surfaced to the operator who disabled it |
 | `catalog.alias-dual-convention-collision` | Both endpoints described as setting 'the alias for a model' should write the same KV shape so a value set through either surface is visible to the other, and to actual chat routing | The two routes call the same setModelAlias(alias, model) primitive with swapped argument order, so /api/models/alias produces routable aliases (key=alias) while /api/models produces display-only rows (key=modelId) in the same table — each is invisible to the other's reader | An alias set via the main /api/models list page's inline rename never actually works as a callable alias in a chat request (resolveModelAliasFromMap won't find it), while a routable alias created via the dedicated alias-management endpoint never appears as that model's display label in the main list — two silently disconnected features sharing one KV namespace |

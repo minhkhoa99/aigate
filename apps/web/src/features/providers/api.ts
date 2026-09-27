@@ -17,6 +17,10 @@ export interface Connection {
   apiVersion: string | null;
   organization: string | null;
   accountId: string | null;
+  // SP16 (docs/contracts/oauth.md): a signed-in connection shows its account and token expiry.
+  authType: "api-key" | "oauth";
+  email: string | null;
+  expiresAt: string | null;
   isActive: boolean;
   testStatus: TestStatus;
   lastError: string | null;
@@ -37,8 +41,13 @@ export interface ProviderSummary {
   hidden: boolean;
   connectable: boolean;
   reason: string | null;
+  // SP16: how the dashboard signs in to the provider (null: API key only), and whether it takes no API key at all.
+  signIn: OAuthFlow | null;
+  signInOnly: boolean;
   modelCount: number;
 }
+
+export type OAuthFlow = "authorization_code" | "authorization_code_pkce" | "device_code" | "browser_token";
 
 export interface ProviderModel {
   id: string;
@@ -83,6 +92,23 @@ export const useUpdateConnection = () =>
 export const useDeleteConnection = () => useConnectionMutation((id: string) => apiVoid(path(id), "DELETE"));
 export const useTestConnection = () =>
   useConnectionMutation((id: string) => api<Connection>(`${path(id)}/test`, { method: "POST", timeoutMs: TEST_TIMEOUT_MS }));
+
+// docs/contracts/oauth.md: the sign-in steps. The server allows 30 s for each step that calls the provider.
+const OAUTH_TIMEOUT_MS = 35_000;
+const oauthPath = (provider: string, step: string) => `/api/oauth/${encodeURIComponent(provider)}/${step}`;
+
+export interface OAuthStart { authUrl: string | null; state: string; codeVerifier: string; redirectUri: string; flowType: OAuthFlow }
+export interface DeviceCode { device_code: string; user_code: string; verification_uri_complete: string; expires_in: number; interval: number }
+export type PollAnswer = { success: true; connection: { id: string } } | { success: false; error: string; errorDescription?: string | null; pending: boolean };
+
+export const oauthAuthorize = (provider: string, redirectUri: string, meta: Record<string, string>) =>
+  api<OAuthStart>(`${oauthPath(provider, "authorize")}?${new URLSearchParams({ redirect_uri: redirectUri, ...meta }).toString()}`);
+export const oauthDeviceCode = (provider: string) => api<DeviceCode>(oauthPath(provider, "device-code"), { timeoutMs: OAUTH_TIMEOUT_MS });
+export const oauthPoll = (provider: string, deviceCode: string) =>
+  api<PollAnswer>(oauthPath(provider, "poll"), { method: "POST", body: { deviceCode }, timeoutMs: OAUTH_TIMEOUT_MS });
+export const useOAuthExchange = () =>
+  useConnectionMutation(({ provider, ...body }: { provider: string; code: string; redirectUri: string; codeVerifier: string; state: string; meta: Record<string, string> }) =>
+    api<{ success: true; connection: { id: string; email: string | null } }>(oauthPath(provider, "exchange"), { method: "POST", body, timeoutMs: OAUTH_TIMEOUT_MS }));
 
 // docs/contracts/custom-providers.md
 export type NodeType = "openai-compatible" | "anthropic-compatible";

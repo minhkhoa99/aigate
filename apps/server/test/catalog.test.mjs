@@ -17,12 +17,14 @@ test("the provider catalog lists every provider with its connectable status, beh
     const openai = list.find((p) => p.id === "openai");
     assert.deepEqual({ ...openai, modelCount: openai.modelCount > 0 }, {
       id: "openai", name: "OpenAI", aliases: openai.aliases, category: openai.category, protocol: "openai-compatible", authKinds: openai.authKinds, hidden: false,
-      connectable: true, reason: null, modelCount: true,
+      connectable: true, reason: null, signIn: null, signInOnly: false, modelCount: true,
     });
+    const kilo = list.find((p) => p.id === "kilocode");
+    assert.deepEqual([kilo.connectable, kilo.signIn, kilo.signInOnly], [true, "device_code", true], "SP16: a sign-in provider");
     const claude = list.find((p) => p.id === "claude");
     assert.deepEqual([claude.connectable, claude.reason], [false, "Needs OAuth sign-in (SP16)"]);
     assert.ok(list.every((p) => p.connectable === (p.reason === null)), "a reason exactly when not connectable");
-    assert.equal(list.filter((p) => p.connectable).length, 59);
+    assert.equal(list.filter((p) => p.connectable).length, 62);
     await app.close();
   }));
 

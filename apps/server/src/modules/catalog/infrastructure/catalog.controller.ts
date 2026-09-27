@@ -14,6 +14,10 @@ interface ProviderSummary {
   hidden: boolean;
   connectable: boolean;
   reason: string | null;
+  // SP16 (docs/contracts/oauth.md): how the dashboard signs in to the provider, or null when it takes only a key.
+  signIn: string | null;
+  // The provider takes no API key: it connects only by signing in.
+  signInOnly: boolean;
   modelCount: number;
 }
 
@@ -29,6 +33,8 @@ function summary(provider: CatalogProvider): ProviderSummary {
     hidden: provider.hidden,
     connectable: status?.connectable ?? false,
     reason: status && !status.connectable ? status.reason : null,
+    signIn: builtinRegistry.provider(provider.id)?.oauth ?? null,
+    signInOnly: !provider.auth.kinds.includes("api-key"),
     modelCount: provider.models.length,
   };
 }

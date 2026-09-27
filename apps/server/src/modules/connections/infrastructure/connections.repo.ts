@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq } from "drizzle-orm";
-import { providerConnections, type DatabaseHandle, type TestStatus } from "@aigate/database";
+import { and, asc, eq, isNotNull, lt } from "drizzle-orm";
+import { providerConnections, type AuthType, type DatabaseHandle, type TestStatus } from "@aigate/database";
+import type { OAuthTokens } from "@aigate/engine";
 import { DATABASE } from "../../../database.provider.js";
 import { SECRET_CIPHER, type SecretCipherPort } from "../../../secret-cipher.js";
-import { keyHint, maskHint, sealContext, type ConnectionChanges, type ConnectionFields } from "../domain/connection.js";
+import { keyHint, maskHint, refreshContext, sealContext, type ConnectionChanges, type ConnectionFields } from "../domain/connection.js";
 
 // SP11 allows one connection per registry provider; the bound only guards the listing.
 const MAX_CONNECTIONS = 100;
@@ -21,6 +22,10 @@ export interface ConnectionView {
   apiVersion: string | null;
   organization: string | null;
   accountId: string | null;
+  // SP16 (docs/contracts/oauth.md): how the connection authenticates, the account it signed in as, and when its token expires.
+  authType: AuthType;
+  email: string | null;
+  expiresAt: string | null;
   isActive: boolean;
   testStatus: TestStatus;
   lastError: string | null;
@@ -36,26 +41,61 @@ export interface TestOutcome {
   lastErrorCode: string | null;
 }
 
-// A positive allowlist: the sealed key is not in it, so no read can return it (catalog.connection-listing).
+// A positive allowlist: the sealed key and tokens are not in it, so no read can return them (catalog.connection-listing).
 const t = providerConnections;
 const columns = {
   id: t.id, provider: t.provider, name: t.name, keyHint: t.keyHint, baseUrl: t.baseUrl,
-  deployment: t.deployment, apiVersion: t.apiVersion, organization: t.organization, accountId: t.accountId, isActive: t.isActive, testStatus: t.testStatus,
-  lastError: t.lastError, lastErrorCode: t.lastErrorCode, lastTestedAt: t.lastTestedAt, createdAt: t.createdAt, updatedAt: t.updatedAt,
+  deployment: t.deployment, apiVersion: t.apiVersion, organization: t.organization, accountId: t.accountId, authType: t.authType, email: t.email,
+  expiresAt: t.expiresAt, isActive: t.isActive, testStatus: t.testStatus, lastError: t.lastError, lastErrorCode: t.lastErrorCode, lastTestedAt: t.lastTestedAt,
+  createdAt: t.createdAt, updatedAt: t.updatedAt,
 };
-type Row = Omit<ConnectionView, "lastTestedAt" | "createdAt" | "updatedAt"> & { lastTestedAt: Date | null; createdAt: Date; updatedAt: Date };
+type Row = Omit<ConnectionView, "expiresAt" | "lastTestedAt" | "createdAt" | "updatedAt"> & { expiresAt: Date | null; lastTestedAt: Date | null; createdAt: Date; updatedAt: Date };
 
 // What withConnection needs to reach the provider (connection.ollama-local-host, connection.azure-openai-deployment, …).
 const data = { baseUrl: t.baseUrl, deployment: t.deployment, apiVersion: t.apiVersion, organization: t.organization, accountId: t.accountId };
 export type ConnectionData = { [K in keyof typeof data]: string | null };
 
+// An oauth connection's refresh state (oauth.refresh-lifecycle).
+export interface OAuthState {
+  refreshToken: string | undefined;
+  expiresAt: Date | null;
+}
+// The key (or access token) routing and the connection test use, with the row it came from.
+export type StoredCredential = { id: string; apiKey: string; oauth?: OAuthState } & ConnectionData;
+
+const secret = { id: t.id, sealed: t.apiKeySealed, authType: t.authType, refreshSealed: t.refreshTokenSealed, expiresAt: t.expiresAt, ...data };
+
 const toView = (row: Row): ConnectionView => ({
   ...row,
   keyHint: maskHint(row.keyHint),
+  expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
   lastTestedAt: row.lastTestedAt ? row.lastTestedAt.toISOString() : null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
+
+const storedUsername = (raw: string | null): string | undefined => {
+  if (!raw) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    const name = typeof parsed === "object" && parsed !== null && "username" in parsed ? parsed.username : undefined;
+    return typeof name === "string" && name ? name : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+// oauth.token-storage: a new sign-in updates the provider's connection when it is the same account (the email, and the
+// username too when either side has one); SP11 allows one connection per provider, so another account conflicts.
+function sameAccount(existing: { authType: AuthType; email: string | null; oauthData: string | null }, tokens: OAuthTokens): boolean {
+  if (existing.authType !== "oauth" || !tokens.email || existing.email !== tokens.email) return false;
+  const incoming = tokens.data.username;
+  const stored = storedUsername(existing.oauthData);
+  if (incoming && stored) return incoming === stored;
+  return !incoming && !stored;
+}
+
+const expiry = (now: Date, seconds: number | undefined) => (seconds === undefined ? null : new Date(now.getTime() + seconds * 1000));
 
 @Injectable()
 export class ConnectionsRepository {
@@ -86,6 +126,48 @@ export class ConnectionsRepository {
     return row ? toView(row) : undefined;
   }
 
+  // oauth.token-storage: create the oauth connection, or refresh the tokens of the same account's connection. The read
+  // and the write share one transaction; no network I/O happens inside it.
+  saveOAuth(input: { provider: string; name: string; tokens: OAuthTokens; organization?: string }): Promise<ConnectionView | "conflict"> {
+    return this.database.db.transaction(async (tx) => {
+      const existing = await tx.select({ id: t.id, authType: t.authType, email: t.email, oauthData: t.oauthData }).from(t).where(eq(t.provider, input.provider)).get();
+      if (existing && !sameAccount(existing, input.tokens)) return "conflict";
+      const id = existing?.id ?? randomUUID();
+      const now = new Date();
+      const { tokens } = input;
+      const values = {
+        apiKeySealed: this.cipher.seal(tokens.accessToken, sealContext(id)), keyHint: keyHint(tokens.accessToken), authType: "oauth" as const,
+        refreshTokenSealed: tokens.refreshToken ? this.cipher.seal(tokens.refreshToken, refreshContext(id)) : null,
+        expiresAt: expiry(now, tokens.expiresIn), email: tokens.email ?? null, oauthData: JSON.stringify(tokens.data), organization: input.organization ?? null,
+        isActive: true, testStatus: "active" as const, lastError: null, lastErrorCode: null, lastTestedAt: null, updatedAt: now,
+      };
+      const [row] = existing
+        ? await tx.update(t).set(values).where(eq(t.id, id)).returning(columns)
+        : await tx.insert(t).values({ id, provider: input.provider, name: input.name, createdAt: now, ...values }).returning(columns);
+      if (!row) throw new Error("the oauth connection was not saved");
+      return toView(row);
+    });
+  }
+
+  // oauth.refresh-lifecycle: the new access token (and refresh token, when the provider sent one) replace the old ones.
+  // A refresh without an expiry keeps the old one, as 9router does.
+  async storeRefresh(id: string, tokens: OAuthTokens): Promise<void> {
+    const now = new Date();
+    await this.database.db.update(t).set({
+      apiKeySealed: this.cipher.seal(tokens.accessToken, sealContext(id)), keyHint: keyHint(tokens.accessToken),
+      ...(tokens.refreshToken ? { refreshTokenSealed: this.cipher.seal(tokens.refreshToken, refreshContext(id)) } : {}),
+      ...(tokens.expiresIn !== undefined ? { expiresAt: expiry(now, tokens.expiresIn) } : {}),
+      lastRefreshAt: now, updatedAt: now,
+    }).where(and(eq(t.id, id), eq(t.authType, "oauth")));
+  }
+
+  // The active oauth connections with a refresh token that expire before `before` (the background refresh).
+  async oauthExpiring(before: Date): Promise<{ id: string; provider: string; refreshToken: string }[]> {
+    const rows = await this.database.db.select({ id: t.id, provider: t.provider, refreshSealed: t.refreshTokenSealed }).from(t)
+      .where(and(eq(t.authType, "oauth"), eq(t.isActive, true), isNotNull(t.refreshTokenSealed), lt(t.expiresAt, before))).limit(MAX_CONNECTIONS);
+    return rows.flatMap((row) => (row.refreshSealed ? [{ id: row.id, provider: row.provider, refreshToken: this.cipher.open(row.refreshSealed, refreshContext(row.id)) }] : []));
+  }
+
   // A new key starts over as untested: the old result described a different key.
   async update(id: string, changes: ConnectionChanges): Promise<ConnectionView | undefined> {
     const { apiKey, ...rest } = changes;
@@ -103,19 +185,16 @@ export class ConnectionsRepository {
   }
 
   // Throws SecretUnreadableError when the secret key changed since the key was saved.
-  async readKey(id: string): Promise<({ provider: string; apiKey: string; sealed: string } & ConnectionData) | undefined> {
-    const row = await this.database.db.select({ provider: t.provider, sealed: t.apiKeySealed, ...data }).from(t).where(eq(t.id, id)).get();
-    return row ? { ...row, apiKey: this.cipher.open(row.sealed, sealContext(id)) } : undefined;
+  async readKey(id: string): Promise<(StoredCredential & { provider: string; sealed: string }) | undefined> {
+    const row = await this.database.db.select({ provider: t.provider, ...secret }).from(t).where(eq(t.id, id)).get();
+    return row ? { provider: row.provider, sealed: row.sealed, ...this.open(row) } : undefined;
   }
 
   // The key and connection data routing uses (SP12): only an active connection counts; its test status does not.
   // Throws SecretUnreadableError when the secret key changed since the key was saved.
-  async activeCredential(provider: string): Promise<({ apiKey: string } & ConnectionData) | undefined> {
-    const row = await this.database.db.select({ id: t.id, sealed: t.apiKeySealed, ...data }).from(t)
-      .where(and(eq(t.provider, provider), eq(t.isActive, true))).get();
-    if (!row) return undefined;
-    const { id, sealed, ...rest } = row;
-    return { apiKey: this.cipher.open(sealed, sealContext(id)), ...rest };
+  async activeCredential(provider: string): Promise<StoredCredential | undefined> {
+    const row = await this.database.db.select(secret).from(t).where(and(eq(t.provider, provider), eq(t.isActive, true))).get();
+    return row ? this.open(row) : undefined;
   }
 
   async activeProviders(): Promise<Set<string>> {
@@ -128,5 +207,11 @@ export class ConnectionsRepository {
     const [row] = await this.database.db.update(t).set({ ...outcome, lastTestedAt: new Date() })
       .where(and(eq(t.id, id), eq(t.apiKeySealed, sealed))).returning(columns);
     return row ? toView(row) : this.get(id);
+  }
+
+  private open(row: { id: string; sealed: string; authType: AuthType; refreshSealed: string | null; expiresAt: Date | null } & ConnectionData): StoredCredential {
+    const { id, sealed, authType, refreshSealed, expiresAt, ...rest } = row;
+    const oauth = authType === "oauth" ? { oauth: { refreshToken: refreshSealed ? this.cipher.open(refreshSealed, refreshContext(id)) : undefined, expiresAt } } : {};
+    return { id, apiKey: this.cipher.open(sealed, sealContext(id)), ...oauth, ...rest };
   }
 }

@@ -128,8 +128,46 @@ function neutralAgentPrompt(message: Json): Json {
   return { ...message, content: typeof content === "string" ? NEUTRAL_PROMPT : [{ type: "text", text: NEUTRAL_PROMPT }] };
 }
 
+// provider.kimchi-browser-token: what the 9router KimchiExecutor changes in the finished body.
+const KIMCHI_DROPS = ["anthropic_version", "anthropic_beta", "client_metadata", "mcp_servers", "stop_sequences", "thinking", "top_k"];
+const REASONING_PLACEHOLDER_MAX = 8;
+const ANTHROPIC_MODEL = /(^|[-_/])(?:claude|anthropic)(?:[-_/]|$)/i;
+
+function withoutKeys(value: unknown, keys: readonly string[]): unknown {
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !keys.includes(key)));
+}
+
+function kimchiBody(body: Json): void {
+  // A top-level system (copied from a client's fields) joins the first system message.
+  const system = (typeof body.system === "string" ? body.system
+    : list(body.system).map((part) => (typeof part === "string" ? part : text(record(part).text) ?? "")).filter(Boolean).join("\n")).trim();
+  const messages = list(body.messages).map(record);
+  if (system) {
+    const existing = messages.find((message) => message.role === "system");
+    if (!existing) messages.unshift({ role: "system", content: system });
+    else if (typeof existing.content === "string") existing.content = `${system}\n\n${existing.content}`;
+    else if (Array.isArray(existing.content)) existing.content = [{ type: "text", text: system }, ...existing.content];
+  }
+  delete body.system;
+  for (const key of KIMCHI_DROPS) delete body[key];
+  if (ANTHROPIC_MODEL.test(text(body.model) ?? "")) {
+    delete body.reasoning_effort;
+    delete body.reasoning;
+  }
+  body.messages = messages.map((message) => {
+    const clean = withoutKeys(message, ["cache_control"]);
+    const out = record(clean);
+    if (out.role === "assistant" && typeof out.reasoning_content === "string" && out.reasoning_content.length > REASONING_PLACEHOLDER_MAX) delete out.reasoning_content;
+    if (Array.isArray(out.content)) out.content = out.content.map((part: unknown) => withoutKeys(part, ["cache_control", "signature"]));
+    return out;
+  });
+  if (Array.isArray(body.tools)) body.tools = body.tools.map((tool: unknown) => withoutKeys(tool, ["cache_control"]));
+}
+
 // What the 9router CodeBuddy executors change in the finished body.
 function applyQuirks(body: Json, quirks: readonly string[]): void {
+  if (quirks.includes("kimchi")) kimchiBody(body);
   if (quirks.includes("reasoningSummary")) {
     const effort = body.reasoning_effort;
     if (effort === "none" || effort === "off") delete body.reasoning_effort;

@@ -146,3 +146,5 @@ export function keyHint(apiKey: string): string {
 export const maskHint = (hint: string): string => (hint === "" ? "no key" : hint.length <= 4 ? `••••${hint}` : hint);
 // Authenticated with the sealed value, so it only opens for this row and field.
 export const sealContext = (id: string): string => `provider_connections:${id}:api_key`;
+// SP16: an oauth connection's refresh token has its own context, so the two sealed values cannot be swapped.
+export const refreshContext = (id: string): string => `provider_connections:${id}:refresh_token`;

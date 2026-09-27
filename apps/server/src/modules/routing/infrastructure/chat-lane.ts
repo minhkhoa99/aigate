@@ -14,7 +14,8 @@ import {
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { extractApiKey } from "../../apikeys/domain/api-key.js";
 import { ApiKeysRepository } from "../../apikeys/infrastructure/api-keys.repo.js";
-import { ConnectionsRepository } from "../../connections/infrastructure/connections.repo.js";
+import { ConnectionsRepository, type StoredCredential } from "../../connections/infrastructure/connections.repo.js";
+import { TokenRefresher } from "../../connections/infrastructure/token-refresher.js";
 import { isReservedPrefix, nodeDescriptor, ProviderNodesRepository } from "../../connections/infrastructure/provider-nodes.repo.js";
 import { isLocalRequest } from "../../identity/domain/local-request.js";
 import { SettingsRepository } from "../../settings/infrastructure/settings.repo.js";
@@ -26,8 +27,11 @@ export const CHAT_LIMITS = Symbol("CHAT_LIMITS");
 export interface ChatLimits {
   // Longest silence allowed between two upstream stream chunks (AIGATE_STREAM_IDLE_TIMEOUT_MS).
   readonly streamIdleTimeoutMs: number;
+  // The pause unit between the reactive refresh attempts after a 401/403 (oauth.refresh-lifecycle: 1 s, then 2 s).
+  readonly refreshRetryDelayMs: number;
 }
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000;
+export const DEFAULT_REFRESH_RETRY_DELAY_MS = 1_000;
 const REQUEST_BUDGET_MS = 600_000;
 
 // A failure AIGate itself decides, already in OpenAI terms.
@@ -79,7 +83,13 @@ interface Target {
   provider: ProviderDescriptor;
   request: CanonicalRequest;
   credential: Credential;
+  // The connection the credential came from (SP16: its oauth token can be refreshed).
+  connection: StoredCredential;
 }
+
+// The provider answered 401 or 403 (not a key AIGate refused before sending).
+const upstreamAuthFailure = (error: unknown): boolean =>
+  error instanceof EngineError && error.code === "AUTH_ERROR" && (error.details.status === 401 || error.details.status === 403);
 
 interface Ids {
   created: number;
@@ -185,6 +195,7 @@ export class ChatLane {
     private readonly keys: ApiKeysRepository,
     private readonly connections: ConnectionsRepository,
     private readonly nodes: ProviderNodesRepository,
+    private readonly refresher: TokenRefresher,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
     @Inject(CHAT_LIMITS) private readonly limits: ChatLimits,
   ) {}
@@ -269,13 +280,25 @@ export class ChatLane {
       const target = { ...resolved, request: parsed.prepare(resolved.request, resolved.provider) };
       const adapter = createAdapter(target.provider, this.transport);
       const ids = { created: Math.floor(Date.now() / 1000), fallbackId: `chatcmpl-${requestId.replaceAll("-", "")}`, requestId };
-      if (!target.request.stream) {
-        const ctx: ExecCtx = { signal: AbortSignal.any([client.signal, budget.signal]), requestId };
-        const response = await adapter.execute(target.request, target.credential, ctx);
-        reply.code(200).header("cache-control", "no-store").send(parsed.respond(response, target.provider, ids));
-        return;
+      const run = async (credential: Credential): Promise<void> => {
+        if (!target.request.stream) {
+          const ctx: ExecCtx = { signal: AbortSignal.any([client.signal, budget.signal]), requestId };
+          const response = await adapter.execute(target.request, credential, ctx);
+          reply.code(200).header("cache-control", "no-store").send(parsed.respond(response, target.provider, ids));
+          return;
+        }
+        await this.stream(reply, adapter, { ...target, credential }, parsed.encoder(target.provider, { ...ids, model: target.request.model }), ids.requestId, client, budget.signal);
+      };
+      try {
+        await run(target.credential);
+      } catch (error) {
+        // oauth.refresh-lifecycle (9router, kept): a 401/403 before the first byte refreshes the connection's token, for
+        // every provider, and the request is sent once more with the new token.
+        if (!upstreamAuthFailure(error) || reply.sent || client.signal.aborted) throw error;
+        const token = await this.refresher.reactive(target.provider.id, target.connection, this.limits.refreshRetryDelayMs);
+        if (!token) throw error;
+        await run({ kind: "api-key", apiKey: token });
       }
-      await this.stream(reply, adapter, target, parsed.encoder(target.provider, { ...ids, model: target.request.model }), ids.requestId, client, budget.signal);
     } catch (error) {
       if (client.signal.aborted) {
         // Nobody is left to answer; the upstream call was already cancelled through the shared signal.
@@ -395,14 +418,16 @@ export class ChatLane {
           `No active connection serves "${ref}". Add or enable one for ${names}${declaring.length > 3 ? ", …" : ""} in AIGate: Providers → Connections.`);
       }
     }
-    const stored = await this.connections.activeCredential(provider.id);
-    if (stored === undefined) {
+    const current = await this.connections.activeCredential(provider.id);
+    if (current === undefined) {
       throw new GatewayError(404, "not_found_error", "no_active_connection", `${provider.name} has no active connection. Add or enable one in AIGate: Providers → Connections.`);
     }
     const upstream: CanonicalRequest = { ...request, model: modelId };
     assertModelSupports(upstream, provider.id, builtinRegistry.model(provider.id, modelId), modelId);
+    // oauth.refresh-lifecycle: an oauth token about to expire is refreshed first.
+    const stored = await this.refresher.fresh(provider.id, current);
     // connection.ollama-local-host: a connection may point the provider at its own host.
-    return { provider: withConnection(provider, stored), request: upstream, credential: { kind: "api-key", apiKey: stored.apiKey } };
+    return { provider: withConnection(provider, stored), request: upstream, credential: { kind: "api-key", apiKey: stored.apiKey }, connection: stored };
   }
 
   private modelNotFound(ref: string): GatewayError {

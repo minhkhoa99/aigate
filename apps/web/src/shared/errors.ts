@@ -22,7 +22,9 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   NOT_FOUND: "That item no longer exists. The list was refreshed.",
   // docs/contracts/connections.md. The server message gives the catalog reason.
   PROVIDER_NOT_SUPPORTED: (body) => typeof body.message === "string" ? body.message : "This provider cannot be connected yet.",
-  ALREADY_CONNECTED: "This provider is already connected. Use Replace key on its row instead.",
+  ALREADY_CONNECTED: (body) => typeof body.message === "string" ? body.message : "This provider is already connected. Use Replace key on its row instead.",
+  // docs/contracts/oauth.md: the provider refused the sign-in; its own words follow.
+  OAUTH_FAILED: (body) => typeof body.message === "string" ? `The sign-in failed: ${body.message}` : "The sign-in failed. Try again.",
   CREDENTIAL_UNREADABLE: "The saved key can no longer be decrypted, because the secret key file changed. Use Replace key to enter it again.",
   // docs/contracts/custom-providers.md.
   NODE_LIMIT: "You have reached the maximum of 100 custom providers. Delete one you no longer use.",

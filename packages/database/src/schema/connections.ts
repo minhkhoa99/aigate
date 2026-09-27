@@ -3,6 +3,8 @@ import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-cor
 
 export const TEST_STATUSES = ["untested", "active", "invalid", "no_quota", "unreachable"] as const;
 export type TestStatus = (typeof TEST_STATUSES)[number];
+export const AUTH_TYPES = ["api-key", "oauth"] as const;
+export type AuthType = (typeof AUTH_TYPES)[number];
 
 // docs/contracts/connections.md. SP11: one API-key account per provider (unique provider).
 export const providerConnections = sqliteTable(
@@ -21,6 +23,14 @@ export const providerConnections = sqliteTable(
     apiVersion: text("api_version"),
     organization: text("organization"),
     accountId: text("account_id"),
+    // SP16 (docs/contracts/oauth.md): an oauth connection keeps its access token in api_key_sealed, sealed like a key.
+    authType: text("auth_type", { enum: AUTH_TYPES }).notNull().default("api-key"),
+    refreshTokenSealed: text("refresh_token_sealed"),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    lastRefreshAt: integer("last_refresh_at", { mode: "timestamp_ms" }),
+    email: text("email"),
+    // The provider's own sign-in data (Kilo Code organization, GitLab instance, names), read and written whole.
+    oauthData: text("oauth_data"),
     isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
     testStatus: text("test_status", { enum: TEST_STATUSES }).notNull().default("untested"),
     lastError: text("last_error"),
@@ -29,7 +39,10 @@ export const providerConnections = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
-  () => [check("provider_connections_test_status", sql.raw(`test_status IN (${TEST_STATUSES.map((s) => `'${s}'`).join(", ")})`))],
+  () => [
+    check("provider_connections_test_status", sql.raw(`test_status IN (${TEST_STATUSES.map((s) => `'${s}'`).join(", ")})`)),
+    check("provider_connections_auth_type", sql.raw(`auth_type IN (${AUTH_TYPES.map((s) => `'${s}'`).join(", ")})`)),
+  ],
 );
 
 // docs/contracts/custom-providers.md (SP13b, SP14b). OpenAI- or Anthropic-compatible endpoints the user defines;

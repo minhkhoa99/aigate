@@ -26,9 +26,9 @@ function fakeTransport(...answers) {
 const answer = (content = "ok") => json(200, { id: "c1", model: "m", choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }] });
 const hello = (model) => ({ model, stream: false, messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }] });
 
-test("azure, cloudflare-ai, and clinepass are connectable; cline still needs OAuth", () => {
-  for (const id of ["azure", "cloudflare-ai", "clinepass"]) assert.deepEqual(builtinRegistry.status(id), { connectable: true }, id);
-  assert.deepEqual(builtinRegistry.status("cline"), { connectable: false, reason: "Needs OAuth sign-in (SP16)" });
+test("azure, cloudflare-ai, and clinepass are connectable; cline connects by signing in (SP16)", () => {
+  for (const id of ["azure", "cloudflare-ai", "clinepass", "cline"]) assert.deepEqual(builtinRegistry.status(id), { connectable: true }, id);
+  assert.equal(builtinRegistry.provider("cline").oauth, "authorization_code");
   assert.deepEqual(azure.auth, { kind: "api-key", header: "api-key", scheme: "raw" });
   assert.deepEqual(azure.connectionFields.required, ["baseUrl"]);
   assert.deepEqual(cloudflare.connectionFields, { required: ["accountId"], optional: [] });

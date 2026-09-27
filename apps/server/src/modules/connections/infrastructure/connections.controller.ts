@@ -2,12 +2,13 @@ import { randomUUID } from "node:crypto";
 import {
   BadRequestException, Body, ConflictException, Controller, Delete, Get, Header, HttpCode, HttpStatus, Inject, NotFoundException, Param, Patch, Post,
 } from "@nestjs/common";
-import { builtinRegistry, createAdapter, EngineError, parseGoogleCredential, withConnection, type HttpTransportPort, type ProviderDescriptor } from "@aigate/engine";
+import { builtinRegistry, CATALOG, createAdapter, EngineError, parseGoogleCredential, withConnection, type HttpTransportPort, type ProviderDescriptor } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
 import { DATA_FIELD_NAMES, isJsonCredential, parseChanges, parseNewConnection, type ConnectionChanges } from "../domain/connection.js";
 import { ConnectionsRepository, type ConnectionView, type TestOutcome } from "./connections.repo.js";
 import { nodeDescriptor, ProviderNodesRepository } from "./provider-nodes.repo.js";
+import { TokenRefresher } from "./token-refresher.js";
 
 // Above the adapter's own 15 s /models budget, so its TIMEOUT is what normally fires.
 const TEST_BUDGET_MS = 20_000;
@@ -30,6 +31,10 @@ const named = (view: ConnectionView, nodeNames: ReadonlyMap<string, string>): Na
 // by a provider that declares it (connectionBaseUrl, connectionFields), and a required one cannot be missing or cleared.
 // provider.vertex-google-auth: only a Google Cloud provider takes a JSON credential.
 function checkForProvider(provider: ProviderDescriptor, fields: ConnectionChanges, creating: boolean): void {
+  // docs/contracts/oauth.md: a provider whose catalog entry takes no API key connects only by signing in.
+  if (fields.apiKey !== undefined && provider.oauth && CATALOG.find((entry) => entry.id === provider.id)?.auth.kinds.includes("api-key") === false) {
+    throw invalid(`${provider.name} connects by signing in, not with an API key`);
+  }
   if (fields.apiKey === "" && !provider.auth.optional) throw invalid("apiKey must be 8-4096 printable characters without spaces");
   const declared = provider.connectionFields;
   const takes = (field: string) => (field === "baseUrl" && provider.connectionBaseUrl !== undefined)
@@ -73,6 +78,7 @@ export class ConnectionsController {
     private readonly connections: ConnectionsRepository,
     private readonly nodes: ProviderNodesRepository,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
+    private readonly refresher: TokenRefresher,
   ) {}
 
   @Get()
@@ -126,6 +132,7 @@ export class ConnectionsController {
     if (Object.keys(checked).length > 0) {
       const current = await this.connections.get(id);
       if (!current) throw notFound();
+      if (current.authType === "oauth" && checked.apiKey !== undefined) throw invalid("This connection signs in with OAuth; sign in again to replace its token");
       const provider = await this.provider(current.provider);
       if (!provider) throw notSupported(current.provider);
       checkForProvider(provider, checked, false);
@@ -158,8 +165,12 @@ export class ConnectionsController {
     if (!stored) throw notFound();
     const provider = await this.provider(stored.provider);
     if (!provider) throw notSupported(stored.provider);
-    const outcome = await runTest(withConnection(provider, stored), this.transport, stored.apiKey);
-    const view = await this.connections.recordTest(id, stored.sealed, outcome);
+    // oauth.refresh-lifecycle: a token about to expire is refreshed before the test, as 9router does.
+    const fresh = await this.refresher.fresh(provider.id, stored);
+    const outcome = await runTest(withConnection(provider, fresh), this.transport, fresh.apiKey);
+    // After a refresh the sealed token changed, so the result is recorded against the new one.
+    const sealed = fresh === stored ? stored.sealed : (await this.connections.readKey(id))?.sealed ?? stored.sealed;
+    const view = await this.connections.recordTest(id, sealed, outcome);
     if (!view) throw notFound();
     return this.withName(view);
   }

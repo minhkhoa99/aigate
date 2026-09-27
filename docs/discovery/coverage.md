@@ -1,13 +1,13 @@
 # Discovery coverage
 
-Entries: 318
+Entries: 325
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
 | routes | 166/166 |  |
-| pages | 5/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +15 |
+| pages | 6/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +14 |
 | providers | 21/124 | alicode, alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu … +95 |
-| executors | 15/31 | devin-cli, gemini-cli, github, grok-cli, grok-web, iflow, kimchi, mimo-free … +8 |
+| executors | 16/31 | devin-cli, gemini-cli, github, grok-cli, grok-web, iflow, mimo-free, opencode … +7 |
 | translators | 44/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js |
 | repos | 11/11 |  |
 | settingsKeys | 47/52 | cloudEnabled, dnsToolEnabled, oidcLoginLabel, samlLoginLabel, tunnelProvider |
@@ -16,7 +16,7 @@ Entries: 318
 
 - apikeys: 9
 - catalog: 29
-- connections: 55
+- connections: 62
 - identity: 11
 - media: 15
 - routing: 107
@@ -28,8 +28,8 @@ Entries: 318
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 17
-- REFERENCE_BEHAVIOR: 271
-- SUSPECTED_BUG: 65
+- REFERENCE_BEHAVIOR: 278
+- SUSPECTED_BUG: 69
 
 ## Missing — pages
 
@@ -52,7 +52,6 @@ Entries: 318
 - (dashboard)/dashboard/token-saver
 - (dashboard)/dashboard/translator
 - (dashboard)/dashboard/usage
-- callback
 - dashboard/settings/pricing
 - landing
 - login
@@ -171,7 +170,6 @@ Entries: 318
 - grok-cli
 - grok-web
 - iflow
-- kimchi
 - mimo-free
 - opencode
 - opencode-go

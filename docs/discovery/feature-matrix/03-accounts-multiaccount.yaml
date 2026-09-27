@@ -456,7 +456,7 @@
     - { file: src/sse/services/tokenRefresh.js, line: 233, note: "checkAndRefreshToken proactive path — same no-lock pattern, runs on every request whose token is near expiry" }
     - { file: src/lib/db/repos/connectionsRepo.js, line: 192, note: "updateProviderConnection — the DB write itself is atomic per call, ruling out a corrupted-row race" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "Two concurrent requests hitting an expired/rejected token on the same connection should converge on one valid refreshed token — either serialized so the second reuses the first's fresh token, or each refresh is independently idempotent regardless of which refreshToken value it started from"

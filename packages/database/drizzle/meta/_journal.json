@@ -64,6 +64,13 @@
       "when": 1790436766878,
       "tag": "0008_freezing_wild_child",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790490406820,
+      "tag": "0009_messy_rhino",
+      "breakpoints": true
     }
   ]
 }

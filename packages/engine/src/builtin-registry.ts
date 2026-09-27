@@ -1,5 +1,6 @@
 import { CATALOG } from "./catalog/providers.generated.js";
 import type { CatalogProvider } from "./catalog/schema.js";
+import { OAUTH_PROVIDERS } from "./oauth.js";
 import { defineRegistry, PROVIDER_PROTOCOLS, type ProviderDescriptor, type ProviderProtocol, type ProviderStatus } from "./registry.js";
 
 // The runtime registry is the extracted catalog, filtered to what the adapters can serve today
@@ -36,16 +37,21 @@ const EXECUTOR_QUIRKS: Readonly<Record<string, readonly string[]>> = {
   "codebuddy-cn": ["reasoningSummary", "neutralAgentPrompt"],
   "codebuddy-intl": ["reasoningSummary"],
   "cloudflare-ai": ["flattenContent"],
+  // provider.cline-oauth: a Cline OAuth token (a WorkOS JWT) is sent as "workos:<jwt>".
+  cline: ["clineAuth"],
+  clinepass: ["clineAuth"],
+  // provider.kimchi-browser-token: the KimchiExecutor body adjustments, for both sign-ins.
+  kimchi: ["kimchi"],
 };
 // provider.clinepass-headers-envelope: the Cline client headers, naming AIGate (user decision 2026-09-26; 9router names
 // itself). ponytail: AIGate has no release version yet; 0.1.0 until it does.
 const CLIENT_VERSION = "0.1.0";
-const EXTRA_HEADERS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  clinepass: {
-    "user-agent": `AIGate/${CLIENT_VERSION}`, "x-platform": process.platform, "x-platform-version": process.version, "x-client-type": "aigate",
-    "x-client-version": CLIENT_VERSION, "x-core-version": CLIENT_VERSION, "x-is-multiroot": "false",
-  },
+const CLINE_HEADERS = {
+  "user-agent": `AIGate/${CLIENT_VERSION}`, "x-platform": process.platform, "x-platform-version": process.version, "x-client-type": "aigate",
+  "x-client-version": CLIENT_VERSION, "x-core-version": CLIENT_VERSION, "x-is-multiroot": "false",
 };
+// provider.cline-oauth: Cline's OAuth requests carry the same headers (9router's clineHeaders hook).
+const EXTRA_HEADERS: Readonly<Record<string, Readonly<Record<string, string>>>> = { clinepass: CLINE_HEADERS, cline: CLINE_HEADERS };
 // connection.azure-openai-deployment (kept as 9router, user decision 2026-09-26) and connection.cloudflare-account-id:
 // each connection fills the URL, and the connection test posts a one-token chat. provider.clinepass-headers-envelope:
 // Cline answers GET /models with 200 even without a key, so its test is a one-token chat too (user decision 2026-09-26).
@@ -82,12 +88,15 @@ export function unsupportedReason(provider: CatalogProvider): string | undefined
   // ponytail: speech-to-text only; nanobanana (image-only, connectable since SP13) is left for SP22 to decide.
   if (provider.serviceKinds.length > 0 && provider.serviceKinds.every((kind) => kind === "stt")) return PROTOCOL_REASONS.service;
   if (!isProtocol(provider.protocol)) return PROTOCOL_REASONS[provider.protocol] ?? `Needs the ${provider.protocol} adapter (SP14)`;
-  if (!provider.auth.kinds.includes("api-key")) {
+  // docs/contracts/oauth.md: a provider AIGate can sign in to is connectable without an API key.
+  const signIn = OAUTH_PROVIDERS[provider.id] !== undefined;
+  if (!provider.auth.kinds.includes("api-key") && !signIn) {
     if (provider.auth.kinds.includes("oauth")) return "Needs OAuth sign-in (SP16)";
     if (provider.auth.kinds.includes("cookie")) return "Needs a web session (later)";
     return "Keyless providers come later";
   }
-  if (provider.hidden) return "Hidden in the 9router catalog";
+  // gitlab is hidden in 9router's dashboard; it is ported by user decision (2026-09-27), so AIGate lists it.
+  if (provider.hidden && !signIn) return "Hidden in the 9router catalog";
   if (PER_CONNECTION[provider.id]) return undefined;
   if (provider.chatUrl === null) return "Each connection needs its own endpoint URL (later)";
   if (provider.chatUrl.includes("{")) return "The endpoint needs per-account data (later)";
@@ -96,6 +105,7 @@ export function unsupportedReason(provider: CatalogProvider): string | undefined
 }
 
 export function toDescriptor(provider: CatalogProvider, chatUrl: string): ProviderDescriptor {
+  const signIn = OAUTH_PROVIDERS[provider.id];
   const protocol: ProviderProtocol = isProtocol(provider.protocol) ? provider.protocol : "openai-compatible";
   const paths = PATHS[protocol];
   const headers = { ...Object.fromEntries(Object.entries(provider.headers).map(([name, value]) => [name.toLowerCase(), value])), ...EXTRA_HEADERS[provider.id] };
@@ -127,6 +137,8 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
     ...(provider.id === "ollama-local" ? OLLAMA_LOCAL : {}),
     ...(provider.forceStream && !STREAM_OPTIONAL.has(provider.id) ? { streamOnly: true } : {}),
     ...PER_CONNECTION[provider.id]?.(provider),
+    ...(signIn ? { oauth: signIn.flow } : {}),
+    ...(provider.id === "kilocode" ? { organizationHeader: "x-kilocode-organizationid" } : {}),
   };
 }
 

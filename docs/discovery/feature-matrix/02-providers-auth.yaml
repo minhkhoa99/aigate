@@ -2077,3 +2077,274 @@
     expected: "The Test button checks the key, including an error event in a 200 answer"
     actual: "Test always fails; validate passes an in-band error"
     impact: "Working connections look broken and some bad keys look valid"
+
+- id: oauth.dashboard-flow
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "The dashboard sign-in flow: GET authorize / device-code, POST exchange / poll on /api/oauth/{provider}/{action}, and the /callback page"
+  trigger: "The operator clicks Connect on an OAuth provider in the dashboard"
+  input: "authorize?redirect_uri=http://localhost:<appPort>/callback[&meta…]; exchange { code, redirectUri, codeVerifier, state, meta }; device-code; poll { deviceCode, codeVerifier, extraData }"
+  output: "authorize → { authUrl, state, codeVerifier, codeChallenge, redirectUri, flowType }; device-code → { device_code, user_code, verification_uri, expires_in, interval, codeVerifier }; exchange/poll → a saved oauth connection { id, provider, email, displayName } or { success: false, error, pending }"
+  businessRules:
+    - "authorize builds the provider's auth URL with a fresh PKCE pair (S256) and state and returns them to the browser; every query parameter other than redirect_uri is provider meta (gitlab: baseUrl, clientId, clientSecret)"
+    - "The popup lands on /callback, which reads code, token (kimchi), state and error from the query and hands them to the opener by postMessage (trusted origins only), BroadcastChannel or localStorage; a remote dashboard shows the URL for manual copying"
+    - "exchange requires code and redirectUri, and codeVerifier except for cline, clinepass and kimchi; it exchanges, maps the tokens, and creates (or updates) the connection with authType oauth, expiresAt = now + expiresIn when known, testStatus active"
+    - "device-code (kilocode, github, kimi, …) returns the provider's user code and verification URL; poll maps authorization_pending and slow_down to { pending: true }, any other error to { success: false, error }, and success to a saved connection"
+    - "The modal polls at the provider interval, backing off 5 s on slow_down up to 30 s, until expires_in"
+  state:
+    reads: []
+    writes: ["providerConnections (a new or updated oauth row)"]
+    runtimeOnly: []
+  dependencies: ["oauth.token-storage", "oauth.generic-provider-action-route"]
+  providerInteraction: "The provider's authorize / token / device endpoints"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "missing code, redirectUri or codeVerifier (400 Missing required fields); a body that is not JSON (400)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "the provider rejects the exchange (500 with the upstream text as the message)", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The server never checks that the state it issued matches the one sent back; state and the PKCE verifier live only in the browser"
+    - "gitlab's clientSecret travels in the authorize query string"
+  evidence:
+    - { file: "src/app/api/oauth/[provider]/[action]/route.js", line: 98, note: "authorize: redirect_uri and meta from the query" }
+    - { file: src/lib/oauth/providers/index.js, line: 87, note: "generateAuthData returns state and codeVerifier to the caller" }
+    - { file: "src/app/api/oauth/[provider]/[action]/route.js", line: 238, note: "device-code" }
+    - { file: "src/app/api/oauth/[provider]/[action]/route.js", line: 458, note: "exchange: no PKCE for cline, clinepass, kimchi; state not checked" }
+    - { file: "src/app/api/oauth/[provider]/[action]/route.js", line: 493, note: "poll" }
+    - { file: src/app/callback/page.js, line: 14, note: "code, token, state from the query; postMessage to trusted origins" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "The server issues state and the PKCE verifier, keeps them for a short time bound to the dashboard session, and rejects an exchange whose state it did not issue; secrets never travel in URLs"
+    actual: "state and verifier are returned to the browser and trusted back unchecked; gitlab's clientSecret goes in a GET query"
+    impact: "A crafted callback can bind a connection to an attacker's account (login CSRF); a client secret lands in logs and history"
+
+- id: oauth.token-storage
+  group: OAuth providers
+  feature: Provider account management
+  subFeature: "How an OAuth connection is stored and updated: tokens, expiry, provider data, and the upsert by account"
+  trigger: "A successful exchange or poll, and every token refresh"
+  input: "Mapped tokens { accessToken, refreshToken, expiresIn, email, displayName, providerSpecificData }"
+  output: "A providerConnections row with authType oauth"
+  businessRules:
+    - "Fields: accessToken, refreshToken, expiresAt (ISO, from expiresIn), expiresIn, idToken, lastRefreshAt, email, displayName, name, priority, isActive, testStatus, providerSpecificData (JSON)"
+    - "A new oauth login for the same provider updates the existing row when the email matches and, when either side has a username in providerSpecificData, the usernames match too (codex matches on the ChatGPT account id); otherwise it creates a new row named after the email (else 'Account N') with the next priority"
+    - "A refresh merges the returned fields into the row and merges providerSpecificData instead of replacing it"
+    - "Tokens are stored in the SQLite row as given"
+  state:
+    reads: ["providerConnections"]
+    writes: ["providerConnections"]
+    runtimeOnly: []
+  dependencies: ["oauth.dashboard-flow"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["providerConnections"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: "read-merge-write inside one transaction" }
+  edgeCases:
+    - "Logging in again with the same account refreshes its tokens in place instead of adding a duplicate"
+  evidence:
+    - { file: src/lib/db/repos/connectionsRepo.js, line: 133, note: "oauth upsert by email (+ username / account id)" }
+    - { file: src/sse/services/tokenRefresh.js, line: 163, note: "updateProviderCredentials merges providerSpecificData" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: oauth.refresh-lifecycle
+  group: OAuth providers
+  feature: Provider authentication
+  subFeature: "Token refresh: proactive before a request, reactive on 401/403, and the background loop"
+  trigger: "A chat request on an oauth connection; an upstream 401/403; the 5-minute background timer"
+  input: "The connection's refreshToken and expiresAt"
+  output: "Updated tokens saved on the connection, and the request retried once after a reactive refresh"
+  businessRules:
+    - "Proactive: before a request, a token that expires within the provider's lead (default 5 min) is refreshed; refreshes of the same connection share one in-flight promise (withCredentialRefreshLock)"
+    - "Reactive: an upstream 401 or 403 calls the executor's refreshCredentials up to 3 times (1 s, then 2 s apart); a new access token is saved and the request is sent once more; otherwise the 401/403 goes to the client"
+    - "The reactive path runs for every provider, including those with no refresh (kilocode, kimchi, API-key connections), and does not use the proactive lock"
+    - "Background: every 5 minutes, every oauth connection that expires within max(provider lead, 30 min) is refreshed"
+    - "A connection with no refresh token, or a provider without a refresher, is never refreshed; its expiry is left to the upstream 401"
+  state:
+    reads: ["providerConnections"]
+    writes: ["providerConnections (tokens, expiresAt, lastRefreshAt)"]
+    runtimeOnly: ["refreshLocks (per connection, in memory)"]
+  dependencies: ["oauth.token-storage", "auth.refresh-provider-specific", "account.concurrent-refresh-race"]
+  providerInteraction: "The provider's refresh endpoint"
+  fallback: { hasFallback: true, retry: "refreshWithRetry: 3 attempts, 1 s and 2 s apart", timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "the refresh fails; the original 401/403 reaches the client", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections"]
+  performanceConcerns: ["A 401 from a provider without a refresher waits 3 s for three refresh attempts that cannot succeed"]
+  behavior: { streaming: false, cancellation: null, concurrency: "proactive refreshes are single-flight per connection; reactive ones are not" }
+  edgeCases:
+    - "Two requests that both get a 401 each refresh with the same refresh token; for a rotating refresh token the second fails"
+  evidence:
+    - { file: src/sse/services/tokenRefresh.js, line: 224, note: "checkAndRefreshToken (proactive)" }
+    - { file: open-sse/services/tokenRefresh.js, line: 43, note: "default lead 5 min" }
+    - { file: open-sse/services/oauthCredentialManager.js, line: 134, note: "withCredentialRefreshLock" }
+    - { file: open-sse/handlers/chatCore.js, line: 420, note: "reactive 401/403 refresh and one retry" }
+    - { file: open-sse/services/tokenRefresh.js, line: 257, note: "refreshWithRetry: 3 attempts, 1 s / 2 s apart" }
+    - { file: open-sse/executors/default.js, line: 219, note: "DefaultExecutor.refreshCredentials, no lock" }
+    - { file: src/sse/services/backgroundTokenRefresh.js, line: 9, note: "30 min background lead, 5 min interval" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "One refresh at a time per connection on every path (spec §9 SP16: single-flight); no refresh attempts for a connection that cannot refresh"
+    actual: "The reactive path bypasses the lock, and it retries three times with delays even when no refresher exists"
+    impact: "Rotating refresh tokens get invalidated under concurrency; every 401 on a non-refreshable connection costs 3 s"
+
+- id: provider.cline-oauth
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "Cline and ClinePass sign-in, token format, refresh, and request headers"
+  trigger: "Connect Cline (or ClinePass) with OAuth; every request on such a connection"
+  input: "The /callback query from app.cline.bot"
+  output: "An oauth connection { accessToken, refreshToken, expiresAt, email, providerSpecificData: { firstName, lastName } }"
+  businessRules:
+    - "Authorize URL: https://api.cline.bot/api/v1/auth/authorize?client_type=extension&callback_url=<redirect>&redirect_uri=<redirect> (no PKCE, no state)"
+    - "The returned code is base64 (padded as needed) of JSON { accessToken, refreshToken, email, firstName, lastName, expiresAt } (text after the last '}' ignored); if it does not decode, POST https://api.cline.bot/api/v1/auth/token { grant_type: authorization_code, code, client_type: extension, redirect_uri } and read data.accessToken / refreshToken / userInfo.email / expiresAt"
+    - "expiresIn = expiresAt − now in seconds, else 3600"
+    - "Refresh: POST https://api.cline.bot/api/v1/auth/refresh { refreshToken, grantType: refresh_token, clientType: extension }; read (data or root).accessToken, refreshToken (kept when absent) and expiresAt; the access token is prefixed 'workos:' when it is not already"
+    - "Requests: Authorization: Bearer <token>, with 'workos:' added to a JWT (eyJ…) token; plus the Cline client headers (HTTP-Referer https://cline.bot, X-Title Cline, User-Agent, X-PLATFORM, X-PLATFORM-VERSION, X-CLIENT-TYPE, X-CLIENT-VERSION, X-CORE-VERSION, X-IS-MULTIROOT) — 9router names itself in them"
+    - "ClinePass shares the flow; 9router's own registry notes that these extension tokens are rejected by the ClinePass API (HTTP 401, issue #2333)"
+  state:
+    reads: []
+    writes: ["providerConnections"]
+    runtimeOnly: []
+  dependencies: ["oauth.dashboard-flow", "oauth.refresh-lifecycle", "provider.clinepass-headers-envelope"]
+  providerInteraction: "api.cline.bot auth and chat"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "the fallback token exchange fails", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A ClinePass OAuth connection signs in but every chat answers 401"
+  evidence:
+    - { file: src/lib/oauth/providers/cline.js, line: 6, note: "buildAuthUrl" }
+    - { file: src/lib/oauth/providers/cline.js, line: 14, note: "base64 JSON code, token exchange fallback" }
+    - { file: open-sse/executors/default.js, line: 293, note: "refreshCline, workos: prefix" }
+    - { file: open-sse/shared/clineAuth.js, line: 5, note: "workos: prefix for a JWT token" }
+    - { file: open-sse/providers/registry/clinepass.js, line: 18, note: "extension tokens rejected by the ClinePass API (#2333)" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "ClinePass offers only the sign-in that works (its API key)"
+    actual: "ClinePass also offers the Cline OAuth sign-in, whose tokens its API rejects"
+    impact: "A ClinePass OAuth connection looks connected and every request fails"
+
+- id: provider.gitlab-duo-oauth
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "GitLab Duo OAuth sign-in (PKCE with the operator's own OAuth application) and its chat requests"
+  trigger: "Connect GitLab Duo (hidden in 9router's provider list)"
+  input: "meta { baseUrl (default https://gitlab.com), clientId, clientSecret? }"
+  output: "An oauth connection { accessToken, refreshToken, expiresIn, scope, providerSpecificData: { username, email, name, baseUrl, clientId, authKind: oauth } }"
+  businessRules:
+    - "Authorize: <baseUrl>/oauth/authorize?client_id&redirect_uri&response_type=code&state&scope=api read_user&code_challenge&code_challenge_method=S256"
+    - "Exchange: POST <baseUrl>/oauth/token (form: client_id, grant_type authorization_code, code, redirect_uri, code_verifier, client_secret when given); user info from <baseUrl>/api/v4/user"
+    - "No refresher exists although GitLab access tokens expire (expires_in, 2 h)"
+    - "Chat: an OpenAI chat body POSTed to https://gitlab.com/api/v4/chat/completions with Authorization: Bearer — always gitlab.com, whatever baseUrl the connection was made on"
+  state:
+    reads: []
+    writes: ["providerConnections"]
+    runtimeOnly: []
+  dependencies: ["oauth.dashboard-flow", "oauth.gitlab-pat"]
+  providerInteraction: "<baseUrl>/oauth/*, gitlab.com/api/v4/chat/completions"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["providerConnections"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "GitLab's /api/v4/chat/completions is the Duo Chat API ({ content } in, a string out), not OpenAI chat completions"
+  evidence:
+    - { file: src/lib/oauth/providers/gitlab.js, line: 7, note: "buildAuthUrl with the operator's clientId" }
+    - { file: src/lib/oauth/providers/gitlab.js, line: 23, note: "exchangeToken, user info" }
+    - { file: open-sse/providers/registry/gitlab.js, line: 17, note: "fixed gitlab.com chat URL; no refresh config" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Chat goes to the connection's GitLab in the Duo Chat format, and the token is refreshed before it expires"
+    actual: "An OpenAI body goes to gitlab.com whatever the instance; no refresh"
+    impact: "GitLab Duo requests fail, and a working sign-in dies after two hours (9router hides the provider)"
+
+- id: provider.kilocode-device-auth
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "Kilo Code device sign-in and the organization header"
+  trigger: "Connect Kilo Code; every request on the connection"
+  input: "The device code the operator approves at Kilo Code"
+  output: "An oauth connection { accessToken, email, providerSpecificData: { orgId }? } with no refresh token and no expiry"
+  businessRules:
+    - "Device code: POST https://api.kilo.ai/api/device-auth/codes → { code, verificationUrl, expiresIn }; user code = device code = code; interval 3 s; expires_in default 300; 429 → 'Too many pending authorization requests'"
+    - "Poll: GET https://api.kilo.ai/api/device-auth/codes/<code>: 202 pending, 403 access_denied, 410 expired_token, other non-2xx poll_failed; { status: approved, token } is success"
+    - "On success GET https://api.kilo.ai/api/profile with the token; organizations[0].id becomes providerSpecificData.orgId (a failure is ignored)"
+    - "Requests: Authorization: Bearer <token> and X-Kilocode-OrganizationID: <orgId> when known; no refresh (the refresher always returns null)"
+  state:
+    reads: []
+    writes: ["providerConnections"]
+    runtimeOnly: []
+  dependencies: ["oauth.dashboard-flow", "catalog.kilo-free-models-cache"]
+  providerInteraction: "api.kilo.ai"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: RATE_LIMIT, when: "too many pending device codes (429)", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: src/lib/oauth/providers/kilocode.js, line: 6, note: "requestDeviceCode" }
+    - { file: src/lib/oauth/providers/kilocode.js, line: 28, note: "pollToken statuses, profile orgId" }
+    - { file: open-sse/executors/default.js, line: 44, note: "kilocodeOrg header hook" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: provider.kimchi-browser-token
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: "Kimchi browser-token sign-in and the Kimchi request adjustments"
+  trigger: "Connect Kimchi with its browser sign-in; every Kimchi request"
+  input: "The token Kimchi returns on the /callback URL (?token=), or a pasted token"
+  output: "An oauth connection { accessToken, email, displayName, providerSpecificData: { authMethod: browser_token, userId, username } } with no refresh"
+  businessRules:
+    - "Sign-in URL: https://app.kimchi.dev/cli-auth?callback=<redirect>&state=<state>; the callback carries ?token="
+    - "The token is checked with GET https://api.cast.ai/v1/llm/openai/supported-providers (Bearer); a non-2xx fails the sign-in; user info from https://app.kimchi.dev/api/v1/me (failure ignored)"
+    - "email = user.email, else kimchi-user-<id>; displayName = name or username"
+    - "Requests (both sign-ins): User-Agent kimchi/0.1.50; the top-level system is merged into the first system message; anthropic_version, anthropic_beta, client_metadata, mcp_servers, stop_sequences, thinking, top_k are dropped; cache_control and signature fields are removed from messages and tools; assistant reasoning_content longer than 8 characters is removed; for Claude/Anthropic models reasoning_effort, reasoning and thinking are dropped"
+  state:
+    reads: []
+    writes: ["providerConnections"]
+    runtimeOnly: []
+  dependencies: ["oauth.dashboard-flow"]
+  providerInteraction: "app.kimchi.dev, api.cast.ai, llm.kimchi.dev"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "the token validation answers non-2xx", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: src/lib/oauth/providers/kimchi.js, line: 6, note: "cli-auth URL" }
+    - { file: src/lib/oauth/providers/kimchi.js, line: 13, note: "validation against api.cast.ai, user info" }
+    - { file: open-sse/executors/kimchi.js, line: 95, note: "KimchiExecutor.transformRequest adjustments" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]

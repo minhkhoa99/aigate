@@ -26,7 +26,7 @@ Each bounded context adds its own tables in the SP that implements it, after its
 
 6. **Declare uniqueness in the database and map constraint violations to 409 or 400.** Never check with a `SELECT` first, and never let a create silently upsert over an existing row. Foreign keys are on for every driver; declare `ON DELETE` explicitly.
    - Evidence: `combo.storage-shape`, `combo.api-crud`, `proxypool.storage-json-blob`, `catalog.alias-dual-convention-collision`.
-7. **Do every read-merge-write in one transaction, and keep transactions short.** The driver chain serializes all access through one lock, so never await network I/O inside a transaction. Token refresh is single-flight per connection, outside any transaction.
+7. **Do every read-merge-write in one transaction, and keep transactions short.** The driver chain serializes all access through one lock, so never await network I/O inside a transaction. Token refresh is single-flight per connection, outside any transaction. (SP16: the proactive refresh is; the reactive refresh after a 401/403 follows 9router without the lock, by user decision, `docs/contracts/oauth.md`.)
    - Evidence: `connection.update-atomic-merge-and-reorder`, `pricing.crud-api`, `catalog.model-disabled-crud-api`, `account.concurrent-refresh-race` (`SUSPECTED_BUG`), SPIKE-1.
 8. **Use versioned migrations; never rename a key silently.** A renamed setting or column must carry the old value forward in its migration.
    - Evidence: `settings.defaults-and-merge`.
