@@ -1248,14 +1248,15 @@
     },
     {
       "id": "sp_sp16",
-      "label": "SP16 — OAuth for 20 providers: flow + single-flight refresh + reactive/proactive",
+      "label": "SP16 — OAuth providers (flow, single-flight refresh, reactive/proactive refresh)",
       "file_type": "document",
-      "source_file": "docs/superpowers/specs/2026-09-22-aigate-design.md",
-      "source_location": "§9",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
       "source_url": null,
       "captured_at": null,
       "author": null,
-      "contributor": null
+      "contributor": null,
+      "status": "next"
     },
     {
       "id": "sp_sp17",
@@ -9043,7 +9044,7 @@
     },
     {
       "id": "sp_sp15c",
-      "label": "SP15c — Gemini client protocol (/v1beta/models/*)",
+      "label": "SP15c — Gemini client protocol (/v1beta/models/*, GET /v1beta/models, TTS passthrough)",
       "file_type": "document",
       "source_file": "docs/PROGRESS_HANDOFF.md",
       "source_location": null,
@@ -9051,7 +9052,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "status": "next"
+      "status": "done"
     },
     {
       "id": "decision_sp15b",
@@ -9152,6 +9153,139 @@
     {
       "id": "api_ui_map_row_sp15b",
       "label": "API_UI_MAP row: SP15b OpenAI Responses client protocol",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "protocol_gemini_contract",
+      "label": "Gemini client protocol contract (M2 SP15c)",
+      "file_type": "document",
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done",
+      "rationale": "/v1beta/models generate and listing. User decision 2026-09-27: keep 9router (text only, no tool calls or trailing usage, chat key headers, two-segment model id, open catalog listing); port the TTS passthrough now."
+    },
+    {
+      "id": "decision_sp15c",
+      "label": "User decision 2026-09-27: SP15c keeps 9router on request, response and auth/path; TTS passthrough ported now",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "11_translation_i18n_translator_gemini_client_request",
+      "label": "translator.gemini-client-request",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "11_translation_i18n_translator_openai_to_gemini_client_response",
+      "label": "translator.openai-to-gemini-client-response",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/11-translation-i18n.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "04_model_registry_mapping_catalog_v1beta_models_listing",
+      "label": "catalog.v1beta-models-listing",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/04-model-registry-mapping.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "04_model_registry_mapping_catalog_v1beta_generate_content_dispatch",
+      "label": "catalog.v1beta-generate-content-dispatch",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/04-model-registry-mapping.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "implemented"
+    },
+    {
+      "id": "gemini_client_protocol",
+      "label": "protocols/gemini-generate.ts — path parsing, text-only request, GenerateContentResponse, Gemini SSE encoder, model list, TTS request",
+      "file_type": "document",
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "gemini_tts_passthrough",
+      "label": "TTS passthrough: body to Google unchanged with the gemini connection key; only content-type forwarded",
+      "file_type": "document",
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "screen_endpoint_gemini",
+      "label": "Endpoint screen: Gemini chip, key and text-only notes, Gemini curl copy field",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "wired"
+    },
+    {
+      "id": "sp15c_tests",
+      "label": "SP15c tests: engine gemini-protocol.test.mjs (6), server gemini-client-lane.test.mjs; 54 mutations",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "status": "done"
+    },
+    {
+      "id": "api_ui_map_row_sp15c",
+      "label": "API_UI_MAP row: SP15c Gemini client protocol",
       "file_type": "document",
       "source_file": "docs/design/API_UI_MAP.md",
       "source_location": null,
@@ -29856,6 +29990,226 @@
     {
       "source": "sp_sp15b",
       "target": "api_ui_map_row_sp15b",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp15c",
+      "target": "sp_sp16",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp15c",
+      "target": "protocol_gemini_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp15c",
+      "target": "decision_sp15c",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp15c",
+      "target": "11_translation_i18n_translator_gemini_client_request",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp15c",
+      "target": "11_translation_i18n_translator_openai_to_gemini_client_response",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp15c",
+      "target": "04_model_registry_mapping_catalog_v1beta_models_listing",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "decision_sp15c",
+      "target": "04_model_registry_mapping_catalog_v1beta_generate_content_dispatch",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_gemini_contract",
+      "target": "gemini_client_protocol",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_gemini_contract",
+      "target": "client_protocol_lane",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "protocol_gemini_contract",
+      "target": "provider_gemini_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_client_protocol",
+      "target": "concept_cip",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_client_protocol",
+      "target": "gemini_tts_passthrough",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_client_protocol",
+      "target": "11_translation_i18n_translator_gemini_client_request",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_client_protocol",
+      "target": "11_translation_i18n_translator_openai_to_gemini_client_response",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_client_protocol",
+      "target": "04_model_registry_mapping_catalog_v1beta_models_listing",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "gemini_tts_passthrough",
+      "target": "04_model_registry_mapping_catalog_v1beta_generate_content_dispatch",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/protocol-gemini.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "screen_endpoint_keys",
+      "target": "screen_endpoint_gemini",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp15c_tests",
+      "target": "gemini_client_protocol",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp15c",
+      "target": "sp15c_tests",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_doc",
+      "target": "api_ui_map_row_sp15c",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp15c",
+      "target": "screen_endpoint_gemini",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp15c",
+      "target": "api_ui_map_row_sp15c",
       "relation": "references",
       "confidence": "EXTRACTED",
       "confidence_score": 1,
