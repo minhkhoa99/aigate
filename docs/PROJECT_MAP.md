@@ -56,6 +56,7 @@ Nguồn: `docs/superpowers/specs/2026-09-22-aigate-design.md` (spec — thắng 
 | **Connections: CONNECTION_FIELDS per provider (ollama host, Azure endpoint/deployment/API version/organization, Cloudflare account); Edit keeps the key** | — | — | — | — | — | — |
 | **Connections: service-account JSON or API key field for Vertex (16384 chars)** | — | — | — | — | — | — |
 | **Connections: Host field and optional key for Ollama Local; row shows host, no key, Edit** | — | — | — | — | — | — |
+| **Connections: sign-in in Add connection (popup, paste, device code), Signed-in rows, Sign in again; /callback relay** | — | — | — | — | — | — |
 | **Console — /traffic/console (dev only)** | U11 | tooling | console_log | color_tokens, type_scale | — | console_visibility |
 | **/providers/new → CustomProviderForm (create; ?id= edit); save → Add connection modal preselected** | — | — | — | — | — | — |
 | **/providers → Custom providers section (features/providers/custom.tsx): Connect, Edit, Delete** | — | — | — | — | — | — |
