@@ -136,14 +136,23 @@ const OAUTH_TIMEOUT_MS = 35_000;
 const oauthPath = (provider: string, step: string) => `/api/oauth/${encodeURIComponent(provider)}/${step}`;
 
 export interface OAuthStart { authUrl: string | null; state: string; codeVerifier: string; redirectUri: string; flowType: OAuthFlow }
-export interface DeviceCode { device_code: string; user_code: string; verification_uri_complete: string; expires_in: number; interval: number }
+export interface DeviceCode { device_code: string; user_code: string; verification_uri_complete: string; expires_in: number; interval: number; providerData?: Record<string, string> }
 export type PollAnswer = { success: true; connection: { id: string } } | { success: false; error: string; errorDescription?: string | null; pending: boolean };
 
 export const oauthAuthorize = (provider: string, redirectUri: string, meta: Record<string, string>) =>
   api<OAuthStart>(`${oauthPath(provider, "authorize")}?${new URLSearchParams({ redirect_uri: redirectUri, ...meta }).toString()}`);
-export const oauthDeviceCode = (provider: string) => api<DeviceCode>(oauthPath(provider, "device-code"), { timeoutMs: OAUTH_TIMEOUT_MS });
-export const oauthPoll = (provider: string, deviceCode: string) =>
-  api<PollAnswer>(oauthPath(provider, "poll"), { method: "POST", body: { deviceCode }, timeoutMs: OAUTH_TIMEOUT_MS });
+export const oauthDeviceCode = (provider: string, meta: Record<string, string> = {}) => {
+  const query = new URLSearchParams(meta).toString();
+  return api<DeviceCode>(`${oauthPath(provider, "device-code")}${query ? `?${query}` : ""}`, { timeoutMs: OAUTH_TIMEOUT_MS });
+};
+export const oauthPoll = (provider: string, deviceCode: string, providerData?: Record<string, string>) =>
+  api<PollAnswer>(oauthPath(provider, "poll"), { method: "POST", body: { deviceCode, ...(providerData ? { providerData } : {}) }, timeoutMs: OAUTH_TIMEOUT_MS });
+export interface TraeStart { authUrl: string; state: string; callbackUrl: string }
+export interface TraeStatus { status: "unknown" | "pending" | "processing" | "done" | "error"; connectionId?: string; email?: string | null; error?: string }
+export const traeStart = () => api<TraeStart>(oauthPath("trae", "start-proxy"), { timeoutMs: OAUTH_TIMEOUT_MS });
+export const traePoll = (state: string) => api<TraeStatus>(`${oauthPath("trae", "poll-status")}?${new URLSearchParams({ state })}`);
+export const traeStop = () => api<{ success: true }>(oauthPath("trae", "stop-proxy"));
+export const traeExchange = (code: string) => api<{ success: true; connection: { id: string } }>(oauthPath("trae", "exchange"), { method: "POST", body: { code }, timeoutMs: OAUTH_TIMEOUT_MS });
 export const useOAuthExchange = () =>
   useConnectionMutation(({ provider, ...body }: { provider: string; code: string; redirectUri: string; codeVerifier: string; state: string; meta: Record<string, string> }) =>
     api<{ success: true; connection: { id: string; email: string | null } }>(oauthPath(provider, "exchange"), { method: "POST", body, timeoutMs: OAUTH_TIMEOUT_MS }));
@@ -153,6 +162,15 @@ export const cursorAutoImport = () => api<CursorAutoImport>(oauthPath("cursor", 
 export const useCursorImport = () =>
   useConnectionMutation((body: { accessToken: string; machineId: string }) =>
     api<{ success: true; connection: { id: string; email: string | null } }>(oauthPath("cursor", "import"), { method: "POST", body, timeoutMs: OAUTH_TIMEOUT_MS }));
+
+export interface KiroImportHint { found: boolean; refreshToken?: string; clientId?: string | null; clientSecret?: string | null; region?: string | null; authMethod?: string | null; profileArn?: string | null; error?: string }
+export const kiroAutoImport = () => api<KiroImportHint>(oauthPath("kiro", "auto-import"), { timeoutMs: OAUTH_TIMEOUT_MS });
+export const kiroImport = (body: { refreshToken: string; clientId?: string; clientSecret?: string; region?: string; profileArn?: string }) =>
+  api<{ success: true; connection: { id: string; email: string | null } }>(oauthPath("kiro", "import"), { method: "POST", body, timeoutMs: OAUTH_TIMEOUT_MS });
+export const kiroCliProxyImport = (json: string) =>
+  api<{ success: true; connection: { id: string; email: string | null } }>(oauthPath("kiro", "import-cli-proxy"), { method: "POST", body: { json }, timeoutMs: OAUTH_TIMEOUT_MS });
+export const kiroApiKeyImport = (body: { apiKey: string; region: string }) =>
+  api<{ success: true; connection: { id: string; email: string | null } }>(oauthPath("kiro", "api-key"), { method: "POST", body, timeoutMs: OAUTH_TIMEOUT_MS });
 
 // docs/contracts/custom-providers.md
 export type NodeType = "openai-compatible" | "anthropic-compatible";

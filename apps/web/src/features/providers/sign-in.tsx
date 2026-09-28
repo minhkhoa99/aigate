@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button, Field, Input, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
-import { cursorAutoImport, oauthAuthorize, oauthDeviceCode, oauthPoll, useCursorImport, useOAuthExchange, type DeviceCode, type OAuthStart, type ProviderSummary } from "./api";
+import { cursorAutoImport, kiroApiKeyImport, kiroAutoImport, kiroCliProxyImport, kiroImport, oauthAuthorize, oauthDeviceCode, oauthPoll, traeExchange, traePoll, traeStart, traeStop, useCursorImport, useOAuthExchange, type DeviceCode, type KiroImportHint, type OAuthStart, type ProviderSummary, type TraeStart } from "./api";
 
 // docs/contracts/oauth.md (oauth.dashboard-flow, kept from 9router): the provider's page opens in a popup and returns to
 // /callback, which hands the code back to this window; a remote dashboard pastes the callback URL instead. A device
@@ -31,7 +31,63 @@ function pasted(raw: string): CallbackData {
 
 export function SignIn({ provider, onDone }: { provider: ProviderSummary; onDone: () => void }) {
   if (provider.signIn === "browser_token" && provider.id === "cursor") return <CursorSignIn onDone={onDone} />;
+  if (provider.id === "kiro") return <KiroSignIn provider={provider} onDone={onDone} />;
+  if (provider.id === "trae") return <TraeSignIn onDone={onDone} />;
   return provider.signIn === "device_code" ? <DeviceSignIn provider={provider} onDone={onDone} /> : <BrowserSignIn provider={provider} onDone={onDone} />;
+}
+
+function TraeSignIn({ onDone }: { onDone: () => void }) {
+  const client = useQueryClient(); const showToast = useToast();
+  const [session, setSession] = useState<TraeStart | null>(null); const [callback, setCallback] = useState("");
+  const [busy, setBusy] = useState(false); const [problem, setProblem] = useState<string | null>(null);
+  const done = useRef(onDone); done.current = onDone;
+
+  useEffect(() => {
+    if (!session) return undefined;
+    let stopped = false; let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const result = await traePoll(session.state);
+        if (stopped) return;
+        if (result.status === "done") {
+          await client.invalidateQueries({ queryKey: ["connections"], exact: true });
+          showToast({ tone: "success", message: "Signed in to Trae." }); done.current(); return;
+        }
+        if (result.status === "error" || result.status === "unknown") { setProblem(result.error ?? "Trae login session ended. Paste the callback URL below."); setSession(null); return; }
+        timer = setTimeout(() => void poll(), 1500);
+      } catch (error) {
+        if (!stopped) { showToast({ tone: "error", ...toProblem(error) }); timer = setTimeout(() => void poll(), 3000); }
+      }
+    };
+    timer = setTimeout(() => void poll(), 1500);
+    return () => { stopped = true; clearTimeout(timer); void traeStop().catch(() => undefined); };
+  }, [session, client, showToast]);
+
+  const begin = async () => {
+    const popup = window.open("about:blank", OAUTH_CHANNEL, "popup,width=600,height=720");
+    if (!popup) { setProblem("Allow pop-ups for this site, then try again."); return; }
+    setBusy(true); setProblem(null);
+    try { const next = await traeStart(); setSession(next); popup.location.assign(next.authUrl); }
+    catch (error) { popup.close(); showToast({ tone: "error", ...toProblem(error) }); }
+    finally { setBusy(false); }
+  };
+  const importToken = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setBusy(true); setProblem(null);
+    try { await traeExchange(callback.trim()); await client.invalidateQueries({ queryKey: ["connections"], exact: true }); showToast({ tone: "success", message: "Signed in to Trae." }); done.current(); }
+    catch (error) { const issue = toProblem(error); setProblem(issue.message); }
+    finally { setBusy(false); }
+  };
+
+  return <div className="stack">
+    <p className="muted">Sign in through Trae, or paste a Cloud-IDE-JWT token or full callback URL.</p>
+    <Button type="button" variant="primary" onClick={() => void begin()} disabled={busy || !!session}>{busy ? "Opening…" : session ? "Waiting for Trae callback…" : "Sign in to Trae"}</Button>
+    {session && <p className="muted">If the browser cannot reach <code>{session.callbackUrl}</code>, copy the full callback address and paste it below.</p>}
+    <form onSubmit={importToken} className="stack">
+      <Field label="Cloud-IDE-JWT token or callback URL"><textarea className="input" value={callback} onChange={(event) => setCallback(event.target.value)} rows={4} maxLength={8192} autoComplete="off" /></Field>
+      <Button type="submit" disabled={busy || !callback.trim()}>{busy ? "Importing…" : "Import token or callback"}</Button>
+    </form>
+    {problem && <Warning tone="danger">{problem}</Warning>}
+  </div>;
 }
 
 function CursorSignIn({ onDone }: { onDone: () => void }) {
@@ -67,7 +123,7 @@ function CursorSignIn({ onDone }: { onDone: () => void }) {
 
 type Session = OAuthStart & { meta: Record<string, string> };
 
-function BrowserSignIn({ provider, onDone }: { provider: ProviderSummary; onDone: () => void }) {
+function BrowserSignIn({ provider, onDone, metaOverride = {} }: { provider: ProviderSummary; onDone: () => void; metaOverride?: Record<string, string> }) {
   const exchange = useOAuthExchange();
   const showToast = useToast();
   const [session, setSession] = useState<Session | null>(null);
@@ -78,7 +134,7 @@ function BrowserSignIn({ provider, onDone }: { provider: ProviderSummary; onDone
   // provider.gitlab-duo-oauth: GitLab signs in with the operator's own OAuth application.
   const needsApp = provider.id === "gitlab";
   // provider.codex-oauth: a provider that returns only to its CLI's address (codex: localhost:1455) cannot reach /callback.
-  const elsewhere = session !== null && !session.redirectUri.startsWith(`${window.location.origin}/`);
+  const elsewhere = session !== null && (provider.id === "kiro" || !session.redirectUri.startsWith(`${window.location.origin}/`));
 
   const finish = (current: Session, data: CallbackData) => {
     if (handled.current) return;
@@ -112,20 +168,24 @@ function BrowserSignIn({ provider, onDone }: { provider: ProviderSummary; onDone
 
   const begin = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const popup = window.open("about:blank", OAUTH_CHANNEL, "popup,width=600,height=720");
+    if (!popup) { setProblem("Allow pop-ups for this site, then try again."); return; }
     const form = new FormData(event.currentTarget);
-    const meta = needsApp ? Object.fromEntries(["baseUrl", "clientId", "clientSecret"].flatMap((name) => {
+    const formMeta = needsApp ? Object.fromEntries(["baseUrl", "clientId", "clientSecret"].flatMap((name) => {
       const value = form.get(name);
       return typeof value === "string" && value.trim() ? [[name, value.trim()]] : [];
     })) : {};
+    const meta = { ...metaOverride, ...formMeta };
     setStarting(true);
     setProblem(null);
     handled.current = false;
     oauthAuthorize(provider.id, `${window.location.origin}/callback`, meta)
       .then((start) => {
         setSession({ ...start, meta });
-        if (start.authUrl) window.open(start.authUrl, OAUTH_CHANNEL, "popup,width=600,height=720");
+        if (start.authUrl) popup.location.assign(start.authUrl);
+        else popup.close();
       })
-      .catch((error: unknown) => showToast({ tone: "error", ...toProblem(error) }))
+      .catch((error: unknown) => { popup.close(); showToast({ tone: "error", ...toProblem(error) }); })
       .finally(() => setStarting(false));
   };
 
@@ -146,7 +206,9 @@ function BrowserSignIn({ provider, onDone }: { provider: ProviderSummary; onDone
     </form>
     {session && <form onSubmit={submitPasted} className="stack">
       <p className="muted">{elsewhere
-        ? <>{provider.name} returns to <code>{session.redirectUri}</code>, which this dashboard cannot receive. After you sign in, the window shows a page that cannot load: copy its full address and paste it here.</>
+        ? provider.id === "kiro"
+          ? <>Kiro returns to its <code>kiro://</code> app callback. Copy the full address shown by the browser and paste it here.</>
+          : <>{provider.name} returns to <code>{session.redirectUri}</code>, which this dashboard cannot receive. After you sign in, the window shows a page that cannot load: copy its full address and paste it here.</>
         : "Finish in the window that opened. If it does not come back here (for example on a remote dashboard), paste the address of the page it ended on, or the code it shows."}</p>
       <Field label="Callback URL or code"><Input name="callback" maxLength={8192} autoComplete="off" placeholder={`${session.redirectUri}?code=…`} /></Field>
       <Button type="submit" disabled={exchange.isPending}>{exchange.isPending ? "Signing in…" : "Finish sign-in"}</Button>
@@ -155,7 +217,7 @@ function BrowserSignIn({ provider, onDone }: { provider: ProviderSummary; onDone
   </div>;
 }
 
-function DeviceSignIn({ provider, onDone }: { provider: ProviderSummary; onDone: () => void }) {
+function DeviceSignIn({ provider, onDone, meta = {} }: { provider: ProviderSummary; onDone: () => void; meta?: Record<string, string> }) {
   const client = useQueryClient();
   const showToast = useToast();
   const [device, setDevice] = useState<DeviceCode | null>(null);
@@ -177,7 +239,7 @@ function DeviceSignIn({ provider, onDone }: { provider: ProviderSummary; onDone:
       if (stopped) return;
       if (Date.now() > deadline) { setProblem("The code expired before it was approved. Get a new code."); return; }
       try {
-        const answer = await oauthPoll(provider.id, device.device_code);
+        const answer = await oauthPoll(provider.id, device.device_code, device.providerData);
         if (stopped) return;
         if (answer.success) {
           await client.invalidateQueries({ queryKey: ["connections"], exact: true });
@@ -200,7 +262,7 @@ function DeviceSignIn({ provider, onDone }: { provider: ProviderSummary; onDone:
   const begin = () => {
     setStarting(true);
     setProblem(null);
-    oauthDeviceCode(provider.id)
+    oauthDeviceCode(provider.id, meta)
       .then((code) => { setDevice(code); window.open(code.verification_uri_complete, "_blank", "noopener"); })
       .catch((error: unknown) => showToast({ tone: "error", ...toProblem(error) }))
       .finally(() => setStarting(false));
@@ -212,4 +274,76 @@ function DeviceSignIn({ provider, onDone }: { provider: ProviderSummary; onDone:
       <p>Approve it at <a href={device.verification_uri_complete} target="_blank" rel="noreferrer">{device.verification_uri_complete}</a>. This window finishes by itself once it is approved.</p></div>}
     {problem && <Warning tone="danger">{problem}</Warning>}
   </div>;
+}
+
+function KiroSignIn({ provider, onDone }: { provider: ProviderSummary; onDone: () => void }) {
+  const client = useQueryClient();
+  const showToast = useToast();
+  const [method, setMethod] = useState<string | null>(null);
+  const [region, setRegion] = useState("us-east-1");
+  const [startUrl, setStartUrl] = useState("");
+  const [token, setToken] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [profileArn, setProfileArn] = useState("");
+  const [cliJson, setCliJson] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [hint, setHint] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (method !== "import") return;
+    let active = true;
+    kiroAutoImport().then((result: KiroImportHint) => {
+      if (!active) return;
+      if (result.found) {
+        setToken(result.refreshToken ?? ""); setClientId(result.clientId ?? ""); setClientSecret(result.clientSecret ?? "");
+        setRegion(result.region ?? "us-east-1"); setProfileArn(result.profileArn ?? "");
+        setHint("Kiro token found in the local AWS SSO cache.");
+      } else setHint(result.error ?? "No Kiro token found. Paste a refresh token below.");
+    }).catch((error: unknown) => { if (active) showToast({ tone: "error", ...toProblem(error) }); });
+    return () => { active = false; };
+  }, [method, showToast]);
+
+  const save = async (action: () => Promise<unknown>) => {
+    setLoading(true);
+    try {
+      await action(); await client.invalidateQueries({ queryKey: ["connections"], exact: true });
+      showToast({ tone: "success", message: "Signed in to Kiro." }); onDone();
+    } catch (error) { showToast({ tone: "error", ...toProblem(error) }); }
+    finally { setLoading(false); }
+  };
+
+  if (method === "builder") return <div className="stack"><Button type="button" onClick={() => setMethod(null)}>Back</Button><DeviceSignIn provider={provider} onDone={onDone} meta={{ authMethod: "builder-id" }} /></div>;
+  if (method === "idc") return <div className="stack">
+    <Field label="IDC start URL"><input className="input" value={startUrl} onChange={(event) => setStartUrl(event.target.value)} placeholder="https://your-org.awsapps.com/start" maxLength={2048} /></Field>
+    <Field label="AWS region"><input className="input" value={region} onChange={(event) => setRegion(event.target.value)} maxLength={64} /></Field>
+    <Button type="button" onClick={() => setMethod(null)}>Back</Button>
+    <DeviceSignIn provider={provider} onDone={onDone} meta={{ authMethod: "idc", startUrl: startUrl.trim(), region: region.trim() || "us-east-1" }} />
+  </div>;
+  if (method === "google" || method === "github") return <div className="stack"><Button type="button" onClick={() => setMethod(null)}>Back</Button><BrowserSignIn provider={provider} onDone={onDone} metaOverride={{ socialProvider: method }} /></div>;
+  if (method === "import") return <div className="stack">
+    <Button type="button" onClick={() => setMethod(null)}>Back</Button>
+    {hint && <Warning tone="warning">{hint}</Warning>}
+    <Field label="Refresh token"><textarea className="input" value={token} onChange={(event) => setToken(event.target.value)} rows={3} maxLength={8192} autoComplete="off" /></Field>
+    <Field label="IDC client ID (optional)"><input className="input" value={clientId} onChange={(event) => setClientId(event.target.value)} maxLength={512} autoComplete="off" /></Field>
+    <Field label="IDC client secret (optional)"><input className="input" value={clientSecret} onChange={(event) => setClientSecret(event.target.value)} type="password" maxLength={1024} autoComplete="off" /></Field>
+    <Field label="AWS region"><input className="input" value={region} onChange={(event) => setRegion(event.target.value)} maxLength={64} /></Field>
+    <Field label="Profile ARN (optional)"><input className="input" value={profileArn} onChange={(event) => setProfileArn(event.target.value)} maxLength={1024} autoComplete="off" /></Field>
+    <Button type="button" variant="primary" disabled={loading || !token.trim()} onClick={() => void save(() => kiroImport({ refreshToken: token.trim(), ...(clientId && clientSecret ? { clientId, clientSecret, region } : {}), ...(profileArn ? { profileArn } : {}) }))}>{loading ? "Importing…" : "Import refresh token"}</Button>
+  </div>;
+  if (method === "cli") return <div className="stack">
+    <Button type="button" onClick={() => setMethod(null)}>Back</Button>
+    <Field label="CLIProxyAPI auth JSON"><textarea className="input" value={cliJson} onChange={(event) => setCliJson(event.target.value)} rows={8} maxLength={65536} autoComplete="off" /></Field>
+    <Button type="button" variant="primary" disabled={loading || !cliJson.trim()} onClick={() => void save(() => kiroCliProxyImport(cliJson.trim()))}>{loading ? "Importing…" : "Import JSON"}</Button>
+  </div>;
+  if (method === "key") return <div className="stack">
+    <Button type="button" onClick={() => setMethod(null)}>Back</Button>
+    <Field label="Kiro API key"><textarea className="input" value={apiKey} onChange={(event) => setApiKey(event.target.value)} rows={3} maxLength={4096} autoComplete="off" /></Field>
+    <Field label="AWS region"><input className="input" value={region} onChange={(event) => setRegion(event.target.value)} maxLength={64} /></Field>
+    <Button type="button" variant="primary" disabled={loading || !apiKey.trim()} onClick={() => void save(() => kiroApiKeyImport({ apiKey: apiKey.trim(), region: region.trim() || "us-east-1" }))}>{loading ? "Validating…" : "Validate and import key"}</Button>
+  </div>;
+
+  const options = [["builder", "AWS Builder ID"], ["idc", "AWS IAM Identity Center"], ["google", "Google account"], ["github", "GitHub account"], ["import", "Import refresh token"], ["cli", "Import CLIProxyAPI JSON"], ["key", "Kiro API key"]];
+  return <div className="stack"><p className="muted">Choose how to connect Kiro.</p>{options.map(([id, label]) => <Button key={id} type="button" onClick={() => setMethod(id)}>{label}</Button>)}</div>;
 }

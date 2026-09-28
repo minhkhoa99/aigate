@@ -56,7 +56,7 @@ function checkForProvider(provider: ProviderDescriptor, fields: ConnectionChange
 }
 
 // provider.gemini-cli-oauth: the model list names the connection's Cloud Code project.
-const credentialOf = (stored: StoredCredential): Credential => ({ kind: "api-key", apiKey: stored.apiKey, ...(stored.projectId ? { projectId: stored.projectId } : {}), ...(stored.providerData ? { providerData: stored.providerData } : {}) });
+const credentialOf = (stored: StoredCredential): Credential => ({ kind: "api-key", apiKey: stored.apiKey, sessionId: stored.id, ...(stored.projectId ? { projectId: stored.projectId } : {}), ...(stored.providerData ? { providerData: stored.providerData } : {}) });
 
 // Only an answer about the key is invalid or no_quota; anything else means "not checked" (connection.test-single-connection).
 async function runTest(provider: ProviderDescriptor, transport: HttpTransportPort, credential: Credential): Promise<TestOutcome> {

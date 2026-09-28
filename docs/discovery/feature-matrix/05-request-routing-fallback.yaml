@@ -1710,3 +1710,92 @@
   newModule: routing
   parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
+
+- id: provider.trae-solo
+  group: Request routing
+  feature: Trae SOLO chat transport
+  subFeature: Create a SOLO remote chat session, consume its event stream, and map output into canonical chat completions
+  trigger: A routed chat request uses a Trae connection
+  input: "Cloud-IDE-JWT credential and provider data, model id, canonical messages, stream preference, cancellation signal"
+  output: "OpenAI-compatible chat completion JSON or SSE chunks with optional usage"
+  businessRules:
+    - "REFERENCE_BEHAVIOR: POST /chat_sessions uses Authorization: Cloud-IDE-JWT, Trae web headers, referer, region, and a browser user agent"
+    - "REFERENCE_BEHAVIOR: canonical messages flatten into [System]/[Assistant] labeled text and then a JSON typed text block"
+    - "REFERENCE_BEHAVIOR: auto selects code mode with automatic model selection; work/auto-work/solo-work selects work mode; other models select code mode with a named model"
+    - "REFERENCE_BEHAVIOR: common_params embeds locale, identity, scope, tenant, region, privacy, and solo_chat_mode; an existing session id is included when provided"
+    - "REFERENCE_BEHAVIOR: createSession returns chat_session_id and message_id; GET events uses reply_to_message_id"
+    - "REFERENCE_BEHAVIOR: cumulative plan_item.thought content is tracked by id, longest value wins, and only newly appended text is streamed; token_usage is mapped to prompt/completion/total usage"
+    - "REFERENCE_BEHAVIOR: error events are represented as error chunks for streaming and 502 JSON for non-streaming; a done event ends the turn"
+    - "REFERENCE_BEHAVIOR: model catalog is auto, work, Gemini 3.1 Pro, Gemini 3 Flash, MiniMax M3/M2.7, Kimi K2.5, and GPT 5.4/5.2"
+  state:
+    reads: ["sealed connection access token and provider-specific identity data", "bounded provider event stream"]
+    writes: []
+    runtimeOnly: ["upstream chat_session_id/message_id", "per-turn thought snapshots and ordering"]
+  dependencies: ["oauth.trae-browser-and-import", "routing.streaming-pipeline", "provider.model-catalog"]
+  providerInteraction: "HTTPS core-normal.trae.ai SOLO /chat_sessions and /chat_sessions/{id}/events"
+  fallback: { hasFallback: false, retry: null, timeout: "five-minute stream timeout", quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "upstream rejects Cloud-IDE-JWT", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "session creation or event stream fails", partial: true }
+  sideEffects: ["creates one upstream SOLO chat session per request"]
+  persistence: []
+  performanceConcerns: ["stream parsing and cumulative thought snapshots are bounded by the active response lifetime"]
+  behavior: { streaming: true, cancellation: "aborts the active stream", concurrency: "one upstream session per request" }
+  edgeCases:
+    - "SUSPECTED_BUG: event-stream EOF without a done event resolves normally and returns accumulated content as a successful completion; preserve this observed contract"
+    - "An error event ends the event reader; streaming reports an error chunk and non-streaming responds with 502"
+  evidence:
+    - { file: "open-sse/providers/registry/trae.js", line: 8, note: "provider id, fixed SOLO endpoint, headers, auth and model list" }
+    - { file: "open-sse/executors/trae.js", line: 19, note: "message flattening, mode mapping, common_params, session creation and event parser" }
+    - { file: "open-sse/executors/trae.js", line: 118, note: "stream/non-stream mapping, cumulative thought text, errors and token usage" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A SOLO event stream should contain a terminal done event before its response is reported successful."
+    actual: "The reference resolves on stream EOF even if no done event arrived and returns the collected thought text as success."
+    impact: "A truncated upstream stream can be mistaken for a complete answer; preserve behavior and track separately."
+
+- id: provider.kiro-eventstream
+  group: Request routing
+  feature: Kiro AI provider transport
+  subFeature: AWS CodeWhisperer/Amazon Q request shaping and binary EventStream response decoding
+  trigger: A routed chat request or provider model/credential check uses a Kiro connection
+  input: "Kiro credential and auth metadata, model id, canonical messages, optional tools, and request cancellation"
+  output: "Canonical response/stream chunks from AWS EventStream; live Kiro model list with static fallback"
+  businessRules:
+    - "REFERENCE_BEHAVIOR: requests send Bearer auth and Kiro IDE headers; API keys add TokenType=API_KEY; Microsoft external_idp OAuth adds TokenType=EXTERNAL_IDP; a profile ARN is sent when available"
+    - "REFERENCE_BEHAVIOR: AWS SSO IDC uses its credential region; OAuth/social credentials use Kiro runtime and AWS fallback surfaces, and API-key/IDC/external_idp credentials use the Amazon Q/CodeWhisperer surfaces"
+    - "REFERENCE_BEHAVIOR: canonical chat content is converted into Kiro history/current-message payloads, including system instructions, tool results, tool declarations, images, thinking and agentic model variants"
+    - "REFERENCE_BEHAVIOR: response chunks decode AWS EventStream framing and map text, reasoning, code, tool calls, stop reason, and usage into CIP; frame and buffered tool input sizes are bounded"
+    - "REFERENCE_BEHAVIOR: live models come from the account's Amazon Q catalog and expand into thinking/agentic variants; the special auto model has no agentic variants; an unavailable or empty live result falls back to the static catalog"
+    - "IMPLEMENTATION_ACCIDENT: 9router's executor class, Node fetch calls, and internal SSE intermediary are not carried over; the provider behavior runs through AIGate's framework-free engine and transport ports"
+  state:
+    reads: ["sealed connection credential and Kiro provider data", "bounded upstream EventStream response"]
+    writes: []
+    runtimeOnly: ["per-request request id", "bounded partial-frame and tool-argument buffers", "bounded per-credential model cache"]
+  dependencies: ["oauth.kiro-dashboard", "routing.streaming-pipeline", "catalog.provider-models-live-fetch"]
+  providerInteraction: "HTTPS AWS CodeWhisperer, Amazon Q, and Kiro runtime endpoints"
+  fallback: { hasFallback: true, retry: "only documented retryable statuses with finite attempts", timeout: "request deadline", quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "Kiro refuses the credential", partial: false }
+    - { code: RATE_LIMIT, when: "all eligible Kiro endpoints refuse the request for rate limiting", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "upstream HTTP/EventStream is unavailable or malformed", partial: true }
+    - { code: INVALID_REQUEST, when: "the Kiro request cannot represent a supplied feature", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["EventStream frames, aggregate parser buffering, and tool arguments must be bounded", "model cache requires TTL and an entry cap"]
+  behavior: { streaming: true, cancellation: "aborts the active upstream response", concurrency: "independent request streams" }
+  edgeCases:
+    - "SUSPECTED_BUG: the social authorize route returns state but social exchange never accepts or compares it; preserve the observed contract and revisit CSRF binding separately"
+  evidence:
+    - { file: "open-sse/executors/kiro.js", line: 230, note: "auth-aware endpoint selection, request headers, and EventStream decoding" }
+    - { file: "open-sse/translator/request/openai-to-kiro.js", line: 1, note: "canonical chat payload shaping and Kiro conversation mapping" }
+    - { file: "open-sse/services/kiroModels.js", line: 236, note: "dynamic model catalog, credential refresh, and fallback" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT, SUSPECTED_BUG]
+  suspicion:
+    expected: "A returned social OAuth state should be compared with the state associated with the exchanged authorization code."
+    actual: "The reference Kiro social exchange has no state parameter and does not compare the state returned from authorize."
+    impact: "A callback state mismatch is not detected; preserve the observed contract and track CSRF binding separately."

@@ -31,6 +31,7 @@ export interface DeviceCode {
   readonly verification_uri_complete: string;
   readonly expires_in: number;
   readonly interval: number;
+  readonly providerData?: Readonly<Record<string, string>>;
 }
 
 export type PollResult =
@@ -48,10 +49,11 @@ export interface OAuthIO {
 
 export interface OAuthProvider {
   readonly flow: OAuthFlow;
+  prepare?(redirectUri: string, state: string, meta: OAuthMeta, io: OAuthIO): Promise<{ authUrl: string }>;
   authUrl?(redirectUri: string, state: string, codeChallenge: string, meta: OAuthMeta): string;
   exchange?(code: string, redirectUri: string, codeVerifier: string, meta: OAuthMeta, io: OAuthIO): Promise<OAuthTokens>;
-  deviceCode?(io: OAuthIO): Promise<DeviceCode>;
-  poll?(deviceCode: string, io: OAuthIO): Promise<PollResult>;
+  deviceCode?(io: OAuthIO, meta?: OAuthMeta): Promise<DeviceCode>;
+  poll?(deviceCode: string, io: OAuthIO, providerData?: Readonly<Record<string, string>>): Promise<PollResult>;
   // null when the provider refused the refresh.
   refresh?(refreshToken: string, io: OAuthIO, currentApiKey?: string, data?: Readonly<Record<string, string>>): Promise<OAuthTokens | null>;
   // A callback the provider accepts only at this address (codex: its CLI's fixed port); the dashboard pastes it back.
@@ -257,6 +259,106 @@ const kimchi: OAuthProvider = {
     const displayName = text(user.name) || username || undefined;
     return { accessToken, ...(email ? { email } : {}), ...(displayName ? { displayName } : {}), data: strings({ authMethod: "browser_token", userId, username }) };
   },
+};
+
+// Trae's native IDE login asks a service for its authorization host before opening the browser.
+const TRAE_CONFIG = {
+  clientId: "ono9krqynydwx5",
+  guidance: ["https://api.marscode.com/cloudide/api/v3/trae/GetLoginGuidance", "https://api.trae.ai/cloudide/api/v3/trae/GetLoginGuidance", "https://www.trae.ai/cloudide/api/v3/trae/GetLoginGuidance"],
+  origins: ["https://api.marscode.com", "https://api.trae.ai", "https://www.trae.ai", "https://www.marscode.com"],
+  exchange: "/cloudide/api/v3/trae/oauth/ExchangeToken",
+  profile: "/cloudide/api/v3/trae/GetUserInfo",
+  userAgent: "Trae/1.0.0 antigravity-cockpit-tools",
+};
+const traeValue = (root: Record<string, unknown>, paths: readonly (readonly string[])[]): string | undefined => {
+  for (const path of paths) {
+    let value: unknown = root;
+    for (const key of path) value = isRecord(value) ? value[key] : undefined;
+    const found = text(value);
+    if (found) return found;
+  }
+  return undefined;
+};
+
+function traeCallback(raw: string): Record<string, string> {
+  const value = raw.trim();
+  const query = value.includes("?") ? value.slice(value.indexOf("?") + 1) : value.replace(/^#/, "");
+  const params = new URLSearchParams(query);
+  const get = (...keys: string[]) => keys.map((key) => params.get(key)?.trim()).find(Boolean) ?? "";
+  const error = get("error", "error_code", "errorCode");
+  if (error) throw new EngineError("AUTH_ERROR", `Trae auth failed: ${error}${get("error_description", "error_desc", "message") ? ` (${get("error_description", "error_desc", "message")})` : ""}`, { provider: "trae" });
+  const refreshToken = get("refreshToken", "refresh_token", "RefreshToken");
+  const loginHost = get("loginHost", "login_host", "LoginHost", "host", "consoleHost");
+  if (!refreshToken || !loginHost) throw new EngineError("INVALID_REQUEST", "Trae callback requires refreshToken and loginHost", { provider: "trae" });
+  return { refreshToken, loginHost, cloudideToken: get("x-cloudide-token", "xCloudideToken", "accessToken", "access_token", "token") };
+}
+
+async function traeToken(refreshToken: string, cloudideToken: string, io: OAuthIO): Promise<OAuthTokens> {
+  const originRetry = { signal: io.ctx.signal, maxAttempts: TRAE_CONFIG.origins.length, baseDelayMs: 0, maxDelayMs: 0, shouldRetry: () => true };
+  let origin = TRAE_CONFIG.origins[0];
+  const token = await withRetry(async (attempt) => {
+    origin = TRAE_CONFIG.origins[attempt - 1];
+    const answer = await call(io, "POST", `${origin}${TRAE_CONFIG.exchange}`, { ...JSON_HEADERS, "user-agent": TRAE_CONFIG.userAgent, ...(cloudideToken ? { "x-cloudide-token": cloudideToken } : {}) }, JSON.stringify({ ClientID: TRAE_CONFIG.clientId, RefreshToken: refreshToken, ClientSecret: "-", UserID: "" }));
+    if (!answer.ok) throw new Error(`${origin} HTTP ${answer.status}`);
+    const root = record(parseJson(answer.text));
+    const accessToken = traeValue(root, [["Result", "AccessToken"], ["Result", "accessToken"], ["result", "access_token"], ["accessToken"]]);
+    if (!accessToken) throw new Error(`${origin} missing AccessToken`);
+    return { root, accessToken };
+  }, originRetry).catch((error: unknown) => { throw failed("trae", `Trae ExchangeToken failed: ${error instanceof Error ? error.message : String(error)}`); });
+  const { root, accessToken } = token;
+  const nextRefresh = traeValue(root, [["Result", "RefreshToken"], ["result", "refresh_token"], ["refreshToken"]]) ?? refreshToken;
+  const expiresIn = secondsUntil(traeValue(root, [["Result", "ExpiresAt"], ["Result", "expiresAt"], ["result", "expires_at"], ["expiresAt"]]));
+  let user: Record<string, unknown> = {};
+  try {
+    user = await withRetry(async (attempt) => {
+      const profileOrigin = TRAE_CONFIG.origins[attempt - 1];
+      const profile = await call(io, "POST", `${profileOrigin}${TRAE_CONFIG.profile}`, { ...JSON_HEADERS, "user-agent": TRAE_CONFIG.userAgent, "x-cloudide-token": accessToken }, "{}");
+      if (!profile.ok) throw new Error(`${profileOrigin} HTTP ${profile.status}`);
+      const profileRoot = record(parseJson(profile.text));
+      return record(profileRoot.Result ?? profileRoot.result ?? record(profileRoot.data).Result ?? profileRoot.data ?? profileRoot);
+    }, originRetry);
+  } catch { /* Profile is optional; token exchange remains usable. */ }
+    const aiRegion = traeValue(user, [["AIRegion"], ["aiRegion"]]) ?? "US-East";
+    const lowerRegion = aiRegion.toLowerCase();
+    const scope = lowerRegion === "sg" || lowerRegion.includes("singapore") ? "marscode-sg" : lowerRegion === "cn" || lowerRegion.includes("cn") || lowerRegion.includes("china") ? "marscode-cn" : "marscode-us";
+    return {
+      accessToken, refreshToken: nextRefresh, ...(expiresIn !== undefined ? { expiresIn: Math.max(1, expiresIn) } : { expiresIn: 14 * 24 * 3600 }),
+      ...(traeValue(user, [["NonPlainTextEmail"], ["Email"], ["email"], ["data", "email"]]) ? { email: traeValue(user, [["NonPlainTextEmail"], ["Email"], ["email"], ["data", "email"]]) } : {}),
+      ...(traeValue(user, [["ScreenName"], ["Nickname"], ["Name"], ["nickname"], ["name"]]) ? { displayName: traeValue(user, [["ScreenName"], ["Nickname"], ["Name"], ["nickname"], ["name"]]) } : {}),
+      data: { authMethod: "oauth", aiRegion, region: traeValue(user, [["Region"], ["region"]]) ?? aiRegion, tenant: traeValue(user, [["TenantID"], ["tenantId"]]) ?? "marscode", userId: traeValue(user, [["UserID"], ["userId"]]) ?? "", scope, appLanguage: "en", appVersion: "3.5.54", userRegion: aiRegion === "SG" ? "SG" : "US", userIdentity: "Free" },
+    };
+}
+
+const trae: OAuthProvider = {
+  flow: "browser_token",
+  async prepare(redirectUri, state, _meta, io) {
+    const loginHost = await withRetry(async (attempt) => {
+      const url = TRAE_CONFIG.guidance[attempt - 1];
+      const answer = await call(io, "POST", url, { ...JSON_HEADERS, "user-agent": TRAE_CONFIG.userAgent }, JSON.stringify({ loginTraceID: state, login_trace_id: state }));
+      if (!answer.ok) throw new Error(`${url} HTTP ${answer.status}`);
+      const root = record(parseJson(answer.text));
+      const host = traeValue(root, [["Result", "LoginHost"], ["Result", "loginHost"], ["Result", "LoginURL"], ["result", "loginHost"], ["data", "Result", "LoginHost"], ["data", "loginHost"], ["LoginHost"], ["loginHost"]]);
+      if (!host) throw new Error(`${url} missing LoginHost`);
+      return host;
+    }, { signal: io.ctx.signal, maxAttempts: TRAE_CONFIG.guidance.length, baseDelayMs: 0, maxDelayMs: 0, shouldRetry: () => true }).catch((error: unknown) => { throw failed("trae", `Trae GetLoginGuidance failed: ${error instanceof Error ? error.message : String(error)}`); });
+    const host = new URL(loginHost.startsWith("http") ? loginHost : `https://${loginHost}`);
+    const machineId = crypto.randomUUID();
+    const params = new URLSearchParams({ login_version: "1", auth_from: "trae", login_channel: "native_ide", plugin_version: "local", auth_type: "local", client_id: TRAE_CONFIG.clientId, redirect: "0", login_trace_id: state, auth_callback_url: redirectUri, machine_id: machineId, device_id: "0", x_device_id: "0", x_machine_id: machineId, x_device_brand: "unknown", x_device_type: "unknown", x_os_version: "unknown", x_env: "", x_app_version: "3.5.54", x_app_type: "stable" });
+    host.pathname = "/authorization";
+    host.search = params.toString();
+    return { authUrl: host.toString() };
+  },
+  async exchange(code, _redirectUri, _verifier, _meta, io) {
+    const value = code.trim();
+    if (!/[?=&]/.test(value) || !/(refreshToken|refresh_token)/.test(value)) {
+      const accessToken = value.replace(/^(Cloud-IDE-JWT|Bearer)\s+/i, "");
+      if (!accessToken) throw new EngineError("INVALID_REQUEST", "Trae token is required", { provider: "trae" });
+      return { accessToken, expiresIn: 14 * 24 * 3600, data: { authMethod: "imported", aiRegion: "US-East", region: "US-East", tenant: "marscode", userId: "", scope: "marscode-us", appLanguage: "en", appVersion: "3.5.54", userRegion: "US", userIdentity: "Free" } };
+    }
+    const callback = traeCallback(value);
+    return traeToken(callback.refreshToken, callback.cloudideToken, io);
+  },
+  async refresh(refreshToken, io) { return traeToken(refreshToken, "", io); },
 };
 
 // ---- claude (provider.claude-oauth), kept as 9router has it (user decision 2026-09-27) ----
@@ -665,6 +767,127 @@ const iflow: OAuthProvider = {
   },
 };
 
+// provider.kiro-eventstream / oauth.kiro-dashboard: AWS Builder ID and IDC device flow,
+// Kiro's social callback, imported credentials, and external_idp refresh all share these tokens.
+const KIRO_AUTH = "https://prod.us-east-1.auth.desktop.kiro.dev";
+const KIRO_REDIRECT = "kiro://kiro.kiroAgent/authenticate-success";
+const AWS_REGION = /^[a-z]{2}-[a-z]+-\d{1,2}$/;
+const kiroRegion = (value: string | undefined): string => {
+  const region = value || "us-east-1";
+  if (!AWS_REGION.test(region)) throw new EngineError("INVALID_REQUEST", "Invalid AWS region", { provider: "kiro" });
+  return region;
+};
+const kiroEmail = (token: string): string | undefined => {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return undefined;
+    const value = record(parseJson(new TextDecoder().decode(Uint8Array.from(atob(part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=")), (c) => c.charCodeAt(0)))));
+    return text(value.email) ?? text(value.preferred_username) ?? text(value.sub);
+  } catch { return undefined; }
+};
+const packKiroRefresh = (token: string, data: Readonly<Record<string, string>>): string => data.clientSecret
+  ? `kiro1.${base64url(new TextEncoder().encode(JSON.stringify({ token, clientId: data.clientId, clientSecret: data.clientSecret, region: data.region, authMethod: data.authMethod, startUrl: data.startUrl })) )}`
+  : token;
+const unpackKiroRefresh = (token: string, data: Readonly<Record<string, string>>) => {
+  if (!token.startsWith("kiro1.")) return { token, data };
+  try {
+    const raw: unknown = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(token.slice(6)), (char) => char.charCodeAt(0))));
+    if (!isRecord(raw)) return { token, data };
+    const stored = strings(raw);
+    if (!stored.token || !stored.clientId || !stored.clientSecret) return { token, data };
+    return { token: stored.token, data: { ...data, ...stored } };
+  } catch { return { token, data }; }
+};
+const kiro: OAuthProvider = {
+  flow: "authorization_code_pkce",
+  authUrl: (_redirect, state, challenge, meta) => {
+    const provider = meta.socialProvider;
+    if (provider !== "google" && provider !== "github") throw new EngineError("INVALID_REQUEST", "Choose Google or GitHub for Kiro sign-in", { provider: "kiro" });
+    return `${KIRO_AUTH}/login?${new URLSearchParams({ idp: provider === "google" ? "Google" : "Github", redirect_uri: KIRO_REDIRECT, code_challenge: challenge, code_challenge_method: "S256", state, prompt: "select_account" })}`;
+  },
+  async exchange(code, _redirect, verifier, meta, io) {
+    if (meta.socialProvider !== "google" && meta.socialProvider !== "github") throw new EngineError("INVALID_REQUEST", "Choose Google or GitHub for Kiro sign-in", { provider: "kiro" });
+    const answer = await call(io, "POST", `${KIRO_AUTH}/oauth/token`, JSON_HEADERS, JSON.stringify({ code, code_verifier: verifier, redirect_uri: KIRO_REDIRECT }));
+    if (!answer.ok) throw failed("kiro", `Kiro token exchange failed: ${answer.text}`);
+    const data = record(parseJson(answer.text));
+    const accessToken = text(data.accessToken);
+    if (!accessToken) throw failed("kiro", "Kiro returned no access token");
+    return { accessToken, ...(text(data.refreshToken) ? { refreshToken: text(data.refreshToken) } : {}), expiresIn: typeof data.expiresIn === "number" ? data.expiresIn : 3600, ...(kiroEmail(accessToken) ? { email: kiroEmail(accessToken) } : {}), data: { authMethod: meta.socialProvider, provider: meta.socialProvider === "google" ? "Google" : "Github", ...(text(data.profileArn) ? { profileArn: text(data.profileArn) } : {}) } };
+  },
+  async deviceCode(io, meta = {}) {
+    const region = kiroRegion(meta.region);
+    const startUrl = meta.startUrl?.trim() || "https://view.awsapps.com/start";
+    if (meta.startUrl && (!/^https:\/\//i.test(startUrl) || startUrl.length > 2048)) throw new EngineError("INVALID_REQUEST", "IDC start URL must be an HTTPS URL", { provider: "kiro" });
+    const registered = await call(io, "POST", `https://oidc.${region}.amazonaws.com/client/register`, JSON_HEADERS, JSON.stringify({ clientName: "kiro-oauth-client", clientType: "public", scopes: ["codewhisperer:completions", "codewhisperer:analysis", "codewhisperer:conversations"], grantTypes: ["urn:ietf:params:oauth:grant-type:device_code", "refresh_token"], issuerUrl: "https://identitycenter.amazonaws.com/ssoins-722374e8c3c8e6c6" }));
+    if (!registered.ok) throw failed("kiro", `Kiro client registration failed: ${registered.text}`);
+    const client = record(parseJson(registered.text));
+    const clientId = text(client.clientId); const clientSecret = text(client.clientSecret);
+    if (!clientId || !clientSecret) throw failed("kiro", "AWS OIDC returned no client credentials");
+    const answer = await call(io, "POST", `https://oidc.${region}.amazonaws.com/device_authorization`, JSON_HEADERS, JSON.stringify({ clientId, clientSecret, startUrl }));
+    if (!answer.ok) throw failed("kiro", `Kiro device authorization failed: ${answer.text}`);
+    const data = record(parseJson(answer.text));
+    const device_code = text(data.deviceCode); const user_code = text(data.userCode); const verification_uri = text(data.verificationUri);
+    if (!device_code || !user_code || !verification_uri) throw failed("kiro", "AWS OIDC returned an incomplete device code");
+    return { device_code, user_code, verification_uri, verification_uri_complete: text(data.verificationUriComplete) || verification_uri, expires_in: typeof data.expiresIn === "number" && data.expiresIn > 0 ? Math.floor(data.expiresIn) : 300, interval: typeof data.interval === "number" && data.interval > 0 ? Math.floor(data.interval) : 5, providerData: strings({ clientId, clientSecret, region, authMethod: meta.authMethod === "idc" ? "idc" : "builder-id", startUrl }) };
+  },
+  async poll(deviceCode, io, providerData = {}) {
+    const region = kiroRegion(providerData.region);
+    const answer = await call(io, "POST", `https://oidc.${region}.amazonaws.com/token`, JSON_HEADERS, JSON.stringify({ clientId: providerData.clientId, clientSecret: providerData.clientSecret, deviceCode, grantType: "urn:ietf:params:oauth:grant-type:device_code" }));
+    const data = record(parseJson(answer.text));
+    if (!answer.ok || data.error) {
+      const error = text(data.error) ?? "authorization_pending";
+      if (error === "authorization_pending" || error === "slow_down") return { status: "pending", ...(error === "slow_down" ? { slowDown: true } : {}) };
+      return { status: "error", error, ...(text(data.error_description) ? { description: text(data.error_description) } : {}) };
+    }
+    const accessToken = text(data.accessToken);
+    if (!accessToken) return { status: "pending" };
+    const refreshToken = text(data.refreshToken);
+    const profileArn = text(data.profileArn);
+    const authMethod = providerData.authMethod || "builder-id";
+    const dataFields = strings({ ...providerData, clientSecret: undefined, profileArn, authMethod, provider: authMethod === "idc" ? "Enterprise" : "AWS Builder ID" });
+    let resolvedProfileArn = profileArn;
+    if (!resolvedProfileArn) {
+      try {
+        const profiles = await call(io, "POST", `https://codewhisperer.${region}.amazonaws.com`, { "content-type": "application/x-amz-json-1.0", "x-amz-target": "AmazonCodeWhispererService.ListAvailableProfiles", authorization: `Bearer ${accessToken}`, accept: "application/json" }, JSON.stringify({ maxResults: 10 }));
+        if (profiles.ok) {
+          const list = record(parseJson(profiles.text)).profiles;
+          const firstProfile = Array.isArray(list) ? list.map(record).find((item) => text(item.arn) || text(item.profileArn)) : undefined;
+          resolvedProfileArn = text(firstProfile?.arn) ?? text(firstProfile?.profileArn);
+        }
+      } catch { /* profile lookup is optional; routing can use the token's default profile */ }
+    }
+    const finalData = strings({ ...dataFields, ...(resolvedProfileArn ? { profileArn: resolvedProfileArn } : {}) });
+    return { status: "approved", tokens: { accessToken, ...(refreshToken ? { refreshToken: packKiroRefresh(refreshToken, providerData) } : {}), ...(typeof data.expiresIn === "number" ? { expiresIn: data.expiresIn } : {}), ...(kiroEmail(accessToken) ? { email: kiroEmail(accessToken) } : {}), data: finalData } };
+  },
+  async refresh(refreshToken, io, _apiKey, data = {}) {
+    const unpacked = unpackKiroRefresh(refreshToken, data);
+    refreshToken = unpacked.token;
+    data = unpacked.data;
+    if (data.authMethod === "external_idp") {
+      let endpoint: URL;
+      try { endpoint = new URL(data.tokenEndpoint ?? ""); } catch { return null; }
+      if (endpoint.protocol !== "https:" || !["login.microsoftonline.com", "login.microsoft.com", "login.windows.net"].includes(endpoint.hostname.toLowerCase())) return null;
+      const form = new URLSearchParams({ grant_type: "refresh_token", client_id: data.clientId ?? "", refresh_token: refreshToken, scope: data.scope ?? "" });
+      const answer = await call(io, "POST", endpoint.toString(), { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, form.toString());
+      if (!answer.ok) return null;
+      const token = record(parseJson(answer.text)); const accessToken = text(token.access_token);
+      const nextData = strings(data);
+      const nextRefresh = text(token.refresh_token) || refreshToken;
+      return accessToken ? { accessToken, refreshToken: nextRefresh, ...(typeof token.expires_in === "number" ? { expiresIn: token.expires_in } : {}), ...(kiroEmail(accessToken) ? { email: kiroEmail(accessToken) } : {}), data: nextData } : null;
+    }
+    const region = kiroRegion(data.region);
+    const idc = Boolean(data.clientId && data.clientSecret);
+    const answer = await call(io, "POST", idc ? `https://oidc.${region}.amazonaws.com/token` : `${KIRO_AUTH}/refreshToken`, JSON_HEADERS, JSON.stringify(idc ? { clientId: data.clientId, clientSecret: data.clientSecret, refreshToken, grantType: "refresh_token" } : { refreshToken }));
+    if (!answer.ok) return null;
+    const token = record(parseJson(answer.text));
+    const accessToken = text(token.accessToken);
+    if (!accessToken) return null;
+    const nextData = strings({ ...data, ...(text(token.profileArn) ? { profileArn: token.profileArn } : {}) });
+    const nextRefresh = text(token.refreshToken) || refreshToken;
+    return { accessToken, refreshToken: packKiroRefresh(nextRefresh, data), ...(typeof token.expiresIn === "number" ? { expiresIn: token.expiresIn } : idc ? {} : { expiresIn: 3600 }), ...(kiroEmail(accessToken) ? { email: kiroEmail(accessToken) } : {}), data: strings({ ...nextData, clientSecret: undefined }) };
+  },
+};
+
 // ---- Google Cloud Code sign-ins (provider.gemini-cli-oauth), kept as 9router has them (user decision 2026-09-27) ----
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -785,7 +1008,7 @@ async function onboardAntigravity(token: string, tierId: string, transport: Http
 
 export const OAUTH_PROVIDERS: Readonly<Record<string, OAuthProvider>> = {
   cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi, claude, codex, github, "gemini-cli": geminiCli, antigravity,
-  "grok-cli": grokCli, kimi, "codebuddy-cn": codeBuddy("codebuddy-cn"), "codebuddy-intl": codeBuddy("codebuddy-intl"), iflow, cursor,
+  "grok-cli": grokCli, kimi, "codebuddy-cn": codeBuddy("codebuddy-cn"), "codebuddy-intl": codeBuddy("codebuddy-intl"), iflow, kiro, cursor, trae,
 };
 
 // Cline OAuth access tokens are WorkOS JWTs sent as "workos:<jwt>"; a ClinePass API key (not a JWT) goes as is.

@@ -10222,6 +10222,83 @@
       "file_type": "code",
       "source_file": "apps/web/src/features/providers/sign-in.tsx",
       "status": "implemented"
+    },
+    {
+      "id": "sp_kiro",
+      "label": "M2 Kiro OAuth and provider family",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "done"
+    },
+    {
+      "id": "kiro_oauth_contract",
+      "label": "Kiro OAuth, local imports, and refresh contract",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "status": "implemented"
+    },
+    {
+      "id": "kiro_adapter",
+      "label": "Kiro AWS EventStream and Q model adapter",
+      "file_type": "code",
+      "source_file": "packages/engine/src/adapters/kiro.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "kiro_oauth_server",
+      "label": "Kiro OAuth and local credential import routes",
+      "file_type": "code",
+      "source_file": "apps/server/src/modules/connections/infrastructure/oauth.controller.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "kiro_connect_ui",
+      "label": "Kiro device, social, token, CLIProxy, and API-key sign-in UI",
+      "file_type": "code",
+      "source_file": "apps/web/src/features/providers/sign-in.tsx",
+      "status": "implemented"
+    },
+    {
+      "id": "sp_trae",
+      "label": "M2 Trae OAuth and SOLO provider family",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "implemented"
+    },
+    {
+      "id": "trae_oauth_contract",
+      "label": "Trae loopback OAuth and token import contract",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "status": "implemented"
+    },
+    {
+      "id": "trae_provider_contract",
+      "label": "Trae SOLO session and EventStream contract",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-trae.md",
+      "status": "implemented"
+    },
+    {
+      "id": "trae_adapter",
+      "label": "Trae SOLO chat session and SSE adapter",
+      "file_type": "code",
+      "source_file": "packages/engine/src/adapters/trae.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "trae_oauth_server",
+      "label": "Trae dynamic loopback OAuth proxy and token exchange",
+      "file_type": "code",
+      "source_file": "apps/server/src/modules/connections/infrastructure/oauth.controller.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "trae_signin_ui",
+      "label": "Trae browser sign-in and callback/token import UI",
+      "file_type": "code",
+      "source_file": "apps/web/src/features/providers/sign-in.tsx",
+      "status": "implemented"
     }
   ],
   "edges": [
@@ -32817,6 +32894,150 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1,
       "source_file": "apps/server/src/modules/transport/infrastructure/direct-transport.ts",
+      "weight": 1
+    },
+    {
+      "source": "sp_kiro",
+      "target": "kiro_oauth_contract",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "kiro_oauth_contract",
+      "target": "oauth_contract",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "kiro_adapter",
+      "target": "kiro_oauth_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "packages/engine/src/adapters/kiro.ts",
+      "weight": 1
+    },
+    {
+      "source": "kiro_adapter",
+      "target": "port_http_transport",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "packages/engine/src/adapters/kiro.ts",
+      "weight": 1
+    },
+    {
+      "source": "kiro_oauth_server",
+      "target": "kiro_oauth_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/server/src/modules/connections/infrastructure/oauth.controller.ts",
+      "weight": 1
+    },
+    {
+      "source": "kiro_connect_ui",
+      "target": "kiro_oauth_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/web/src/features/providers/sign-in.tsx",
+      "weight": 1
+    },
+    {
+      "source": "sp_trae",
+      "target": "trae_oauth_contract",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_trae",
+      "target": "trae_provider_contract",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "trae_oauth_contract",
+      "target": "oauth_contract",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "trae_provider_contract",
+      "target": "trae_adapter",
+      "relation": "specifies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-trae.md",
+      "weight": 1
+    },
+    {
+      "source": "trae_adapter",
+      "target": "trae_provider_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "packages/engine/src/adapters/trae.ts",
+      "weight": 1
+    },
+    {
+      "source": "trae_adapter",
+      "target": "port_http_transport",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "packages/engine/src/adapters/trae.ts",
+      "weight": 1
+    },
+    {
+      "source": "trae_oauth_server",
+      "target": "trae_oauth_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/server/src/modules/connections/infrastructure/oauth.controller.ts",
+      "weight": 1
+    },
+    {
+      "source": "trae_oauth_server",
+      "target": "oauth_controller",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/server/src/modules/connections/infrastructure/oauth.controller.ts",
+      "weight": 1
+    },
+    {
+      "source": "trae_signin_ui",
+      "target": "trae_oauth_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/web/src/features/providers/sign-in.tsx",
+      "weight": 1
+    },
+    {
+      "source": "trae_signin_ui",
+      "target": "screen_connections",
+      "relation": "wires",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/web/src/features/providers/sign-in.tsx",
       "weight": 1
     }
   ],

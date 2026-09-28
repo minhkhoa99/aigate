@@ -6,7 +6,7 @@ import type { ModelCapabilities } from "../registry.js";
 
 export const CATALOG_PROTOCOLS = [
   "openai-compatible", "anthropic", "openai-responses", "gemini", "gemini-cli", "vertex", "antigravity",
-  "kiro", "cursor", "commandcode", "ollama", "grok-web", "perplexity-web", "service",
+  "kiro", "trae", "cursor", "commandcode", "ollama", "grok-web", "perplexity-web", "service",
 ] as const;
 export type CatalogProtocol = (typeof CATALOG_PROTOCOLS)[number];
 

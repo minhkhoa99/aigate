@@ -999,7 +999,7 @@
     - { file: src/app/api/oauth/kiro/api-key/route.js, line: 40, note: "expiresAt hardcoded to +365 days, refreshToken: null" }
     - { file: src/app/api/oauth/kiro/api-key/route.js, line: 61, note: "generic error message, comment: SSRF hardening, do not reflect upstream body" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: oauth.kiro-auto-import
@@ -1034,7 +1034,7 @@
     - { file: src/app/api/oauth/kiro/auto-import/route.js, line: 79, note: "IDC clientIdHash -> {hash}.json resolution for clientId/clientSecret" }
     - { file: src/app/api/oauth/kiro/auto-import/route.js, line: 106, note: "profileArn region forced to us-east-1 regardless of the IDC region" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: oauth.kiro-import-cli-proxy
@@ -1067,7 +1067,7 @@
     - { file: src/app/api/oauth/kiro/import-cli-proxy/route.js, line: 13, note: "normalizeKiroExternalIdpAuth(rawAuth) — the CLIProxyAPI-shape adapter" }
     - { file: src/app/api/oauth/kiro/import-cli-proxy/route.js, line: 35, note: "raw error.message returned with 400 status, no generic-message hardening" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: oauth.kiro-import
@@ -1102,7 +1102,7 @@
     - { file: src/app/api/oauth/kiro/import/route.js, line: 31, note: "kiroService.refreshToken called during import to validate + obtain a fresh accessToken" }
     - { file: src/app/api/oauth/kiro/import/route.js, line: 36, note: "profileArn precedence: body field, then refresh response, else null" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: oauth.kiro-social-authorize
@@ -1136,7 +1136,7 @@
     - { file: src/app/api/oauth/kiro/social-authorize/route.js, line: 26, note: "kiroService.buildSocialLoginUrl(provider, codeChallenge, state) — the kiro:// callback URL" }
     - { file: src/app/api/oauth/kiro/social-authorize/route.js, line: 34, note: "codeVerifier returned directly in the response body, not stored server-side" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: oauth.kiro-social-exchange
@@ -1166,12 +1166,17 @@
   behavior: { streaming: false, cancellation: null, concurrency: null }
   edgeCases:
     - "Once persisted, this connection is indistinguishable in the refresh path from one created via oauth.kiro-import or oauth.kiro-import-cli-proxy — the social-login provenance is display-only metadata, confirmed by refreshKiro in auth.refresh-provider-specific never reading providerSpecificData.authMethod"
+    - "SUSPECTED_BUG: authorize supplies state but this exchange contract has no state field and does not compare it; preserve the observed behavior while recording the missing CSRF binding"
   evidence:
     - { file: src/app/api/oauth/kiro/social-exchange/route.js, line: 31, note: "kiroService.exchangeSocialCode(code, codeVerifier) — redirect_uri handled internally, not passed per-request" }
     - { file: src/app/api/oauth/kiro/social-exchange/route.js, line: 49, note: "providerSpecificData.authMethod set to the social provider name (google|github), display-only" }
   newModule: connections
-  parityStatus: traced
-  labels: [REFERENCE_BEHAVIOR]
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "The social OAuth state returned by authorize should be checked when the code is exchanged."
+    actual: "The reference exchange takes only code, codeVerifier, and provider; it never accepts or compares state."
+    impact: "A callback state mismatch is not detected by this endpoint; the port keeps parity and leaves a CSRF behavior change for a separate decision."
 
 - id: catalog.provider-models-live-fetch
   group: Providers
@@ -1615,9 +1620,93 @@
   parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
   suspicion:
-    expected: "A custom provider without a base URL is refused, a pasted /chat/completions suffix is normalized like the sibling node types, and a prefix that is reserved, duplicated, or unusable is refused when the node is saved"
-    actual: "A missing baseUrl silently becomes https://api.openai.com/v1; a pasted /chat/completions yields .../chat/completions/chat/completions at request time; a reserved, duplicate, or slash-containing prefix is stored and then silently unreachable"
-    impact: "The custom provider's key is sent to OpenAI (a 401 and a leaked credential) or requests fail with a 404 from a doubled path; a shadowed prefix routes nowhere with no error at save time"
+    expected: "A custom provider prefix should be unique and usable for provider/model routing."
+    actual: "Provider-node creation trims the prefix but does not check uniqueness, reserved ids, or slash characters; the first matching node silently wins."
+    impact: "Duplicate, reserved, or unusable prefixes create nodes that cannot be selected consistently or reached by /v1 requests."
+
+- id: oauth.trae-browser-and-import
+  group: OAuth providers
+  feature: Trae OAuth connection
+  subFeature: Browser login through GetLoginGuidance and loopback callback, plus Cloud-IDE-JWT token import
+  trigger: Operator chooses Trae in Add connection
+  input: "A generated login trace, browser callback URL/query containing refreshToken and loginHost, or a pasted Cloud-IDE-JWT access token"
+  output: "A sealed Trae connection with access/refresh tokens and best-effort identity metadata"
+  businessRules:
+    - "REFERENCE_BEHAVIOR: authorization calls GetLoginGuidance with loginTraceID and login_trace_id, then builds the provider authorization URL with the dynamic loopback callback and Trae device context"
+    - "REFERENCE_BEHAVIOR: callback refreshToken triggers ExchangeToken against the fixed HTTPS origin allowlist; callback loginHost is parsed but never used as an upstream origin"
+    - "REFERENCE_BEHAVIOR: a pasted raw token, Cloud-IDE-JWT value, or Bearer value is stored directly with a 14-day expiry and no refresh token"
+    - "REFERENCE_BEHAVIOR: callback ExchangeToken identity lookup is best effort; GetUserInfo populates email, display name, region, tenant, and user id when available"
+    - "REFERENCE_BEHAVIOR: local proxy callback state mismatch is rejected only when callback state is present; origin must pass the loopback-origin check"
+    - "SUSPECTED_BUG: callback state is optional, so a callback with no state is accepted despite a registered state; preserve this behavior"
+  state:
+    reads: ["OAuth callback and optional user profile"]
+    writes: ["provider_connections OAuth credentials and providerSpecificData"]
+    runtimeOnly: ["single in-memory Trae proxy session and dynamic loopback listener, stopped after callback or timeout"]
+  dependencies: ["oauth.generic-provider-action-route", "oauth.refresh-lifecycle", "oauth.token-sealing"]
+  providerInteraction: "Trae GetLoginGuidance, authorization host, ExchangeToken, and GetUserInfo over HTTPS"
+  fallback: { hasFallback: true, retry: "GetLoginGuidance and exchange try the fixed origin list in order", timeout: "proxy ends after ten minutes", quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "Trae OAuth exchange or token import fails", partial: false }
+    - { code: INVALID_REQUEST, when: "token/callback is empty or callback lacks refreshToken/loginHost", partial: false }
+  sideEffects: ["opens Trae login page and listens on a dynamic loopback port"]
+  persistence: ["sealed access token, optional refresh token, expiry, and provider-specific identity metadata"]
+  performanceConcerns: ["profile lookup is best effort and tries a fixed, bounded list of provider origins"]
+  behavior: { streaming: false, cancellation: "proxy timeout after ten minutes", concurrency: "one active proxy session per provider" }
+  edgeCases:
+    - "SUSPECTED_BUG: missing callback state is accepted, while a present but mismatched state is rejected"
+    - "Callback loginHost is ignored for upstream exchange; the fixed HTTPS allowlist is an intentional SSRF guard and is preserved"
+  evidence:
+    - { file: "src/lib/oauth/providers/trae.js", line: 25, note: "GetLoginGuidance, callback parse, ExchangeToken, profile and token mapping" }
+    - { file: "src/lib/oauth/utils/server.js", line: 447, note: "singleton session, loopback callback state/origin checks and timeout" }
+    - { file: "src/app/api/oauth/[provider]/[action]/route.js", line: 140, note: "start, poll, stop, and session registration routes" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A callback should include and match the state associated with the active login."
+    actual: "The reference rejects a mismatched state only when one is present; a missing state passes."
+    impact: "A callback without state cannot be correlated to the initiating login; preserve observed behavior for parity."
+
+- id: oauth.kiro-dashboard
+  group: OAuth providers
+  feature: OAuth providers
+  subFeature: Kiro sign-in screen wiring across Builder ID, IDC, social callback, local token import, CLIProxyAPI, and API key
+  trigger: Operator chooses Kiro in Add connection
+  input: "Builder ID or IDC start URL/region; Google/GitHub callback; local AWS SSO cache; refresh token; CLIProxyAPI JSON; or API key"
+  output: "A sealed Kiro connection; device and social flows complete through the existing Connections UI"
+  businessRules:
+    - "REFERENCE_BEHAVIOR: the UI offers Builder ID, IDC, Google, GitHub, refresh-token import, CLIProxyAPI JSON import, and API key methods; hidden Google/GitHub controls remain hidden"
+    - "REFERENCE_BEHAVIOR: selecting refresh-token import auto-detects ~/.aws/sso/cache, prefers kiro-auth-token.json, resolves client credentials by clientIdHash, and reads the Kiro profile ARN from the two platform locations"
+    - "REFERENCE_BEHAVIOR: device sign-in registers an AWS OIDC client, starts device authorization, and retains client id, secret, region, auth method, and start URL through poll and token persistence"
+    - "REFERENCE_BEHAVIOR: all Kiro credentials are encrypted at rest; token and client secret values are never rendered back after save"
+  state:
+    reads: ["local AWS SSO cache and Kiro IDE profile file for auto-import"]
+    writes: ["provider_connections row and sealed OAuth/provider data"]
+    runtimeOnly: ["device-code metadata held by the dashboard until polling completes"]
+  dependencies: ["oauth.kiro-auto-import", "oauth.kiro-import", "oauth.kiro-social-authorize", "oauth.kiro-social-exchange", "oauth.kiro-import-cli-proxy", "oauth.kiro-api-key"]
+  providerInteraction: "AWS OIDC, Kiro auth service, Amazon Q model catalog"
+  fallback: { hasFallback: false, retry: null, timeout: "bounded by the OAuth request deadline", quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "upstream Kiro/AWS OAuth operation fails", partial: false }
+    - { code: INVALID_REQUEST, when: "required fields or auth JSON are invalid", partial: false }
+  sideEffects: ["opens the selected provider's verification page"]
+  persistence: ["Kiro OAuth token, refresh token, profile ARN, auth method, and IDC client metadata"]
+  performanceConcerns: ["auto-import scans only JSON files in the local AWS SSO cache"]
+  behavior: { streaming: false, cancellation: "OAuth request deadline", concurrency: null }
+  edgeCases:
+    - "SUSPECTED_BUG: local auto-import uses the first matching JSON entry in directory enumeration order; preserve the observed selection rule"
+    - "AIGate UI contract: browser OAuth opens a popup synchronously on the click before waiting for authorize; the returned URL navigates that popup so Chrome does not leave it at about:blank"
+  evidence:
+    - { file: "src/shared/components/KiroAuthModal.js", line: 1, note: "method selection and all local/import forms" }
+    - { file: "src/shared/components/KiroOAuthWrapper.js", line: 1, note: "device and social flow orchestration" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Auto-import should use a stable, explicitly selected local Kiro cache entry."
+    actual: "The reference uses the first matching JSON entry in filesystem enumeration order."
+    impact: "Multiple cache entries can select different accounts across systems; parity keeps the observed selection behavior."
+
 # 2026-09-24 delta against 9Router v0.5.86: Xiaomi MiMo import and login routes.
 - id: connection.xiaomi-mimo-key-import
   group: Provider authentication

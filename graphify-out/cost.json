@@ -208,6 +208,27 @@
       "output_tokens": 0,
       "files": 4,
       "mode": "M2 Cursor IDE token import and HTTP2 transport"
+    },
+    {
+      "date": "2026-09-28T15:00:55.412851+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "Kiro provider-family graph chunk"
+    },
+    {
+      "date": "2026-09-28T15:13:23.490358+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "Kiro provider-family graph chunk"
+    },
+    {
+      "date": "2026-09-28T15:37:57.535542+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "Trae OAuth and SOLO provider family"
     }
   ],
   "total_input_tokens": 574916,

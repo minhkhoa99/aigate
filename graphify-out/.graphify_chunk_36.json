@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    {"id":"sp_kiro","label":"M2 Kiro OAuth and provider family","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"done"},
+    {"id":"kiro_oauth_contract","label":"Kiro OAuth, local imports, and refresh contract","file_type":"document","source_file":"docs/contracts/oauth.md","status":"implemented"},
+    {"id":"kiro_adapter","label":"Kiro AWS EventStream and Q model adapter","file_type":"code","source_file":"packages/engine/src/adapters/kiro.ts","status":"implemented"},
+    {"id":"kiro_oauth_server","label":"Kiro OAuth and local credential import routes","file_type":"code","source_file":"apps/server/src/modules/connections/infrastructure/oauth.controller.ts","status":"implemented"},
+    {"id":"kiro_connect_ui","label":"Kiro device, social, token, CLIProxy, and API-key sign-in UI","file_type":"code","source_file":"apps/web/src/features/providers/sign-in.tsx","status":"implemented"}
+  ],
+  "edges": [
+    {"source":"sp_kiro","target":"kiro_oauth_contract","relation":"documents","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"kiro_oauth_contract","target":"oauth_contract","relation":"extends","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/oauth.md","weight":1},
+    {"source":"kiro_adapter","target":"kiro_oauth_contract","relation":"implements","confidence":"EXTRACTED","confidence_score":1,"source_file":"packages/engine/src/adapters/kiro.ts","weight":1},
+    {"source":"kiro_adapter","target":"port_http_transport","relation":"uses","confidence":"EXTRACTED","confidence_score":1,"source_file":"packages/engine/src/adapters/kiro.ts","weight":1},
+    {"source":"kiro_oauth_server","target":"kiro_oauth_contract","relation":"implements","confidence":"EXTRACTED","confidence_score":1,"source_file":"apps/server/src/modules/connections/infrastructure/oauth.controller.ts","weight":1},
+    {"source":"kiro_connect_ui","target":"kiro_oauth_contract","relation":"implements","confidence":"EXTRACTED","confidence_score":1,"source_file":"apps/web/src/features/providers/sign-in.tsx","weight":1}
+  ]
+}

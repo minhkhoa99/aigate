@@ -1561,6 +1561,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - profileArn is read from a separate Kiro-IDE-specific profile.json (checked at two OS-dependent candidate paths) and its region is force-normalized to us-east-1 in the ARN string regardless of the IDC region, because the comment states the runtime gateway requires us-east-1 in the ARN specifically
 - **Errors:** `INTERNAL_ERROR` (~/.aws/sso/cache does not exist (readdir throws))
 
+### Kiro sign-in screen wiring across Builder ID, IDC, social callback, local token import, CLIProxyAPI, and API key
+
+- **id:** `oauth.kiro-dashboard` · **module:** `connections`
+- **Trigger:** Operator chooses Kiro in Add connection
+- **Input:** Builder ID or IDC start URL/region; Google/GitHub callback; local AWS SSO cache; refresh token; CLIProxyAPI JSON; or API key
+- **Output:** A sealed Kiro connection; device and social flows complete through the existing Connections UI
+- **Rules:**
+  - REFERENCE_BEHAVIOR: the UI offers Builder ID, IDC, Google, GitHub, refresh-token import, CLIProxyAPI JSON import, and API key methods; hidden Google/GitHub controls remain hidden
+  - REFERENCE_BEHAVIOR: selecting refresh-token import auto-detects ~/.aws/sso/cache, prefers kiro-auth-token.json, resolves client credentials by clientIdHash, and reads the Kiro profile ARN from the two platform locations
+  - REFERENCE_BEHAVIOR: device sign-in registers an AWS OIDC client, starts device authorization, and retains client id, secret, region, auth method, and start URL through poll and token persistence
+  - REFERENCE_BEHAVIOR: all Kiro credentials are encrypted at rest; token and client secret values are never rendered back after save
+- **Errors:** `AUTH_ERROR` (upstream Kiro/AWS OAuth operation fails), `INVALID_REQUEST` (required fields or auth JSON are invalid)
+- **AIGate required behavior:** Auto-import should use a stable, explicitly selected local Kiro cache entry.
+
 ### POST /api/oauth/kiro/import — persist a manually-supplied (or auto-detected) Kiro refresh token, supporting both social/builder-id and IDC (org) shapes
 
 - **id:** `oauth.kiro-import` · **module:** `connections`
@@ -1606,6 +1620,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - This is the exchange counterpart to oauth.kiro-social-authorize — it cannot use the generic route's exchange action because that action expects a standard redirectUri to be supplied and re-validated, while this flow's redirect_uri is the fixed kiro:// callback handled internally inside kiroService.exchangeSocialCode rather than passed per-request
   - provider (google|github) is stored verbatim (capitalized) into providerSpecificData.provider and also as providerSpecificData.authMethod — used later purely as a display/diagnostic label distinguishing which social identity produced this Kiro connection, not as a functional branch in the refresh path (auth.refresh-provider-specific's refreshKiro treats every Kiro connection identically regardless of how it was obtained)
 - **Errors:** `INVALID_REQUEST` (code or codeVerifier missing), `INVALID_REQUEST` (provider is missing or not google/github), `AUTH_ERROR` (kiroService.exchangeSocialCode rejects the code/verifier pair)
+- **AIGate required behavior:** The social OAuth state returned by authorize should be checked when the code is exchanged.
 
 ### Token refresh: proactive before a request, reactive on 401/403, and the background loop
 
@@ -1633,6 +1648,22 @@ Every item below is a capability AIGate must have. Derived from tracing
   - A new oauth login for the same provider updates the existing row when the email matches and, when either side has a username in providerSpecificData, the usernames match too (codex matches on the ChatGPT account id); otherwise it creates a new row named after the email (else 'Account N') with the next priority
   - A refresh merges the returned fields into the row and merges providerSpecificData instead of replacing it
   - Tokens are stored in the SQLite row as given
+
+### Browser login through GetLoginGuidance and loopback callback, plus Cloud-IDE-JWT token import
+
+- **id:** `oauth.trae-browser-and-import` · **module:** `connections`
+- **Trigger:** Operator chooses Trae in Add connection
+- **Input:** A generated login trace, browser callback URL/query containing refreshToken and loginHost, or a pasted Cloud-IDE-JWT access token
+- **Output:** A sealed Trae connection with access/refresh tokens and best-effort identity metadata
+- **Rules:**
+  - REFERENCE_BEHAVIOR: authorization calls GetLoginGuidance with loginTraceID and login_trace_id, then builds the provider authorization URL with the dynamic loopback callback and Trae device context
+  - REFERENCE_BEHAVIOR: callback refreshToken triggers ExchangeToken against the fixed HTTPS origin allowlist; callback loginHost is parsed but never used as an upstream origin
+  - REFERENCE_BEHAVIOR: a pasted raw token, Cloud-IDE-JWT value, or Bearer value is stored directly with a 14-day expiry and no refresh token
+  - REFERENCE_BEHAVIOR: callback ExchangeToken identity lookup is best effort; GetUserInfo populates email, display name, region, tenant, and user id when available
+  - REFERENCE_BEHAVIOR: local proxy callback state mismatch is rejected only when callback state is present; origin must pass the loopback-origin check
+  - SUSPECTED_BUG: callback state is optional, so a callback with no state is accepted despite a registered state; preserve this behavior
+- **Errors:** `AUTH_ERROR` (Trae OAuth exchange or token import fails), `INVALID_REQUEST` (token/callback is empty or callback lacks refreshToken/loginHost)
+- **AIGate required behavior:** A callback should include and match the state associated with the active login.
 
 ### antigravity: Google OAuth with the public Antigravity client, the IDE's Cloud Code endpoint daily-cloudcode-pa.googleapis.com, Gemini and Claude models in one envelope, image generation, IDE request ids
 
@@ -2347,7 +2378,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Nothing checks that a prefix is unique among nodes, or that it is a usable provider token (a prefix containing / can never match, since <prefix>/<model> splits on the first /)
   - At /v1, <prefix>/<model> reaches the node whose prefix matches, with the model passed as given; built-in provider ids and aliases are reserved and always win, so a node whose prefix equals one is silently unreachable
 - **Errors:** `INVALID_REQUEST` (name or prefix missing, apiType invalid for openai-compatible, or an unknown type), `INTERNAL_ERROR` (storage fails (500 Failed to create provider node))
-- **AIGate required behavior:** A custom provider without a base URL is refused, a pasted /chat/completions suffix is normalized like the sibling node types, and a prefix that is reserved, duplicated, or unusable is refused when the node is saved
+- **AIGate required behavior:** A custom provider prefix should be unique and usable for provider/model routing.
 
 ### nodesRepo (src/lib/db/repos/nodesRepo.js) — storage shape and CRUD primitives backing custom/compatible provider nodes
 
@@ -2866,6 +2897,43 @@ Every item below is a capability AIGate must have. Derived from tracing
   - GetUsableModels is a bounded HTTP/2 unary protobuf request; a failed or empty live result falls back to the static Cursor catalog
 - **Streaming:** yes
 - **Errors:** `INVALID_REQUEST` (the routed credential has no machineId), `AUTH_ERROR` (Cursor rejects the access token or checksum), `PROVIDER_UNAVAILABLE` (the bounded HTTP/2 session or ConnectRPC response fails)
+
+### AWS CodeWhisperer/Amazon Q request shaping and binary EventStream response decoding
+
+- **id:** `provider.kiro-eventstream` · **module:** `routing`
+- **Trigger:** A routed chat request or provider model/credential check uses a Kiro connection
+- **Input:** Kiro credential and auth metadata, model id, canonical messages, optional tools, and request cancellation
+- **Output:** Canonical response/stream chunks from AWS EventStream; live Kiro model list with static fallback
+- **Rules:**
+  - REFERENCE_BEHAVIOR: requests send Bearer auth and Kiro IDE headers; API keys add TokenType=API_KEY; Microsoft external_idp OAuth adds TokenType=EXTERNAL_IDP; a profile ARN is sent when available
+  - REFERENCE_BEHAVIOR: AWS SSO IDC uses its credential region; OAuth/social credentials use Kiro runtime and AWS fallback surfaces, and API-key/IDC/external_idp credentials use the Amazon Q/CodeWhisperer surfaces
+  - REFERENCE_BEHAVIOR: canonical chat content is converted into Kiro history/current-message payloads, including system instructions, tool results, tool declarations, images, thinking and agentic model variants
+  - REFERENCE_BEHAVIOR: response chunks decode AWS EventStream framing and map text, reasoning, code, tool calls, stop reason, and usage into CIP; frame and buffered tool input sizes are bounded
+  - REFERENCE_BEHAVIOR: live models come from the account's Amazon Q catalog and expand into thinking/agentic variants; the special auto model has no agentic variants; an unavailable or empty live result falls back to the static catalog
+  - IMPLEMENTATION_ACCIDENT: 9router's executor class, Node fetch calls, and internal SSE intermediary are not carried over; the provider behavior runs through AIGate's framework-free engine and transport ports
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (Kiro refuses the credential), `RATE_LIMIT` (all eligible Kiro endpoints refuse the request for rate limiting), `PROVIDER_UNAVAILABLE` (upstream HTTP/EventStream is unavailable or malformed), `INVALID_REQUEST` (the Kiro request cannot represent a supplied feature)
+- **AIGate required behavior:** A returned social OAuth state should be compared with the state associated with the exchanged authorization code.
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### Create a SOLO remote chat session, consume its event stream, and map output into canonical chat completions
+
+- **id:** `provider.trae-solo` · **module:** `routing`
+- **Trigger:** A routed chat request uses a Trae connection
+- **Input:** Cloud-IDE-JWT credential and provider data, model id, canonical messages, stream preference, cancellation signal
+- **Output:** OpenAI-compatible chat completion JSON or SSE chunks with optional usage
+- **Rules:**
+  - REFERENCE_BEHAVIOR: POST /chat_sessions uses Authorization: Cloud-IDE-JWT, Trae web headers, referer, region, and a browser user agent
+  - REFERENCE_BEHAVIOR: canonical messages flatten into [System]/[Assistant] labeled text and then a JSON typed text block
+  - REFERENCE_BEHAVIOR: auto selects code mode with automatic model selection; work/auto-work/solo-work selects work mode; other models select code mode with a named model
+  - REFERENCE_BEHAVIOR: common_params embeds locale, identity, scope, tenant, region, privacy, and solo_chat_mode; an existing session id is included when provided
+  - REFERENCE_BEHAVIOR: createSession returns chat_session_id and message_id; GET events uses reply_to_message_id
+  - REFERENCE_BEHAVIOR: cumulative plan_item.thought content is tracked by id, longest value wins, and only newly appended text is streamed; token_usage is mapped to prompt/completion/total usage
+  - REFERENCE_BEHAVIOR: error events are represented as error chunks for streaming and 502 JSON for non-streaming; a done event ends the turn
+  - REFERENCE_BEHAVIOR: model catalog is auto, work, Gemini 3.1 Pro, Gemini 3 Flash, MiniMax M3/M2.7, Kimi K2.5, and GPT 5.4/5.2
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (upstream rejects Cloud-IDE-JWT), `PROVIDER_UNAVAILABLE` (session creation or event stream fails)
+- **AIGate required behavior:** A SOLO event stream should contain a terminal done event before its response is reported successful.
 
 ### Upstream URL construction (compatible-prefix rule, runtime transport, gemini path, accountId template)
 
@@ -4574,9 +4642,12 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `identity.saml-replay-inresponseto-gap` | A signed SAML assertion should be usable to establish a session at most once: either node-saml's own validateInResponseTo tracking should be enabled ('always' or 'ifPresent'), or the code's manual InResponseTo/expectedRequestId comparison should be mandatory (reject when expectedRequestId is missing) rather than only applied when a saml_state cookie happens to still be present. | createSamlInstance sets validateInResponseTo: 'never', and validateSamlResponse's own fallback InResponseTo check is wrapped in `if (expectedRequestId)`, so a request with no saml_state cookie (already consumed, expired, or simply not sent) skips replay validation entirely and is judged solely on signature and time-window validity. | Any captured, correctly-signed SAMLResponse (via browser history/cache, a shared proxy log, a compromised extension, or a non-TLS hop) can be POSTed to /api/auth/saml/acs and re-establish a valid dashboard session for that identity at any point before the assertion's IdP-set NotOnOrAfter expiry, with no per-assertion one-time-use enforcement — a classic SAML replay attack that InResponseTo tracking exists specifically to prevent. |
 | `oauth.cursor-auto-import` | A local filesystem failure returns a stable, non-sensitive explanation | The outer catch returns error.message directly in a 500 response | A runtime error can expose local implementation details to the authenticated dashboard |
 | `oauth.cursor-import` | A malformed credential pair is an INVALID_REQUEST response | The route throws inside its broad catch and returns HTTP 500 with the local validation message | The dashboard describes operator input as a server failure |
+| `oauth.kiro-social-exchange` | The social OAuth state returned by authorize should be checked when the code is exchanged. | The reference exchange takes only code, codeVerifier, and provider; it never accepts or compares state. | A callback state mismatch is not detected by this endpoint; the port keeps parity and leaves a CSRF behavior change for a separate decision. |
 | `catalog.suggested-models-open-proxy` | A server-side fetch proxy that accepts an arbitrary URL from the query string validates that URL the same way provider-nodes/validate does (SSRF guard) before fetching it, regardless of which UI feature happens to be the only current caller | No SSRF check of any kind runs on url — the route trusts the browser-side caller to only ever pass one of a small fixed set of URLs, a constraint enforced nowhere on the server. dashboardGuard.js does require a valid dashboard session, a valid CLI token, or settings.requireLogin===false to reach the route at all — this is not an anonymous-internet-facing endpoint by default | Exploitability is scoped to: (1) an authenticated dashboard session itself performing the request (limited value — a logged-in admin SSRFing their own server), (2) a CSRF-style crafted link that rides an already-logged-in admin's sameSite:lax session cookie via a top-level GET navigation — a blind SSRF trigger the attacker cannot read the response of, but the internal request still fires, (3) a leaked/stolen CLI token, or (4) settings.requireLogin=false, which removes the auth requirement entirely and, combined with 13's tunnel.enable-lacks-server-side-security-gate (tunnel exposure has no server-side requireLogin/requireApiKey check), can leave this reachable by any internet caller with no auth at all |
 | `connection.provider-node-validate-partial-ssrf` | A remote (non-local) caller's user-supplied baseUrl is validated with the same DNS-resolution and redirect-safe protection ssrfGuard.js documents as necessary (assertPublicUrlResolved / fetchPublic) — the module comment explicitly says layer 1 alone leaves DNS-rebinding and redirect bypasses open | Only assertPublicUrl (layer 1, literal hostname/IP string check) runs, and the actual request uses a plain fetch with no manual redirect re-validation. dashboardGuard.js does require a valid dashboard session, a valid CLI token, or settings.requireLogin===false to reach the route at all — this is not an anonymous-internet-facing endpoint by default, and its POST+JSON-body shape is not CSRF-reachable the way a GET route would be under a sameSite:lax cookie | Exploitability is scoped to a caller that is BOTH non-local (reverse-proxied or tunnel-exposed, so isLocalRequest() is false and the route's own SSRF check actually runs) AND already past dashboardGuard's auth gate (a valid dashboard session, a valid CLI token, or settings.requireLogin===false) — e.g. an operator's own tunnel-exposed dashboard session, a compromised/leaked session or CLI token, or a requireLogin:false deployment combined with 13's tunnel.enable-lacks-server-side-security-gate (tunnel exposure enforces no requireLogin/requireApiKey check of its own). Within that scope, such a caller can supply a hostname that resolves to an internal/metadata address, or a URL that redirects to one, and this route will still fetch it and echo back a validity signal — a real but narrower-than-anonymous-internet SSRF gap, and one that (unlike catalog.suggested-models-open-proxy) is not reachable via a simple crafted-link CSRF because of its POST+JSON shape |
-| `connection.provider-node-create-list` | A custom provider without a base URL is refused, a pasted /chat/completions suffix is normalized like the sibling node types, and a prefix that is reserved, duplicated, or unusable is refused when the node is saved | A missing baseUrl silently becomes https://api.openai.com/v1; a pasted /chat/completions yields .../chat/completions/chat/completions at request time; a reserved, duplicate, or slash-containing prefix is stored and then silently unreachable | The custom provider's key is sent to OpenAI (a 401 and a leaked credential) or requests fail with a 404 from a doubled path; a shadowed prefix routes nowhere with no error at save time |
+| `connection.provider-node-create-list` | A custom provider prefix should be unique and usable for provider/model routing. | Provider-node creation trims the prefix but does not check uniqueness, reserved ids, or slash characters; the first matching node silently wins. | Duplicate, reserved, or unusable prefixes create nodes that cannot be selected consistently or reached by /v1 requests. |
+| `oauth.trae-browser-and-import` | A callback should include and match the state associated with the active login. | The reference rejects a mismatched state only when one is present; a missing state passes. | A callback without state cannot be correlated to the initiating login; preserve observed behavior for parity. |
+| `oauth.kiro-dashboard` | Auto-import should use a stable, explicitly selected local Kiro cache entry. | The reference uses the first matching JSON entry in filesystem enumeration order. | Multiple cache entries can select different accounts across systems; parity keeps the observed selection behavior. |
 | `connection.anthropic-compatible-node` | An API-key request carries only the betas it needs; the official host is decided by hostname; the connection test calls <baseUrl>/messages and reports 404 or 5xx as not verified | claude-* models get the Claude Code OAuth and redact-thinking betas with an API key; a substring decides the official host; the test calls <baseUrl>/v1/messages and counts any status but 401/403 as valid | Thinking text can come back redacted, a look-alike gateway URL skips the Bearer header, and a wrong base URL or dead endpoint tests as a working key |
 | `provider.vertex-google-auth` | A 401 forces a new token, the cache follows the credential itself, ADC tokens are cached until they expire, and the key never goes in the URL | The retry reuses the cached token, a replaced key under the same client_email keeps the old token, ADC refreshes on every request, and the raw key is an unencoded query parameter | A revoked token keeps failing for up to 55 minutes, extra token round-trips, and the key leaks into logs |
 | `connection.vertex-credential-test` | The Test button works, a service account is checked by minting a token, and a bad key (400 API_KEY_INVALID) is invalid | Test always fails, a service account is valid on field presence, and any status but 401/403 is valid | Working connections look broken and broken ones look healthy |
@@ -4613,6 +4684,8 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `routing.responses-non-stream-answer` | A non-streaming client receives the model answer: text, reasoning, tool calls, usage, and the finish reason | The client receives an empty assistant message with finish_reason stop | Every non-streaming request to a Responses provider silently loses its answer |
 | `routing.provider-thinking-default` | Only a request that carries no thinking of its own gets the provider level | Only reasoning_effort is checked: a Claude client's thinking budget or a Responses client's reasoning.effort is overridden by the injected level, which the translator reads first | A client that asked for a specific budget or effort silently gets the provider default instead |
 | `routing.model-thinking-suffix` | A literal catalog model id ending in parentheses remains addressable unless its suffix is a known thinking override | The reference removes every trailing parenthesized value before lookup, including an unknown value | A future provider model named like foo(beta) can resolve as foo or fail instead of reaching its literal id |
+| `provider.trae-solo` | A SOLO event stream should contain a terminal done event before its response is reported successful. | The reference resolves on stream EOF even if no done event arrived and returns the collected thought text as success. | A truncated upstream stream can be mistaken for a complete answer; preserve behavior and track separately. |
+| `provider.kiro-eventstream` | A returned social OAuth state should be compared with the state associated with the exchanged authorization code. | The reference Kiro social exchange has no state parameter and does not compare the state returned from authorize. | A callback state mismatch is not detected; preserve the observed contract and track CSRF binding separately. |
 | `tokensaver.pxpipe-master-optout-bug` | x-9router-token-saver: off disables every token-saver stage, including PXPIPE, for that request | PXPIPE runs whenever settings.pxpipeEnabled is true, regardless of the per-request opt-out header — only RTK, headroom, caveman and ponytail honor it | A client that opts out to keep its exact payload intact (e.g. to preserve verbatim tool output for debugging, or because it distrusts lossy image conversion) can still have its request body silently rewritten into PNG image blocks by PXPIPE, changing token accounting and provider-visible content the client explicitly asked to avoid |
 | `usage.history-write-dedup-transaction` | Every completed request that calls saveRequestUsage produces its own usageHistory row | A request whose ISO-millisecond timestamp, provider, model, connectionId, apiKey, promptTokens and completionTokens all match the most recently matching prior row is treated as a duplicate: no new row is inserted, no usageDaily counts are added, no lifetime counter increment happens — only the endpoint column may be backfilled | Genuinely distinct requests that happen to land in the same millisecond with identical provider/model/account/token counts (e.g. rapid retries, fixed-size embeddings calls) are silently undercounted in usageHistory, usageDaily aggregates, byModel/byAccount stats and the lifetime request counter |
 | `usage.history-route-returns-aggregate-not-rows` | A route named /api/usage/history returns per-request usage history rows — the sibling getUsageHistory(filter) function (provider/model/date-range filterable) appears purpose-built to back exactly this route | It calls getUsageStats() with no period, returning the same aggregated shape as /api/usage/stats?period=all; getUsageHistory() is never invoked by any route or other code in the checkout | AIGate would misdesign a 'usage history' endpoint contract by assuming per-row data if this were ported literally; the working, filter-capable raw-row query exists in source but is unreachable from the API surface |

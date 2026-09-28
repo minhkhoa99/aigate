@@ -24,6 +24,71 @@ test("Cursor imports IDE credentials locally and keeps 9router's malformed-input
     await app.close();
   }));
 
+test("Kiro supports regional Builder ID device sign-in and Google social PKCE", () =>
+  withTempDb(async (file) => {
+    const upstream = fakeUpstream(
+      json(200, { clientId: "kiro-client", clientSecret: "kiro-secret" }),
+      json(200, { deviceCode: "kiro-device", userCode: "ABCD-EFGH", verificationUri: "https://device.sso", expiresIn: 300 }),
+      json(200, { accessToken: JWT(7), refreshToken: "aorAAAAAG-refresh", expiresIn: 3600 }),
+      json(200, { profiles: [{ arn: "arn:aws:codewhisperer:eu-west-1:123:profile/abc" }] }),
+      json(200, { accessToken: JWT(8), refreshToken: "social-refresh", expiresIn: 3600, profileArn: "arn:aws:codewhisperer:us-east-1:123:profile/social" }),
+    );
+    const { app, dash } = await ready(file, upstream);
+    const device = await dash({ url: "/api/oauth/kiro/device-code?region=eu-west-1" });
+    assert.deepEqual([device.statusCode, device.json().device_code, device.json().providerData.authMethod], [200, "kiro-device", "builder-id"]);
+    const approved = await dash({ method: "POST", url: "/api/oauth/kiro/poll", body: { deviceCode: "kiro-device", providerData: device.json().providerData } });
+    assert.deepEqual([approved.statusCode, approved.json().success, approved.json().connection.provider], [200, true, "kiro"]);
+    assert.equal(upstream.calls[0].request.url, "https://oidc.eu-west-1.amazonaws.com/client/register");
+    assert.equal(upstream.calls[2].request.url, "https://oidc.eu-west-1.amazonaws.com/token");
+    assert.equal(upstream.calls[3].request.headers["x-amz-target"], "AmazonCodeWhispererService.ListAvailableProfiles");
+
+    const saved = (await dash({ url: "/api/connections" })).json().find((connection) => connection.provider === "kiro");
+    await dash({ method: "DELETE", url: `/api/connections/${saved.id}` });
+    const start = await dash({ url: "/api/oauth/kiro/authorize?socialProvider=google" });
+    assert.equal(new URL(start.json().authUrl).searchParams.get("idp"), "Google");
+    assert.equal(new URL(start.json().authUrl).searchParams.get("redirect_uri"), "kiro://kiro.kiroAgent/authenticate-success");
+    const signed = await dash({ method: "POST", url: "/api/oauth/kiro/exchange", body: {
+      code: "social-code", redirectUri: start.json().redirectUri, codeVerifier: start.json().codeVerifier,
+      meta: { socialProvider: "google" },
+    } });
+    assert.deepEqual([signed.statusCode, signed.json().success, signed.json().connection?.provider], [200, true, "kiro"], JSON.stringify(signed.json()));
+    assert.deepEqual(JSON.parse(upstream.calls[4].request.body), {
+      code: "social-code", code_verifier: start.json().codeVerifier, redirect_uri: "kiro://kiro.kiroAgent/authenticate-success",
+    });
+    await app.close();
+  }));
+
+test("Trae uses the loopback callback, fixed exchange origins, and persists its OAuth connection", () =>
+  withTempDb(async (file) => {
+    const expiresAt = new Date(Date.now() + 3600_000).toISOString();
+    const upstream = fakeUpstream(
+      json(200, { Result: { LoginHost: "https://login.trae.test" } }),
+      json(200, { Result: { AccessToken: JWT(31), RefreshToken: "trae-refresh", ExpiresAt: expiresAt } }),
+      json(200, { Result: { Email: "trae@example.test", ScreenName: "Trae User", AIRegion: "SG", Region: "SG", UserID: "trae-user" } }),
+    );
+    return ready(file, upstream).then(async ({ app, dash }) => {
+      const start = await dash({ url: "/api/oauth/trae/start-proxy" });
+      assert.equal(start.statusCode, 200);
+      const { authUrl, callbackUrl, state } = start.json();
+      assert.equal(new URL(authUrl).origin, "https://login.trae.test");
+      assert.ok(callbackUrl.startsWith("http://127.0.0.1:"));
+      const callback = await fetch(`${callbackUrl}?refreshToken=refreshed&loginHost=https%3A%2F%2Fevil.invalid`);
+      assert.equal(callback.status, 200);
+      let status;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        status = await dash({ url: `/api/oauth/trae/poll-status?state=${encodeURIComponent(state)}` }).then((answer) => answer.json());
+        if (status.status !== "processing" && status.status !== "pending") break;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      assert.equal(status.status, "done");
+      assert.equal(upstream.calls[1].request.url, "https://api.marscode.com/cloudide/api/v3/trae/oauth/ExchangeToken");
+      const saved = (await dash({ url: "/api/connections" })).json().find((connection) => connection.provider === "trae");
+      assert.deepEqual([saved.authType, saved.email], ["oauth", "trae@example.test"]);
+      assert.ok(Math.abs(Date.parse(saved.expiresAt) - Date.parse(expiresAt)) < 2000);
+      await app.close();
+    });
+  }));
+
 test("cline: sign in with the callback code, refresh before a request and after a 401", () =>
   withTempDb(async (file) => {
     const upstream = fakeUpstream(

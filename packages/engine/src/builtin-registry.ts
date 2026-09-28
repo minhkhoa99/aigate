@@ -20,6 +20,8 @@ const PATHS: Readonly<Record<ProviderProtocol, { chat: RegExp; models: string }>
   // routing.vertex-endpoints: the catalog URL is the host; the adapter builds every path, and lists the catalog models.
   // translator.openai-to-commandcode-request: POST <host>/alpha/generate; the model list is the catalog.
   commandcode: { chat: /\/alpha\/generate$/, models: "/alpha/models" },
+  kiro: { chat: /\/generateAssistantResponse$/, models: "/ListAvailableModels" },
+  trae: { chat: /\/chat_sessions$/, models: "/chat_sessions" },
   vertex: { chat: /^https:\/\/aiplatform\.googleapis\.com$/, models: "https://aiplatform.googleapis.com/v1/publishers/google/models" },
 };
 // provider.vertex-google-auth: Google Cloud credentials; vertex-partner speaks OpenAI chat on a URL built from the project.
@@ -67,6 +69,18 @@ const CLINE_HEADERS = {
 };
 // provider.cline-oauth: Cline's OAuth requests carry the same headers (9router's clineHeaders hook).
 const EXTRA_HEADERS: Readonly<Record<string, Readonly<Record<string, string>>>> = { clinepass: CLINE_HEADERS, cline: CLINE_HEADERS };
+// 9router hides Trae, so the generated extraction omits it; its public data stays local here.
+const traeNames: readonly [string, string][] = [
+  ["auto", "Auto (Server Picks)"], ["work", "Work (Fast)"], ["gemini-3.1-pro", "Gemini 3.1 Pro"], ["gemini-3-flash-solo", "Gemini 3 Flash"],
+  ["minimax-m3", "MiniMax M3"], ["minimax-m2.7", "MiniMax M2.7"], ["kimi-k2.5", "Kimi K2.5"], ["gpt-5.4", "GPT 5.4"], ["gpt-5.2", "GPT 5.2"],
+];
+const TRAE: CatalogProvider = {
+  id: "trae", name: "Trae", category: "oauth", aliases: ["tr", "marscode"], protocol: "trae",
+  auth: { kinds: ["oauth"], header: null, scheme: null }, chatUrl: "https://core-normal.trae.ai/api/remote/v1/chat_sessions", modelsUrl: "https://core-normal.trae.ai/api/remote/v1/chat_sessions",
+  headers: { "X-Trae-Client-Type": "web", "X-Preferenced-Language": "en", Referer: "https://solo.trae.ai/" }, forceStream: false, quirks: [], serviceKinds: [], hidden: false, deprecated: false, unmodelled: [],
+  models: traeNames.map(([id, name]) => ({ id, name, kind: "llm", upstreamModelId: null, capabilities: { vision: false, pdf: false, audioInput: false, videoInput: false, tools: true, reasoning: false }, capabilitySource: "default", contextWindow: null, maxOutputTokens: null })),
+};
+const PORTED_CATALOG = [...CATALOG, TRAE];
 // connection.azure-openai-deployment (kept as 9router, user decision 2026-09-26) and connection.cloudflare-account-id:
 // each connection fills the URL, and the connection test posts a one-token chat. provider.clinepass-headers-envelope:
 // Cline answers GET /models with 200 even without a key, so its test is a one-token chat too (user decision 2026-09-26).
@@ -102,6 +116,7 @@ const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Par
   }),
   // provider.cursor-protobuf: both paths are ConnectRPC HTTP/2; CursorAdapter builds their protobuf body and headers.
   cursor: () => ({ chatUrl: "https://api2.cursor.sh/aiserver.v1.ChatService/StreamUnifiedChatWithTools", modelsUrl: "https://agent.api5.cursor.sh/agent.v1.AgentService/GetUsableModels" }),
+  trae: () => ({ testByExpiry: true }),
 };
 // provider.gemini-cli-oauth: Cloud Code speaks the Gemini protocol inside its own envelope.
 const CLOUD_CODE_PROTOCOLS: Readonly<Record<string, ProviderProtocol>> = { "gemini-cli": "gemini" };
@@ -175,12 +190,13 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
     ...PER_CONNECTION[provider.id]?.(provider),
     ...(signIn ? { oauth: signIn.flow } : {}),
     ...(provider.id === "kilocode" ? { organizationHeader: "x-kilocode-organizationid" } : {}),
+    ...(provider.id === "kiro" ? { testByExpiry: true } : {}),
   };
 }
 
 const statuses = new Map<string, ProviderStatus>();
 const connectable: ProviderDescriptor[] = [];
-for (const provider of CATALOG) {
+for (const provider of PORTED_CATALOG) {
   const reason = unsupportedReason(provider);
   // unsupportedReason returns undefined only for a provider with a chat URL, or one whose connection supplies it (azure).
   if (reason === undefined) connectable.push(toDescriptor(provider, provider.chatUrl ?? ""));
