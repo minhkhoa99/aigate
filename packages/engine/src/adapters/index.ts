@@ -3,6 +3,7 @@ import type { ProviderDescriptor } from "../registry.js";
 import { AnthropicAdapter } from "./anthropic.js";
 import { AntigravityAdapter } from "./antigravity.js";
 import { CommandCodeAdapter } from "./commandcode.js";
+import { CursorAdapter } from "./cursor.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
 import { GeminiAdapter } from "./gemini.js";
 import { GeminiCliAdapter } from "./gemini-cli.js";
@@ -38,6 +39,7 @@ function familyAdapter(provider: ProviderDescriptor, transport: HttpTransportPor
     case "gemini": return new GeminiAdapter(provider, transport);
     case "vertex": return new VertexAdapter(provider, transport);
     case "commandcode": return new CommandCodeAdapter(provider, transport);
+    case "cursor": return new CursorAdapter(provider, transport);
     // vertex-partner: the OpenAI chat protocol with Google Cloud credentials (routing.vertex-endpoints).
     default: return provider.auth.googleCloud ? new VertexPartnerAdapter(provider, transport) : new OpenAICompatibleAdapter(provider, transport);
   }

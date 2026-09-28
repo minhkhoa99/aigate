@@ -10187,6 +10187,41 @@
       "file_type": "code",
       "source_file": "apps/web/src/features/providers/model-rules.ts",
       "status": "implemented"
+    },
+    {
+      "id": "sp_cursor",
+      "label": "M2 Cursor IDE token import and HTTP/2 provider",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "done"
+    },
+    {
+      "id": "cursor_oauth_contract",
+      "label": "Cursor local token import and no-refresh contract",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "status": "implemented"
+    },
+    {
+      "id": "cursor_adapter",
+      "label": "Cursor ConnectRPC and AgentService adapter",
+      "file_type": "code",
+      "source_file": "packages/engine/src/adapters/cursor.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "http2_transport_port",
+      "label": "Bounded server-owned HTTP/2 transport",
+      "file_type": "code",
+      "source_file": "apps/server/src/modules/transport/infrastructure/direct-transport.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "cursor_connect_ui",
+      "label": "Cursor auto-detect and manual import dialog",
+      "file_type": "code",
+      "source_file": "apps/web/src/features/providers/sign-in.tsx",
+      "status": "implemented"
     }
   ],
   "edges": [
@@ -32728,6 +32763,60 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1,
       "source_file": "apps/web/src/features/providers/model-rules.ts",
+      "weight": 1
+    },
+    {
+      "source": "sp_cursor",
+      "target": "cursor_oauth_contract",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "cursor_oauth_contract",
+      "target": "oauth_contract",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "cursor_adapter",
+      "target": "cursor_oauth_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "packages/engine/src/adapters/cursor.ts",
+      "weight": 1
+    },
+    {
+      "source": "cursor_adapter",
+      "target": "http2_transport_port",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "packages/engine/src/adapters/cursor.ts",
+      "weight": 1
+    },
+    {
+      "source": "cursor_connect_ui",
+      "target": "cursor_oauth_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/web/src/features/providers/sign-in.tsx",
+      "weight": 1
+    },
+    {
+      "source": "http2_transport_port",
+      "target": "transport_contract",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/server/src/modules/transport/infrastructure/direct-transport.ts",
       "weight": 1
     }
   ],

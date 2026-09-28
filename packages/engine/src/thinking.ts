@@ -11,6 +11,7 @@ export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 // 9router thinkingLevels.js FORMAT_LEVELS, by the family AIGate's adapter speaks: OpenAI effort, the Claude budget
 // levels, Gemini's thinking level and budget together, Ollama's base set, Command Code's full set.
 const FAMILY_LEVELS: Readonly<Record<ProviderProtocol, readonly ThinkingLevel[]>> = {
+  cursor: [],
   "openai-compatible": ["none", "minimal", "low", "medium", "high", "xhigh"],
   "openai-responses": ["none", "minimal", "low", "medium", "high", "xhigh"],
   anthropic: ["none", "low", "medium", "high", "xhigh", "max"],

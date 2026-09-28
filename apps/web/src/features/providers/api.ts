@@ -148,6 +148,12 @@ export const useOAuthExchange = () =>
   useConnectionMutation(({ provider, ...body }: { provider: string; code: string; redirectUri: string; codeVerifier: string; state: string; meta: Record<string, string> }) =>
     api<{ success: true; connection: { id: string; email: string | null } }>(oauthPath(provider, "exchange"), { method: "POST", body, timeoutMs: OAUTH_TIMEOUT_MS }));
 
+export interface CursorAutoImport { found: boolean; accessToken?: string; machineId?: string; error?: string; windowsManual?: boolean }
+export const cursorAutoImport = () => api<CursorAutoImport>(oauthPath("cursor", "auto-import"), { timeoutMs: OAUTH_TIMEOUT_MS });
+export const useCursorImport = () =>
+  useConnectionMutation((body: { accessToken: string; machineId: string }) =>
+    api<{ success: true; connection: { id: string; email: string | null } }>(oauthPath("cursor", "import"), { method: "POST", body, timeoutMs: OAUTH_TIMEOUT_MS }));
+
 // docs/contracts/custom-providers.md
 export type NodeType = "openai-compatible" | "anthropic-compatible";
 export type ApiType = "chat" | "responses";

@@ -35,9 +35,9 @@
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1790588293.563419,
-    "ast_hash": "837e672889b55c6eeee73a799ba6d78e",
-    "semantic_hash": "837e672889b55c6eeee73a799ba6d78e"
+    "mtime": 1790590721.2162192,
+    "ast_hash": "e6a64bf3c7b6960dcb0c0fb533e21892",
+    "semantic_hash": "e6a64bf3c7b6960dcb0c0fb533e21892"
   },
   "docs/design/UI_HANDOFF.md": {
     "mtime": 1790304403.8708513,
@@ -165,9 +165,9 @@
     "semantic_hash": "d6b7d9191daab2f8d4429ca0b73f08ce"
   },
   "docs/contracts/oauth.md": {
-    "mtime": 1790586702.8940408,
-    "ast_hash": "106992a10a5d35abfbb76bce100f1acc",
-    "semantic_hash": "106992a10a5d35abfbb76bce100f1acc"
+    "mtime": 1790590721.2162192,
+    "ast_hash": "442d32d6ac4b18c87c74a3a50e8a4438",
+    "semantic_hash": "442d32d6ac4b18c87c74a3a50e8a4438"
   },
   "docs/contracts/custom-models.md": {
     "mtime": 1790504148.32178,

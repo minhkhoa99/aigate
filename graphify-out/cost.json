@@ -201,6 +201,13 @@
       "output_tokens": 0,
       "files": 4,
       "mode": "M2 model-thinking suffixes"
+    },
+    {
+      "date": "2026-09-28T10:26:30.765876+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "M2 Cursor IDE token import and HTTP2 transport"
     }
   ],
   "total_input_tokens": 574916,

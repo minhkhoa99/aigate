@@ -16,6 +16,7 @@ const PATHS: Readonly<Record<ProviderProtocol, { chat: RegExp; models: string }>
   // Gemini posts to <base>/<model>:generateContent; the base itself lists the models.
   gemini: { chat: /\/models$/, models: "/models" },
   antigravity: { chat: /daily-cloudcode-pa\.googleapis\.com$/, models: "/v1internal:models" },
+  cursor: { chat: /api2\.cursor\.sh$/, models: "" },
   // routing.vertex-endpoints: the catalog URL is the host; the adapter builds every path, and lists the catalog models.
   // translator.openai-to-commandcode-request: POST <host>/alpha/generate; the model list is the catalog.
   commandcode: { chat: /\/alpha\/generate$/, models: "/alpha/models" },
@@ -99,6 +100,8 @@ const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Par
     modelsUrl: ANTIGRAVITY_MODELS_URL,
     auth: { kind: "api-key", header: "authorization", scheme: "bearer" },
   }),
+  // provider.cursor-protobuf: both paths are ConnectRPC HTTP/2; CursorAdapter builds their protobuf body and headers.
+  cursor: () => ({ chatUrl: "https://api2.cursor.sh/aiserver.v1.ChatService/StreamUnifiedChatWithTools", modelsUrl: "https://agent.api5.cursor.sh/agent.v1.AgentService/GetUsableModels" }),
 };
 // provider.gemini-cli-oauth: Cloud Code speaks the Gemini protocol inside its own envelope.
 const CLOUD_CODE_PROTOCOLS: Readonly<Record<string, ProviderProtocol>> = { "gemini-cli": "gemini" };

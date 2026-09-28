@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button, Field, Input, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
-import { oauthAuthorize, oauthDeviceCode, oauthPoll, useOAuthExchange, type DeviceCode, type OAuthStart, type ProviderSummary } from "./api";
+import { cursorAutoImport, oauthAuthorize, oauthDeviceCode, oauthPoll, useCursorImport, useOAuthExchange, type DeviceCode, type OAuthStart, type ProviderSummary } from "./api";
 
 // docs/contracts/oauth.md (oauth.dashboard-flow, kept from 9router): the provider's page opens in a popup and returns to
 // /callback, which hands the code back to this window; a remote dashboard pastes the callback URL instead. A device
@@ -30,7 +30,39 @@ function pasted(raw: string): CallbackData {
 }
 
 export function SignIn({ provider, onDone }: { provider: ProviderSummary; onDone: () => void }) {
+  if (provider.signIn === "browser_token" && provider.id === "cursor") return <CursorSignIn onDone={onDone} />;
   return provider.signIn === "device_code" ? <DeviceSignIn provider={provider} onDone={onDone} /> : <BrowserSignIn provider={provider} onDone={onDone} />;
+}
+
+function CursorSignIn({ onDone }: { onDone: () => void }) {
+  const importToken = useCursorImport();
+  const showToast = useToast();
+  const [accessToken, setAccessToken] = useState("");
+  const [machineId, setMachineId] = useState("");
+  const [checking, setChecking] = useState(true);
+  const [notice, setNotice] = useState<string | null>(null);
+  const detect = () => {
+    setChecking(true); setNotice(null);
+    cursorAutoImport().then((result) => {
+      if (result.found && result.accessToken && result.machineId) { setAccessToken(result.accessToken); setMachineId(result.machineId); setNotice("Token and machine ID found in Cursor IDE."); }
+      else setNotice(result.error ?? "Could not read Cursor IDE automatically. Paste the two values below.");
+    }).catch((error: unknown) => showToast({ tone: "error", ...toProblem(error) })).finally(() => setChecking(false));
+  };
+  useEffect(() => { detect(); }, []);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    importToken.mutate({ accessToken: accessToken.trim(), machineId: machineId.trim() }, {
+      onSuccess: () => { showToast({ tone: "success", message: "Imported Cursor IDE token." }); onDone(); },
+      onError: (error) => showToast({ tone: "error", ...toProblem(error) }),
+    });
+  };
+  return <form onSubmit={submit} className="stack">
+    <p className="muted">AIGate reads Cursor's local state database when available. The token is encrypted before it is saved.</p>
+    {checking ? <p className="muted">Reading Cursor IDE…</p> : <>{notice && <Warning tone="warning">{notice}</Warning>}<Button type="button" onClick={detect}>Retry auto-detect</Button></>}
+    <Field label="Access token" hint="Cursor state.vscdb → cursorAuth/accessToken"><textarea className="input" value={accessToken} onChange={(event) => setAccessToken(event.target.value)} rows={3} maxLength={4096} autoComplete="off" /></Field>
+    <Field label="Machine ID" hint="Cursor state.vscdb → storage.serviceMachineId"><input className="input" value={machineId} onChange={(event) => setMachineId(event.target.value)} maxLength={256} autoComplete="off" /></Field>
+    <Button type="submit" variant="primary" disabled={checking || importToken.isPending || !accessToken.trim() || !machineId.trim()}>{importToken.isPending ? "Importing…" : "Import token"}</Button>
+  </form>;
 }
 
 type Session = OAuthStart & { meta: Record<string, string> };

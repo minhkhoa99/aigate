@@ -15,7 +15,7 @@ export interface HttpRequest {
   readonly method: "GET" | "POST";
   readonly url: string;
   readonly headers: Readonly<Record<string, string>>;
-  readonly body?: string;
+  readonly body?: string | Uint8Array;
   // Bounds the whole exchange (headers and body), inside the ctx deadline. Required, so every call
   // site states its budget; 1..600000 ms.
   readonly timeoutMs: number;
@@ -29,10 +29,29 @@ export interface HttpResponse {
   readonly body: ReadableStream<Uint8Array> | null;
 }
 
+// A bounded binary HTTP/2 response (Cursor ConnectRPC). The engine owns the protocol bytes; the server owns Node's
+// HTTP/2 implementation, so the engine stays framework- and runtime-library-free.
+export interface HttpBytesResponse {
+  readonly status: number;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body: Uint8Array;
+}
+
+export interface HttpDuplex {
+  readonly response: Promise<{ readonly status: number; readonly headers: Readonly<Record<string, string>> }>;
+  write(body: Uint8Array): void;
+  end(): void;
+  close(): void;
+  read(): Promise<{ readonly done: boolean; readonly value?: Uint8Array }>;
+}
+
 // Rejects with EngineError TIMEOUT, PROVIDER_UNAVAILABLE (network failure or redirect), or
 // INVALID_REQUEST (URL not allowed). A ctx abort rejects with ctx.signal.reason unchanged.
 export interface HttpTransportPort {
   send(request: HttpRequest, ctx: ExecCtx): Promise<HttpResponse>;
+  // Optional because fetch-only test transports and non-Node deployments can still serve every other adapter.
+  sendHttp2?(request: HttpRequest, ctx: ExecCtx, maxBytes: number): Promise<HttpBytesResponse>;
+  openHttp2?(request: HttpRequest, ctx: ExecCtx): HttpDuplex;
 }
 
 // An API key or an OAuth access token (SP16 keeps both as "api-key").

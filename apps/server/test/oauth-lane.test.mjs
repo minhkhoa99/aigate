@@ -10,6 +10,20 @@ const inSeconds = (s) => new Date(Date.now() + s * 1000).toISOString();
 const hello = (model) => ({ model, messages: [{ role: "user", content: "hi" }] });
 const empty = (status) => () => ({ status, headers: {}, body: new Response("").body });
 
+test("Cursor imports IDE credentials locally and keeps 9router's malformed-input 500", () =>
+  withTempDb(async (file) => {
+    const { app, dash } = await ready(file, fakeUpstream());
+    const payload = Buffer.from(JSON.stringify({ email: "cursor@x.dev" })).toString("base64url");
+    const accessToken = `header.${payload}.${"x".repeat(60)}`;
+    const imported = await dash({ method: "POST", url: "/api/oauth/cursor/import", body: { accessToken, machineId: "12345678-1234-1234-1234-123456789abc" } });
+    assert.deepEqual([imported.statusCode, imported.json().success, imported.json().connection.provider, imported.json().connection.email], [200, true, "cursor", "cursor@x.dev"]);
+    const saved = (await dash({ url: "/api/connections" })).json().find((connection) => connection.provider === "cursor");
+    assert.deepEqual([saved.authType, saved.email, saved.keyHint], ["oauth", "cursor@x.dev", `••••${accessToken.slice(-4)}`]);
+    const malformed = await dash({ method: "POST", url: "/api/oauth/cursor/import", body: { accessToken: "short", machineId: "bad" } });
+    assert.deepEqual([malformed.statusCode, malformed.json().code], [500, "INTERNAL_ERROR"]);
+    await app.close();
+  }));
+
 test("cline: sign in with the callback code, refresh before a request and after a 401", () =>
   withTempDb(async (file) => {
     const upstream = fakeUpstream(

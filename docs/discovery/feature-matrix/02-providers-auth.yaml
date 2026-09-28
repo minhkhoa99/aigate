@@ -788,7 +788,7 @@
   output: "{ found: true, accessToken, machineId } | { found: false, error } | { found: false, windowsManual: true, dbPath }"
   businessRules:
     - "This route makes ZERO network calls to Cursor or any OAuth endpoint — it locates Cursor's own state.vscdb SQLite file (platform-specific candidate paths for darwin/win32/linux) and reads two keys out of its itemTable: cursorAuth/accessToken (or the legacy cursorAuth/token) and one of three machine-id keys — because Cursor has no public OAuth authorize/token endpoint the generic route could call at all"
-    - "Extraction is tried via three strategies in order: better-sqlite3 (bundled native binding) first, then a shell-out to the sqlite3 CLI if the native binding is unavailable, then falls back to `{ found:false, windowsManual:true }` asking the user to paste values manually — the generic route has no equivalent multi-strategy local-file-read fallback chain"
+    - "Extraction is tried via better-sqlite3 first, then a sqlite3 CLI shell-out, then `{ found:false, windowsManual:true, dbPath }`; the first two mechanism choices are implementation accidents, while the manual fallback is the behavior contract"
     - "On Linux specifically, the route additionally verifies Cursor is actually installed (`which cursor` or a .desktop file) before attempting extraction, to avoid treating leftover config from an uninstalled Cursor as a valid source"
   state:
     reads: ["Cursor's local state.vscdb SQLite file (platform-specific path), read-only"]
@@ -798,7 +798,7 @@
   providerInteraction: null
   fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
   errorCases:
-    - { code: INTERNAL_ERROR, when: "no candidate state.vscdb path is readable on this machine", partial: false }
+    - { code: INTERNAL_ERROR, when: "an outer filesystem/runtime error is caught; its raw message is returned in HTTP 500", partial: false }
   sideEffects: []
   persistence: []
   performanceConcerns: []
@@ -811,8 +811,12 @@
     - { file: src/app/api/oauth/cursor/auto-import/route.js, line: 200, note: "Linux-only installed-check before attempting extraction" }
     - { file: src/app/api/oauth/cursor/auto-import/route.js, line: 250, note: "final fallback: found:false, windowsManual:true, asks for manual paste" }
   newModule: connections
-  parityStatus: traced
-  labels: [REFERENCE_BEHAVIOR]
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT, SUSPECTED_BUG]
+  suspicion:
+    expected: "A local filesystem failure returns a stable, non-sensitive explanation"
+    actual: "The outer catch returns error.message directly in a 500 response"
+    impact: "A runtime error can expose local implementation details to the authenticated dashboard"
 
 - id: oauth.cursor-import
   group: OAuth providers
@@ -822,7 +826,7 @@
   input: "{ accessToken, machineId }"
   output: "{ success, connection: { id, provider, email } }"
   businessRules:
-    - "machineId is a required, separate credential component alongside accessToken — Cursor's API validates the pair together (CursorService.validateImportToken makes the actual upstream API call to confirm the token is live), unlike a normal OAuth exchange where only the token/code matters"
+    - "machineId is a required, separate credential component alongside accessToken; CursorService validates only locally (token length at least 50 and UUID-like machine id), makes no upstream call, then real requests validate the pair"
     - "refreshToken is explicitly stored as null with the comment \"Cursor doesn't have public refresh endpoint\" — this connection can never be silently refreshed by any of the auth.refresh-* mechanisms; expiresAt is set from the validated token's own expiresIn"
     - "GET on the same route (no body) returns static instructions + a requiredFields schema for the dashboard's manual-entry form — the generic route has no equivalent self-describing GET for a specific credential-pair form"
   state:
@@ -830,11 +834,10 @@
     writes: ["providerConnections table (new row)"]
     runtimeOnly: []
   dependencies: []
-  providerInteraction: "CursorService.validateImportToken calls Cursor's own API to confirm the token/machineId pair is valid before persisting"
+  providerInteraction: "None during import; Cursor validates the pair only when a later chat, model-list, or connection-test request reaches its API"
   fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
   errorCases:
-    - { code: INVALID_REQUEST, when: "accessToken or machineId missing/not a string", partial: false }
-    - { code: AUTH_ERROR, when: "CursorService.validateImportToken rejects the pair", partial: false }
+    - { code: INTERNAL_ERROR, when: "accessToken or machineId is missing, malformed, or rejected by local format checks; route catches it and returns HTTP 500 with error.message", partial: false }
   sideEffects: []
   persistence: ["providerConnections row: authType oauth, provider cursor, refreshToken: null"]
   performanceConcerns: []
@@ -842,12 +845,16 @@
   edgeCases:
     - "providerSpecificData.provider is literally set to the string \"Imported\" (authMethod: \"imported\") — a display-label marker distinguishing this path from a hypothetical direct-OAuth cursor connection, even though no direct-OAuth cursor flow exists elsewhere in this inventory"
   evidence:
-    - { file: src/app/api/oauth/cursor/import/route.js, line: 34, note: "CursorService.validateImportToken(accessToken, machineId) — the live upstream check" }
+    - { file: src/lib/oauth/services/cursor.js, line: 97, note: "validateImportToken only checks length and UUID-like format; comment says no upstream validation" }
     - { file: src/app/api/oauth/cursor/import/route.js, line: 47, note: "refreshToken: null, comment: Cursor doesn't have public refresh endpoint" }
     - { file: src/app/api/oauth/cursor/import/route.js, line: 77, note: "GET — static instructions + requiredFields for the manual-entry form" }
   newModule: connections
-  parityStatus: traced
-  labels: [REFERENCE_BEHAVIOR]
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A malformed credential pair is an INVALID_REQUEST response"
+    actual: "The route throws inside its broad catch and returns HTTP 500 with the local validation message"
+    impact: "The dashboard describes operator input as a server failure"
 
 - id: oauth.gitlab-pat
   group: API-key providers

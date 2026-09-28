@@ -771,6 +771,9 @@ const antigravity = googleSignIn("antigravity", "Antigravity", ANTIGRAVITY_SCOPE
   return { ...(email ? { email } : {}), ...(projectId ? { projectId } : {}) };
 });
 
+// provider.cursor-protobuf: Cursor exposes no public authorize or refresh endpoint; the dashboard imports its local IDE token.
+const cursor: OAuthProvider = { flow: "browser_token", background: false };
+
 async function onboardAntigravity(token: string, tierId: string, transport: HttpTransportPort): Promise<void> {
   const ctx = { signal: AbortSignal.timeout(60_000), requestId: crypto.randomUUID() };
   const headers = { authorization: `Bearer ${token}`, "content-type": "application/json", "user-agent": "antigravity/ide/2.11.0 darwin/arm64", "x-request-source": "local" };
@@ -782,7 +785,7 @@ async function onboardAntigravity(token: string, tierId: string, transport: Http
 
 export const OAUTH_PROVIDERS: Readonly<Record<string, OAuthProvider>> = {
   cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi, claude, codex, github, "gemini-cli": geminiCli, antigravity,
-  "grok-cli": grokCli, kimi, "codebuddy-cn": codeBuddy("codebuddy-cn"), "codebuddy-intl": codeBuddy("codebuddy-intl"), iflow,
+  "grok-cli": grokCli, kimi, "codebuddy-cn": codeBuddy("codebuddy-cn"), "codebuddy-intl": codeBuddy("codebuddy-intl"), iflow, cursor,
 };
 
 // Cline OAuth access tokens are WorkOS JWTs sent as "workos:<jwt>"; a ClinePass API key (not a JWT) goes as is.

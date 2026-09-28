@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { access, constants } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
-  BadRequestException, Body, ConflictException, Controller, Get, Header, HttpCode, HttpException, HttpStatus, Inject, Param, Post, Query,
+  BadRequestException, Body, ConflictException, Controller, Get, Header, HttpCode, HttpException, HttpStatus, Inject, InternalServerErrorException, Param, Post, Query,
 } from "@nestjs/common";
 import { builtinRegistry, EngineError, generatePkce, OAUTH_PROVIDERS, type HttpTransportPort, type OAuthProvider, type OAuthTokens, type ProviderDescriptor } from "@aigate/engine";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
@@ -39,6 +42,8 @@ export class OAuthController {
   @Get(":provider/:action")
   @Header("Cache-Control", "no-store")
   async start(@Param("provider") id: string, @Param("action") action: string, @Query() query: unknown) {
+    if (id === "cursor" && action === "auto-import") return this.cursorAutoImport();
+    if (id === "cursor" && action === "import") return this.cursorInstructions();
     const { flow } = this.provider(id);
     if (action === "authorize") {
       const params = strings(query);
@@ -74,6 +79,7 @@ export class OAuthController {
     const { descriptor, flow } = this.provider(id);
     if (typeof body !== "object" || body === null) throw invalid("The request body must be a JSON object");
     const fields = strings(body);
+    if (id === "cursor" && action === "import") return this.cursorImport(descriptor, fields);
     if (action === "exchange") {
       const { code, redirectUri, codeVerifier } = fields;
       if (!code || !redirectUri || (!codeVerifier && !NO_PKCE.has(descriptor.id)) || !flow.exchange) throw invalid("Missing required fields: code, redirectUri, codeVerifier");
@@ -103,6 +109,82 @@ export class OAuthController {
     const flow = descriptor ? OAUTH_PROVIDERS[descriptor.id] : undefined;
     if (!descriptor || !flow) throw new BadRequestException({ code: "PROVIDER_NOT_SUPPORTED", message: `${id} does not support signing in from AIGate.` });
     return { descriptor, flow };
+  }
+
+  // provider.cursor-protobuf: fixed local Cursor state locations. The native SQLite reader replaces 9router's bundled
+  // dependency/CLI fallback; a missing or unreadable database still leaves manual paste available.
+  private async cursorAutoImport(): Promise<{ found: true; accessToken: string; machineId: string } | { found: false; error?: string; windowsManual?: true; dbPath?: string }> {
+    const home = homedir();
+    const appData = process.env.APPDATA || join(home, "AppData", "Roaming");
+    const localAppData = process.env.LOCALAPPDATA || join(home, "AppData", "Local");
+    const candidates = process.platform === "darwin"
+      ? [join(home, "Library", "Application Support", "Cursor", "User", "globalStorage", "state.vscdb"), join(home, "Library", "Application Support", "Cursor - Insiders", "User", "globalStorage", "state.vscdb")]
+      : process.platform === "win32"
+        ? [join(appData, "Cursor", "User", "globalStorage", "state.vscdb"), join(appData, "Cursor - Insiders", "User", "globalStorage", "state.vscdb"), join(localAppData, "Cursor", "User", "globalStorage", "state.vscdb"), join(localAppData, "Programs", "Cursor", "User", "globalStorage", "state.vscdb")]
+        : [join(home, ".config", "Cursor", "User", "globalStorage", "state.vscdb"), join(home, ".config", "cursor", "User", "globalStorage", "state.vscdb")];
+    const dbPath = await this.firstReadable(candidates);
+    if (!dbPath) return { found: false, error: `Cursor database not found. Checked locations:\n${candidates.join("\n")}\n\nMake sure Cursor IDE is installed and opened at least once.` };
+    try {
+      const { DatabaseSync } = await import("node:sqlite");
+      const db = new DatabaseSync(dbPath, { readOnly: true });
+      try {
+        const query = (keys: readonly string[]) => keys.map((key) => db.prepare("SELECT value FROM itemTable WHERE key=? LIMIT 1").get(key)?.value).find((value): value is string => typeof value === "string" && value !== "") ?? "";
+        const accessToken = this.cursorValue(query(["cursorAuth/accessToken", "cursorAuth/token"]));
+        const machineId = this.cursorValue(query(["storage.serviceMachineId", "storage.machineId", "telemetry.machineId"]));
+        if (accessToken && machineId) return { found: true, accessToken, machineId };
+      } finally { db.close(); }
+    } catch {
+      // 9router's final manual path; its better-sqlite3 and sqlite3 CLI mechanics are intentionally not carried over.
+    }
+    return { found: false, windowsManual: true, dbPath };
+  }
+
+  private async firstReadable(paths: readonly string[]): Promise<string | undefined> {
+    for (const path of paths) if (await access(path, constants.R_OK).then(() => true, () => false)) return path;
+    return undefined;
+  }
+
+  private cursorValue(value: string): string {
+    try { const parsed: unknown = JSON.parse(value); return typeof parsed === "string" ? parsed : value; } catch { return value; }
+  }
+
+  private cursorInstructions() {
+    return {
+      provider: "cursor", method: "import_token",
+      requiredFields: [
+        { name: "accessToken", label: "Access token", description: "cursorAuth/accessToken in Cursor state.vscdb", type: "textarea" },
+        { name: "machineId", label: "Machine ID", description: "storage.serviceMachineId in Cursor state.vscdb", type: "text" },
+      ],
+    };
+  }
+
+  private async cursorImport(descriptor: ProviderDescriptor, fields: Record<string, string>) {
+    try {
+      const accessToken = fields.accessToken?.trim();
+      const machineId = fields.machineId?.trim();
+      if (!accessToken) throw new Error("Access token is required");
+      if (!machineId) throw new Error("Machine ID is required");
+      if (accessToken.length < 50 || /[\r\n]/.test(accessToken)) throw new Error("Invalid token format. Token appears too short.");
+      if (!/^[a-f0-9-]{32,}$/i.test(machineId.replace(/-/g, ""))) throw new Error("Invalid machine ID format. Expected UUID format.");
+      const email = this.cursorJwtEmail(accessToken);
+      const saved = await this.save(descriptor, { accessToken, expiresIn: 86_400, ...(email ? { email } : {}), data: { machineId, authMethod: "imported", provider: "Imported" } });
+      return { success: true, connection: { id: saved.id, provider: saved.provider, email: saved.email } };
+    } catch (error) {
+      // SUSPECTED_BUG, kept: 9router's broad handler turns bad operator input into HTTP 500.
+      const message = error instanceof Error ? error.message : "Cursor token import failed";
+      throw new InternalServerErrorException({ code: "INTERNAL_ERROR", message });
+    }
+  }
+
+  private cursorJwtEmail(token: string): string | undefined {
+    try {
+      const part = token.split(".")[1];
+      if (!part) return undefined;
+      const parsed: unknown = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
+      if (typeof parsed !== "object" || parsed === null) return undefined;
+      const email = Reflect.get(parsed, "email"); const sub = Reflect.get(parsed, "sub");
+      return typeof email === "string" ? email : typeof sub === "string" ? sub : undefined;
+    } catch { return undefined; }
   }
 
   private io() {

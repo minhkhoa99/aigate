@@ -1,6 +1,6 @@
-# OAuth sign-in contract (M2 SP16, SP16b, SP16b2, SP16c, SP16c2, SP16d)
+# OAuth sign-in contract (M2 SP16, SP16b, SP16b2, SP16c, SP16c2, SP16d, Cursor)
 
-Scope, per spec §9 (SP16, OAuth providers): the OAuth core (sign-in flow, token storage, refresh) and the providers the existing adapters can serve: **cline, clinepass, gitlab, kilocode, kimchi**; SP16b adds **claude** and **codex**, SP16b2 **github** (Copilot), SP16c **gemini-cli**, SP16c2 **antigravity**, SP16d **grok-cli, kimi, codebuddy-cn, codebuddy-intl, iflow**. Later cursor, kiro, trae; qoder is not ported (SP14f).
+Scope, per spec §9 (SP16, OAuth providers): the OAuth core (sign-in flow, token storage, refresh) and the providers the existing adapters can serve: **cline, clinepass, gitlab, kilocode, kimchi**; SP16b adds **claude** and **codex**, SP16b2 **github** (Copilot), SP16c **gemini-cli**, SP16c2 **antigravity**, SP16d **grok-cli, kimi, codebuddy-cn, codebuddy-intl, iflow**, and Cursor adds **cursor**. Later kiro, trae; qoder is not ported (SP14f).
 
 **User decisions (2026-09-27).** Scope as above. Keep 9router's official-client headers for OAuth providers (the user accepts the terms-of-service risk); cline's headers name AIGate, as ClinePass's do since SP14g, because 9router names itself there. A fixed-port callback (codex, later) is finished by pasting the callback URL, with no extra listener. Kept from 9router, on the second ask: state and the PKCE verifier live in the browser and are sent back unchecked (gitlab's secret travels in the authorize query); refresh as 9router (proactive single-flight, reactive three attempts without the lock, even for connections that cannot refresh, and the 5-minute background loop), which overrides the spec's "single-flight on every path"; ClinePass offers the Cline sign-in although its API rejects those tokens (#2333); GitLab Duo is ported with its OpenAI-body chat to gitlab.com and no refresh.
 
@@ -13,6 +13,8 @@ Scope, per spec §9 (SP16, OAuth providers): the OAuth core (sign-in flow, token
 **SP16c2 (2026-09-28), same rule.** Antigravity uses the IDE OAuth client from `.env`, local request-source headers, the daily Cloud Code host, the sandbox model list, an in-memory per-connection numeric session, the model-level suffix, Claude/Gemini envelope rules, image non-streaming, and bounded 429/5xx retries. The traced `cloakTools` path is dead and is not ported.
 
 **SP16d (2026-09-28), same rule.** Grok CLI uses xAI device code without PKCE and the Responses executor's bounded session/request metadata. Kimi keeps the device id in provider data and sends Kimi's `X-Msh-*` headers. CodeBuddy keeps its browser state polling and CN/Intl header split. iFlow requires `AIGATE_IFLOW_OAUTH_CLIENT_SECRET`, stores the minted API key as the routing key, and signs each request with Web Crypto HMAC-SHA256. All four use the existing dashboard flow and error mapping.
+
+**Cursor (2026-09-28), same rule.** Cursor has no public OAuth authorization or refresh endpoint. The dashboard reads Cursor IDE's local read-only SQLite state database when possible, then imports the separate access token and machine id as a 24-hour OAuth connection. The HTTP/2 ConnectRPC adapter uses Cursor's IDE headers/checksum, AgentService for text-only requests, legacy ChatService for media, and a five-minute, connection-keyed model cache capped at 100 entries. Kept suspected behavior: malformed import input is returned as `INTERNAL_ERROR` HTTP 500.
 
 ## Matrix entries
 

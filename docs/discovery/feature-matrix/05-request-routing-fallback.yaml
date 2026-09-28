@@ -1665,9 +1665,48 @@
     - { file: open-sse/config/providerModels.js, line: 79, note: "getModelUpstreamId strips then re-appends a trailing suffix for thinking normalization" }
     - { file: open-sse/translator/concerns/thinkingUnified.js, line: 32, note: "parseSuffix makes a suffix override win over request intent and stripThinkingSuffix removes it before upstream" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG, IMPLEMENTATION_ACCIDENT]
   suspicion:
     expected: "A literal catalog model id ending in parentheses remains addressable unless its suffix is a known thinking override"
     actual: "The reference removes every trailing parenthesized value before lookup, including an unknown value"
     impact: "A future provider model named like foo(beta) can resolve as foo or fail instead of reaching its literal id"
+
+- id: provider.cursor-protobuf
+  group: Request routing
+  feature: Cursor IDE provider transport
+  subFeature: "Cursor's authenticated ConnectRPC chat, model catalogue, and AgentService request paths"
+  trigger: "A routed /v1 request or model import uses a connected Cursor credential"
+  input: "Cursor access token, machineId, model, canonical messages and optional tools"
+  output: "OpenAI-compatible completion or SSE; account-specific model ids"
+  businessRules:
+    - "Every upstream request sends a per-request Cursor checksum plus the IDE identity headers derived from the access token and required machineId; no public token refresh exists"
+    - "The legacy ChatService sends a length-prefixed ConnectRPC protobuf request to api2.cursor.sh and decodes protobuf text, thinking, and tool-call frames into OpenAI output; non-200 answers are surfaced before decoding"
+    - "Text-only requests, including declared tools and tool history, take AgentService Run at agent.api5.cursor.sh instead; it is an HTTP/2 bidirectional session whose server IDE-tool requests are answered with bounded local protocol responses or an explicit unsupported-tool error"
+    - "GetUsableModels is a bounded HTTP/2 unary protobuf request; a failed or empty live result falls back to the static Cursor catalog"
+  state:
+    reads: ["provider_connections sealed access token", "provider_connections oauth_data.machineId"]
+    writes: []
+    runtimeOnly: ["request UUIDs and Cursor checksum"]
+  dependencies: ["oauth.cursor-import", "catalog.provider-models-live-fetch", "routing.streaming-pipeline"]
+  providerInteraction: "POST api2.cursor.sh/aiserver.v1.ChatService/StreamUnifiedChatWithTools or agent.api5.cursor.sh/agent.v1.AgentService/Run; POST agent.api5.cursor.sh/agent.v1.AgentService/GetUsableModels"
+  fallback: { hasFallback: true, retry: null, timeout: "request deadline; reference adds 60 s HTTP/2 guards", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "the routed credential has no machineId", partial: false }
+    - { code: AUTH_ERROR, when: "Cursor rejects the access token or checksum", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "the bounded HTTP/2 session or ConnectRPC response fails", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["HTTP/2 response bytes and protobuf frames must remain bounded by the route deadline", "model cache must have a TTL and key derived without retaining the raw token"]
+  behavior: { streaming: true, cancellation: "abort closes the active HTTP/2 request/session", concurrency: "one request session per routed call" }
+  edgeCases:
+    - "Image parts use the legacy ChatService; AgentService is selected only for text-only request content"
+    - "Composer response thinking after </think> is exposed as visible content"
+  evidence:
+    - { file: open-sse/executors/cursor.js, line: 80, note: "isAgentCapableRequest selects AgentService for text-only content" }
+    - { file: open-sse/executors/cursor.js, line: 346, note: "CursorExecutor requires machineId and builds Cursor headers" }
+    - { file: open-sse/executors/cursor.js, line: 841, note: "legacy execute chooses HTTP/2 when no proxy and transforms protobuf to OpenAI output" }
+    - { file: open-sse/services/cursorModels.js, line: 161, note: "GetUsableModels has a five-minute credential-keyed cache and returns null for static fallback" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]
