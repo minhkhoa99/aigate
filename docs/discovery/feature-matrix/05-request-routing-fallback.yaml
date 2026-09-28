@@ -1588,3 +1588,45 @@
     expected: "A non-streaming client receives the model answer: text, reasoning, tool calls, usage, and the finish reason"
     actual: "The client receives an empty assistant message with finish_reason stop"
     impact: "Every non-streaming request to a Responses provider silently loses its answer"
+
+- id: routing.provider-thinking-default
+  group: Request routing
+  feature: Per-provider default thinking level
+  subFeature: "settings.providerThinking[provider]: a level picked on the provider page is sent as the request's reasoning when the client sends none"
+  trigger: "The Thinking picker on a provider's page; every chat request routed to that provider"
+  input: "Provider id and a level (auto, or one of the levels its reasoning models accept)"
+  output: "The stored level; requests without their own thinking carry it"
+  businessRules:
+    - "The picker appears on a provider's page when at least one of its models (catalog or custom) accepts thinking; its options are auto followed by the union of those models' levels (thinkingLevels.js: openai none, minimal, low, medium, high, xhigh; claude-budget none, low, medium, high, xhigh, max; claude-adaptive and kimi none, low, medium, high, max; gemini-level minimal, low, medium, high; gemini-budget, qwen, hunyuan, step none, low, medium, high; commandcode none..max; model patterns override, e.g. *codex* low, medium, high, xhigh)"
+    - "Choosing a level saves settings.providerThinking[provider] = { mode: level } through PATCH /api/settings; auto deletes the entry"
+    - "On each chat request, when a mode other than auto is stored and the client body has no reasoning_effort, reasoning_effort = mode is added to the body before translation (modes on and off, which the picker never offers, set thinking { type: enabled, budget_tokens: 10000 } or { type: disabled } when the body has no thinking)"
+    - "The level is then applied in the target's own format (thinkingUnified): OpenAI reasoning_effort (max and ultra become xhigh unless the model lists them), a Claude budget (low 1024, medium 8192, high 24576, xhigh 32768, max 128000), a Gemini thinkingLevel or thinkingBudget; a model without reasoning has every thinking field stripped"
+    - "The picked level also adds a (level) suffix to model names copied from the provider page, for models that accept it"
+  state:
+    reads: ["settings.providerThinking"]
+    writes: ["settings.providerThinking on a picker change"]
+    runtimeOnly: []
+  dependencies: ["routing.credential-preparation", "translator.pivot-loss"]
+  providerInteraction: "None directly; it changes the thinking fields of the upstream request"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["settings.providerThinking"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A save failure is only logged in the browser console"
+  evidence:
+    - { file: open-sse/handlers/chatCore.js, line: 105, note: "provider-level thinking injected only when the client has not set it" }
+    - { file: src/sse/handlers/chat.js, line: 267, note: "providerThinking read from settings per request" }
+    - { file: "src/app/(dashboard)/dashboard/providers/[id]/page.js", line: 186, note: "picker levels: auto plus the union of the provider's model levels" }
+    - { file: "src/app/(dashboard)/dashboard/providers/[id]/page.js", line: 419, note: "saveThinkingConfig: auto deletes the entry" }
+    - { file: open-sse/providers/thinkingLevels.js, line: 19, note: "FORMAT_LEVELS and model pattern overrides" }
+    - { file: open-sse/translator/concerns/thinkingUnified.js, line: 373, note: "applyThinking strips thinking for a model without reasoning" }
+  newModule: catalog
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Only a request that carries no thinking of its own gets the provider level"
+    actual: "Only reasoning_effort is checked: a Claude client's thinking budget or a Responses client's reasoning.effort is overridden by the injected level, which the translator reads first"
+    impact: "A client that asked for a specific budget or effort silently gets the provider default instead"

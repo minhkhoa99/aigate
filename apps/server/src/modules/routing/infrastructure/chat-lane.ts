@@ -8,12 +8,13 @@ import {
   estimateAnthropicInputTokens, geminiModelList, GeminiStreamEncoder, geminiTtsRequest, isGeminiTtsRequest, OpenAIChatStreamEncoder,
   parseAnthropicMessagesRequest, parseGeminiGenerateRequest, parseGeminiPath, parseOpenAIChatRequest, parseOpenAIResponsesRequest,
   responsesClientGetsObject, responsesRequestFor, ResponsesStreamEncoder, toAnthropicMessage, toGeminiResponse, toOpenAIChatCompletion, toOpenAIError,
-  toResponsesObject, UnsupportedFeatureError, withClaudeCodePrompt, withConnection, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential,
+  toResponsesObject, UnsupportedFeatureError, withClaudeCodePrompt, withConnection, withThinking, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential,
   type ExecCtx, type GeminiRoute, type HttpTransportPort, type OpenAIError, type ProviderDescriptor, type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { extractApiKey } from "../../apikeys/domain/api-key.js";
 import { CustomModelsRepository } from "../../catalog/infrastructure/custom-models.repo.js";
+import { ProviderThinkingRepository } from "../../catalog/infrastructure/provider-thinking.repo.js";
 import { ApiKeysRepository } from "../../apikeys/infrastructure/api-keys.repo.js";
 import { ConnectionsRepository, type StoredCredential } from "../../connections/infrastructure/connections.repo.js";
 import { TokenRefresher } from "../../connections/infrastructure/token-refresher.js";
@@ -211,6 +212,7 @@ export class ChatLane {
     private readonly connections: ConnectionsRepository,
     private readonly nodes: ProviderNodesRepository,
     private readonly customModels: CustomModelsRepository,
+    private readonly thinking: ProviderThinkingRepository,
     private readonly refresher: TokenRefresher,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
     @Inject(CHAT_LIMITS) private readonly limits: ChatLimits,
@@ -293,7 +295,7 @@ export class ChatLane {
       const accept = request.headers.accept;
       const parsed = protocol.parse(request.body, typeof accept === "string" ? accept : undefined);
       const resolved = await this.resolve(parsed.request);
-      const prepared = parsed.prepare(resolved.request, resolved.provider);
+      const prepared = await this.thought(parsed.prepare(resolved.request, resolved.provider), resolved.provider);
       // provider.claude-oauth (kept from 9router): a non-Claude client's request to claude gets the Claude Code prompt.
       const target = { ...resolved, request: protocol === ANTHROPIC_MESSAGES ? prepared : claudeCodePrompt(prepared, resolved.provider) };
       const adapter = createAdapter(target.provider, this.transport);
@@ -351,7 +353,7 @@ export class ChatLane {
       // max_tokens 1024: reasoning models spend the budget thinking before they answer (9router #3010).
       const { request } = parseOpenAIChatRequest({ model, max_tokens: 1024, stream: false, messages: [{ role: "user", content: "hi" }] });
       const resolved = await this.resolve(request);
-      const target = { ...resolved, request: claudeCodePrompt(resolved.request, resolved.provider) };
+      const target = { ...resolved, request: claudeCodePrompt(await this.thought(resolved.request, resolved.provider), resolved.provider) };
       const adapter = createAdapter(target.provider, this.transport);
       const response = await this.withRefresh(target, (credential) => adapter.execute(target.request, credential, { signal: budget.signal, requestId }), () => true);
       const answered = response.content.some((part) => part.type === "text" && part.text.trim() !== "");
@@ -366,6 +368,12 @@ export class ChatLane {
     } finally {
       budget.clear();
     }
+  }
+
+  // routing.provider-thinking-default: the provider's stored level, for a request that carries no thinking of its own.
+  private async thought(request: CanonicalRequest, provider: ProviderDescriptor): Promise<CanonicalRequest> {
+    const level = await this.thinking.get(provider.id);
+    return level ? withThinking(request, provider, level) : request;
   }
 
   // oauth.refresh-lifecycle (9router, kept): a 401/403 before the first byte refreshes the connection's token, for every

@@ -58,9 +58,14 @@ export interface ProviderModel {
   maxOutputTokens: number | null;
 }
 
+// docs/contracts/provider-thinking.md: the level sent when a request carries no thinking of its own.
+export type ThinkingLevel = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+export interface ThinkingView { level: ThinkingLevel | "auto"; levels: ThinkingLevel[] | null }
+
 export interface ProviderDetailView extends ProviderSummary {
   chatUrl: string | null;
   models: ProviderModel[];
+  thinking: ThinkingView;
 }
 
 // The server allows 20 s for a test (the provider has 15 s); the client waits a little longer.
@@ -72,6 +77,17 @@ export const useConnections = () => useQuery({ queryKey: connectionsKey, queryFn
 export const useProviders = () => useQuery({ queryKey: ["providers"], queryFn: () => api<ProviderSummary[]>("/api/providers"), staleTime: Infinity });
 export const useProvider = (id: string, enabled = true) =>
   useQuery({ queryKey: ["providers", id], queryFn: () => api<ProviderDetailView>(`/api/providers/${encodeURIComponent(id)}`), staleTime: Infinity, enabled });
+
+// The detail is cached forever, so a saved level is written into it; a failure reads the server's value again.
+export function useSetThinking(id: string) {
+  const client = useQueryClient();
+  const key = ["providers", id];
+  return useMutation({
+    mutationFn: (level: ThinkingLevel | "auto") => api<ThinkingView>(`/api/providers/${encodeURIComponent(id)}/thinking`, { method: "PUT", body: { level } }),
+    onSuccess: (thinking) => client.setQueryData<ProviderDetailView>(key, (detail) => (detail ? { ...detail, thinking } : detail)),
+    onError: () => client.invalidateQueries({ queryKey: key, exact: true }),
+  });
+}
 
 function useConnectionMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
   const client = useQueryClient();

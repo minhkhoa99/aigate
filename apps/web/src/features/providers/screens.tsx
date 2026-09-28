@@ -7,8 +7,8 @@ import { mediaGroups } from "./catalog";
 import { CustomProviderDetail, CustomProviderForm, CustomProviders } from "./custom";
 import { ProviderModels } from "./models";
 import {
-  useConnections, useCreateConnection, useDeleteConnection, useProvider, useProviderNodes, useProviders, useTestConnection, useUpdateConnection, type Connection, type ConnectionField,
-  type ProviderDetailView,
+  useConnections, useCreateConnection, useDeleteConnection, useProvider, useProviderNodes, useProviders, useSetThinking, useTestConnection, useUpdateConnection, type Connection,
+  type ConnectionField, type ProviderDetailView, type ThinkingLevel,
 } from "./api";
 import { describeTest, needsAttention, statusPill } from "./test-result";
 import { SignIn } from "./sign-in";
@@ -74,6 +74,28 @@ function ProviderConnection({ provider }: { provider: ProviderDetailView }) {
   return <div className="list-row"><div><strong>{connection.name}</strong><small>{connection.authType === "oauth" ? <>Signed in{connection.email && <> as <code>{connection.email}</code></>}</> : <>Key <code>{connection.keyHint}</code></>} · {connection.lastTestedAt ? `tested ${new Date(connection.lastTestedAt).toLocaleString()}` : "not tested yet"}</small></div><Pill tone={pill.tone}>{pill.label}</Pill><a className="button" href="/providers/connections">Manage</a></div>;
 }
 
+// docs/contracts/provider-thinking.md (routing.provider-thinking-default, kept from 9router): the level a request gets when
+// it asks for no thinking itself; only for a model that reasons, and never over the client's own effort or budget.
+const levelLabel = (level: string) => (level === "xhigh" ? "Extra high" : level.charAt(0).toUpperCase() + level.slice(1));
+
+function ProviderThinking({ provider }: { provider: ProviderDetailView }) {
+  const save = useSetThinking(provider.id);
+  const showToast = useToast();
+  const { level, levels } = provider.thinking;
+  if (!levels) return null;
+  const change = (next: ThinkingLevel | "auto") => save.mutate(next, {
+    onSuccess: () => showToast({ tone: "success", message: next === "auto" ? `${provider.name} leaves thinking to each request.` : `${provider.name} thinks at ${levelLabel(next)} unless a request asks otherwise.` }),
+    onError: (error) => showToast({ tone: "error", ...toProblem(error) }),
+  });
+  return <Panel title="Thinking" detail="The reasoning level sent to this provider when a request asks for none. A request that sets its own effort or budget keeps it; models that do not reason are left alone." className="section-gap">
+    <Field label="Default thinking level" hint="Auto sends nothing, so the model uses its own default. The levels are those this provider's API family takes.">
+      <select className="input" value={level} disabled={save.isPending} onChange={(event) => { const value = event.target.value; const next = value === "auto" ? "auto" : levels.find((item) => item === value); if (next) change(next); }}>
+        <option value="auto">Auto</option>
+        {levels.map((item) => <option key={item} value={item}>{levelLabel(item)}</option>)}
+      </select></Field>
+  </Panel>;
+}
+
 function CatalogProvider({ providerId }: { providerId: string }) {
   // A custom provider has its own detail page (docs/contracts/custom-models.md); the catalog is asked only otherwise.
   const nodes = useProviderNodes();
@@ -91,6 +113,7 @@ function CatalogProvider({ providerId }: { providerId: string }) {
   const group = groupOf(provider.category);
   return <><PageHeading eyebrow={`Providers / ${group.title}`} title={provider.name} description="Connection status, credentials, and the models this provider offers." />
     <div className="grid grid-2"><Panel title="Provider type"><Pill tone="info">{group.title}</Pill><p className="muted">Built-in catalog entry · ID <code>{provider.id}</code></p>{provider.chatUrl && <p className="muted" style={{ overflowWrap: "anywhere" }}>Endpoint <code>{provider.chatUrl}</code></p>}</Panel><Panel title="Connection"><ProviderConnection provider={provider} /></Panel></div>
+    <ProviderThinking provider={provider} />
     <ProviderModels providerId={provider.id} prefix={provider.id} catalog={provider.models} />
   </>;
 }

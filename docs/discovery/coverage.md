@@ -1,6 +1,6 @@
 # Discovery coverage
 
-Entries: 333
+Entries: 334
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
@@ -15,7 +15,7 @@ Entries: 333
 ## Entries per bounded context
 
 - apikeys: 9
-- catalog: 31
+- catalog: 32
 - connections: 67
 - identity: 11
 - media: 15
@@ -28,8 +28,8 @@ Entries: 333
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 18
-- REFERENCE_BEHAVIOR: 285
-- SUSPECTED_BUG: 77
+- REFERENCE_BEHAVIOR: 286
+- SUSPECTED_BUG: 78
 
 ## Missing — pages
 
