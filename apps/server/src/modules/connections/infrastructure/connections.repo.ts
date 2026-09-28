@@ -62,10 +62,13 @@ export interface OAuthState {
   // SP16b: codex refreshes a token whose last refresh is 8 days old (9router maxRefreshAgeMs).
   lastRefreshAt: Date | null;
 }
-// The key (or access token) routing and the connection test use, with the row it came from.
-export type StoredCredential = { id: string; apiKey: string; oauth?: OAuthState } & ConnectionData;
+// The key (or access token) routing and the connection test use, with the row it came from. SP16c: projectId is the
+// Google Cloud Code project a gemini-cli sign-in found.
+export type StoredCredential = { id: string; apiKey: string; oauth?: OAuthState; projectId?: string } & ConnectionData;
 
-const secret = { id: t.id, sealed: t.apiKeySealed, authType: t.authType, refreshSealed: t.refreshTokenSealed, expiresAt: t.expiresAt, lastRefreshAt: t.lastRefreshAt, ...data };
+const secret = {
+  id: t.id, sealed: t.apiKeySealed, authType: t.authType, refreshSealed: t.refreshTokenSealed, expiresAt: t.expiresAt, lastRefreshAt: t.lastRefreshAt, oauthData: t.oauthData, ...data,
+};
 
 const toView = (row: Row): ConnectionView => ({
   ...row,
@@ -76,12 +79,13 @@ const toView = (row: Row): ConnectionView => ({
   updatedAt: row.updatedAt.toISOString(),
 });
 
-const storedUsername = (raw: string | null): string | undefined => {
+// One string of the sign-in data (oauth_data JSON).
+const oauthField = (raw: string | null, field: string): string | undefined => {
   if (!raw) return undefined;
   try {
     const parsed: unknown = JSON.parse(raw);
-    const name = typeof parsed === "object" && parsed !== null && "username" in parsed ? parsed.username : undefined;
-    return typeof name === "string" && name ? name : undefined;
+    const value = typeof parsed === "object" && parsed !== null ? Reflect.get(parsed, field) : undefined;
+    return typeof value === "string" && value ? value : undefined;
   } catch {
     return undefined;
   }
@@ -92,7 +96,7 @@ const storedUsername = (raw: string | null): string | undefined => {
 function sameAccount(existing: { authType: AuthType; email: string | null; oauthData: string | null }, tokens: OAuthTokens): boolean {
   if (existing.authType !== "oauth" || !tokens.email || existing.email !== tokens.email) return false;
   const incoming = tokens.data.username;
-  const stored = storedUsername(existing.oauthData);
+  const stored = oauthField(existing.oauthData, "username");
   if (incoming && stored) return incoming === stored;
   return !incoming && !stored;
 }
@@ -213,10 +217,13 @@ export class ConnectionsRepository {
     return row ? toView(row) : this.get(id);
   }
 
-  private open(row: { id: string; sealed: string; authType: AuthType; refreshSealed: string | null; expiresAt: Date | null; lastRefreshAt: Date | null } & ConnectionData): StoredCredential {
-    const { id, sealed, authType, refreshSealed, expiresAt, lastRefreshAt, ...rest } = row;
+  private open(row: {
+    id: string; sealed: string; authType: AuthType; refreshSealed: string | null; expiresAt: Date | null; lastRefreshAt: Date | null; oauthData: string | null;
+  } & ConnectionData): StoredCredential {
+    const { id, sealed, authType, refreshSealed, expiresAt, lastRefreshAt, oauthData, ...rest } = row;
     const refreshToken = refreshSealed ? this.cipher.open(refreshSealed, refreshContext(id)) : undefined;
     const oauth = authType === "oauth" ? { oauth: { refreshToken, expiresAt, lastRefreshAt } } : {};
-    return { id, apiKey: this.cipher.open(sealed, sealContext(id)), ...oauth, ...rest };
+    const projectId = oauthField(oauthData, "projectId");
+    return { id, apiKey: this.cipher.open(sealed, sealContext(id)), ...oauth, ...(projectId ? { projectId } : {}), ...rest };
   }
 }

@@ -48,7 +48,13 @@ export class OAuthController {
       const meta = Object.fromEntries(Object.entries(params).filter(([key]) => key !== "redirect_uri"));
       const pkce = await generatePkce();
       // A device flow has no URL up front (it has no authUrl).
-      const authUrl = flow.authUrl?.(redirectUri, pkce.state, pkce.codeChallenge, meta) ?? null;
+      // A Google sign-in without its client in .env names the missing variables (INVALID_REQUEST).
+      let authUrl: string | null;
+      try {
+        authUrl = flow.authUrl?.(redirectUri, pkce.state, pkce.codeChallenge, meta) ?? null;
+      } catch (error) {
+        flowError(error);
+      }
       return { authUrl, state: pkce.state, codeVerifier: pkce.codeVerifier, codeChallenge: pkce.codeChallenge, redirectUri, flowType: flow.flow, callbackPath: "/callback" };
     }
     if (action === "device-code") {

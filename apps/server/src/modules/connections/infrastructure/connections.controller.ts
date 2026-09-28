@@ -4,7 +4,7 @@ import {
 } from "@nestjs/common";
 import {
   builtinRegistry, CATALOG, createAdapter, EngineError, OAUTH_PROVIDERS, parseGoogleCredential, withConnection, type AIProviderPort, type CredentialStatus,
-  type HttpTransportPort, type OAuthIO, type ProviderDescriptor,
+  type Credential, type HttpTransportPort, type OAuthIO, type ProviderDescriptor,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
@@ -55,11 +55,14 @@ function checkForProvider(provider: ProviderDescriptor, fields: ConnectionChange
   }
 }
 
+// provider.gemini-cli-oauth: the model list names the connection's Cloud Code project.
+const credentialOf = (stored: StoredCredential): Credential => ({ kind: "api-key", apiKey: stored.apiKey, ...(stored.projectId ? { projectId: stored.projectId } : {}) });
+
 // Only an answer about the key is invalid or no_quota; anything else means "not checked" (connection.test-single-connection).
-async function runTest(provider: ProviderDescriptor, transport: HttpTransportPort, apiKey: string): Promise<TestOutcome> {
+async function runTest(provider: ProviderDescriptor, transport: HttpTransportPort, credential: Credential): Promise<TestOutcome> {
   const ctx = { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID() };
   try {
-    const status = await createAdapter(provider, transport).validateCredential({ kind: "api-key", apiKey }, ctx);
+    const status = await createAdapter(provider, transport).validateCredential(credential, ctx);
     if (status.valid) return { testStatus: "active", lastError: null, lastErrorCode: null };
     if (status.code === "AUTH_ERROR" && status.message.includes("Check it in AIGate: Gateway → Endpoint & Keys.")) {
       return { testStatus: "unreachable", lastError: `${provider.name} points back to AIGate. Edit its Base URL to the upstream provider API.`, lastErrorCode: "INVALID_REQUEST" };
@@ -95,7 +98,7 @@ export class ConnectionsController {
   private async provider(id: string): Promise<ProviderDescriptor | undefined> {
     const builtin = builtinRegistry.provider(id);
     if (builtin) return builtin;
-    const node = await this.nodes.get(id);
+    const node = await this.nodes.stored(id);
     return node ? nodeDescriptor(node) : undefined;
   }
 
@@ -161,7 +164,7 @@ export class ConnectionsController {
     const refreshToken = fresh.oauth?.refreshToken;
     const outcome = provider.testByExpiry ? this.expiryTest(provider, stored, fresh)
       : flowTest && refreshToken ? await this.flowTest((io) => flowTest(refreshToken, io))
-      : await runTest(withConnection(provider, fresh), this.transport, fresh.apiKey);
+      : await runTest(withConnection(provider, fresh), this.transport, credentialOf(fresh));
     // After a refresh the sealed token changed, so the result is recorded against the new one.
     const sealed = fresh === stored ? stored.sealed : (await this.connections.readKey(id))?.sealed ?? stored.sealed;
     const view = await this.connections.recordTest(id, sealed, outcome);
@@ -177,7 +180,7 @@ export class ConnectionsController {
     const ctx = { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID() };
     let listed: Awaited<ReturnType<AIProviderPort["getModels"]>>;
     try {
-      listed = await createAdapter(withConnection(provider, fresh), this.transport).getModels({ kind: "api-key", apiKey: fresh.apiKey }, ctx);
+      listed = await createAdapter(withConnection(provider, fresh), this.transport).getModels(credentialOf(fresh), ctx);
     } catch (error) {
       // Kept from 9router (user decision 2026-09-27): only the upstream status, not its reason, and "Failed to fetch
       // models" for anything else. 502, not the upstream status, so that a provider's 401 does not read as the dashboard

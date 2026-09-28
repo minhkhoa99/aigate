@@ -56,6 +56,11 @@ export const providerNodes = sqliteTable("provider_nodes", {
   name: text("name").notNull(),
   prefix: text("prefix").notNull(),
   baseUrl: text("base_url").notNull(),
+  // Custom headers sent with every request to the node, a sealed JSON list of { name, value } read and written whole
+  // (values may be secrets, rule 9); null when there are none.
+  customHeadersSealed: text("custom_headers_sealed"),
+  // Retry a stream that fails before its first content (429 or a stream error event), off unless the user enables it.
+  retryStreamErrors: integer("retry_stream_errors", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (t) => [index("provider_nodes_prefix_idx").on(t.prefix, t.createdAt)]);

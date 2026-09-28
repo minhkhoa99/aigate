@@ -305,16 +305,13 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
   // Errors before the first chunk are thrown from the first next(); the caller may fall back only then.
   async *stream(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): AsyncGenerator<StreamChunk> {
     const response = await this.send(this.chat(request, credential, true), credential, ctx, RETRY.maxAttempts);
-    if (!response.body || !(response.headers["content-type"] ?? "").includes("text/event-stream")) {
-      await response.body?.cancel();
-      throw this.invalid("a non-SSE response to a streaming request");
-    }
+    const body = await this.sseBody(response, credential);
     let started = false;
     let finished = false;
     let sawToolCall = false;
     let stopReason: StopReason | undefined;
     let usage: TokenUsage | undefined;
-    for await (const data of readSseData(response.body)) {
+    for await (const data of readSseData(body)) {
       if (data === "[DONE]") {
         finished = true;
         break;

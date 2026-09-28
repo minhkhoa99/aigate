@@ -1,4 +1,4 @@
-# Custom providers contract (M2 SP13b, SP14b)
+# Custom providers contract (M2 SP13b, SP14b; custom headers and stream retries 2026-09-28)
 
 Scope: user-defined **OpenAI-compatible** (SP13b) and **Anthropic-compatible** (SP14b) providers (9router "provider nodes"). A custom provider is a type, a name, a prefix, and a base URL. It gets one API-key connection like a built-in provider, and `/v1` reaches it as `<prefix>/<model>`.
 - **UI:** `/providers` (Custom providers section), `/providers/new` (create and edit form, both protocols), and the Connections Add modal.
@@ -29,6 +29,8 @@ Scope: user-defined **OpenAI-compatible** (SP13b) and **Anthropic-compatible** (
 | `name` | text, 1–64 characters |
 | `prefix` | text, indexed with `created_at` (not unique; `0004` dropped the unique index of `0003`) |
 | `base_url` | text, trimmed |
+| `custom_headers_sealed` | text, nullable (migration `0011`): the custom headers as a JSON object `{ name: value }`, sealed with the secret key (context `provider_nodes:<id>:custom_headers`), read and written whole; null when there are none |
+| `retry_stream_errors` | integer boolean, not null, default false (migration `0011`) |
 | `created_at`, `updated_at` | timestamp_ms |
 
 At most **100** custom providers (409 `NODE_LIMIT`); the count and the insert run in one transaction.
@@ -40,21 +42,27 @@ At most **100** custom providers (409 `NODE_LIMIT`); the count and the insert ru
 - `prefix`: trimmed, 1–200 characters. No format, reserved, or uniqueness check (9router).
 - `baseUrl`: optional on create, default `https://api.openai.com/v1` (OpenAI) or `https://api.anthropic.com/v1` (Anthropic). Trimmed, at most 2048 characters, no spaces. It must parse as a URL with `https:`, or `http:` to `localhost`, `127.0.0.1`, or `[::1]`, and may not carry a username, password, query, or fragment. These checks are AIGate security rules, not 9router's. For an Anthropic-compatible provider, one trailing `/` and then a trailing `/messages` are removed before it is stored, on create and update.
 - `apiType` (SP14c, `connection.provider-node-api-type`): `chat` or `responses`, else 400 "apiType must be chat or responses"; only on OpenAI-compatible providers (400 "apiType applies only to OpenAI-compatible providers"); changeable by PATCH, applied to the next request. Left out on create it is `chat`: 9router refuses a missing apiType, AIGate keeps the pre-SP14c behavior.
+- `customHeaders` (an AIGate option, not in 9router): a list of `{ name, value }`, at most 20. A name is 1–64 RFC 9110 token characters (letters, digits and the punctuation a header name allows), stored lower-case, unique regardless of case; `authorization`, `x-api-key`, `content-type`, `content-length`, `accept`, `host`, `connection`, `keep-alive`, `transfer-encoding`, `te`, `trailer`, `upgrade`, `expect` and any `proxy-*` are refused ("… is set by AIGate and cannot be a custom header"). A value is trimmed, 1–2048 printable ASCII characters. On create every header needs a value. On PATCH the list replaces the stored one: a header sent without a value keeps the value stored under its name (400 "the custom header <name> needs a value" when there is none), one left out is removed, and `[]` removes them all; the read, merge and write run in one transaction.
+- `retryStreamErrors` (an AIGate option, not in 9router): `true` or `false`, default `false`.
 - Unknown body keys are 400.
 
-The OpenAI descriptor: with one trailing `/` removed from the base URL, `chatUrl` = `<base>/chat/completions` (apiType `chat`, OpenAI adapter) or `<base>/responses` (apiType `responses`, Responses adapter, `provider-openai-responses.md`) and `modelsUrl` = `<base>/models`; `Authorization: Bearer <key>`, no static headers, no declared models. The Anthropic descriptor is under "Anthropic-compatible".
+**Custom headers on the wire.** They go with every request to the provider (chat, the connection test, the model list), before the family's own headers, so the key, `anthropic-version` (overridable on an Anthropic-compatible provider), `content-type` and `accept` always come from AIGate. The values are never returned: a view names each header with a hint (`••••` and the last 4 characters of a value longer than 8, else `••••`). Headers sealed under an older secret key read as none in the dashboard views (so they can be entered again), while a request to the provider fails as for an unreadable key.
+
+**Retry stream errors.** Off unless the provider asks for it. When on (`adapters/stream-retry.ts`), a request is sent again, at most twice (0.5 s, then 1 s later), when it fails before any content: a 429 that is not a spent quota (`insufficient_quota` is not retried), or an error the stream sends as its first event (for example conduit's `{"error":{"type":"server_error","message":"Temporary service interruption…"}}` after 200). The start of the answer is held back until its first content, so a retried attempt never reaches the client; an error after content, a spent quota, an auth error or a bad request is never retried. 502/503/504 and network failures keep the HTTP layer's own retries.
+
+The OpenAI descriptor: with one trailing `/` removed from the base URL, `chatUrl` = `<base>/chat/completions` (apiType `chat`, OpenAI adapter) or `<base>/responses` (apiType `responses`, Responses adapter, `provider-openai-responses.md`) and `modelsUrl` = `<base>/models`; `Authorization: Bearer <key>`, the custom headers, no declared models. The Anthropic descriptor is under "Anthropic-compatible".
 
 The Base URL form asks for the **upstream provider API**, not AIGate's own `/v1` URL. A self-referential URL (for example the Vite proxy at `http://127.0.0.1:5173/v1`) returns AIGate's `invalid_api_key` when tested with a provider key; the test reports `unreachable` / `INVALID_REQUEST` with an Edit Base URL instruction (`connections.md`).
 
 ## API (dashboard session)
 
-Every response is `Cache-Control: no-store`. The view is `{ id, type, apiType, name, prefix, baseUrl, createdAt, updatedAt }` (`apiType` is `null` for an Anthropic-compatible provider).
+Every response is `Cache-Control: no-store`. The view is `{ id, type, apiType, name, prefix, baseUrl, customHeaders: [{ name, hint }], retryStreamErrors, createdAt, updatedAt }` (`apiType` is `null` for an Anthropic-compatible provider).
 
 | Method and path | Body | Success | Errors |
 |---|---|---|---|
 | `GET /api/provider-nodes` | — | 200 `View[]`, oldest first | — |
-| `POST /api/provider-nodes` | `{ type?, apiType?, name, prefix, baseUrl? }` | 201 `View` | 400 `INVALID_REQUEST` (names the field); 409 `NODE_LIMIT` |
-| `PATCH /api/provider-nodes/:id` | any of `{ name, prefix, baseUrl, apiType }` | 200 `View` | 404 `NOT_FOUND` (checked first); 400 |
+| `POST /api/provider-nodes` | `{ type?, apiType?, name, prefix, baseUrl?, customHeaders?, retryStreamErrors? }` | 201 `View` | 400 `INVALID_REQUEST` (names the field); 409 `NODE_LIMIT` |
+| `PATCH /api/provider-nodes/:id` | any of `{ name, prefix, baseUrl, apiType, customHeaders, retryStreamErrors }` | 200 `View` | 404 `NOT_FOUND` (checked first); 400 |
 | `DELETE /api/provider-nodes/:id` | — | 204; the node's connection is deleted in the same transaction | 404 `NOT_FOUND` |
 
 `GET /api/providers` summaries also carry `aliases`, so the dashboard can tell a reserved prefix. Connections (`connections.md`) accept a custom provider id. Its connection test calls `GET <base>/models`.

@@ -200,17 +200,14 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
   async *stream(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): AsyncGenerator<StreamChunk> {
     const { http, names } = await this.chat(request, credential, true);
     const response = await this.send(http, credential, ctx, RETRY.maxAttempts);
-    if (!response.body || !(response.headers["content-type"] ?? "").includes("text/event-stream")) {
-      await response.body?.cancel();
-      throw this.invalid("a non-SSE response to a streaming request");
-    }
+    const body = await this.sseBody(response, credential);
     let started = false;
     let finished = false;
     let stopReason: unknown;
     let usage: Record<string, unknown> = {};
     // Messages numbers every content block; OpenAI numbers tool calls only.
     const toolIndex = new Map<number, number>();
-    for await (const data of readSseData(response.body)) {
+    for await (const data of readSseData(body)) {
       const event = record(parseJson(data));
       const type = text(event.type);
       if (type === undefined) throw this.invalid("a stream event without a type", started);

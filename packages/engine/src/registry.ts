@@ -69,6 +69,9 @@ export interface ProviderDescriptor {
   readonly accountIdHeader?: string;
   // SP16b: the connection test reads the stored token expiry and calls nobody (provider.claude-oauth, kept from 9router).
   readonly testByExpiry?: boolean;
+  // A custom provider that asks for it (docs/contracts/custom-providers.md): a request that fails before its first content
+  // with a 429 or a stream error event is sent again, at most twice (adapters/stream-retry.ts).
+  readonly retryStreamErrors?: boolean;
 }
 
 export const CONNECTION_FIELDS = ["baseUrl", "deployment", "apiVersion", "organization", "accountId"] as const;

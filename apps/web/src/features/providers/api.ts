@@ -143,9 +143,14 @@ export interface ProviderNode {
   name: string;
   prefix: string;
   baseUrl: string;
+  // Header values stay on the server: each header is shown by name and a hint of its value.
+  customHeaders: { name: string; hint: string }[];
+  retryStreamErrors: boolean;
   createdAt: string;
   updatedAt: string;
 }
+// A header to save; on an edit a header without a value keeps the one already saved.
+export interface HeaderInput { name: string; value?: string }
 
 const nodesKey = ["provider-nodes"] as const;
 const nodePath = (id: string) => `/api/provider-nodes/${encodeURIComponent(id)}`;
@@ -161,7 +166,7 @@ function useNodeMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
   });
 }
 
-type NodeFields = { name: string; prefix: string; baseUrl?: string; apiType?: ApiType };
+type NodeFields = { name: string; prefix: string; baseUrl?: string; apiType?: ApiType; customHeaders: HeaderInput[]; retryStreamErrors: boolean };
 // The type is chosen at creation only (docs/contracts/custom-providers.md).
 export const useCreateNode = () => useNodeMutation((body: NodeFields & { type: NodeType }) => api<ProviderNode>("/api/provider-nodes", { method: "POST", body }));
 export const useUpdateNode = () => useNodeMutation(({ id, ...body }: NodeFields & { id: string }) => api<ProviderNode>(nodePath(id), { method: "PATCH", body }));

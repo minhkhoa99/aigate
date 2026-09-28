@@ -1,7 +1,7 @@
 // Contract: docs/contracts/custom-providers.md — the Unreachable pill follows the /v1 prefix rules.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { unreachable } from "./node-rules.ts";
+import { headerPayload, unreachable } from "./node-rules.ts";
 
 const node = (id, type, prefix) => ({ id, type, name: id, prefix, baseUrl: "https://x.example/v1", createdAt: "", updatedAt: "" });
 
@@ -19,4 +19,13 @@ test("a custom provider is unreachable when /v1 picks something else for its pre
   const anthropics = [olderAnthropic, node("later-anthropic", "anthropic-compatible", "gate")];
   assert.equal(unreachable(olderAnthropic, anthropics, reserved), null);
   assert.match(unreachable(anthropics[1], anthropics, reserved), /^old-anthropic has the same prefix and was added first/);
+});
+
+test("custom header rows: blank rows dropped, names trimmed, an empty value keeps the saved one", () => {
+  assert.deepEqual(headerPayload([
+    { id: 1, name: " x-team ", value: "secret" },
+    { id: 2, name: "x-kept", value: "", hint: "••••1234" },
+    { id: 3, name: "  ", value: "orphan" },
+  ]), [{ name: "x-team", value: "secret" }, { name: "x-kept" }]);
+  assert.deepEqual(headerPayload([]), [], "no rows clears the headers");
 });

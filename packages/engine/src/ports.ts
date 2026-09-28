@@ -41,6 +41,8 @@ export interface Credential {
   readonly apiKey: string;
   // A session id stable per connection (SP16b: claude's metadata.user_id, codex's session_id and prompt_cache_key).
   readonly sessionId?: string;
+  // SP16c: the Google Cloud Code project the connection signed in with (gemini-cli, antigravity).
+  readonly projectId?: string;
 }
 
 // One id from an upstream model list. `descriptor` is the registry entry when the id is known; an

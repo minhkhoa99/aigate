@@ -182,3 +182,50 @@ test("github: device sign-in (slow_down passed through), the Copilot token as be
     assert.equal(upstream.calls.length, 9, "the background loop leaves the short Copilot token alone");
     await app.close();
   }));
+
+test("gemini-cli: Google sign-in finds the project, chat goes in the Cloud Code envelope with it, a 401 refreshes, test and models use Cloud Code", () =>
+  withTempDb(async (file) => {
+    const answer = { response: { responseId: "g", modelVersion: "gemini-2.5-flash", candidates: [{ content: { parts: [{ text: "hello" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 } } };
+    const upstream = fakeUpstream(
+      json(200, { access_token: "ya29.one", refresh_token: "1//rt", expires_in: 3599, scope: "s" }),
+      json(200, { email: "ada@gmail.com" }),
+      json(200, { cloudaicompanionProject: "proj-7" }),
+      json(401, { error: { code: 401, message: "expired" } }),
+      json(200, { access_token: "ya29.two", expires_in: 3599 }),
+      json(200, answer),
+      json(200, {}),
+      json(200, { models: { "gemini-2.5-pro": {}, "gemini-x": {} } }),
+    );
+    const { app, call, dash, key } = await ready(file, upstream, { refreshRetryDelayMs: 0 });
+    const authorize = () => dash({ url: "/api/oauth/gemini-cli/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A20200%2Fcallback" });
+    // The client comes from .env; without it the sign-in names the variables to set.
+    delete process.env.AIGATE_GEMINI_CLI_OAUTH_CLIENT_ID;
+    const missing = await authorize();
+    assert.deepEqual([missing.statusCode, missing.json().code], [400, "INVALID_REQUEST"]);
+    assert.match(missing.json().message, /AIGATE_GEMINI_CLI_OAUTH_CLIENT_ID and AIGATE_GEMINI_CLI_OAUTH_CLIENT_SECRET in AIGate's \.env/);
+    process.env.AIGATE_GEMINI_CLI_OAUTH_CLIENT_ID = "test-gemini-client.apps.googleusercontent.com";
+    process.env.AIGATE_GEMINI_CLI_OAUTH_CLIENT_SECRET = "test-gemini-secret";
+    const begun = (await authorize()).json();
+    assert.equal(begun.redirectUri, "http://127.0.0.1:20200/callback");
+    assert.match(begun.authUrl, /^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth\?client_id=test-gemini-client/);
+    const signed = await dash({ method: "POST", url: "/api/oauth/gemini-cli/exchange", body: { code: "4/c", redirectUri: begun.redirectUri, codeVerifier: begun.codeVerifier, state: begun.state } });
+    assert.deepEqual([signed.statusCode, signed.json().connection.email], [200, "ada@gmail.com"]);
+    const connection = (await dash({ url: "/api/connections" })).json().find((c) => c.provider === "gemini-cli");
+    assert.deepEqual([connection.name, connection.authType], ["ada@gmail.com", "oauth"]);
+
+    const chat = await call({ method: "POST", url: "/v1/chat/completions", headers: { authorization: `Bearer ${key}` }, body: { model: "gemini-cli/gemini-2.5-flash", stream: false, messages: [{ role: "user", content: "hi" }] } });
+    assert.equal(chat.statusCode, 200);
+    assert.equal(chat.json().choices[0].message.content, "hello");
+    const [first, refresh, retried] = [3, 4, 5].map((i) => upstream.calls[i].request);
+    assert.deepEqual([first.url, first.headers.authorization, JSON.parse(first.body).project], ["https://cloudcode-pa.googleapis.com/v1internal:generateContent", "Bearer ya29.one", "proj-7"]);
+    assert.deepEqual([refresh.url, new URLSearchParams(refresh.body).get("refresh_token")], ["https://oauth2.googleapis.com/token", "1//rt"], "a 401 refreshes the Google token");
+    assert.deepEqual([retried.headers.authorization, JSON.parse(retried.body).project], ["Bearer ya29.two", "proj-7"], "the refresh keeps the project");
+
+    const tested = (await dash({ method: "POST", url: `/api/connections/${connection.id}/test` })).json();
+    assert.equal(tested.testStatus, "active");
+    assert.deepEqual([upstream.calls[6].request.url, upstream.calls[6].request.headers.authorization], ["https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", "Bearer ya29.two"]);
+    const models = (await dash({ url: `/api/connections/${connection.id}/models` })).json();
+    assert.deepEqual(models.models, [{ id: "gemini-2.5-pro", inCatalog: true }, { id: "gemini-x", inCatalog: false }]);
+    assert.deepEqual(JSON.parse(upstream.calls[7].request.body), { project: "proj-7" });
+    await app.close();
+  }));

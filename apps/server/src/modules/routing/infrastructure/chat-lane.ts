@@ -487,8 +487,10 @@ export class ChatLane {
     // oauth.refresh-lifecycle: an oauth token about to expire is refreshed first.
     const stored = await this.refresher.fresh(provider.id, current);
     // connection.ollama-local-host: a connection may point the provider at its own host.
-    // The connection id is the session id claude and codex send (9router derives one per connection).
-    return { provider: withConnection(provider, stored), request: upstream, credential: { kind: "api-key", apiKey: stored.apiKey, sessionId: stored.id }, connection: stored };
+    // The connection id is the session id claude and codex send (9router derives one per connection); gemini-cli names
+    // the project its sign-in found.
+    const credential: Credential = { kind: "api-key", apiKey: stored.apiKey, sessionId: stored.id, ...(stored.projectId ? { projectId: stored.projectId } : {}) };
+    return { provider: withConnection(provider, stored), request: upstream, credential, connection: stored };
   }
 
   private modelNotFound(ref: string): GatewayError {

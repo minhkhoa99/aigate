@@ -5,7 +5,7 @@ import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
 import { useConnections, useCreateNode, useDeleteNode, useProviderNodes, useProviders, useUpdateNode, type ApiType, type NodeType, type ProviderNode } from "./api";
 import { ProviderModels } from "./models";
-import { unreachable } from "./node-rules";
+import { headerPayload, unreachable, type HeaderRow } from "./node-rules";
 import { statusPill } from "./test-result";
 
 // docs/contracts/custom-providers.md: user-defined OpenAI- or Anthropic-compatible endpoints, reached as "<prefix>/<model>".
@@ -25,6 +25,8 @@ const PROTOCOLS: Readonly<Record<NodeType, { label: string; hint: string; placeh
     test: "Add its API key; like 9router, the test posts to <base URL>/v1/messages and accepts any answer except 401/403",
   },
 };
+// The server's bound (docs/contracts/custom-providers.md).
+const MAX_HEADERS = 20;
 const typeParam = (value: string | null): NodeType => (value === "anthropic-compatible" ? value : "openai-compatible");
 // connection.provider-node-api-type: which OpenAI API an OpenAI-compatible provider speaks.
 const API_TYPES: Readonly<Record<ApiType, string>> = { chat: "Chat completions (/chat/completions)", responses: "Responses (/responses)" };
@@ -45,7 +47,8 @@ export function CustomProviderDetail({ node }: { node: ProviderNode }) {
   const connection = connections.data?.find((c) => c.provider === node.id);
   const pill = connection && statusPill(connection);
   return <><PageHeading eyebrow="Providers / Custom" title={node.name} description={`Called on /v1 as ${node.prefix}/<model>.`} action={<a className="button" href={`/providers/new?id=${encodeURIComponent(node.id)}`}>Edit</a>} />
-    <div className="grid grid-2"><Panel title="Provider type"><Pill tone="info">{protocolLabel(node)}</Pill><p className="muted">Custom provider · prefix <code>{node.prefix}</code></p><p className="muted" style={{ overflowWrap: "anywhere" }}>Base URL <code>{node.baseUrl}</code></p></Panel>
+    <div className="grid grid-2"><Panel title="Provider type"><Pill tone="info">{protocolLabel(node)}</Pill><p className="muted">Custom provider · prefix <code>{node.prefix}</code></p><p className="muted" style={{ overflowWrap: "anywhere" }}>Base URL <code>{node.baseUrl}</code></p>
+      <p className="muted">Custom headers {node.customHeaders.length === 0 ? "none" : node.customHeaders.map((header) => <code key={header.name}>{header.name}</code>)} · Retry stream errors {node.retryStreamErrors ? "on" : "off"}</p></Panel>
       <Panel title="Connection">{connections.isPending ? <StateBlock state="loading" />
         : connections.isError ? <StateBlock state="error" code={toProblem(connections.error).code} action={<Button onClick={() => void connections.refetch()}>Retry</Button>} />
         : connection && pill ? <div className="list-row"><div><strong>{connection.name}</strong><small>Key <code>{connection.keyHint}</code></small></div><Pill tone={pill.tone}>{pill.label}</Pill><a className="button" href="/providers/connections">Manage</a></div>
@@ -79,10 +82,28 @@ export function CustomProviders() {
   </section>;
 }
 
+// docs/contracts/custom-providers.md: headers sent with every request to the provider. A saved value is never shown;
+// leaving it empty keeps it.
+function HeaderRows({ rows, onChange }: { rows: HeaderRow[]; onChange: (rows: HeaderRow[]) => void }) {
+  const set = (id: number, change: Partial<HeaderRow>) => onChange(rows.map((row) => (row.id === id ? { ...row, ...change } : row)));
+  const add = () => onChange([...rows, { id: Math.max(0, ...rows.map((row) => row.id)) + 1, name: "", value: "" }]);
+  return <div className="stack">
+    {rows.map((row) => <div className="row" key={row.id}>
+      <input className="input" aria-label="Header name" maxLength={64} value={row.name} placeholder="X-Custom-Header" onChange={(event) => set(row.id, { name: event.target.value })} />
+      <input className="input" aria-label={`Value of ${row.name || "the header"}`} type="password" autoComplete="off" maxLength={2048} value={row.value}
+        placeholder={row.hint ? `Unchanged (${row.hint})` : "Value"} onChange={(event) => set(row.id, { value: event.target.value })} />
+      <Button variant="ghost" onClick={() => onChange(rows.filter((item) => item.id !== row.id))}>Remove</Button>
+    </div>)}
+    <div className="row"><Button onClick={add} disabled={rows.length >= MAX_HEADERS}>+ Add header</Button>{rows.length >= MAX_HEADERS && <small className="muted">At most {MAX_HEADERS} headers.</small>}</div>
+  </div>;
+}
+
 function NodeForm({ node, type, onType }: { node?: ProviderNode; type: NodeType; onType?: (type: NodeType) => void }) {
   const create = useCreateNode();
   const update = useUpdateNode();
   const showToast = useToast();
+  const [headers, setHeaders] = useState<HeaderRow[]>(() => (node?.customHeaders ?? []).map((header, index) => ({ id: index + 1, name: header.name, value: "", hint: header.hint })));
+  const [retry, setRetry] = useState(node?.retryStreamErrors ?? false);
   const pending = create.isPending || update.isPending;
   const fail = (error: unknown) => showToast({ tone: "error", ...toProblem(error) });
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -90,7 +111,10 @@ function NodeForm({ node, type, onType }: { node?: ProviderNode; type: NodeType;
     const baseUrl = text(event.currentTarget, "baseUrl");
     // An empty base URL is left out, so the server applies the 9router default.
     const apiType = type === "openai-compatible" ? apiTypeParam(text(event.currentTarget, "apiType")) : undefined;
-    const fields = { name: text(event.currentTarget, "name"), prefix: text(event.currentTarget, "prefix"), ...(baseUrl ? { baseUrl } : {}), ...(apiType ? { apiType } : {}) };
+    const fields = {
+      name: text(event.currentTarget, "name"), prefix: text(event.currentTarget, "prefix"), ...(baseUrl ? { baseUrl } : {}), ...(apiType ? { apiType } : {}),
+      customHeaders: headerPayload(headers), retryStreamErrors: retry,
+    };
     // A new provider goes straight to its API key; an edit applies to the existing connection at once.
     if (!node) create.mutate({ ...fields, type }, { onSuccess: (created) => window.location.assign(connectHref(created.id)), onError: fail });
     else update.mutate({ id: node.id, ...fields }, { onSuccess: () => window.location.assign("/providers"), onError: fail });
@@ -101,6 +125,11 @@ function NodeForm({ node, type, onType }: { node?: ProviderNode; type: NodeType;
     <Field label="Protocol" hint={node ? "The protocol cannot be changed; add a new custom provider instead." : undefined}><select className="input" name="type" value={type} onChange={(event) => onType?.(typeParam(event.target.value))} disabled={Boolean(node)}>{Object.entries(PROTOCOLS).map(([value, p]) => <option key={value} value={value}>{p.label}</option>)}</select></Field>
     {type === "openai-compatible" && <Field label="API" hint="Responses uses the OpenAI Responses API at <base URL>/responses. Changing it applies to the next request."><select className="input" name="apiType" defaultValue={node?.apiType ?? "chat"}>{Object.entries(API_TYPES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>}
     <Field label="Base URL" hint={PROTOCOLS[type].hint}><Input name="baseUrl" maxLength={2048} defaultValue={node?.baseUrl} placeholder={PROTOCOLS[type].placeholder} /></Field>
+    {/* Several controls, so a group rather than the single-control Field label. */}
+    <div className="field" role="group" aria-label="Custom headers"><span>Custom headers</span><HeaderRows rows={headers} onChange={setHeaders} />
+      <small>Sent with every request to this provider, including the connection test and the model list. Authorization, x-api-key, Content-Type and Accept are set by AIGate. Values are encrypted and never shown again; leave one empty to keep it.</small></div>
+    <div className="list-row"><div><strong>Retry stream errors</strong><small>Off by default. When on, a request that fails before any answer text (a 429 other than a spent quota, or an error the stream sends first) is sent again, at most twice.</small></div>
+      <input type="checkbox" checked={retry} onChange={(event) => setRetry(event.target.checked)} aria-label="Retry stream errors" /></div>
     <div className="row"><Link className="button" to="/providers">Cancel</Link><Button type="submit" variant="primary" disabled={pending}>{pending ? "Saving…" : node ? "Save changes" : "Save and add API key"}</Button></div>
   </div></form>;
 }

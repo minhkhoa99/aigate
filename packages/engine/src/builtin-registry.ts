@@ -48,6 +48,8 @@ const EXECUTOR_QUIRKS: Readonly<Record<string, readonly string[]>> = {
   codex: ["codex"],
   // provider.github-copilot-oauth (SP16b2, kept as 9router): the GithubExecutor routes.
   github: ["copilot"],
+  // provider.gemini-cli-oauth (SP16c, kept as 9router): the Cloud Code envelope around the Gemini protocol.
+  "gemini-cli": ["geminiCli"],
 };
 // provider.clinepass-headers-envelope: the Cline client headers, naming AIGate (user decision 2026-09-26; 9router names
 // itself). ponytail: AIGate has no release version yet; 0.1.0 until it does.
@@ -84,7 +86,11 @@ const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Par
     accountIdHeader: "chatgpt-account-id",
     chatProbe: { model: "gpt-5.3-codex", body: { model: "gpt-5.3-codex", input: [], stream: false, store: false }, invalidStatuses: [401] },
   }),
+  // provider.gemini-cli-oauth (kept from 9router): the Google token goes as Bearer; the models come from fetchAvailableModels.
+  "gemini-cli": () => ({ auth: { kind: "api-key", header: "authorization", scheme: "bearer" }, modelsUrl: "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels" }),
 };
+// provider.gemini-cli-oauth: Cloud Code speaks the Gemini protocol inside its own envelope.
+const CLOUD_CODE_PROTOCOLS: Readonly<Record<string, ProviderProtocol>> = { "gemini-cli": "gemini" };
 const PROTOCOL_REASONS: Readonly<Record<string, string>> = {
   service: "Media and search services come with SP22/SP23",
 };
@@ -92,6 +98,7 @@ const PROTOCOL_REASONS: Readonly<Record<string, string>> = {
 export const ANTHROPIC_VERSION = "2023-06-01";
 
 const isProtocol = (value: string): value is ProviderProtocol => PROVIDER_PROTOCOLS.some((p) => p === value);
+const protocolOf = (provider: CatalogProvider): string => CLOUD_CODE_PROTOCOLS[provider.protocol] ?? provider.protocol;
 
 // A reason why the provider cannot be connected yet, or undefined when it can.
 export function unsupportedReason(provider: CatalogProvider): string | undefined {
@@ -100,7 +107,8 @@ export function unsupportedReason(provider: CatalogProvider): string | undefined
   // assemblyai and deepgram have no transport format, so the catalog calls them openai-compatible; they only transcribe.
   // ponytail: speech-to-text only; nanobanana (image-only, connectable since SP13) is left for SP22 to decide.
   if (provider.serviceKinds.length > 0 && provider.serviceKinds.every((kind) => kind === "stt")) return PROTOCOL_REASONS.service;
-  if (!isProtocol(provider.protocol)) return PROTOCOL_REASONS[provider.protocol] ?? `Needs the ${provider.protocol} adapter (SP14)`;
+  const protocol = protocolOf(provider);
+  if (!isProtocol(protocol)) return PROTOCOL_REASONS[provider.protocol] ?? `Needs the ${provider.protocol} adapter (SP14)`;
   // docs/contracts/oauth.md: a provider AIGate can sign in to is connectable without an API key.
   const signIn = OAUTH_PROVIDERS[provider.id] !== undefined;
   if (!provider.auth.kinds.includes("api-key") && !signIn) {
@@ -113,13 +121,14 @@ export function unsupportedReason(provider: CatalogProvider): string | undefined
   if (PER_CONNECTION[provider.id]) return undefined;
   if (provider.chatUrl === null) return "Each connection needs its own endpoint URL (later)";
   if (provider.chatUrl.includes("{")) return "The endpoint needs per-account data (later)";
-  if (!GOOGLE_CLOUD.has(provider.id) && !PATHS[provider.protocol].chat.test(provider.chatUrl)) return "Non-standard endpoint (SP14)";
+  if (!GOOGLE_CLOUD.has(provider.id) && !PATHS[protocol].chat.test(provider.chatUrl)) return "Non-standard endpoint (SP14)";
   return undefined;
 }
 
 export function toDescriptor(provider: CatalogProvider, chatUrl: string): ProviderDescriptor {
   const signIn = OAUTH_PROVIDERS[provider.id];
-  const protocol: ProviderProtocol = isProtocol(provider.protocol) ? provider.protocol : "openai-compatible";
+  const named = protocolOf(provider);
+  const protocol: ProviderProtocol = isProtocol(named) ? named : "openai-compatible";
   const paths = PATHS[protocol];
   const headers = { ...Object.fromEntries(Object.entries(provider.headers).map(([name, value]) => [name.toLowerCase(), value])), ...EXTRA_HEADERS[provider.id] };
   // 9router authenticates every API key of the Anthropic family with a raw x-api-key, whatever the entry says.

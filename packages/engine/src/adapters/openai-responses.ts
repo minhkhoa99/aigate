@@ -169,10 +169,7 @@ export class OpenAIResponsesAdapter extends OpenAICompatibleAdapter implements A
   // that stops early still ends normally, and incomplete answers and refusals are not reported.
   override async *stream(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): AsyncGenerator<StreamChunk> {
     const response = await this.send(this.responses(request, credential, true), credential, ctx, RETRY.maxAttempts);
-    if (!response.body || !(response.headers["content-type"] ?? "").includes("text/event-stream")) {
-      await response.body?.cancel();
-      throw this.invalid("a non-SSE response to a streaming request");
-    }
+    const body = await this.sseBody(response, credential);
     let started = false;
     let usage: TokenUsage | undefined;
     let toolCount = 0;
@@ -181,7 +178,7 @@ export class OpenAIResponsesAdapter extends OpenAICompatibleAdapter implements A
     const argumentsSent = new Set<number>();
     const lastTool = () => Math.max(0, toolCount - 1);
     const end = (): StreamChunk => ({ type: "stop", stopReason: toolCount > 0 ? "tool_use" : "end_turn" });
-    for await (const data of readSseData(response.body)) {
+    for await (const data of readSseData(body)) {
       const event = record(parseJson(data));
       const type = text(event.type) ?? text(event.event);
       const payload = isRecord(event.data) ? event.data : event;

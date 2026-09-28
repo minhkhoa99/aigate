@@ -16,6 +16,19 @@ export const DEFAULT_BASE_URLS: Readonly<Record<NodeType, string>> = {
   "anthropic-compatible": "https://api.anthropic.com/v1",
 };
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
+// Custom headers (docs/contracts/custom-providers.md): bounded, HTTP token names, printable ASCII values.
+export const MAX_HEADERS = 20;
+const MAX_HEADER_VALUE = 2048;
+const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,64}$/;
+const HEADER_VALUE = /^[\x20-\x7e]+$/;
+// Set by AIGate on every request (the key, the body framing, stream negotiation) or by the HTTP stack.
+const RESERVED_HEADERS = new Set([
+  "authorization", "x-api-key", "content-type", "content-length", "accept", "host", "connection", "keep-alive", "transfer-encoding", "te", "trailer",
+  "upgrade", "expect", "proxy-authorization", "proxy-connection",
+]);
+
+// A header to send; on an update a header without a value keeps the value already stored under that name.
+export interface HeaderInput { name: string; value?: string }
 
 export interface NodeFields {
   type: NodeType;
@@ -23,6 +36,8 @@ export interface NodeFields {
   name: string;
   prefix: string;
   baseUrl: string;
+  customHeaders: HeaderInput[];
+  retryStreamErrors: boolean;
 }
 export type NodeChanges = Partial<Omit<NodeFields, "type">>;
 
@@ -71,12 +86,59 @@ function stored(type: NodeType, base: string): string {
 function asBody(input: unknown): Parsed<Record<string, unknown>> {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return fail("Body must be a JSON object");
   const body = Object.fromEntries(Object.entries(input));
-  const unknown = Object.keys(body).find((key) => !["type", "apiType", "name", "prefix", "baseUrl"].includes(key));
+  const unknown = Object.keys(body).find((key) => !["type", "apiType", "name", "prefix", "baseUrl", "customHeaders", "retryStreamErrors"].includes(key));
   return unknown === undefined ? { ok: true, value: body } : fail(`${unknown} is not a field of a custom provider`);
 }
 
-function parseFields(body: Record<string, unknown>, type: NodeType): Parsed<NodeChanges> {
+// Names are stored lower-case, as the transport sends them; a value is trimmed.
+function parseHeaders(value: unknown, requireValues: boolean): Parsed<HeaderInput[]> {
+  if (!Array.isArray(value)) return fail("customHeaders must be a list of { name, value }");
+  if (value.length > MAX_HEADERS) return fail(`customHeaders holds at most ${MAX_HEADERS} headers`);
+  const headers: HeaderInput[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return fail("each custom header must be { name, value }");
+    const entry = Object.fromEntries(Object.entries(item));
+    const raw = typeof entry.name === "string" ? entry.name.trim() : "";
+    if (!HEADER_NAME.test(raw)) return fail("a custom header name must be 1-64 letters, digits or !#$%&'*+.^_`|~-");
+    const name = raw.toLowerCase();
+    if (RESERVED_HEADERS.has(name) || name.startsWith("proxy-")) return fail(`${name} is set by AIGate and cannot be a custom header`);
+    if (headers.some((header) => header.name === name)) return fail(`${name} appears twice in customHeaders`);
+    if (entry.value === undefined || entry.value === "") {
+      if (requireValues) return fail(`the custom header ${name} needs a value`);
+      headers.push({ name });
+      continue;
+    }
+    const text = typeof entry.value === "string" ? entry.value.trim() : "";
+    if (text === "" || text.length > MAX_HEADER_VALUE || !HEADER_VALUE.test(text)) {
+      return fail(`the value of ${name} must be 1-${MAX_HEADER_VALUE} printable ASCII characters`);
+    }
+    headers.push({ name, value: text });
+  }
+  return { ok: true, value: headers };
+}
+
+// The headers to store: a header without a value keeps the one stored under its name (an update only).
+export function mergeHeaders(input: readonly HeaderInput[], stored: Readonly<Record<string, string>>): Parsed<Record<string, string>> {
+  const merged: Record<string, string> = {};
+  for (const header of input) {
+    const value = header.value ?? stored[header.name];
+    if (value === undefined) return fail(`the custom header ${header.name} needs a value`);
+    merged[header.name] = value;
+  }
+  return { ok: true, value: merged };
+}
+
+function parseFields(body: Record<string, unknown>, type: NodeType, creating: boolean): Parsed<NodeChanges> {
   const changes: NodeChanges = {};
+  if (body.customHeaders !== undefined) {
+    const headers = parseHeaders(body.customHeaders, creating);
+    if (!headers.ok) return headers;
+    changes.customHeaders = headers.value;
+  }
+  if (body.retryStreamErrors !== undefined) {
+    if (typeof body.retryStreamErrors !== "boolean") return fail("retryStreamErrors must be true or false");
+    changes.retryStreamErrors = body.retryStreamErrors;
+  }
   if (body.apiType !== undefined) {
     if (type !== "openai-compatible") return fail("apiType applies only to OpenAI-compatible providers");
     if (!isApiType(body.apiType)) return fail(`apiType must be ${API_TYPES.join(" or ")}`);
@@ -97,9 +159,9 @@ export function parseNodeChanges(input: unknown, type: NodeType): Parsed<NodeCha
   const body = asBody(input);
   if (!body.ok) return body;
   if (body.value.type !== undefined) return fail("type cannot be changed; add a new custom provider instead");
-  const parsed = parseFields(body.value, type);
+  const parsed = parseFields(body.value, type, false);
   if (!parsed.ok) return parsed;
-  return Object.keys(parsed.value).length > 0 ? parsed : fail("Send at least one of name, prefix, baseUrl, apiType");
+  return Object.keys(parsed.value).length > 0 ? parsed : fail("Send at least one of name, prefix, baseUrl, apiType, customHeaders, retryStreamErrors");
 }
 
 export function parseNewNode(input: unknown): Parsed<NodeFields> {
@@ -107,11 +169,17 @@ export function parseNewNode(input: unknown): Parsed<NodeFields> {
   if (!body.ok) return body;
   const type = body.value.type ?? "openai-compatible";
   if (!isNodeType(type)) return fail(`type must be ${NODE_TYPES.join(" or ")}`);
-  const parsed = parseFields(body.value, type);
+  const parsed = parseFields(body.value, type, true);
   if (!parsed.ok) return parsed;
-  const { name, prefix, baseUrl, apiType } = parsed.value;
+  const { name, prefix, baseUrl, apiType, customHeaders, retryStreamErrors } = parsed.value;
   if (name === undefined) return fail(`name must be 1-${MAX_NAME} characters`);
   if (prefix === undefined) return fail("prefix is required");
   // 9router refuses a missing apiType; AIGate keeps chat, the only API before SP14c, so older clients still work.
-  return { ok: true, value: { type, apiType: apiType ?? "chat", name, prefix, baseUrl: baseUrl ?? stored(type, DEFAULT_BASE_URLS[type]) } };
+  return {
+    ok: true,
+    value: {
+      type, apiType: apiType ?? "chat", name, prefix, baseUrl: baseUrl ?? stored(type, DEFAULT_BASE_URLS[type]), customHeaders: customHeaders ?? [],
+      retryStreamErrors: retryStreamErrors ?? false,
+    },
+  };
 }

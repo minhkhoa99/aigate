@@ -38,6 +38,8 @@ export class ProviderNodesController {
     if (!parsed.ok) throw invalid(parsed.message);
     const updated = await this.nodes.update(id, parsed.value);
     if (!updated) throw notFound();
+    // A header sent without a value that is not stored yet.
+    if ("error" in updated) throw invalid(updated.error);
     return updated;
   }
 

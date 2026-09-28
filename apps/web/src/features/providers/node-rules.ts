@@ -1,4 +1,16 @@
-import type { ProviderNode } from "./api";
+import type { HeaderInput, ProviderNode } from "./api";
+
+// One custom header row of the form; hint is set for a header already saved.
+export interface HeaderRow { id: number; name: string; value: string; hint?: string }
+
+// The headers to save: blank rows are dropped; an empty value keeps the saved one (the server refuses it for a new name).
+export function headerPayload(rows: readonly HeaderRow[]): HeaderInput[] {
+  return rows.flatMap((row) => {
+    const name = row.name.trim();
+    if (name === "") return [];
+    return row.value === "" ? [{ name }] : [{ name, value: row.value }];
+  });
+}
 
 // Why /v1 can never reach a custom provider (docs/contracts/custom-providers.md). The server stores these as
 // 9router does (connection.provider-node-create-list, connection.anthropic-compatible-node).

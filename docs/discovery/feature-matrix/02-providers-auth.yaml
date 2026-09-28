@@ -2491,3 +2491,112 @@
     expected: "A missing Copilot subscription fails the sign-in, the model list refreshes an expired Copilot token, poll errors stop polling, and the Claude route gets the same parameter rules"
     actual: "A failed Copilot exchange saves a connection without a Copilot token, the model list uses the stored (often expired) token, unknown poll errors keep polling, and the Claude route skips the parameter rules"
     impact: "A connection reads as working but cannot chat; Import from /models fails after 30 minutes; the dialog waits for nothing; Claude models may answer 400"
+
+- id: provider.gemini-cli-oauth
+  group: OAuth providers
+  feature: Gemini CLI (Google Cloud Code Assist) sign-in
+  subFeature: "gemini-cli: Google OAuth with the public Gemini CLI client, project discovery through loadCodeAssist, generateContent wrapped in the Cloud Code envelope at cloudcode-pa.googleapis.com/v1internal"
+  trigger: "Dashboard sign-in for Gemini CLI; any request routed to provider gemini-cli"
+  input: "Authorization code from the dashboard /callback"
+  output: "An oauth connection { accessToken, refreshToken, expiresIn, scope, email, projectId }; generateContent answers"
+  businessRules:
+    - "Authorize https://accounts.google.com/o/oauth2/v2/auth with the Gemini CLI client_id (9router open-sse/providers/shared.js GOOGLE_OAUTH_CLIENT), response_type code, redirect_uri, scopes cloud-platform userinfo.email userinfo.profile, state, access_type offline, prompt consent (no PKCE challenge)"
+    - "Exchange POST https://oauth2.googleapis.com/token form { grant_type: authorization_code, client_id, client_secret (the same GOOGLE_OAUTH_CLIENT), code, redirect_uri }; a failure reads 'Token exchange failed: <body>'"
+    - "After the exchange: GET https://www.googleapis.com/oauth2/v1/userinfo?alt=json (email; a failure gives none), then POST https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist { metadata: { ideType: 9, platform: <os enum>, pluginType: 2 }, mode: 1 } with only Bearer and content-type; cloudaicompanionProject (or its id) is the projectId; any failure leaves it empty and the connection is saved anyway"
+    - "Refresh POST the same token URL form { grant_type: refresh_token, refresh_token, client_id, client_secret }; the old refresh token stays when none comes back; any failure is a refused refresh; refreshed 5 minutes before expiry"
+    - "A request without a projectId fetches it first: loadCodeAssist { metadata } with User-Agent google-api-nodejs-client/9.15.1, X-Goog-Api-Client 'google-cloud-sdk vscode_cloudshelleditor/0.1', Client-Metadata; no project -> onboardUser { tierId (the default allowed tier, else legacy-tier), metadata } up to 2 attempts 12 s apart plus jitter, 30 s each; the answer is cached 1 hour per connection, concurrent fetches share one, and it is saved to the connection in the background"
+    - "Requests: POST <base>:streamGenerateContent?alt=sse or <base>:generateContent with Authorization Bearer, User-Agent GeminiCLI/0.34.0/<model> (<platform>; <arch>; terminal), X-Goog-Api-Client google-genai-sdk/1.41.0 gl-node/v22.19.0, Accept text/event-stream or application/json"
+    - "Body: the Gemini request (same translation as the gemini provider, the Gemini CLI thought signature on the first call without a cached one) inside { project: projectId or a random '<adjective>-<noun>-<5 hex>', model, userAgent: gemini-cli, requestId: agent-<uuid>, request: { sessionId: <uuid><epoch ms>, contents, systemInstruction, generationConfig, tools, safetySettings, toolConfig { functionCallingConfig: { mode: VALIDATED } } when tools } }"
+    - "Answers are the Gemini answer inside { response }, translated as for the gemini provider"
+    - "Connection test POST .../v1internal:loadCodeAssist { metadata: { ideType: IDE_UNSPECIFIED, platform: PLATFORM_UNSPECIFIED, pluginType: GEMINI } } with User-Agent 'google-api-nodejs-client/9.15.1 gemini-cli/0.34.0'; 2xx is valid, anything else invalid with the upstream message; a 401 refreshes and tests once more"
+    - "Model listing POST https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels { project } with the loadCodeAssist headers; models as an array (id, model or name) or an object keyed by id without isInternal"
+  state:
+    reads: ["providerConnections (accessToken, refreshToken, projectId)"]
+    writes: ["providerConnections on sign-in, refresh and a discovered projectId"]
+    runtimeOnly: ["project id cache (1 hour) and pending fetches"]
+  dependencies: ["oauth.dashboard-flow", "oauth.refresh-lifecycle", "translator.openai-to-gemini-request", "translator.gemini-to-openai-response"]
+  providerInteraction: "accounts.google.com and oauth2.googleapis.com (authorize, token), www.googleapis.com (userinfo), cloudcode-pa.googleapis.com (loadCodeAssist, onboardUser, generateContent, fetchAvailableModels)"
+  fallback: { hasFallback: true, retry: "reactive refresh on 401/403", timeout: null, quota: "429 RetryInfo.retryDelay surfaced as retryAfter for the account cooldown" }
+  errorCases:
+    - { code: AUTH_ERROR, when: "token refused or refresh failed", partial: false }
+    - { code: RATE_LIMIT, when: "429 RESOURCE_EXHAUSTED", partial: false }
+  sideEffects: ["onboardUser can provision a Cloud Code project for the account"]
+  persistence: ["providerConnections oauth row with projectId"]
+  performanceConcerns: ["a cold project lookup with onboarding can hold a request for about a minute"]
+  behavior: { streaming: true, cancellation: null, concurrency: "concurrent project lookups for one connection share one fetch" }
+  edgeCases:
+    - "The sign-in lookup sends mode 1 and no client headers; the request-path lookup sends Antigravity's ideType 9 for Gemini CLI too; the test sends string enums"
+    - "Deprecated in 9router's catalog with a risk notice"
+  evidence:
+    - { file: open-sse/providers/registry/gemini-cli.js, line: 23, note: "base URL, format gemini-cli, CLI version, API client" }
+    - { file: open-sse/providers/shared.js, line: 101, note: "GOOGLE_OAUTH_CLIENT id and secret" }
+    - { file: src/lib/oauth/providers/gemini-cli.js, line: 41, note: "postExchange: userinfo and loadCodeAssist" }
+    - { file: open-sse/executors/gemini-cli.js, line: 10, note: "URL, headers, envelope, refresh" }
+    - { file: open-sse/translator/request/openai-to-gemini.js, line: 265, note: "wrapInCloudCodeEnvelope" }
+    - { file: open-sse/services/projectId.js, line: 158, note: "fetchProjectId and onboardUser" }
+    - { file: src/sse/handlers/chat.js, line: 256, note: "cold-miss project lookup on the request path" }
+    - { file: "src/app/api/providers/[id]/test/testUtils.js", line: 180, note: "loadCodeAssist test probe" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 451, note: "fetchAvailableModels listing" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "A sign-in without a Cloud Code project fails or retries; requests keep one session; the three loadCodeAssist calls describe the same client"
+    actual: "The connection is saved with an empty project and requests fall back to a random project name; every request gets a new session id; the calls describe Gemini CLI as Antigravity (ideType 9) or as unspecified"
+    impact: "A connection reads as signed in but its requests fail on a project that does not exist; no conversation caching across turns"
+
+- id: provider.antigravity-oauth
+  group: OAuth providers
+  feature: Antigravity (Google IDE) sign-in
+  subFeature: "antigravity: Google OAuth with the public Antigravity client, the IDE's Cloud Code endpoint daily-cloudcode-pa.googleapis.com, Gemini and Claude models in one envelope, image generation, IDE request ids"
+  trigger: "Dashboard sign-in for Antigravity; any request routed to provider antigravity"
+  input: "Authorization code from the dashboard /callback"
+  output: "An oauth connection { accessToken, refreshToken, expiresIn, scope, email, projectId }; generateContent answers"
+  businessRules:
+    - "Authorize and exchange as provider.gemini-cli-oauth with the Antigravity client_id and client_secret (9router open-sse/providers/shared.js ANTIGRAVITY_OAUTH_CLIENT), and the extra scopes cclog and experimentsandconfigs"
+    - "After the exchange: userinfo with x-request-source local, then loadCodeAssist { metadata } with User-Agent antigravity/ide/2.11.0 darwin/arm64 and x-request-source local; the projectId as for gemini-cli, the default allowed tier (else legacy-tier); when a project was found, onboardUser { tierId, metadata } runs in the background up to 10 times 5 s apart until done"
+    - "Refresh as gemini-cli with the Antigravity client, 5 minutes before expiry; the request-path project lookup uses only content-type and the Antigravity User-Agent"
+    - "Requests: POST https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse or :generateContent, Authorization Bearer, User-Agent antigravity/ide/2.11.0 darwin/arm64"
+    - "A catalog model's upstreamModelId (e.g. gemini-3.8-flash-high(high)) is sent without its '(level)' suffix, and the suffix sets the thinking level"
+    - "Gemini models: the Gemini request (Antigravity thought signature) in { project, model, userAgent: antigravity, requestId, request }; safetySettings are not sent; requestType is never sent on the chat path"
+    - "Claude models (name contains claude): the request is first translated to Claude, then to Gemini contents: text, tool_use -> functionCall { id, sanitized name, args } with the cached or (first call) Antigravity signature, tool_result -> functionResponse { id, name of its call, response { result } }; images and thinking dropped; generationConfig { temperature (0 becomes 1), maxOutputTokens = max_tokens }; tools with input_schema only"
+    - "Then for every chat request: a part holding a functionResponse makes its turn user; thought-only and signature-only parts removed; same-role turns merged; tool groups merged into one functionDeclarations list, deduplicated by sanitized name, schemas cleaned, a tool without parameters gets { reason: string } required; thinking fields at the request root removed; system prompt rewrites (the Claude Agent SDK sentence removed, Hermes Agent line reworded, x-anthropic-billing-header lines removed, OpenCode -> Antigravity); maxOutputTokens capped at 64000; toolConfig VALIDATED when tools"
+    - "sessionId: a per-connection id kept in memory, sent as a signed 63-bit number; requestId agent/<uuid from the session>/<epoch ms>/<uuid from session, model and type>/<2 x contents - 1>"
+    - "Image models (name contains image or imagen): always non-streaming generateContent; text parts only; generationConfig { temperature 1, topP 0.95, topK 40, maxOutputTokens 8192, imageConfig { aspectRatio from a -WxH suffix, else 1:1 } }; requestType image_gen; no tools, system or safety settings"
+    - "Retries: 429, 500, 502 and 503 up to 3 times, 504 twice; the wait is Retry-After, x-ratelimit-reset-after, x-ratelimit-reset or 'reset after 1h2m3s' in the body when at most 10 s (a longer one is not retried); otherwise transient answers (429, 5xx, or high traffic / capacity / temporarily unavailable / timeout / stream ended / empty response texts) wait 2 s, 4 s, 8 s (at most 10 s for 429, 15 s otherwise)"
+    - "Connection test: loadCodeAssist as for gemini-cli with User-Agent 'google-api-nodejs-client/9.15.1 vscode-antigravity/1.107.0'"
+    - "Model listing POST https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:models {} with Bearer; the models array is the list"
+  state:
+    reads: ["providerConnections (accessToken, refreshToken, projectId, email)"]
+    writes: ["providerConnections on sign-in, refresh and a discovered projectId"]
+    runtimeOnly: ["session id per connection (at most 1000)", "thought signature cache"]
+  dependencies: ["provider.gemini-cli-oauth", "oauth.refresh-lifecycle", "translator.openai-to-gemini-request", "translator.gemini-to-openai-response", "account.antigravity-quota-prefilter"]
+  providerInteraction: "Google OAuth, cloudcode-pa.googleapis.com (loadCodeAssist, onboardUser), daily-cloudcode-pa.googleapis.com (generateContent), daily-cloudcode-pa.sandbox.googleapis.com (models)"
+  fallback: { hasFallback: true, retry: "429/5xx retried with Retry-After or backoff; reactive refresh on 401/403", timeout: null, quota: "quota cache and strike breaker (account.antigravity-quota-prefilter, SP17)" }
+  errorCases:
+    - { code: AUTH_ERROR, when: "token refused or refresh failed", partial: false }
+    - { code: RATE_LIMIT, when: "429 after the retries, or a reset longer than 10 s", partial: false }
+  sideEffects: ["onboardUser can provision a Cloud Code project for the account"]
+  persistence: ["providerConnections oauth row with projectId"]
+  performanceConcerns: ["retries can hold a request for about 15 s"]
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "AntigravityExecutor.cloakTools (the _ide renames and decoy tools) is never called"
+    - "The Claude path drops the client's thinking request and images without an error"
+  evidence:
+    - { file: open-sse/providers/registry/antigravity.js, line: 21, note: "base URL, User-Agent, retry, models with upstreamModelId, oauth config" }
+    - { file: open-sse/providers/shared.js, line: 88, note: "IDE version 2.11.0, daily host, Antigravity OAuth client" }
+    - { file: src/lib/oauth/providers/antigravity.js, line: 41, note: "postExchange: userinfo, loadCodeAssist, background onboarding" }
+    - { file: open-sse/executors/antigravity.js, line: 137, note: "transformRequest: image path, contents fixes, tools, rewrites, cap, envelope" }
+    - { file: open-sse/executors/antigravity.js, line: 421, note: "computeRetryDelay" }
+    - { file: open-sse/executors/antigravity.js, line: 454, note: "cloakTools, no caller" }
+    - { file: open-sse/translator/request/openai-to-gemini.js, line: 301, note: "wrapInCloudCodeEnvelopeForClaude" }
+    - { file: open-sse/config/appConstants.js, line: 179, note: "ANTIGRAVITY_PROMPT_REWRITES" }
+    - { file: "src/app/api/providers/[id]/models/route.js", line: 208, note: "antigravity model listing" }
+  newModule: connections
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG, IMPLEMENTATION_ACCIDENT]
+  suspicion:
+    expected: "Claude models keep the client's thinking and images; a tool without parameters is sent without them; onboarding runs when no project exists; the model list uses the chat host"
+    actual: "The Claude path drops thinking and images, temperature 0 becomes 1, a parameterless tool gets a required reason argument, onboarding runs only when a project already exists, and models are listed from the sandbox host"
+    impact: "Claude answers ignore reasoning settings and pictures; tool calls carry an extra argument; accounts without a project stay without one"

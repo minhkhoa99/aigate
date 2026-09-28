@@ -91,6 +91,19 @@ export abstract class HttpProviderAdapter {
     });
   }
 
+  // 9router's streaming check: a body without a content type is read as SSE (codex sends none), and any other type (an
+  // HTML error page, JSON) is refused with the page title, the upstream error message, or a short body.
+  protected async sseBody(response: HttpResponse, credential: Credential): Promise<ReadableStream<Uint8Array>> {
+    const type = (response.headers["content-type"] ?? "").toLowerCase();
+    if (response.body && (type === "" || type.includes("text/event-stream"))) return response.body;
+    const raw = await readBoundedText(response.body, ERROR_BODY_BYTES).catch(() => "");
+    const title = /<title>([^<]+)<\/title>/i.exec(raw)?.[1];
+    const root = record(parseJson(raw));
+    const said = title ?? text(record(root.error).message) ?? text(root.error) ?? text(root.message) ?? (raw.length < 200 ? raw : undefined);
+    const message = this.clean(said?.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim(), credential);
+    throw this.invalid(`a non-SSE response to a streaming request (${response.status}, ${type || "no body"})${message ? `: ${message}` : ""}`);
+  }
+
   protected streamError(value: unknown, credential: Credential, partial: boolean): EngineError {
     const error = record(value);
     const message = this.clean(text(error.message) ?? text(value), credential);

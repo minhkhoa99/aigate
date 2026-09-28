@@ -1,3 +1,5 @@
+// First: loads .env into process.env before any other module reads it.
+import "./env.js";
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";

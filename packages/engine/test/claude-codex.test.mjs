@@ -289,6 +289,10 @@ test("codex requests: headers, the account header, the stream collapsed for exec
   assert.equal(JSON.parse(call.body).stream, true);
   await createAdapter(codex, transport).execute({ model: "gpt-5.5", stream: false, messages: [] }, { kind: "api-key", apiKey: "at" }, ctx);
   assert.deepEqual([transport.calls[1].headers.session_id, JSON.parse(transport.calls[1].body).prompt_cache_key, transport.calls[1].headers["chatgpt-account-id"]], ["default", "default", undefined]);
+  const bare = sse(events);
+  delete bare.headers["content-type"];
+  const noType = await createAdapter(connected, fakeTransport(bare)).execute({ model: "gpt-5.5", stream: false, messages: [{ role: "user", content: [{ type: "text", text: "q" }] }] }, { kind: "api-key", apiKey: "at" }, ctx);
+  assert.equal(noType.content[0].text, "Hi", "codex's stream without a content type is still read as SSE (9router)");
 
   const models = fakeTransport(json(200, { models: [{ slug: "gpt-5.5", display_name: "GPT" }, { slug: "gpt-image-2", type: "image" }, { id: "text-embed" }, { id: "gpt-5.4-review" }, { id: "has space" }] }));
   const listed = await createAdapter(connected, models).getModels({ kind: "api-key", apiKey: "at" }, ctx);

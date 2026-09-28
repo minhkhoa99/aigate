@@ -8,3 +8,9 @@ apps/server/dist/
 packages/database/dist/
 packages/engine/dist/
 .playwright-mcp/
+# Local settings and secrets (see .env.example); never committed.
+.env
+.env.*
+!.env.example
+# Throwaway data dirs of local checks (they hold a secret key).
+.tmp-*/

@@ -265,9 +265,24 @@ test("an error event mid-stream fails the stream as partial, with the credential
 test("stream failures before the first chunk are thrown from the first next()", async () => {
   const html = { status: 200, headers: { "content-type": "text/html" }, body: body("<html>captive portal</html>") };
   const iterator = new OpenAICompatibleAdapter(openai, fakeTransport(html)).stream(hello, credential, ctx())[Symbol.asyncIterator]();
-  await assert.rejects(iterator.next(), isCode("PROVIDER_UNAVAILABLE", (error) => error.details.partial === undefined));
-  assert.equal(html.body.cancelled, true);
+  await assert.rejects(iterator.next(), isCode("PROVIDER_UNAVAILABLE", (error) => error.details.partial === undefined
+    && error.message === "OpenAI sent a non-SSE response to a streaming request (200, text/html): captive portal"));
   await assert.rejects(collect(new OpenAICompatibleAdapter(openai, fakeTransport(json(401, {}))).stream(hello, credential, ctx())), isCode("AUTH_ERROR"));
+});
+
+test("9router's streaming check: no content type is SSE; another type is refused with its title or error message", async () => {
+  const bare = sse(streamEvents);
+  delete bare.headers["content-type"];
+  const chunks = await collect(new OpenAICompatibleAdapter(openai, fakeTransport(bare)).stream(hello, credential, ctx()));
+  assert.equal(chunks.at(-1).type, "stop", "a stream without a content type (codex sends none) is read as SSE");
+  const page = { status: 200, headers: { "content-type": "text/html; charset=utf-8" }, body: body(`<html><head><title>Just a moment...</title></head>${"x".repeat(300)}</html>`) };
+  await assert.rejects(collect(new OpenAICompatibleAdapter(openai, fakeTransport(page)).stream(hello, credential, ctx())),
+    (error) => error.message === "OpenAI sent a non-SSE response to a streaming request (200, text/html; charset=utf-8): Just a moment...");
+  await assert.rejects(collect(new OpenAICompatibleAdapter(openai, fakeTransport(json(200, { error: { message: `quota for ${credential.apiKey} used` } }))).stream(hello, credential, ctx())),
+    (error) => error.message === "OpenAI sent a non-SSE response to a streaming request (200, application/json): quota for *** used", "the JSON error message, the key redacted");
+  const long = { status: 200, headers: { "content-type": "text/plain" }, body: body("y".repeat(300)) };
+  await assert.rejects(collect(new OpenAICompatibleAdapter(openai, fakeTransport(long)).stream(hello, credential, ctx())),
+    (error) => error.message === "OpenAI sent a non-SSE response to a streaming request (200, text/plain)", "a long body without a title is not shown");
 });
 
 test("stream bounds: an endless line, a wild tool index; an early break cancels the body", async () => {

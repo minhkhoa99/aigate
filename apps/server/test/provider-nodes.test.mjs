@@ -2,7 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { withTempDb } from "./helpers.mjs";
-import { completion, fakeUpstream, hello, json, ready } from "./lane-helpers.mjs";
+import { DatabaseSync } from "node:sqlite";
+import { chunk, completion, fakeUpstream, frames, hello, json, ready, sse } from "./lane-helpers.mjs";
 
 const body = { name: "Local LLM", prefix: "local", baseUrl: "https://llm.example.com/v1/" };
 
@@ -17,7 +18,8 @@ test("create stores the fields as 9router does; bad fields name the problem", ()
     const node = res.json();
     assert.match(node.id, /^openai-compatible-chat-[0-9a-f]{12}$/, "9router ids embed the apiType");
     assert.deepEqual([node.name, node.prefix, node.baseUrl], ["Local LLM", "local", "https://llm.example.com/v1/"], "trimmed, otherwise as given");
-    assert.deepEqual(Object.keys(node).sort(), ["apiType", "baseUrl", "createdAt", "id", "name", "prefix", "type", "updatedAt"]);
+    assert.deepEqual(Object.keys(node).sort(), ["apiType", "baseUrl", "createdAt", "customHeaders", "id", "name", "prefix", "retryStreamErrors", "type", "updatedAt"]);
+    assert.deepEqual([node.customHeaders, node.retryStreamErrors], [[], false], "no headers and no retry unless asked");
     assert.equal(node.apiType, "chat", "chat when apiType is left out");
     assert.equal(node.type, "openai-compatible", "the default type");
     const defaulted = await create({ name: "No URL", prefix: "nourl" });
@@ -225,5 +227,99 @@ test("deleting a custom provider deletes its connection; the prefix then routes 
     assert.equal((await chat({ ...hello, model: "local/llama-3" })).json().error.code, "model_not_found");
     const orphan = await dash({ method: "POST", url: "/api/connections", body: { provider: node.id, apiKey: "sk-local-key-1234" } });
     assert.deepEqual([orphan.statusCode, orphan.json().code], [400, "PROVIDER_NOT_SUPPORTED"]);
+    await app.close();
+  }));
+
+// ---- Custom headers and stream retries (AIGate options, docs/contracts/custom-providers.md) ----
+
+test("custom headers are sealed, shown as a name and a hint, merged on update, and sent with every request; AIGate's own headers are refused", () =>
+  withTempDb(async (file) => {
+    const upstream = fakeUpstream(json(200, completion), json(200, completion), json(200, completion));
+    const { app, dash, chat } = await ready(file, upstream);
+    const create = (payload) => dash({ method: "POST", url: "/api/provider-nodes", body: { ...body, ...payload } });
+    const res = await create({ customHeaders: [{ name: " X-Team ", value: " team-secret-1234 " }, { name: "x-short", value: "abc" }] });
+    assert.equal(res.statusCode, 201);
+    assert.deepEqual(res.json().customHeaders, [{ name: "x-team", hint: "••••1234" }, { name: "x-short", hint: "••••" }], "lower-case names, values trimmed and hidden");
+    assert.equal(JSON.stringify((await dash({ url: "/api/provider-nodes" })).json()).includes("team-secret"), false, "no value in any view");
+    const node = res.json();
+    for (const [headers, pattern] of [
+      [[{ name: "Authorization", value: "Bearer x" }], /authorization is set by AIGate/],
+      [[{ name: "content-type", value: "text/plain" }], /content-type is set by AIGate/],
+      [[{ name: "proxy-foo", value: "1" }], /proxy-foo is set by AIGate/],
+      [[{ name: "x team", value: "1" }], /header name must be/],
+      [[{ name: "x-a", value: "line\nbreak" }], /printable ASCII/],
+      [[{ name: "x-a", value: "1" }, { name: "X-A", value: "2" }], /x-a appears twice/],
+      [[{ name: "x-a" }], /x-a needs a value/],
+      [Array.from({ length: 21 }, (_, i) => ({ name: `x-${i}`, value: "1" })), /at most 20/],
+      ["x-a: 1", /list of/],
+    ]) {
+      const bad = await create({ prefix: "bad", customHeaders: headers });
+      assert.deepEqual([bad.statusCode, bad.json().code], [400, "INVALID_REQUEST"], JSON.stringify(headers));
+      assert.match(bad.json().message, pattern);
+    }
+    await dash({ method: "POST", url: "/api/connections", body: { provider: node.id, apiKey: "sk-local-key-1234" } });
+    assert.equal((await chat({ ...hello, model: "local/llama-3" })).statusCode, 200);
+    const first = upstream.calls[0].request.headers;
+    assert.deepEqual([first["x-team"], first["x-short"], first.authorization, first["content-type"]], ["team-secret-1234", "abc", "Bearer sk-local-key-1234", "application/json"]);
+
+    const patch = (payload) => dash({ method: "PATCH", url: `/api/provider-nodes/${node.id}`, body: payload });
+    const merged = await patch({ customHeaders: [{ name: "x-team" }, { name: "x-new", value: "new-value-5678" }] });
+    assert.deepEqual(merged.json().customHeaders, [{ name: "x-team", hint: "••••1234" }, { name: "x-new", hint: "••••5678" }], "a header without a value keeps it; one left out goes");
+    const missing = await patch({ customHeaders: [{ name: "x-unknown" }] });
+    assert.deepEqual([missing.statusCode, missing.json().code], [400, "INVALID_REQUEST"]);
+    assert.match(missing.json().message, /x-unknown needs a value/);
+    assert.equal((await chat({ ...hello, model: "local/llama-3" })).statusCode, 200);
+    const second = upstream.calls[1].request.headers;
+    assert.deepEqual([second["x-team"], second["x-new"], second["x-short"]], ["team-secret-1234", "new-value-5678", undefined]);
+    assert.deepEqual((await patch({ customHeaders: [] })).json().customHeaders, [], "an empty list clears them");
+    assert.equal((await chat({ ...hello, model: "local/llama-3" })).statusCode, 200);
+    assert.equal(upstream.calls[2].request.headers["x-team"], undefined);
+    await patch({ customHeaders: [{ name: "x-kept", value: "kept-secret-9999" }] });
+    await app.close();
+    const db = new DatabaseSync(file, { readOnly: true });
+    const sealed = db.prepare("select custom_headers_sealed from provider_nodes where id = ?").get(node.id).custom_headers_sealed;
+    db.close();
+    assert.equal(typeof sealed, "string");
+    assert.equal(sealed.includes("kept-secret"), false, "the values are sealed at rest");
+  }));
+
+test("retryStreamErrors is off by default; when on, a stream error before any content and a 429 are sent again, twice at most", () =>
+  withTempDb(async (file) => {
+    const failing = { error: { message: "Temporary service interruption. Retry the last turn.", type: "server_error" } };
+    const answer = [chunk({ role: "assistant" }), chunk({ content: "Hi" }), chunk({}, { finish_reason: "stop" }), "[DONE]"];
+    const upstream = fakeUpstream(
+      sse([failing]),
+      sse([failing]), sse([failing]), sse(answer),
+      sse([failing]), sse([failing]), sse([failing]),
+      json(429, { error: { message: "slow down" } }), json(200, completion),
+      json(429, { error: { message: "no credit", code: "insufficient_quota" } }),
+      sse([chunk({ content: "partial" }), failing]),
+    );
+    const { app, dash, chat } = await ready(file, upstream);
+    const node = (await dash({ method: "POST", url: "/api/provider-nodes", body })).json();
+    await dash({ method: "POST", url: "/api/connections", body: { provider: node.id, apiKey: "sk-local-key-1234" } });
+    const stream = { ...hello, model: "local/llama-3", stream: true };
+    const off = await chat(stream);
+    assert.equal(off.statusCode, 502, "off: the stream error reaches the client at once");
+    assert.equal(upstream.calls.length, 1);
+
+    const on = await dash({ method: "PATCH", url: `/api/provider-nodes/${node.id}`, body: { retryStreamErrors: true } });
+    assert.equal(on.json().retryStreamErrors, true);
+    const retried = await chat(stream);
+    assert.equal(retried.statusCode, 200);
+    const received = frames(retried.body).filter((frame) => frame !== "[DONE]");
+    assert.equal(received.filter((frame) => frame.choices?.[0]?.delta?.role === "assistant").length, 1, "one start, not one per attempt");
+    assert.equal(received.map((frame) => frame.choices?.[0]?.delta?.content ?? "").join(""), "Hi");
+    assert.equal(upstream.calls.length, 4, "two failures, then the answer");
+    assert.equal((await chat(stream)).statusCode, 502, "three failures: the error reaches the client");
+    assert.equal(upstream.calls.length, 7);
+    assert.equal((await chat({ ...hello, model: "local/llama-3" })).statusCode, 200, "a 429 is retried for a non-streaming request too");
+    assert.equal(upstream.calls.length, 9);
+    assert.equal((await chat({ ...hello, model: "local/llama-3" })).json().error.code, "insufficient_quota", "a spent quota is not retried");
+    assert.equal(upstream.calls.length, 10);
+    const partial = await chat(stream);
+    assert.equal(upstream.calls.length, 11, "an error after content is never retried");
+    assert.match(partial.body, /partial/);
+    assert.equal((await dash({ method: "PATCH", url: `/api/provider-nodes/${node.id}`, body: { retryStreamErrors: "yes" } })).json().code, "INVALID_REQUEST");
     await app.close();
   }));

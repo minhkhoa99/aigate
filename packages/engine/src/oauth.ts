@@ -2,6 +2,7 @@ import { EngineError } from "./errors.js";
 import { readBoundedText } from "./http.js";
 import { isRecord, parseJson, record, text } from "./json.js";
 import type { CredentialStatus, ExecCtx, HttpTransportPort } from "./ports.js";
+import { cloudCodeCall, codeAssistMetadata, projectOf } from "./adapters/cloud-code.js";
 
 // OAuth sign-in and refresh for the SP16 and SP16b providers (docs/contracts/oauth.md). Kept as 9router has them (user decisions
 // 2026-09-27): cline, clinepass (whose tokens the ClinePass API rejects, #2333), gitlab (PKCE with the operator's own
@@ -483,7 +484,94 @@ const github: OAuthProvider = {
   },
 };
 
-export const OAUTH_PROVIDERS: Readonly<Record<string, OAuthProvider>> = { cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi, claude, codex, github };
+// ---- Google Cloud Code sign-ins (provider.gemini-cli-oauth), kept as 9router has them (user decision 2026-09-27) ----
+
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v1/userinfo?alt=json";
+const GOOGLE_SCOPES = ["cloud-platform", "userinfo.email", "userinfo.profile"].map((scope) => `https://www.googleapis.com/auth/${scope}`);
+
+// The public OAuth client of the CLI or IDE AIGate signs in as. 9router ships both in its source; AIGate reads them from
+// the environment (.env, see .env.example) so that no client secret is in the repository, and checks them on each use.
+interface GoogleClient { readonly id: string; readonly secret: string; readonly scopes: readonly string[] }
+export const GOOGLE_CLIENT_ENV: Readonly<Record<string, { readonly id: string; readonly secret: string }>> = {
+  "gemini-cli": { id: "AIGATE_GEMINI_CLI_OAUTH_CLIENT_ID", secret: "AIGATE_GEMINI_CLI_OAUTH_CLIENT_SECRET" },
+};
+// After the exchange: the account's email and its Cloud Code project, both optional.
+type GoogleAccount = (accessToken: string, io: OAuthIO) => Promise<{ email?: string; projectId?: string }>;
+
+function googleClient(provider: string, label: string, scopes: readonly string[]): GoogleClient {
+  const names = GOOGLE_CLIENT_ENV[provider];
+  const id = names ? process.env[names.id]?.trim() : undefined;
+  const secret = names ? process.env[names.secret]?.trim() : undefined;
+  if (!names || !id || !secret) {
+    throw new EngineError("INVALID_REQUEST", `${label} sign-in needs ${names?.id ?? "its client id"} and ${names?.secret ?? "its client secret"} in AIGate's .env (see .env.example), then a restart`, { provider });
+  }
+  return { id, secret, scopes };
+}
+
+function googleSignIn(provider: string, label: string, scopes: readonly string[], account: GoogleAccount): OAuthProvider {
+  const current = () => googleClient(provider, label, scopes);
+  return {
+    flow: "authorization_code",
+    authUrl: (redirectUri, state) => {
+      const client = current();
+      return `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
+        client_id: client.id, response_type: "code", redirect_uri: redirectUri, scope: client.scopes.join(" "), state, access_type: "offline", prompt: "consent",
+      }).toString()}`;
+    },
+    async exchange(code, redirectUri, _verifier, _meta, io) {
+      const client = current();
+      const answer = await call(io, "POST", GOOGLE_TOKEN_URL, FORM_HEADERS,
+        new URLSearchParams({ grant_type: "authorization_code", client_id: client.id, client_secret: client.secret, code, redirect_uri: redirectUri }).toString());
+      if (!answer.ok) throw failed(provider, `Token exchange failed: ${answer.text}`);
+      const root = record(parseJson(answer.text));
+      const accessToken = text(root.access_token);
+      if (!accessToken) throw failed(provider, `${label} returned no access token`);
+      // The connection is saved even when no project was found (kept); requests then look it up again.
+      const { email, projectId } = await account(accessToken, io);
+      const refreshToken = text(root.refresh_token);
+      return {
+        accessToken,
+        ...(refreshToken ? { refreshToken } : {}),
+        ...(typeof root.expires_in === "number" ? { expiresIn: root.expires_in } : {}),
+        ...(email ? { email } : {}),
+        data: strings({ scope: root.scope, projectId }),
+      };
+    },
+    // The project stays as signed in; any failure is a refused refresh.
+    async refresh(refreshToken, io) {
+      const client = current();
+      const answer = await call(io, "POST", GOOGLE_TOKEN_URL, FORM_HEADERS,
+        new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: client.id, client_secret: client.secret }).toString());
+      if (!answer.ok) return null;
+      const root = record(parseJson(answer.text));
+      const accessToken = text(root.access_token);
+      if (!accessToken) return null;
+      return { accessToken, refreshToken: text(root.refresh_token) || refreshToken, ...(typeof root.expires_in === "number" ? { expiresIn: root.expires_in } : {}), data: {} };
+    },
+  };
+}
+
+// gemini-cli's postExchange: userinfo, then loadCodeAssist { metadata, mode: 1 } with no client headers; a failed
+// lookup leaves the project empty.
+const geminiCliAccount: GoogleAccount = async (token, io) => {
+  const user = await call(io, "GET", GOOGLE_USERINFO_URL, { authorization: `Bearer ${token}` });
+  const email = user.ok ? text(record(parseJson(user.text)).email) : undefined;
+  let projectId: string | undefined;
+  try {
+    const answer = await cloudCodeCall(io.transport, io.ctx, "loadCodeAssist", { authorization: `Bearer ${token}`, "content-type": "application/json" }, { metadata: codeAssistMetadata(), mode: 1 });
+    projectId = answer.ok ? projectOf(parseJson(answer.raw)) : undefined;
+  } catch {
+    projectId = undefined;
+  }
+  return { ...(email ? { email } : {}), ...(projectId ? { projectId } : {}) };
+};
+
+const geminiCli = googleSignIn("gemini-cli", "Gemini CLI", GOOGLE_SCOPES, geminiCliAccount);
+
+export const OAUTH_PROVIDERS: Readonly<Record<string, OAuthProvider>> = {
+  cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi, claude, codex, github, "gemini-cli": geminiCli,
+};
 
 // Cline OAuth access tokens are WorkOS JWTs sent as "workos:<jwt>"; a ClinePass API key (not a JWT) goes as is.
 // A token already prefixed does not start with "eyJ", so it passes as is.

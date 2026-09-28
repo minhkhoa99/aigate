@@ -4,15 +4,25 @@ import { AnthropicAdapter } from "./anthropic.js";
 import { CommandCodeAdapter } from "./commandcode.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
 import { GeminiAdapter } from "./gemini.js";
+import { GeminiCliAdapter } from "./gemini-cli.js";
 import { GithubAdapter } from "./github.js";
 import { OllamaAdapter } from "./ollama.js";
 import { OpenAIResponsesAdapter } from "./openai-responses.js";
+import { StreamRetryAdapter } from "./stream-retry.js";
 import { VertexAdapter, VertexPartnerAdapter } from "./vertex.js";
 
-// Adapters are chosen by protocol family, never per vendor (spec §4.2).
+// Adapters are chosen by protocol family, never per vendor (spec §4.2). A custom provider may ask for its stream
+// failures to be retried (docs/contracts/custom-providers.md).
 export function createAdapter(provider: ProviderDescriptor, transport: HttpTransportPort): AIProviderPort {
+  const adapter = familyAdapter(provider, transport);
+  return provider.retryStreamErrors ? new StreamRetryAdapter(adapter) : adapter;
+}
+
+function familyAdapter(provider: ProviderDescriptor, transport: HttpTransportPort): AIProviderPort {
   // provider.github-copilot-oauth: Copilot routes each model to one of three families (9router GithubExecutor).
   if (provider.quirks?.includes("copilot")) return new GithubAdapter(provider, transport);
+  // provider.gemini-cli-oauth: the Gemini protocol inside Cloud Code's envelope.
+  if (provider.quirks?.includes("geminiCli")) return new GeminiCliAdapter(provider, transport);
   switch (provider.protocol) {
     case "anthropic": return new AnthropicAdapter(provider, transport);
     case "openai-responses": return new OpenAIResponsesAdapter(provider, transport);

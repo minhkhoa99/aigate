@@ -319,10 +319,7 @@ export class GeminiAdapter extends OpenAICompatibleAdapter implements AIProvider
   // without finishReason still ends normally.
   override async *stream(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): AsyncGenerator<StreamChunk> {
     const response = await this.send(this.generate(request, credential, true), credential, ctx, RETRY.maxAttempts);
-    if (!response.body || !(response.headers["content-type"] ?? "").includes("text/event-stream")) {
-      await response.body?.cancel();
-      throw this.invalid("a non-SSE response to a streaming request");
-    }
+    const body = await this.sseBody(response, credential);
     let started = false;
     let calls = 0;
     let pending: string | undefined;
@@ -335,7 +332,7 @@ export class GeminiAdapter extends OpenAICompatibleAdapter implements AIProvider
       if (signature) rememberSignature(id, signature, request.model);
       return { type: "tool_call_delta", index, id, name, argumentsDelta: JSON.stringify(fn.args ?? {}) };
     };
-    for await (const data of readSseData(response.body)) {
+    for await (const data of readSseData(body)) {
       const chunk = record(parseJson(data));
       const body = isRecord(chunk.response) ? chunk.response : chunk;
       const candidate = list(body.candidates)[0];
@@ -401,13 +398,25 @@ export class GeminiAdapter extends OpenAICompatibleAdapter implements AIProvider
     }
   }
 
-  private generate(request: CanonicalRequest, credential: Credential, stream: boolean): HttpRequest {
-    const url = `${this.modelsBase?.(credential) ?? this.provider.chatUrl}/${request.model}:${stream ? "streamGenerateContent?alt=sse" : "generateContent"}`;
-    const base = this.request("POST", url, credential, stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS);
+  private wrapped(request: CanonicalRequest, credential: Credential): Json {
+    const body = toBody(request, this.bodyOptions);
+    return this.wrap?.(body, request, credential) ?? body;
+  }
+
+  // provider.gemini-cli-oauth: Cloud Code posts to <base>:<action> and wraps the body in its envelope.
+  protected generateUrl(request: CanonicalRequest, credential: Credential, stream: boolean): string {
+    return `${this.modelsBase?.(credential) ?? this.provider.chatUrl}/${request.model}:${stream ? "streamGenerateContent?alt=sse" : "generateContent"}`;
+  }
+
+  // An envelope around the Gemini body (gemini-cli); the Gemini API and Vertex send the body as is.
+  protected wrap?(body: Json, request: CanonicalRequest, credential: Credential): Json;
+
+  protected generate(request: CanonicalRequest, credential: Credential, stream: boolean): HttpRequest {
+    const base = this.request("POST", this.generateUrl(request, credential, stream), credential, stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS);
     return {
       ...base,
       headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json" },
-      body: JSON.stringify(toBody(request, this.bodyOptions)),
+      body: JSON.stringify(this.wrapped(request, credential)),
     };
   }
 }
