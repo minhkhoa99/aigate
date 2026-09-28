@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { asc, count, eq, sql } from "drizzle-orm";
 import { providerConnections, providerNodes, type DatabaseHandle } from "@aigate/database";
-import { ANTHROPIC_VERSION, CATALOG, type ProviderDescriptor } from "@aigate/engine";
+import { ANTHROPIC_VERSION, CATALOG, familyLevels, isThinkingLevel, type ProviderDescriptor, type ProviderProtocol, type ThinkingLevel } from "@aigate/engine";
 import { DATABASE } from "../../../database.provider.js";
 import { SECRET_CIPHER, SecretUnreadableError, type SecretCipherPort } from "../../../secret-cipher.js";
 import { mergeHeaders, MAX_NODES, type ApiType, type NodeChanges, type NodeFields, type NodeType } from "../domain/provider-node.js";
@@ -19,6 +19,9 @@ export interface NodeView {
   // Header values may be secrets: a view names each header with a hint of its value, never the value.
   customHeaders: { name: string; hint: string }[];
   retryStreamErrors: boolean;
+  // docs/contracts/provider-thinking.md: the level for every model the node serves, and the levels its family takes.
+  thinking: ThinkingLevel | "auto";
+  thinkingLevels: readonly ThinkingLevel[];
   createdAt: string;
   updatedAt: string;
 }
@@ -28,14 +31,23 @@ export type StoredNode = NodeView & { headers: Readonly<Record<string, string>> 
 const n = providerNodes;
 const columns = {
   id: n.id, type: n.type, apiType: n.apiType, name: n.name, prefix: n.prefix, baseUrl: n.baseUrl, customHeadersSealed: n.customHeadersSealed,
-  retryStreamErrors: n.retryStreamErrors, createdAt: n.createdAt, updatedAt: n.updatedAt,
+  retryStreamErrors: n.retryStreamErrors, thinkingLevel: n.thinkingLevel, createdAt: n.createdAt, updatedAt: n.updatedAt,
 };
 type Row = { id: string; type: NodeType; apiType: ApiType; name: string; prefix: string; baseUrl: string; customHeadersSealed: string | null;
-  retryStreamErrors: boolean; createdAt: Date; updatedAt: Date };
+  retryStreamErrors: boolean; thinkingLevel: ThinkingLevel | null; createdAt: Date; updatedAt: Date };
 
 // Authenticated with the sealed value, so the headers only open for this node.
 const headersContext = (id: string): string => `provider_nodes:${id}:custom_headers`;
+// auto is stored as null; the controller has already checked the level (takesThinking).
+const levelColumn = (level: string): ThinkingLevel | null => (isThinkingLevel(level) ? level : null);
 const hintOf = (value: string): string => (value.length > 8 ? `••••${value.slice(-4)}` : "••••");
+
+// The family a node speaks, for its thinking levels.
+export const nodeProtocol = (type: NodeType, apiType: ApiType | null): ProviderProtocol =>
+  type === "anthropic-compatible" ? "anthropic" : apiType === "responses" ? "openai-responses" : "openai-compatible";
+// auto, or a level the family takes; anything else is refused before it is stored.
+export const takesThinking = (type: NodeType, apiType: ApiType | null, level: string): boolean =>
+  level === "auto" || (isThinkingLevel(level) && familyLevels(nodeProtocol(type, apiType)).includes(level));
 
 // Every catalog id and alias, connectable or not: they always win over a custom prefix at /v1, as in 9router.
 const RESERVED = new Set(CATALOG.flatMap((p) => [p.id, ...p.aliases]));
@@ -46,7 +58,10 @@ export const isReservedPrefix = (prefix: string): boolean => RESERVED.has(prefix
 // routing.build-url: exactly one trailing "/" is removed before the path is appended.
 export function nodeDescriptor(node: StoredNode): ProviderDescriptor {
   const base = node.baseUrl.replace(/\/$/, "");
-  const shared = { id: node.id, name: node.name, modelsUrl: `${base}/models`, aliases: [], models: [], ...(node.retryStreamErrors ? { retryStreamErrors: true } : {}) };
+  const shared = {
+    id: node.id, name: node.name, modelsUrl: `${base}/models`, aliases: [], models: [], ...(node.retryStreamErrors ? { retryStreamErrors: true } : {}),
+    ...(node.thinking === "auto" ? {} : { defaultThinking: node.thinking }),
+  };
   if (node.type === "openai-compatible") {
     // connection.provider-node-api-type: the stored apiType picks the endpoint and the adapter.
     const responses = node.apiType === "responses";
@@ -104,7 +119,7 @@ export class ProviderNodesRepository {
       const headers = Object.fromEntries(fields.customHeaders.map((header) => [header.name, header.value ?? ""]));
       const [row] = await tx.insert(n).values({
         id, type: fields.type, apiType: fields.apiType, name: fields.name, prefix: fields.prefix, baseUrl: fields.baseUrl,
-        customHeadersSealed: this.seal(id, headers), retryStreamErrors: fields.retryStreamErrors, createdAt: now, updatedAt: now,
+        customHeadersSealed: this.seal(id, headers), retryStreamErrors: fields.retryStreamErrors, thinkingLevel: levelColumn(fields.thinking), createdAt: now, updatedAt: now,
       }).returning(columns);
       if (!row) throw new Error("insert returned no row");
       return this.view(row, headers);
@@ -116,7 +131,7 @@ export class ProviderNodesRepository {
     return this.database.db.transaction(async (tx) => {
       const current = await tx.select(columns).from(n).where(eq(n.id, id)).get();
       if (!current) return undefined;
-      const { customHeaders, ...rest } = changes;
+      const { customHeaders, thinking, ...rest } = changes;
       let headers = this.readableHeaders(current);
       if (customHeaders !== undefined) {
         const merged = mergeHeaders(customHeaders, headers);
@@ -124,7 +139,8 @@ export class ProviderNodesRepository {
         headers = merged.value;
       }
       const sealed = customHeaders === undefined ? {} : { customHeadersSealed: this.seal(id, headers) };
-      const [row] = await tx.update(n).set({ ...rest, ...sealed, updatedAt: new Date() }).where(eq(n.id, id)).returning(columns);
+      const level = thinking === undefined ? {} : { thinkingLevel: levelColumn(thinking) };
+      const [row] = await tx.update(n).set({ ...rest, ...sealed, ...level, updatedAt: new Date() }).where(eq(n.id, id)).returning(columns);
       return row ? this.view(row, headers) : undefined;
     });
   }
@@ -171,6 +187,7 @@ export class ProviderNodesRepository {
     return {
       id: row.id, type: row.type, apiType: row.type === "openai-compatible" ? row.apiType : null, name: row.name, prefix: row.prefix, baseUrl: row.baseUrl,
       customHeaders: Object.entries(headers).map(([name, value]) => ({ name, hint: hintOf(value) })), retryStreamErrors: row.retryStreamErrors,
+      thinking: row.thinkingLevel ?? "auto", thinkingLevels: familyLevels(nodeProtocol(row.type, row.apiType)),
       createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
     };
   }

@@ -25,8 +25,11 @@ const KNOWN_EFFORTS = new Set(["low", "medium", "high"]);
 
 export const isThinkingLevel = (value: unknown): value is ThinkingLevel => THINKING_LEVELS.some((level) => level === value);
 
+// A custom provider declares no models, so the level its user picked (defaultThinking) goes to every model.
 const reasons = (provider: ProviderDescriptor, model: string): boolean =>
-  provider.models.find((descriptor) => descriptor.id === model)?.capabilities.reasoning === true;
+  provider.defaultThinking !== undefined || provider.models.find((descriptor) => descriptor.id === model)?.capabilities.reasoning === true;
+
+export const familyLevels = (protocol: ProviderProtocol): readonly ThinkingLevel[] => FAMILY_LEVELS[protocol];
 
 // The picker's levels, or null when none of the provider's models reasons (9router hides the picker then).
 export function thinkingLevels(provider: ProviderDescriptor): readonly ThinkingLevel[] | null {

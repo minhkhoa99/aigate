@@ -23,9 +23,13 @@ A built-in provider can carry a default thinking level: the reasoning a request 
 | Ollama | none, low, medium, high |
 | Command Code | none, low, medium, high, xhigh, max |
 
-A provider none of whose catalog models reasons (`capabilities.reasoning`) has no levels, and the dashboard shows no picker. Custom providers have none (they declare no models).
+A provider none of whose catalog models reasons (`capabilities.reasoning`) has no levels, and the dashboard shows no picker.
+
+**Custom providers** (user request, 2026-09-28; 9router shows a picker for a custom provider only when its added models reason): a custom provider declares no models, so AIGate cannot tell which ones reason. Its own level, picked in its form, goes to **every** model it serves. The levels are its family's: OpenAI compatible (chat or Responses) none, minimal, low, medium, high, xhigh; Anthropic compatible none, low, medium, high, xhigh, max. It is stored on the node (`provider_nodes.thinking_level`, migration `0013`, null is auto), so it goes when the node goes. Note that a thinking request a client sends itself to a custom model the catalog does not know is still refused (`model_not_found` "does not support: reasoning", the existing capability check); the provider level is applied after that check.
 
 ## Storage and API
+
+Custom providers: `thinking` (auto or a level of the family) on `POST`/`PATCH /api/provider-nodes`, and `thinking`, `thinkingLevels` in the view; a level the family does not take is 400 `INVALID_REQUEST` "thinking must be auto or one of <levels>" ("thinking must be auto or a thinking level" for a non-string). Built-in providers:
 
 Table `provider_thinking` (migration `0012`): `provider` text primary key (a catalog id), `level` text (checked against the levels above), `updated_at` timestamp_ms. No row is `auto`. The rows are cached in memory and dropped on every write (they are read on every chat request).
 
@@ -37,7 +41,7 @@ Table `provider_thinking` (migration `0012`): `provider` text primary key (a cat
 After the client protocol's own preparation (so an Anthropic client's budget has already become an effort for an OpenAI-style provider), and for the per-model test too, a stored level is applied when all of these hold:
 
 - the request carries no thinking of its own (no `reasoning`, no OpenAI `reasoning_effort`);
-- the model is a catalog model of the provider that reasons (9router strips thinking from the others; an id the catalog does not know is left alone);
+- the model is a catalog model of the provider that reasons (9router strips thinking from the others; an id the catalog does not know is left alone), or the provider is a custom one with its own level;
 - the provider's family takes the level.
 
 Then, as if the client had sent it: an Anthropic-family provider gets a thinking budget (9router `effortToBudget`: minimal 512, low 1024, medium 8192, high 24576, xhigh 32768, max 128000; `none` sends nothing, Claude's default), and any other family gets `reasoning_effort` (low, medium and high as CIP's typed effort, the others as the OpenAI field). A Claude model behind an OpenAI-style provider (Copilot's `/v1/messages`) takes only low, medium and high, the efforts the Anthropic adapter maps; another level is not sent.

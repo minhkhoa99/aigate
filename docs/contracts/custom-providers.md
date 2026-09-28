@@ -44,6 +44,7 @@ At most **100** custom providers (409 `NODE_LIMIT`); the count and the insert ru
 - `apiType` (SP14c, `connection.provider-node-api-type`): `chat` or `responses`, else 400 "apiType must be chat or responses"; only on OpenAI-compatible providers (400 "apiType applies only to OpenAI-compatible providers"); changeable by PATCH, applied to the next request. Left out on create it is `chat`: 9router refuses a missing apiType, AIGate keeps the pre-SP14c behavior.
 - `customHeaders` (an AIGate option, not in 9router): a list of `{ name, value }`, at most 20. A name is 1–64 RFC 9110 token characters (letters, digits and the punctuation a header name allows), stored lower-case, unique regardless of case; `authorization`, `x-api-key`, `content-type`, `content-length`, `accept`, `host`, `connection`, `keep-alive`, `transfer-encoding`, `te`, `trailer`, `upgrade`, `expect` and any `proxy-*` are refused ("… is set by AIGate and cannot be a custom header"). A value is trimmed, 1–2048 printable ASCII characters. On create every header needs a value. On PATCH the list replaces the stored one: a header sent without a value keeps the value stored under its name (400 "the custom header <name> needs a value" when there is none), one left out is removed, and `[]` removes them all; the read, merge and write run in one transaction.
 - `retryStreamErrors` (an AIGate option, not in 9router): `true` or `false`, default `false`.
+- `thinking`: `auto` (default) or a thinking level of the node's family, sent to every model the node serves when a request asks for no thinking (`provider-thinking.md`; column `thinking_level`, migration `0013`).
 - Unknown body keys are 400.
 
 **Custom headers on the wire.** They go with every request to the provider (chat, the connection test, the model list), before the family's own headers, so the key, `anthropic-version` (overridable on an Anthropic-compatible provider), `content-type` and `accept` always come from AIGate. The values are never returned: a view names each header with a hint (`••••` and the last 4 characters of a value longer than 8, else `••••`). Headers sealed under an older secret key read as none in the dashboard views (so they can be entered again), while a request to the provider fails as for an unreadable key.
@@ -56,7 +57,7 @@ The Base URL form asks for the **upstream provider API**, not AIGate's own `/v1`
 
 ## API (dashboard session)
 
-Every response is `Cache-Control: no-store`. The view is `{ id, type, apiType, name, prefix, baseUrl, customHeaders: [{ name, hint }], retryStreamErrors, createdAt, updatedAt }` (`apiType` is `null` for an Anthropic-compatible provider).
+Every response is `Cache-Control: no-store`. The view is `{ id, type, apiType, name, prefix, baseUrl, customHeaders: [{ name, hint }], retryStreamErrors, thinking, thinkingLevels, createdAt, updatedAt }` (`apiType` is `null` for an Anthropic-compatible provider).
 
 | Method and path | Body | Success | Errors |
 |---|---|---|---|

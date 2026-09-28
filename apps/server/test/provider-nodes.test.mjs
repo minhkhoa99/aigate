@@ -18,7 +18,8 @@ test("create stores the fields as 9router does; bad fields name the problem", ()
     const node = res.json();
     assert.match(node.id, /^openai-compatible-chat-[0-9a-f]{12}$/, "9router ids embed the apiType");
     assert.deepEqual([node.name, node.prefix, node.baseUrl], ["Local LLM", "local", "https://llm.example.com/v1/"], "trimmed, otherwise as given");
-    assert.deepEqual(Object.keys(node).sort(), ["apiType", "baseUrl", "createdAt", "customHeaders", "id", "name", "prefix", "retryStreamErrors", "type", "updatedAt"]);
+    assert.deepEqual(Object.keys(node).sort(), ["apiType", "baseUrl", "createdAt", "customHeaders", "id", "name", "prefix", "retryStreamErrors", "thinking", "thinkingLevels", "type", "updatedAt"]);
+    assert.deepEqual([node.thinking, node.thinkingLevels], ["auto", ["none", "minimal", "low", "medium", "high", "xhigh"]], "auto unless asked; the OpenAI family's levels");
     assert.deepEqual([node.customHeaders, node.retryStreamErrors], [[], false], "no headers and no retry unless asked");
     assert.equal(node.apiType, "chat", "chat when apiType is left out");
     assert.equal(node.type, "openai-compatible", "the default type");
@@ -321,5 +322,36 @@ test("retryStreamErrors is off by default; when on, a stream error before any co
     assert.equal(upstream.calls.length, 11, "an error after content is never retried");
     assert.match(partial.body, /partial/);
     assert.equal((await dash({ method: "PATCH", url: `/api/provider-nodes/${node.id}`, body: { retryStreamErrors: "yes" } })).json().code, "INVALID_REQUEST");
+    await app.close();
+  }));
+
+// ---- A custom provider's thinking level (docs/contracts/provider-thinking.md) ----
+
+test("a custom provider's thinking level goes to every model it serves, as its family's field", () =>
+  withTempDb(async (file) => {
+    const upstream = fakeUpstream(json(200, completion), json(200, completion), json(200, claudeReply));
+    const { app, dash, chat } = await ready(file, upstream);
+    const create = (payload) => dash({ method: "POST", url: "/api/provider-nodes", body: payload });
+    const node = (await create({ ...body, thinking: "xhigh" })).json();
+    assert.deepEqual([node.thinking, node.thinkingLevels], ["xhigh", ["none", "minimal", "low", "medium", "high", "xhigh"]]);
+    const refused = await create({ ...body, prefix: "bad", thinking: "max" });
+    assert.deepEqual([refused.statusCode, refused.json().code], [400, "INVALID_REQUEST"]);
+    assert.match(refused.json().message, /thinking must be auto or one of none, minimal, low, medium, high, xhigh/);
+    assert.match((await create({ ...body, prefix: "bad", thinking: 1 })).json().message, /thinking must be auto or a thinking level/);
+    await dash({ method: "POST", url: "/api/connections", body: { provider: node.id, apiKey: "sk-local-key-1234" } });
+    const first = await chat({ ...hello, model: "local/any-model" });
+    assert.equal(first.statusCode, 200, first.body);
+    assert.equal(JSON.parse(upstream.calls[0].request.body).reasoning_effort, "xhigh", "a custom provider declares no models, so every model gets it");
+    const cleared = await dash({ method: "PATCH", url: `/api/provider-nodes/${node.id}`, body: { thinking: "auto" } });
+    assert.equal(cleared.json().thinking, "auto");
+    await chat({ ...hello, model: "local/any-model" });
+    assert.equal(JSON.parse(upstream.calls[1].request.body).reasoning_effort, undefined);
+
+    const gateway = (await create({ type: "anthropic-compatible", name: "Gateway", prefix: "gate", baseUrl: "https://gw.example/v1", thinking: "max" })).json();
+    assert.deepEqual([gateway.thinking, gateway.thinkingLevels], ["max", ["none", "low", "medium", "high", "xhigh", "max"]], "the Anthropic family's levels");
+    await dash({ method: "POST", url: "/api/connections", body: { provider: gateway.id, apiKey: "sk-node-key-5678" } });
+    assert.equal((await chat({ ...hello, model: "gate/claude-sonnet-4-5", max_tokens: 200000 })).statusCode, 200);
+    assert.deepEqual(JSON.parse(upstream.calls[2].request.body).thinking, { type: "enabled", budget_tokens: 128000 }, "a Claude budget");
+    assert.match((await dash({ method: "PATCH", url: `/api/provider-nodes/${gateway.id}`, body: { thinking: "minimal" } })).json().message, /one of none, low, medium, high, xhigh, max/);
     await app.close();
   }));

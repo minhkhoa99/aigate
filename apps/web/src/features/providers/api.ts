@@ -162,6 +162,9 @@ export interface ProviderNode {
   // Header values stay on the server: each header is shown by name and a hint of its value.
   customHeaders: { name: string; hint: string }[];
   retryStreamErrors: boolean;
+  // docs/contracts/provider-thinking.md: the level every model of the provider gets, and the levels its family takes.
+  thinking: ThinkingLevel | "auto";
+  thinkingLevels: ThinkingLevel[];
   createdAt: string;
   updatedAt: string;
 }
@@ -182,7 +185,7 @@ function useNodeMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
   });
 }
 
-type NodeFields = { name: string; prefix: string; baseUrl?: string; apiType?: ApiType; customHeaders: HeaderInput[]; retryStreamErrors: boolean };
+type NodeFields = { name: string; prefix: string; baseUrl?: string; apiType?: ApiType; customHeaders: HeaderInput[]; retryStreamErrors: boolean; thinking: ThinkingLevel | "auto" };
 // The type is chosen at creation only (docs/contracts/custom-providers.md).
 export const useCreateNode = () => useNodeMutation((body: NodeFields & { type: NodeType }) => api<ProviderNode>("/api/provider-nodes", { method: "POST", body }));
 export const useUpdateNode = () => useNodeMutation(({ id, ...body }: NodeFields & { id: string }) => api<ProviderNode>(nodePath(id), { method: "PATCH", body }));

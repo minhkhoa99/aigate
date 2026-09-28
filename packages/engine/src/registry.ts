@@ -1,4 +1,5 @@
 import type { OAuthFlow } from "./oauth.js";
+import type { ThinkingLevel } from "./thinking.js";
 // Provider registry schema (spec §2 "schema thiết kế mới"). Entries are static data checked once at
 // load: defineRegistry() rejects a bad entry loudly instead of letting it fail per request. SP13
 // builds the entries from the extracted catalog (builtin-registry.ts; docs/contracts/catalog-providers.md).
@@ -72,6 +73,8 @@ export interface ProviderDescriptor {
   // A custom provider that asks for it (docs/contracts/custom-providers.md): a request that fails before its first content
   // with a 429 or a stream error event is sent again, at most twice (adapters/stream-retry.ts).
   readonly retryStreamErrors?: boolean;
+  // A custom provider's own thinking level (docs/contracts/provider-thinking.md), applied to every model it serves.
+  readonly defaultThinking?: ThinkingLevel;
 }
 
 export const CONNECTION_FIELDS = ["baseUrl", "deployment", "apiVersion", "organization", "accountId"] as const;

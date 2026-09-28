@@ -38,6 +38,8 @@ export interface NodeFields {
   baseUrl: string;
   customHeaders: HeaderInput[];
   retryStreamErrors: boolean;
+  // docs/contracts/provider-thinking.md: auto, or a level the node's family takes (the controller checks the family).
+  thinking: string;
 }
 export type NodeChanges = Partial<Omit<NodeFields, "type">>;
 
@@ -86,7 +88,7 @@ function stored(type: NodeType, base: string): string {
 function asBody(input: unknown): Parsed<Record<string, unknown>> {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return fail("Body must be a JSON object");
   const body = Object.fromEntries(Object.entries(input));
-  const unknown = Object.keys(body).find((key) => !["type", "apiType", "name", "prefix", "baseUrl", "customHeaders", "retryStreamErrors"].includes(key));
+  const unknown = Object.keys(body).find((key) => !["type", "apiType", "name", "prefix", "baseUrl", "customHeaders", "retryStreamErrors", "thinking"].includes(key));
   return unknown === undefined ? { ok: true, value: body } : fail(`${unknown} is not a field of a custom provider`);
 }
 
@@ -135,6 +137,10 @@ function parseFields(body: Record<string, unknown>, type: NodeType, creating: bo
     if (!headers.ok) return headers;
     changes.customHeaders = headers.value;
   }
+  if (body.thinking !== undefined) {
+    if (typeof body.thinking !== "string" || body.thinking === "") return fail("thinking must be auto or a thinking level");
+    changes.thinking = body.thinking;
+  }
   if (body.retryStreamErrors !== undefined) {
     if (typeof body.retryStreamErrors !== "boolean") return fail("retryStreamErrors must be true or false");
     changes.retryStreamErrors = body.retryStreamErrors;
@@ -161,7 +167,7 @@ export function parseNodeChanges(input: unknown, type: NodeType): Parsed<NodeCha
   if (body.value.type !== undefined) return fail("type cannot be changed; add a new custom provider instead");
   const parsed = parseFields(body.value, type, false);
   if (!parsed.ok) return parsed;
-  return Object.keys(parsed.value).length > 0 ? parsed : fail("Send at least one of name, prefix, baseUrl, apiType, customHeaders, retryStreamErrors");
+  return Object.keys(parsed.value).length > 0 ? parsed : fail("Send at least one of name, prefix, baseUrl, apiType, customHeaders, retryStreamErrors, thinking");
 }
 
 export function parseNewNode(input: unknown): Parsed<NodeFields> {
@@ -171,7 +177,7 @@ export function parseNewNode(input: unknown): Parsed<NodeFields> {
   if (!isNodeType(type)) return fail(`type must be ${NODE_TYPES.join(" or ")}`);
   const parsed = parseFields(body.value, type, true);
   if (!parsed.ok) return parsed;
-  const { name, prefix, baseUrl, apiType, customHeaders, retryStreamErrors } = parsed.value;
+  const { name, prefix, baseUrl, apiType, customHeaders, retryStreamErrors, thinking } = parsed.value;
   if (name === undefined) return fail(`name must be 1-${MAX_NAME} characters`);
   if (prefix === undefined) return fail("prefix is required");
   // 9router refuses a missing apiType; AIGate keeps chat, the only API before SP14c, so older clients still work.
@@ -179,7 +185,7 @@ export function parseNewNode(input: unknown): Parsed<NodeFields> {
     ok: true,
     value: {
       type, apiType: apiType ?? "chat", name, prefix, baseUrl: baseUrl ?? stored(type, DEFAULT_BASE_URLS[type]), customHeaders: customHeaders ?? [],
-      retryStreamErrors: retryStreamErrors ?? false,
+      retryStreamErrors: retryStreamErrors ?? false, thinking: thinking ?? "auto",
     },
   };
 }

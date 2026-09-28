@@ -1,3 +1,4 @@
+import { THINKING_LEVEL_VALUES } from "./catalog.js";
 import { sql } from "drizzle-orm";
 import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
@@ -61,6 +62,9 @@ export const providerNodes = sqliteTable("provider_nodes", {
   customHeadersSealed: text("custom_headers_sealed"),
   // Retry a stream that fails before its first content (429 or a stream error event), off unless the user enables it.
   retryStreamErrors: integer("retry_stream_errors", { mode: "boolean" }).notNull().default(false),
+  // docs/contracts/provider-thinking.md: the node's default thinking level for every model it serves; null is auto. The
+  // API checks it against the node's family (an ALTER cannot add a CHECK in SQLite).
+  thinkingLevel: text("thinking_level", { enum: THINKING_LEVEL_VALUES }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (t) => [index("provider_nodes_prefix_idx").on(t.prefix, t.createdAt)]);

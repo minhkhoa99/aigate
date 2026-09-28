@@ -3,9 +3,9 @@ import { Link } from "@tanstack/react-router";
 import { Button, ConfirmDialog, Field, Input, PageHeading, Panel, Pill, StateBlock } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
-import { useConnections, useCreateNode, useDeleteNode, useProviderNodes, useProviders, useUpdateNode, type ApiType, type NodeType, type ProviderNode } from "./api";
+import { useConnections, useCreateNode, useDeleteNode, useProviderNodes, useProviders, useUpdateNode, type ApiType, type NodeType, type ProviderNode, type ThinkingLevel } from "./api";
 import { ProviderModels } from "./models";
-import { headerPayload, unreachable, type HeaderRow } from "./node-rules";
+import { headerPayload, NODE_THINKING_LEVELS, unreachable, type HeaderRow } from "./node-rules";
 import { statusPill } from "./test-result";
 
 // docs/contracts/custom-providers.md: user-defined OpenAI- or Anthropic-compatible endpoints, reached as "<prefix>/<model>".
@@ -48,7 +48,7 @@ export function CustomProviderDetail({ node }: { node: ProviderNode }) {
   const pill = connection && statusPill(connection);
   return <><PageHeading eyebrow="Providers / Custom" title={node.name} description={`Called on /v1 as ${node.prefix}/<model>.`} action={<a className="button" href={`/providers/new?id=${encodeURIComponent(node.id)}`}>Edit</a>} />
     <div className="grid grid-2"><Panel title="Provider type"><Pill tone="info">{protocolLabel(node)}</Pill><p className="muted">Custom provider · prefix <code>{node.prefix}</code></p><p className="muted" style={{ overflowWrap: "anywhere" }}>Base URL <code>{node.baseUrl}</code></p>
-      <p className="muted">Custom headers {node.customHeaders.length === 0 ? "none" : node.customHeaders.map((header) => <code key={header.name}>{header.name}</code>)} · Retry stream errors {node.retryStreamErrors ? "on" : "off"}</p></Panel>
+      <p className="muted">Custom headers {node.customHeaders.length === 0 ? "none" : node.customHeaders.map((header) => <code key={header.name}>{header.name}</code>)} · Retry stream errors {node.retryStreamErrors ? "on" : "off"} · Thinking {node.thinking}</p></Panel>
       <Panel title="Connection">{connections.isPending ? <StateBlock state="loading" />
         : connections.isError ? <StateBlock state="error" code={toProblem(connections.error).code} action={<Button onClick={() => void connections.refetch()}>Retry</Button>} />
         : connection && pill ? <div className="list-row"><div><strong>{connection.name}</strong><small>Key <code>{connection.keyHint}</code></small></div><Pill tone={pill.tone}>{pill.label}</Pill><a className="button" href="/providers/connections">Manage</a></div>
@@ -104,6 +104,8 @@ function NodeForm({ node, type, onType }: { node?: ProviderNode; type: NodeType;
   const showToast = useToast();
   const [headers, setHeaders] = useState<HeaderRow[]>(() => (node?.customHeaders ?? []).map((header, index) => ({ id: index + 1, name: header.name, value: "", hint: header.hint })));
   const [retry, setRetry] = useState(node?.retryStreamErrors ?? false);
+  const [thinking, setThinking] = useState<ThinkingLevel | "auto">(node?.thinking ?? "auto");
+  const levels = node?.thinkingLevels ?? NODE_THINKING_LEVELS[type];
   const pending = create.isPending || update.isPending;
   const fail = (error: unknown) => showToast({ tone: "error", ...toProblem(error) });
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -113,7 +115,8 @@ function NodeForm({ node, type, onType }: { node?: ProviderNode; type: NodeType;
     const apiType = type === "openai-compatible" ? apiTypeParam(text(event.currentTarget, "apiType")) : undefined;
     const fields = {
       name: text(event.currentTarget, "name"), prefix: text(event.currentTarget, "prefix"), ...(baseUrl ? { baseUrl } : {}), ...(apiType ? { apiType } : {}),
-      customHeaders: headerPayload(headers), retryStreamErrors: retry,
+      // A level the chosen protocol does not take (after a protocol change) is sent as Auto, as the select shows it.
+      customHeaders: headerPayload(headers), retryStreamErrors: retry, thinking: levels.some((level) => level === thinking) ? thinking : "auto",
     };
     // A new provider goes straight to its API key; an edit applies to the existing connection at once.
     if (!node) create.mutate({ ...fields, type }, { onSuccess: (created) => window.location.assign(connectHref(created.id)), onError: fail });
@@ -128,6 +131,10 @@ function NodeForm({ node, type, onType }: { node?: ProviderNode; type: NodeType;
     {/* Several controls, so a group rather than the single-control Field label. */}
     <div className="field" role="group" aria-label="Custom headers"><span>Custom headers</span><HeaderRows rows={headers} onChange={setHeaders} />
       <small>Sent with every request to this provider, including the connection test and the model list. Authorization, x-api-key, Content-Type and Accept are set by AIGate. Values are encrypted and never shown again; leave one empty to keep it.</small></div>
+    <Field label="Default thinking level" hint="Sent to every model of this provider when a request asks for no thinking (it declares no models, so AIGate cannot tell which ones reason). Auto sends nothing.">
+      <select className="input" value={levels.some((level) => level === thinking) ? thinking : "auto"} onChange={(event) => { const value = event.target.value; const next = value === "auto" ? "auto" : levels.find((level) => level === value); if (next) setThinking(next); }}>
+        <option value="auto">Auto</option>{levels.map((level) => <option key={level} value={level}>{level === "xhigh" ? "Extra high" : level.charAt(0).toUpperCase() + level.slice(1)}</option>)}
+      </select></Field>
     <div className="list-row"><div><strong>Retry stream errors</strong><small>Off by default. When on, a request that fails before any answer text (a 429 other than a spent quota, or an error the stream sends first) is sent again, at most twice.</small></div>
       <input type="checkbox" checked={retry} onChange={(event) => setRetry(event.target.checked)} aria-label="Retry stream errors" /></div>
     <div className="row"><Link className="button" to="/providers">Cancel</Link><Button type="submit" variant="primary" disabled={pending}>{pending ? "Saving…" : node ? "Save changes" : "Save and add API key"}</Button></div>

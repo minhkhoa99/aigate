@@ -1,4 +1,10 @@
-import type { HeaderInput, ProviderNode } from "./api";
+import type { HeaderInput, NodeType, ProviderNode, ThinkingLevel } from "./api";
+
+// The levels a new custom provider can pick, by family (the engine's familyLevels; the server refuses any other one).
+export const NODE_THINKING_LEVELS: Readonly<Record<NodeType, readonly ThinkingLevel[]>> = {
+  "openai-compatible": ["none", "minimal", "low", "medium", "high", "xhigh"],
+  "anthropic-compatible": ["none", "low", "medium", "high", "xhigh", "max"],
+};
 
 // One custom header row of the form; hint is set for a header already saved.
 export interface HeaderRow { id: number; name: string; value: string; hint?: string }

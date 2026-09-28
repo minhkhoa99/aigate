@@ -1,0 +1,1 @@
+ALTER TABLE `provider_nodes` ADD `thinking_level` text;

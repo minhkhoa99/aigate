@@ -370,9 +370,10 @@ export class ChatLane {
     }
   }
 
-  // routing.provider-thinking-default: the provider's stored level, for a request that carries no thinking of its own.
+  // routing.provider-thinking-default: the provider's stored level (a custom provider carries its own), for a request that
+  // carries no thinking of its own.
   private async thought(request: CanonicalRequest, provider: ProviderDescriptor): Promise<CanonicalRequest> {
-    const level = await this.thinking.get(provider.id);
+    const level = provider.defaultThinking ?? await this.thinking.get(provider.id);
     return level ? withThinking(request, provider, level) : request;
   }
 
