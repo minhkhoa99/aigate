@@ -3025,6 +3025,22 @@ Every item below is a capability AIGate must have. Derived from tracing
   - An unknown provider prefix is not rejected here; it fails later at account selection with 404 "No active credentials"
 - **Errors:** `INVALID_REQUEST` (bare name that is neither a combo nor an alias — 400 Invalid model format)
 
+### A copied provider/model(level) id resolves the base catalog model and makes the suffix override request and provider-default thinking
+
+- **id:** `routing.model-thinking-suffix` · **module:** `routing`
+- **Trigger:** A client sends, or the provider detail page copies, a trailing model(level) suffix
+- **Input:** <provider>/<model>(none|minimal|low|medium|high|xhigh|max), with an optional provider default or client reasoning
+- **Output:** The base upstream model id; its suffix-level thinking in the provider-native request shape
+- **Rules:**
+  - The provider detail page appends (level) only when its saved provider level is not auto and the catalog model declares reasoning; a custom provider's own level applies to every added model it serves
+  - Resolution strips the final parenthesized suffix before catalog lookup, capability checks, model import probes, and upstream dispatch; the clean catalog model stays the response and upstream model id
+  - A recognized suffix overrides client reasoning and the stored provider default; auto only selects the clean model, while none explicitly disables or omits thinking in the target family
+  - The existing family-level conversion remains authoritative: OpenAI-compatible/Responses use reasoning_effort, Anthropic uses a budget, Gemini/Vertex/Antigravity and Ollama map through their adapters, Command Code uses params.reasoning_effort
+  - 9router strips any final parenthesized value before lookup even when it is not a recognized level; AIGate keeps this potentially destructive behavior for parity
+- **Streaming:** yes
+- **AIGate required behavior:** A literal catalog model id ending in parentheses remains addressable unless its suffix is a known thinking override
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
 ### Same-ecosystem CLI to provider — skip translation
 
 - **id:** `routing.native-passthrough` · **module:** `routing`
@@ -4577,6 +4593,7 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `routing.forced-stream-json-collapse` | The collapsed answer carries what the stream carried (reasoning too), a stream that stops early is an error as on the streaming path, a malformed event is reported, and the buffer is bounded | reasoning_content is dropped when there is content, a cut-off stream is a complete 200 with finish_reason stop, malformed lines vanish, and the body is buffered without limit | Non-streaming clients silently lose reasoning and receive truncated answers as finished ones |
 | `routing.responses-non-stream-answer` | A non-streaming client receives the model answer: text, reasoning, tool calls, usage, and the finish reason | The client receives an empty assistant message with finish_reason stop | Every non-streaming request to a Responses provider silently loses its answer |
 | `routing.provider-thinking-default` | Only a request that carries no thinking of its own gets the provider level | Only reasoning_effort is checked: a Claude client's thinking budget or a Responses client's reasoning.effort is overridden by the injected level, which the translator reads first | A client that asked for a specific budget or effort silently gets the provider default instead |
+| `routing.model-thinking-suffix` | A literal catalog model id ending in parentheses remains addressable unless its suffix is a known thinking override | The reference removes every trailing parenthesized value before lookup, including an unknown value | A future provider model named like foo(beta) can resolve as foo or fail instead of reaching its literal id |
 | `tokensaver.pxpipe-master-optout-bug` | x-9router-token-saver: off disables every token-saver stage, including PXPIPE, for that request | PXPIPE runs whenever settings.pxpipeEnabled is true, regardless of the per-request opt-out header — only RTK, headroom, caveman and ponytail honor it | A client that opts out to keep its exact payload intact (e.g. to preserve verbatim tool output for debugging, or because it distrusts lossy image conversion) can still have its request body silently rewritten into PNG image blocks by PXPIPE, changing token accounting and provider-visible content the client explicitly asked to avoid |
 | `usage.history-write-dedup-transaction` | Every completed request that calls saveRequestUsage produces its own usageHistory row | A request whose ISO-millisecond timestamp, provider, model, connectionId, apiKey, promptTokens and completionTokens all match the most recently matching prior row is treated as a duplicate: no new row is inserted, no usageDaily counts are added, no lifetime counter increment happens — only the endpoint column may be backfilled | Genuinely distinct requests that happen to land in the same millisecond with identical provider/model/account/token counts (e.g. rapid retries, fixed-size embeddings calls) are silently undercounted in usageHistory, usageDaily aggregates, byModel/byAccount stats and the lifetime request counter |
 | `usage.history-route-returns-aggregate-not-rows` | A route named /api/usage/history returns per-request usage history rows — the sibling getUsageHistory(filter) function (provider/model/date-range filterable) appears purpose-built to back exactly this route | It calls getUsageStats() with no period, returning the same aggregated shape as /api/usage/stats?period=all; getUsageHistory() is never invoked by any route or other code in the checkout | AIGate would misdesign a 'usage history' endpoint contract by assuming per-row data if this were ported literally; the working, filter-capable raw-row query exists in source but is unreachable from the API surface |

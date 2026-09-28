@@ -1,7 +1,7 @@
 // Contract: docs/contracts/provider-thinking.md — the provider's thinking level on a request that carries none.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { builtinRegistry, isThinkingLevel, thinkingLevels, withThinking } from "../dist/index.js";
+import { builtinRegistry, isThinkingLevel, splitThinkingSuffix, thinkingLevels, withThinking } from "../dist/index.js";
 
 const provider = (id) => builtinRegistry.provider(id);
 const ask = (model, extra = {}) => ({ model, messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }], ...extra });
@@ -52,4 +52,19 @@ test("the client's own thinking wins, a model that does not reason is left alone
   assert.deepEqual(withThinking(ask(claudeModel), github, "medium").reasoning, { effort: "medium" });
   const copilotClaude = ask(claudeModel);
   assert.equal(withThinking(copilotClaude, github, "xhigh"), copilotClaude);
+});
+
+test("a model(level) suffix resolves the base model and overrides default or client thinking", () => {
+  const openai = provider("openai");
+  assert.deepEqual(splitThinkingSuffix("gpt-5.5(high)"), { model: "gpt-5.5", level: "high", auto: false });
+  assert.deepEqual(splitThinkingSuffix("gpt-5.5(future)"), { model: "gpt-5.5", auto: false }, "9router still strips an unknown suffix");
+  const override = withThinking(ask("gpt-5.5(xhigh)", { reasoning: { effort: "low" } }), openai, "medium");
+  assert.equal(override.model, "gpt-5.5");
+  assert.deepEqual(override.reasoning, undefined);
+  assert.equal(override.vendorExtensions.openai.reasoning_effort, "xhigh");
+  const disabled = withThinking(ask("gpt-5.5(none)", { reasoning: { effort: "high" } }), openai, "medium");
+  assert.equal(disabled.reasoning, undefined);
+  assert.equal(disabled.vendorExtensions.openai.reasoning_effort, "none");
+  const plain = withThinking(ask("gpt-5.5(auto)", { reasoning: { effort: "high" } }), openai, "medium");
+  assert.deepEqual([plain.model, plain.reasoning, plain.vendorExtensions], ["gpt-5.5", undefined, undefined]);
 });

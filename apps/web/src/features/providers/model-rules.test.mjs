@@ -1,7 +1,7 @@
 // docs/contracts/custom-models.md, "Dashboard": what the import dialog offers and what a model test reads as.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { describeProbe, importChoices, importMessage } from "./model-rules.ts";
+import { describeProbe, importChoices, importMessage, useAs } from "./model-rules.ts";
 
 test("only ids neither in the catalog nor already added can be picked", () => {
   const choices = importChoices([{ id: "gpt-4.1", inCatalog: true }, { id: "ft-a", inCatalog: false }, { id: "ft-b", inCatalog: false }], new Set(["gpt-4.1", "ft-a"]));
@@ -15,4 +15,10 @@ test("a model test reads as OK with its latency, or as the lane's error", () => 
   assert.deepEqual(describeProbe({ ok: true, latencyMs: 412, status: 200, error: null }), { tone: "healthy", label: "OK · 412 ms", detail: null });
   assert.equal(describeProbe({ ok: true, latencyMs: 9, status: 200, error: null, note: "reasoning-only response (length-limited)" }).detail, "reasoning-only response (length-limited)");
   assert.deepEqual(describeProbe({ ok: false, latencyMs: 30, status: 404, error: "HTTP 404: nope" }), { tone: "danger", label: "Failed", detail: "HTTP 404: nope" });
+});
+
+test("Use as copies a selected thinking level only for a reasoning model", () => {
+  assert.equal(useAs("openai", "gpt-5.5", "high", true), "openai/gpt-5.5(high)");
+  assert.equal(useAs("openai", "gpt-4o", "high", false), "openai/gpt-4o");
+  assert.equal(useAs("custom", "any-model", "auto", true), "custom/any-model");
 });

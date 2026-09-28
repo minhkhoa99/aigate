@@ -53,7 +53,7 @@ export function CustomProviderDetail({ node }: { node: ProviderNode }) {
         : connections.isError ? <StateBlock state="error" code={toProblem(connections.error).code} action={<Button onClick={() => void connections.refetch()}>Retry</Button>} />
         : connection && pill ? <div className="list-row"><div><strong>{connection.name}</strong><small>Key <code>{connection.keyHint}</code></small></div><Pill tone={pill.tone}>{pill.label}</Pill><a className="button" href="/providers/connections">Manage</a></div>
         : <div className="state-block"><strong>Not connected</strong><p>Add its API key to import its models and route requests.</p><a className="button button-primary" href={connectHref(node.id)}>Add connection</a></div>}</Panel></div>
-    <ProviderModels providerId={node.id} prefix={node.prefix} catalog={[]} />
+    <ProviderModels providerId={node.id} prefix={node.prefix} catalog={[]} thinking={node.thinking} everyModelReasons />
   </>;
 }
 

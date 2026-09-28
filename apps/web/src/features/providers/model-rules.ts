@@ -4,6 +4,10 @@ import type { ListedModel, ModelProbe } from "./api";
 // docs/contracts/custom-models.md, "Dashboard". An id the provider already lists (catalog or custom) cannot be added again.
 export const DUPLICATE = "Model already exists for this provider.";
 
+// routing.model-thinking-suffix: the dashboard only copies a suffix for a model the provider says can reason.
+export const useAs = (prefix: string, id: string, thinking: string, reasons: boolean): string =>
+  `${prefix}/${id}${thinking !== "auto" && reasons ? `(${thinking})` : ""}`;
+
 export interface ImportChoice { id: string; state: "new" | "catalog" | "added" }
 
 export function importChoices(fetched: readonly ListedModel[], listed: ReadonlySet<string>): ImportChoice[] {

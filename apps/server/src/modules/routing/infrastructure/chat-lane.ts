@@ -8,7 +8,7 @@ import {
   estimateAnthropicInputTokens, geminiModelList, GeminiStreamEncoder, geminiTtsRequest, isGeminiTtsRequest, OpenAIChatStreamEncoder,
   parseAnthropicMessagesRequest, parseGeminiGenerateRequest, parseGeminiPath, parseOpenAIChatRequest, parseOpenAIResponsesRequest,
   responsesClientGetsObject, responsesRequestFor, ResponsesStreamEncoder, toAnthropicMessage, toGeminiResponse, toOpenAIChatCompletion, toOpenAIError,
-  toResponsesObject, UnsupportedFeatureError, withClaudeCodePrompt, withConnection, withThinking, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential,
+  splitThinkingSuffix, toResponsesObject, UnsupportedFeatureError, withClaudeCodePrompt, withConnection, withThinking, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential,
   type ExecCtx, type GeminiRoute, type HttpTransportPort, type OpenAIError, type ProviderDescriptor, type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
@@ -376,7 +376,7 @@ export class ChatLane {
   // carries no thinking of its own.
   private async thought(request: CanonicalRequest, provider: ProviderDescriptor): Promise<CanonicalRequest> {
     const level = provider.defaultThinking ?? await this.thinking.get(provider.id);
-    return level ? withThinking(request, provider, level) : request;
+    return withThinking(request, provider, level);
   }
 
   // oauth.refresh-lifecycle (9router, kept): a 401/403 before the first byte refreshes the connection's token, for every
@@ -476,11 +476,12 @@ export class ChatLane {
     }
     const modelId = prefixed ? ref.slice(slash + 1) : ref;
     if (modelId === "") throw this.modelNotFound(ref);
+    const catalogModelId = splitThinkingSuffix(modelId).model;
     const active = await this.connections.activeProviders();
     let provider = prefixed;
     if (!provider) {
       // Model ids may contain "/" (openrouter's "meta-llama/…"), so an unknown prefix is part of the id.
-      const declaring = builtinRegistry.providers.filter((p) => builtinRegistry.model(p.id, ref) !== undefined);
+      const declaring = builtinRegistry.providers.filter((p) => builtinRegistry.model(p.id, catalogModelId) !== undefined);
       if (declaring.length === 0) throw this.modelNotFound(ref);
       provider = declaring.find((p) => active.has(p.id));
       if (!provider) {
@@ -494,7 +495,7 @@ export class ChatLane {
       throw new GatewayError(404, "not_found_error", "no_active_connection", `${provider.name} has no active connection. Add or enable one in AIGate: Providers → Connections.`);
     }
     const upstream: CanonicalRequest = { ...request, model: modelId };
-    assertModelSupports(upstream, provider.id, builtinRegistry.model(provider.id, modelId), modelId);
+    assertModelSupports({ ...upstream, model: catalogModelId }, provider.id, builtinRegistry.model(provider.id, catalogModelId), catalogModelId);
     // oauth.refresh-lifecycle: an oauth token about to expire is refreshed first.
     const stored = await this.refresher.fresh(provider.id, current);
     // connection.ollama-local-host: a connection may point the provider at its own host.

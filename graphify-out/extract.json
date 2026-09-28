@@ -10159,6 +10159,34 @@
       "file_type": "document",
       "source_file": "docs/design/API_UI_MAP.md",
       "status": "done"
+    },
+    {
+      "id": "sp_model_thinking_suffix",
+      "label": "M2 provider thinking part 2 - model-level suffixes",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "done"
+    },
+    {
+      "id": "model_thinking_suffix_contract",
+      "label": "model(level) suffix contract and unknown suffix caveat",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-thinking.md",
+      "status": "implemented"
+    },
+    {
+      "id": "thinking_suffix_parser",
+      "label": "Framework-free thinking suffix parser and override",
+      "file_type": "code",
+      "source_file": "packages/engine/src/thinking.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "model_suffix_ui",
+      "label": "Provider Models Use as, Copy and Test suffix",
+      "file_type": "code",
+      "source_file": "apps/web/src/features/providers/model-rules.ts",
+      "status": "implemented"
     }
   ],
   "edges": [
@@ -32655,6 +32683,51 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1,
       "source_file": "docs/design/API_UI_MAP.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_model_thinking_suffix",
+      "target": "model_thinking_suffix_contract",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "model_thinking_suffix_contract",
+      "target": "provider_thinking_contract",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-thinking.md",
+      "weight": 1
+    },
+    {
+      "source": "thinking_suffix_parser",
+      "target": "model_thinking_suffix_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "packages/engine/src/thinking.ts",
+      "weight": 1
+    },
+    {
+      "source": "thinking_suffix_parser",
+      "target": "chat_lane_model_resolution",
+      "relation": "feeds",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/server/src/modules/routing/infrastructure/chat-lane.ts",
+      "weight": 1
+    },
+    {
+      "source": "model_suffix_ui",
+      "target": "model_thinking_suffix_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/web/src/features/providers/model-rules.ts",
       "weight": 1
     }
   ],

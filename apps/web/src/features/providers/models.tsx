@@ -3,7 +3,7 @@ import { Button, Modal, Panel, Pill, Table } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
 import { fetchConnectionModels, testModel, useAddCustomModels, useConnections, useCustomModels, useDeleteCustomModel, type ModelProbe, type ProviderModel } from "./api";
-import { describeProbe, DUPLICATE, importChoices, importMessage, type ImportChoice } from "./model-rules";
+import { describeProbe, DUPLICATE, importChoices, importMessage, type ImportChoice, useAs } from "./model-rules";
 
 // docs/contracts/custom-models.md, "Dashboard": every model with the id to call on /v1, custom models added by hand or
 // picked from the connection's /models, and a real test request per model.
@@ -41,7 +41,7 @@ function ProbeResult({ probe }: { probe: ModelProbe }) {
   return <span className="model-probe"><Pill tone={tone}>{label}</Pill>{detail && <small>{detail}</small>}</span>;
 }
 
-export function ProviderModels({ providerId, prefix, catalog }: { providerId: string; prefix: string; catalog: readonly ProviderModel[] }) {
+export function ProviderModels({ providerId, prefix, catalog, thinking = "auto", everyModelReasons = false }: { providerId: string; prefix: string; catalog: readonly ProviderModel[]; thinking?: string; everyModelReasons?: boolean }) {
   const connections = useConnections();
   const custom = useCustomModels(providerId);
   const add = useAddCustomModels(providerId);
@@ -100,8 +100,8 @@ export function ProviderModels({ providerId, prefix, catalog }: { providerId: st
     () => showToast({ tone: "success", message: `Copied ${full}.` }),
     () => showToast({ tone: "error", message: "The browser did not allow copying. Select the id and copy it by hand." }),
   );
-  const callAs = (id: string, chat = true) => {
-    const full = `${prefix}/${id}`;
+  const callAs = (id: string, chat = true, reasons = everyModelReasons) => {
+    const full = useAs(prefix, id, thinking, reasons);
     const probe = probes[full];
     return <div className="model-use"><code>{full}</code><Button variant="ghost" onClick={() => void copy(full)}>Copy</Button>
       <Button variant="ghost" disabled={!connection || !chat || probe === "testing"} onClick={() => void test(full)}>{probe === "testing" ? "Testing…" : "Test"}</Button>
@@ -115,7 +115,7 @@ export function ProviderModels({ providerId, prefix, catalog }: { providerId: st
       {!connection && <small className="muted">Add a connection to enable importing models.</small>}
     </div>
     {catalog.length > 0 && <Table empty="The catalog lists no models for this provider." columns={["Model", "Use as", "Kind", "Context window", "Max output", "Capabilities"]}
-      rows={catalog.map((m) => [<strong>{m.name}</strong>, callAs(m.id, m.kind === "chat"), m.kind, limit(m.contextWindow), limit(m.maxOutputTokens), capabilityList(m.capabilities)])} />}
+      rows={catalog.map((m) => [<strong>{m.name}</strong>, callAs(m.id, m.kind === "chat", m.capabilities.reasoning), m.kind, limit(m.contextWindow), limit(m.maxOutputTokens), capabilityList(m.capabilities)])} />}
     <Table empty={custom.isPending ? "Loading…" : custom.isError ? toProblem(custom.error).message : "No models added yet."} columns={["Added model", "Use as", "Added", ""]}
       rows={customModels.map((m) => [<strong>{m.id}</strong>, callAs(m.id), new Date(m.createdAt).toLocaleString(),
         <Button variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate(m.id, { onSuccess: () => showToast({ tone: "success", message: `Removed ${m.id}.` }), onError: fail })}>Delete</Button>])} />

@@ -114,7 +114,7 @@ function CatalogProvider({ providerId }: { providerId: string }) {
   return <><PageHeading eyebrow={`Providers / ${group.title}`} title={provider.name} description="Connection status, credentials, and the models this provider offers." />
     <div className="grid grid-2"><Panel title="Provider type"><Pill tone="info">{group.title}</Pill><p className="muted">Built-in catalog entry · ID <code>{provider.id}</code></p>{provider.chatUrl && <p className="muted" style={{ overflowWrap: "anywhere" }}>Endpoint <code>{provider.chatUrl}</code></p>}</Panel><Panel title="Connection"><ProviderConnection provider={provider} /></Panel></div>
     <ProviderThinking provider={provider} />
-    <ProviderModels providerId={provider.id} prefix={provider.id} catalog={provider.models} />
+    <ProviderModels providerId={provider.id} prefix={provider.id} catalog={provider.models} thinking={provider.thinking.level} />
   </>;
 }
 

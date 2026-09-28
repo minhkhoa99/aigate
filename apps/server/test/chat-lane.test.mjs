@@ -80,6 +80,18 @@ test("model resolution: bare catalog id, provider prefix, unknown model, no acti
     await app.close();
   }));
 
+test("a model(level) suffix looks up the base model, overrides provider thinking, and never reaches upstream", () =>
+  withTempDb(async (file) => {
+    const upstream = fakeUpstream(json(200, completion));
+    const { app, dash, chat } = await ready(file, upstream);
+    await dash({ method: "PUT", url: "/api/providers/openai/thinking", body: { level: "low" } });
+    const result = await chat({ ...hello, model: "openai/gpt-5.5(xhigh)" });
+    assert.equal(result.statusCode, 200);
+    const body = JSON.parse(upstream.calls[0].request.body);
+    assert.deepEqual([body.model, body.reasoning_effort], ["gpt-5.5", "xhigh"]);
+    await app.close();
+  }));
+
 test("a bare id declared by several providers goes to the one with an active connection", () =>
   withTempDb(async (file) => {
     const upstream = fakeUpstream(json(200, completion));

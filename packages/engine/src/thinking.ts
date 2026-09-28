@@ -26,6 +26,16 @@ const KNOWN_EFFORTS = new Set(["low", "medium", "high"]);
 
 export const isThinkingLevel = (value: unknown): value is ThinkingLevel => THINKING_LEVELS.some((level) => level === value);
 
+// routing.model-thinking-suffix: 9router treats every trailing `(value)` as a suffix. Unknown values still lose their
+// suffix before lookup (SUSPECTED_BUG, kept for parity); only known levels, off, and auto affect thinking.
+export function splitThinkingSuffix(model: string): { readonly model: string; readonly level?: ThinkingLevel; readonly auto: boolean } {
+  const match = /^(.*)\(([^()]+)\)\s*$/.exec(model);
+  if (!match) return { model, auto: false };
+  const value = match[2].trim().toLowerCase();
+  const level = value === "off" ? "none" : isThinkingLevel(value) ? value : undefined;
+  return { model: match[1].trim(), ...(level ? { level } : {}), auto: value === "auto" };
+}
+
 // A custom provider declares no models, so the level its user picked (defaultThinking) goes to every model.
 const reasons = (provider: ProviderDescriptor, model: string): boolean =>
   provider.defaultThinking !== undefined || provider.models.find((descriptor) => descriptor.id === model)?.capabilities.reasoning === true;
@@ -42,16 +52,40 @@ export function thinkingLevels(provider: ProviderDescriptor): readonly ThinkingL
 // checks only reasoning_effort, so its level overrode a Claude budget or a Responses effort; AIGate keeps 9router's
 // stated rule, "only if client hasn't set"), when the model does not reason (9router strips thinking from those), or
 // when the family does not take the level.
-export function withThinking(request: CanonicalRequest, provider: ProviderDescriptor, level: ThinkingLevel): CanonicalRequest {
-  if (request.reasoning !== undefined || request.vendorExtensions?.openai?.reasoning_effort !== undefined) return request;
-  if (!reasons(provider, request.model) || !FAMILY_LEVELS[provider.protocol].includes(level)) return request;
+function withoutThinking(request: CanonicalRequest): CanonicalRequest {
+  const openai = request.vendorExtensions?.openai;
+  if (request.reasoning === undefined && openai?.reasoning_effort === undefined) return request;
+  const keptOpenai = { ...(openai ?? {}) };
+  delete keptOpenai.reasoning_effort;
+  const rest = { ...request };
+  delete rest.reasoning;
+  delete rest.vendorExtensions;
+  const keptNamespaces = { ...(request.vendorExtensions ?? {}) };
+  delete keptNamespaces.openai;
+  return {
+    ...rest,
+    ...(Object.keys(keptNamespaces).length > 0 || Object.keys(keptOpenai).length > 0
+      ? { vendorExtensions: { ...keptNamespaces, ...(Object.keys(keptOpenai).length > 0 ? { openai: keptOpenai } : {}) } }
+      : {}),
+  };
+}
+
+export function withThinking(request: CanonicalRequest, provider: ProviderDescriptor, defaultLevel?: ThinkingLevel): CanonicalRequest {
+  const suffix = splitThinkingSuffix(request.model);
+  const clean = suffix.model === request.model ? request : { ...request, model: suffix.model };
+  const level = suffix.auto ? undefined : suffix.level ?? defaultLevel;
+  const explicit = suffix.auto || suffix.level !== undefined;
+  const prepared = explicit ? withoutThinking(clean) : clean;
+  if (suffix.auto || level === undefined) return prepared;
+  if (!explicit && (prepared.reasoning !== undefined || prepared.vendorExtensions?.openai?.reasoning_effort !== undefined)) return prepared;
+  if (!reasons(provider, prepared.model) || !FAMILY_LEVELS[provider.protocol].includes(level)) return prepared;
   if (provider.protocol === "anthropic") {
     // No thinking is Claude's default, so none sends nothing.
     const budget = CLAUDE_BUDGET[level];
-    return budget === undefined ? request : { ...request, reasoning: { budgetTokens: budget } };
+    return budget === undefined ? prepared : { ...prepared, reasoning: { budgetTokens: budget } };
   }
   // A Claude model behind an OpenAI-style provider (Copilot's /v1/messages) takes only the three efforts it can map.
-  if (/claude/i.test(request.model) && !KNOWN_EFFORTS.has(level)) return request;
-  if (level === "low" || level === "medium" || level === "high") return { ...request, reasoning: { effort: level } };
-  return { ...request, vendorExtensions: { ...request.vendorExtensions, openai: { ...request.vendorExtensions?.openai, reasoning_effort: level } } };
+  if (/claude/i.test(prepared.model) && !KNOWN_EFFORTS.has(level)) return prepared;
+  if (level === "low" || level === "medium" || level === "high") return { ...prepared, reasoning: { effort: level } };
+  return { ...prepared, vendorExtensions: { ...prepared.vendorExtensions, openai: { ...prepared.vendorExtensions?.openai, reasoning_effort: level } } };
 }

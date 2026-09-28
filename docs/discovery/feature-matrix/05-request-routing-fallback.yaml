@@ -152,7 +152,7 @@
     - { file: open-sse/utils/bypassHandler.js, line: 76, note: "stream = body.stream !== false" }
     - { file: open-sse/handlers/chatCore.js, line: 77, note: "second bypass check inside handleChatCore" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: routing.combo-dispatch
@@ -1630,3 +1630,44 @@
     expected: "Only a request that carries no thinking of its own gets the provider level"
     actual: "Only reasoning_effort is checked: a Claude client's thinking budget or a Responses client's reasoning.effort is overridden by the injected level, which the translator reads first"
     impact: "A client that asked for a specific budget or effort silently gets the provider default instead"
+
+- id: routing.model-thinking-suffix
+  group: Request routing
+  feature: Model-level thinking override
+  subFeature: "A copied provider/model(level) id resolves the base catalog model and makes the suffix override request and provider-default thinking"
+  trigger: "A client sends, or the provider detail page copies, a trailing model(level) suffix"
+  input: "<provider>/<model>(none|minimal|low|medium|high|xhigh|max), with an optional provider default or client reasoning"
+  output: "The base upstream model id; its suffix-level thinking in the provider-native request shape"
+  businessRules:
+    - "The provider detail page appends (level) only when its saved provider level is not auto and the catalog model declares reasoning; a custom provider's own level applies to every added model it serves"
+    - "Resolution strips the final parenthesized suffix before catalog lookup, capability checks, model import probes, and upstream dispatch; the clean catalog model stays the response and upstream model id"
+    - "A recognized suffix overrides client reasoning and the stored provider default; auto only selects the clean model, while none explicitly disables or omits thinking in the target family"
+    - "The existing family-level conversion remains authoritative: OpenAI-compatible/Responses use reasoning_effort, Anthropic uses a budget, Gemini/Vertex/Antigravity and Ollama map through their adapters, Command Code uses params.reasoning_effort"
+    - "9router strips any final parenthesized value before lookup even when it is not a recognized level; AIGate keeps this potentially destructive behavior for parity"
+  state:
+    reads: ["provider_thinking row or provider_nodes.thinking_level", "catalog model capabilities"]
+    writes: []
+    runtimeOnly: []
+  dependencies: ["routing.provider-thinking-default", "catalog.model-resolution", "catalog.model-connectivity-test"]
+  providerInteraction: "No direct call; the final adapter request receives a suffix-free upstream model and native thinking field"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Dashboard Copy and Test use the suffixed model id when the effective level applies"]
+  persistence: []
+  performanceConcerns: ["One bounded trailing-suffix parse per routed request"]
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A suffix on a non-reasoning model resolves the base model but adds no thinking, like the reference's capability strip"
+    - "An unknown trailing parenthesized value is removed before lookup; this can make a literal catalog id ending in parentheses unreachable"
+  evidence:
+    - { file: "src/app/(dashboard)/dashboard/providers/[id]/page.js", line: 177, note: "resolveThinkingSuffix appends a selected valid level only for a model whose levels include it" }
+    - { file: "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js", line: 5, note: "Copy uses fullModel(thinkingSuffix)" }
+    - { file: open-sse/config/providerModels.js, line: 79, note: "getModelUpstreamId strips then re-appends a trailing suffix for thinking normalization" }
+    - { file: open-sse/translator/concerns/thinkingUnified.js, line: 32, note: "parseSuffix makes a suffix override win over request intent and stripThinkingSuffix removes it before upstream" }
+  newModule: routing
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG, IMPLEMENTATION_ACCIDENT]
+  suspicion:
+    expected: "A literal catalog model id ending in parentheses remains addressable unless its suffix is a known thinking override"
+    actual: "The reference removes every trailing parenthesized value before lookup, including an unknown value"
+    impact: "A future provider model named like foo(beta) can resolve as foo or fail instead of reaching its literal id"

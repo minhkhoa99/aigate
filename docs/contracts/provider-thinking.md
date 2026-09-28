@@ -9,7 +9,7 @@ A built-in provider can carry a default thinking level: the reasoning a request 
 | `routing.provider-thinking-default` | `REFERENCE_BEHAVIOR` | See below. |
 | same: only `reasoning_effort` is checked, so the level overrides a Claude client's thinking budget or a Responses client's `reasoning.effort` | `SUSPECTED_BUG`, not kept | Any thinking the client sends wins (effort, budget, or the OpenAI `reasoning_effort` field), which is 9router's own stated rule ("only if client hasn't set"). |
 | same: modes `on` and `off` | `IMPLEMENTATION_ACCIDENT` | Not ported: 9router's picker never offers them. |
-| same: the picked level adds a `(level)` suffix to copied model names | Not yet | Needs the `model(level)` suffix, which AIGate does not parse yet (part 2). |
+| `routing.model-thinking-suffix`: the picked level adds a `(level)` suffix to copied model names | `REFERENCE_BEHAVIOR`, `SUSPECTED_BUG` | Implemented: the suffix selects the effective level and is removed before catalog lookup and upstream dispatch. |
 
 ## Levels
 
@@ -46,6 +46,16 @@ After the client protocol's own preparation (so an Anthropic client's budget has
 
 Then, as if the client had sent it: an Anthropic-family provider gets a thinking budget (9router `effortToBudget`: minimal 512, low 1024, medium 8192, high 24576, xhigh 32768, max 128000; `none` sends nothing, Claude's default), and any other family gets `reasoning_effort` (low, medium and high as CIP's typed effort, the others as the OpenAI field). A Claude model behind an OpenAI-style provider (Copilot's `/v1/messages`) takes only low, medium and high, the efforts the Anthropic adapter maps; another level is not sent.
 
+## Model suffix (part 2)
+
+When a provider has a non-auto level, its Models panel copies a catalog reasoning model as `<provider>/<model>(<level>)`. A custom provider copies every added model this way because it has no catalog capability list. Copy and Test use this exact id. Non-reasoning catalog models and an Auto setting keep the plain id.
+
+On every client lane and the model test, `model(level)` resolves the base model for catalog lookup, capabilities, and the upstream request. A recognized suffix (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`; `off` is `none`) overrides both client reasoning and the stored default; `auto` clears them and selects the base model. The regular family conversion above then applies. This is why a suffix works for OpenAI Chat, Anthropic Messages, Responses, Gemini, and custom-provider calls without a new endpoint or error code.
+
+**SUSPECTED_BUG, kept from 9router.** Any final parenthesized value is removed before lookup, even if it is not a known level. Therefore a literal future model id such as `foo(beta)` can become `foo` or fail. The UI never creates an unknown suffix, but direct callers can reach this behavior.
+
+**IMPLEMENTATION_ACCIDENT.** 9router also recognizes numeric budgets and `ultra`; AIGate's level picker does not expose them. They follow the unknown-parenthesized suffix behavior above rather than becoming an explicit override.
+
 ## UI
 
-The provider detail page (`/providers/detail?provider=<id>`) shows a **Thinking** panel with a Default thinking level select (Auto and the provider's levels) when the provider has levels. A change saves at once with a success toast; a refused change shows the server's message (`INVALID_REQUEST`) and reads the stored value again.
+The provider detail page (`/providers/detail?provider=<id>`) shows a **Thinking** panel with a Default thinking level select (Auto and the provider's levels) when the provider has levels. A change saves at once with a success toast; a refused change shows the server's message (`INVALID_REQUEST`) and reads the stored value again. Its Models panel immediately changes the **Use as**, Copy, and Test id for the applicable models to include the selected suffix.

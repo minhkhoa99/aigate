@@ -194,6 +194,13 @@
       "output_tokens": 0,
       "files": 4,
       "mode": "SP16d OAuth grok-cli, kimi, CodeBuddy and iFlow"
+    },
+    {
+      "date": "2026-09-28T09:49:40.319486+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "M2 model-thinking suffixes"
     }
   ],
   "total_input_tokens": 574916,
