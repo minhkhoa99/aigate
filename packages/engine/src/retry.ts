@@ -8,6 +8,7 @@ export interface RetryOptions {
   readonly baseDelayMs: number;
   readonly maxDelayMs: number;
   readonly shouldRetry: (error: unknown) => boolean;
+  readonly delayMs?: (attempt: number, error: unknown) => number;
 }
 
 // A hard ceiling, so a misconfigured caller cannot turn one request into a retry storm.
@@ -51,7 +52,8 @@ export async function withRetry<T>(operation: (attempt: number, signal: AbortSig
     } catch (error) {
       // An abort is never retried: the client left or the request budget is spent.
       if (signal.aborted || attempt >= maxAttempts || !shouldRetry(error)) throw error;
-      await delay(Math.min(maxDelayMs, baseDelayMs * 2 ** (attempt - 1)), signal);
+      const custom = options.delayMs?.(attempt, error);
+      await delay(Math.min(maxDelayMs, custom ?? baseDelayMs * 2 ** (attempt - 1)), signal);
     }
   }
 }

@@ -71,7 +71,14 @@ export abstract class HttpProviderAdapter {
       const response = await this.transport.send(request, ctx);
       if (response.status >= 200 && response.status < 300) return response;
       throw await this.upstreamError(response, credential, ctx);
-    }, { ...RETRY, maxAttempts, signal: ctx.signal, shouldRetry: isTransient });
+    }, { ...RETRY, maxAttempts, signal: ctx.signal, shouldRetry: (error) => this.shouldRetry(error), delayMs: (attempt, error) => this.retryDelayMs(error, attempt) });
+  }
+
+  protected shouldRetry(error: unknown): boolean { return isTransient(error); }
+
+  protected retryDelayMs(error: unknown, attempt: number): number {
+    const retryAfter = error instanceof EngineError ? error.details.retryAfterMs : undefined;
+    return typeof retryAfter === "number" ? retryAfter : Math.min(RETRY.maxDelayMs, RETRY.baseDelayMs * 2 ** (attempt - 1));
   }
 
   // OpenAI { error: { message, code, type } } and Anthropic { type: "error", error: { type, message } } share this shape.
@@ -86,8 +93,11 @@ export abstract class HttpProviderAdapter {
     const upstreamCode = text(error.code) ?? text(error.type);
     const code = classifyStatus(response.status, upstreamCode);
     const message = this.clean(text(error.message) ?? text(root.error), credential);
+    const retryAfter = response.headers["retry-after"];
+    const seconds = retryAfter === undefined ? undefined : Number(retryAfter);
+    const retryAfterMs = seconds !== undefined && Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined;
     return new EngineError(code, `${this.provider.name} answered ${response.status}${message ? `: ${message}` : ""}`, {
-      provider: this.provider.id, status: response.status, ...(upstreamCode ? { upstreamCode } : {}),
+      provider: this.provider.id, status: response.status, ...(upstreamCode ? { upstreamCode } : {}), ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
     });
   }
 

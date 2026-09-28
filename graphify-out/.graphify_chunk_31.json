@@ -1,0 +1,11 @@
+{
+  "nodes": [
+    {"id":"settings_env","label":"Repository .env settings loader","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"done"},
+    {"id":"oauth_client_env","label":"Google OAuth client ids and secrets from environment","file_type":"document","source_file":"docs/contracts/oauth.md","status":"done"}
+  ],
+  "edges": [
+    {"source":"settings_env","target":"ctx_settings","relation":"implements","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"oauth_client_env","target":"engine_oauth_module","relation":"configures","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/oauth.md","weight":1},
+    {"source":"settings_env","target":"oauth_client_env","relation":"protects","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1}
+  ]
+}

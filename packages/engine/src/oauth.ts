@@ -2,7 +2,8 @@ import { EngineError } from "./errors.js";
 import { readBoundedText } from "./http.js";
 import { isRecord, parseJson, record, text } from "./json.js";
 import type { CredentialStatus, ExecCtx, HttpTransportPort } from "./ports.js";
-import { cloudCodeCall, codeAssistMetadata, projectOf } from "./adapters/cloud-code.js";
+import { cloudCodeCall, codeAssistMetadata, defaultTier, projectOf } from "./adapters/cloud-code.js";
+import { withRetry } from "./retry.js";
 
 // OAuth sign-in and refresh for the SP16 and SP16b providers (docs/contracts/oauth.md). Kept as 9router has them (user decisions
 // 2026-09-27): cline, clinepass (whose tokens the ClinePass API rejects, #2333), gitlab (PKCE with the operator's own
@@ -489,12 +490,14 @@ const github: OAuthProvider = {
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v1/userinfo?alt=json";
 const GOOGLE_SCOPES = ["cloud-platform", "userinfo.email", "userinfo.profile"].map((scope) => `https://www.googleapis.com/auth/${scope}`);
+const ANTIGRAVITY_SCOPES = [...GOOGLE_SCOPES, "https://www.googleapis.com/auth/cclog", "https://www.googleapis.com/auth/experimentsandconfigs"];
 
 // The public OAuth client of the CLI or IDE AIGate signs in as. 9router ships both in its source; AIGate reads them from
 // the environment (.env, see .env.example) so that no client secret is in the repository, and checks them on each use.
 interface GoogleClient { readonly id: string; readonly secret: string; readonly scopes: readonly string[] }
 export const GOOGLE_CLIENT_ENV: Readonly<Record<string, { readonly id: string; readonly secret: string }>> = {
   "gemini-cli": { id: "AIGATE_GEMINI_CLI_OAUTH_CLIENT_ID", secret: "AIGATE_GEMINI_CLI_OAUTH_CLIENT_SECRET" },
+  antigravity: { id: "AIGATE_ANTIGRAVITY_OAUTH_CLIENT_ID", secret: "AIGATE_ANTIGRAVITY_OAUTH_CLIENT_SECRET" },
 };
 // After the exchange: the account's email and its Cloud Code project, both optional.
 type GoogleAccount = (accessToken: string, io: OAuthIO) => Promise<{ email?: string; projectId?: string }>;
@@ -568,9 +571,37 @@ const geminiCliAccount: GoogleAccount = async (token, io) => {
 };
 
 const geminiCli = googleSignIn("gemini-cli", "Gemini CLI", GOOGLE_SCOPES, geminiCliAccount);
+const antigravity = googleSignIn("antigravity", "Antigravity", ANTIGRAVITY_SCOPES, async (token, io) => {
+  const user = await call(io, "GET", GOOGLE_USERINFO_URL, { authorization: `Bearer ${token}`, "x-request-source": "local" });
+  const email = user.ok ? text(record(parseJson(user.text)).email) : undefined;
+  const headers = { authorization: `Bearer ${token}`, "content-type": "application/json", "user-agent": "antigravity/ide/2.11.0 darwin/arm64", "x-request-source": "local" };
+  let projectId: string | undefined;
+  let tierId = "legacy-tier";
+  try {
+    const answer = await cloudCodeCall(io.transport, io.ctx, "loadCodeAssist", headers, { metadata: codeAssistMetadata() });
+    if (answer.ok) {
+      const value = parseJson(answer.raw);
+      projectId = projectOf(value);
+      tierId = defaultTier(value);
+    }
+  } catch {
+    projectId = undefined;
+  }
+  if (projectId) void onboardAntigravity(token, tierId, io.transport);
+  return { ...(email ? { email } : {}), ...(projectId ? { projectId } : {}) };
+});
+
+async function onboardAntigravity(token: string, tierId: string, transport: HttpTransportPort): Promise<void> {
+  const ctx = { signal: AbortSignal.timeout(60_000), requestId: crypto.randomUUID() };
+  const headers = { authorization: `Bearer ${token}`, "content-type": "application/json", "user-agent": "antigravity/ide/2.11.0 darwin/arm64", "x-request-source": "local" };
+  await withRetry(async () => {
+    const answer = await cloudCodeCall(transport, ctx, "onboardUser", headers, { tierId, metadata: codeAssistMetadata() });
+    if (!answer.ok || record(parseJson(answer.raw)).done !== true) throw new Error("onboardUser is not done");
+  }, { signal: ctx.signal, maxAttempts: 10, baseDelayMs: 5_000, maxDelayMs: 5_000, shouldRetry: () => true }).catch(() => undefined);
+}
 
 export const OAUTH_PROVIDERS: Readonly<Record<string, OAuthProvider>> = {
-  cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi, claude, codex, github, "gemini-cli": geminiCli,
+  cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi, claude, codex, github, "gemini-cli": geminiCli, antigravity,
 };
 
 // Cline OAuth access tokens are WorkOS JWTs sent as "workos:<jwt>"; a ClinePass API key (not a JWT) goes as is.

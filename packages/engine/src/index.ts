@@ -16,6 +16,7 @@ export { OpenAIResponsesAdapter } from "./adapters/openai-responses.js";
 export { OllamaAdapter } from "./adapters/ollama.js";
 export { GeminiAdapter } from "./adapters/gemini.js";
 export { GeminiCliAdapter } from "./adapters/gemini-cli.js";
+export { AntigravityAdapter } from "./adapters/antigravity.js";
 export { cleanGeminiSchema } from "./adapters/gemini-schema.js";
 export { parseGoogleCredential, type GoogleCredential } from "./adapters/google-auth.js";
 export { VertexAdapter, VertexPartnerAdapter } from "./adapters/vertex.js";

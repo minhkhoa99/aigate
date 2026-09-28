@@ -1,0 +1,26 @@
+{
+  "nodes": [
+    {"id":"sp_sp16c","label":"SP16c - OAuth gemini-cli (66 connectable)","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"done"},
+    {"id":"sp_sp16c2","label":"SP16c2 - OAuth antigravity (67 connectable)","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"done"},
+    {"id":"02_providers_auth_provider_antigravity_oauth","label":"provider.antigravity-oauth","file_type":"document","source_file":"docs/discovery/feature-matrix/02-providers-auth.yaml","status":"implemented"},
+    {"id":"antigravity_oauth_flow","label":"Antigravity Google OAuth, userinfo, loadCodeAssist and onboarding","file_type":"document","source_file":"docs/contracts/oauth.md","status":"done"},
+    {"id":"antigravity_adapter","label":"AntigravityAdapter - daily Cloud Code envelope, Gemini/Claude/image requests","file_type":"document","source_file":"docs/contracts/oauth.md","status":"done"},
+    {"id":"api_ui_map_row_sp16c2","label":"API_UI_MAP SP16c2 row - generic OAuth Connections UI","file_type":"document","source_file":"docs/design/API_UI_MAP.md","status":"done"},
+    {"id":"sp16c2_tests","label":"SP16c2 tests - Antigravity engine and server lanes","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"done"}
+  ],
+  "edges": [
+    {"source":"sp_sp16c","target":"sp_sp16c2","relation":"references","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"sp_sp16c2","target":"oauth_contract","relation":"references","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"sp_sp16c2","target":"02_providers_auth_provider_antigravity_oauth","relation":"references","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"sp_sp16c2","target":"antigravity_oauth_flow","relation":"references","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"sp_sp16c2","target":"antigravity_adapter","relation":"references","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"sp_sp16c2","target":"api_ui_map_row_sp16c2","relation":"references","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"sp_sp16c2","target":"sp16c2_tests","relation":"references","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"antigravity_oauth_flow","target":"engine_oauth_module","relation":"references","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/oauth.md","weight":1},
+    {"source":"antigravity_oauth_flow","target":"02_providers_auth_provider_antigravity_oauth","relation":"implements","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/oauth.md","weight":1},
+    {"source":"antigravity_adapter","target":"02_providers_auth_provider_antigravity_oauth","relation":"implements","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/oauth.md","weight":1},
+    {"source":"antigravity_adapter","target":"gemini_adapter","relation":"extends","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/oauth.md","weight":1},
+    {"source":"api_ui_map_row_sp16c2","target":"oauth_controller","relation":"uses","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/design/API_UI_MAP.md","weight":1},
+    {"source":"sp16c2_tests","target":"antigravity_adapter","relation":"verifies","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1}
+  ]
+}

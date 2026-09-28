@@ -1,0 +1,13 @@
+{
+  "nodes": [
+    {"id":"provider_thinking_contract","label":"Provider thinking defaults and model effort levels","file_type":"document","source_file":"docs/contracts/provider-thinking.md","status":"done"},
+    {"id":"provider_thinking_table","label":"provider_thinking table - built-in provider default level","file_type":"document","source_file":"docs/contracts/provider-thinking.md","status":"done"},
+    {"id":"custom_provider_thinking","label":"Custom provider thinking level","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"done"}
+  ],
+  "edges": [
+    {"source":"provider_thinking_contract","target":"ctx_catalog","relation":"implements","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/provider-thinking.md","weight":1},
+    {"source":"provider_thinking_table","target":"provider_thinking_contract","relation":"stores","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/provider-thinking.md","weight":1},
+    {"source":"custom_provider_thinking","target":"provider_thinking_contract","relation":"extends","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"custom_provider_thinking","target":"provider_nodes_table","relation":"changes","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1}
+  ]
+}

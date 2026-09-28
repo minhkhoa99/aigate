@@ -2,6 +2,7 @@ import { CATALOG } from "./catalog/providers.generated.js";
 import type { CatalogProvider } from "./catalog/schema.js";
 import { OAUTH_PROVIDERS } from "./oauth.js";
 import { defineRegistry, PROVIDER_PROTOCOLS, type ProviderDescriptor, type ProviderProtocol, type ProviderStatus } from "./registry.js";
+import { ANTIGRAVITY_IDE_BASE_URL, ANTIGRAVITY_MODELS_URL } from "./adapters/antigravity-config.js";
 
 // The runtime registry is the extracted catalog, filtered to what the adapters can serve today
 // (docs/contracts/catalog-providers.md, provider-anthropic.md). The same rule gives every other provider its reason.
@@ -14,6 +15,7 @@ const PATHS: Readonly<Record<ProviderProtocol, { chat: RegExp; models: string }>
   ollama: { chat: /\/api\/chat$/, models: "/api/tags" },
   // Gemini posts to <base>/<model>:generateContent; the base itself lists the models.
   gemini: { chat: /\/models$/, models: "/models" },
+  antigravity: { chat: /daily-cloudcode-pa\.googleapis\.com$/, models: "/v1internal:models" },
   // routing.vertex-endpoints: the catalog URL is the host; the adapter builds every path, and lists the catalog models.
   // translator.openai-to-commandcode-request: POST <host>/alpha/generate; the model list is the catalog.
   commandcode: { chat: /\/alpha\/generate$/, models: "/alpha/models" },
@@ -50,6 +52,7 @@ const EXECUTOR_QUIRKS: Readonly<Record<string, readonly string[]>> = {
   github: ["copilot"],
   // provider.gemini-cli-oauth (SP16c, kept as 9router): the Cloud Code envelope around the Gemini protocol.
   "gemini-cli": ["geminiCli"],
+  antigravity: ["antigravity"],
 };
 // provider.clinepass-headers-envelope: the Cline client headers, naming AIGate (user decision 2026-09-26; 9router names
 // itself). ponytail: AIGate has no release version yet; 0.1.0 until it does.
@@ -88,6 +91,11 @@ const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Par
   }),
   // provider.gemini-cli-oauth (kept from 9router): the Google token goes as Bearer; the models come from fetchAvailableModels.
   "gemini-cli": () => ({ auth: { kind: "api-key", header: "authorization", scheme: "bearer" }, modelsUrl: "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels" }),
+  antigravity: () => ({
+    chatUrl: ANTIGRAVITY_IDE_BASE_URL,
+    modelsUrl: ANTIGRAVITY_MODELS_URL,
+    auth: { kind: "api-key", header: "authorization", scheme: "bearer" },
+  }),
 };
 // provider.gemini-cli-oauth: Cloud Code speaks the Gemini protocol inside its own envelope.
 const CLOUD_CODE_PROTOCOLS: Readonly<Record<string, ProviderProtocol>> = { "gemini-cli": "gemini" };
@@ -150,7 +158,7 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
     aliases: provider.aliases,
     auth,
     models: provider.models.map((m) => ({
-      id: m.id, name: m.name, kind: m.kind === "llm" ? "chat" : m.kind, capabilities: m.capabilities, contextWindow: m.contextWindow,
+      id: m.id, name: m.name, ...(m.upstreamModelId ? { upstreamModelId: m.upstreamModelId } : {}), kind: m.kind === "llm" ? "chat" : m.kind, capabilities: m.capabilities, contextWindow: m.contextWindow,
       // 9router mixes sources: tencent's registry declares a 200000 context while the *hunyuan* pattern
       // gives a 262144 output. An output limit above the context window is not trusted, so it is unknown.
       maxOutputTokens: m.contextWindow !== null && m.maxOutputTokens !== null && m.maxOutputTokens > m.contextWindow ? null : m.maxOutputTokens,

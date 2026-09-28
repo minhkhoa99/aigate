@@ -15,6 +15,7 @@ const FAMILY_LEVELS: Readonly<Record<ProviderProtocol, readonly ThinkingLevel[]>
   "openai-responses": ["none", "minimal", "low", "medium", "high", "xhigh"],
   anthropic: ["none", "low", "medium", "high", "xhigh", "max"],
   gemini: ["none", "minimal", "low", "medium", "high"],
+  antigravity: ["none", "minimal", "low", "medium", "high"],
   vertex: ["none", "minimal", "low", "medium", "high"],
   ollama: ["none", "low", "medium", "high"],
   commandcode: ["none", "low", "medium", "high", "xhigh", "max"],

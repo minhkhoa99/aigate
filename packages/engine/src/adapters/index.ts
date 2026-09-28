@@ -1,6 +1,7 @@
 import type { AIProviderPort, HttpTransportPort } from "../ports.js";
 import type { ProviderDescriptor } from "../registry.js";
 import { AnthropicAdapter } from "./anthropic.js";
+import { AntigravityAdapter } from "./antigravity.js";
 import { CommandCodeAdapter } from "./commandcode.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
 import { GeminiAdapter } from "./gemini.js";
@@ -23,6 +24,7 @@ function familyAdapter(provider: ProviderDescriptor, transport: HttpTransportPor
   if (provider.quirks?.includes("copilot")) return new GithubAdapter(provider, transport);
   // provider.gemini-cli-oauth: the Gemini protocol inside Cloud Code's envelope.
   if (provider.quirks?.includes("geminiCli")) return new GeminiCliAdapter(provider, transport);
+  if (provider.quirks?.includes("antigravity")) return new AntigravityAdapter(provider, transport);
   switch (provider.protocol) {
     case "anthropic": return new AnthropicAdapter(provider, transport);
     case "openai-responses": return new OpenAIResponsesAdapter(provider, transport);

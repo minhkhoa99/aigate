@@ -1,0 +1,13 @@
+{
+  "nodes": [
+    {"id":"sp_custom_provider_options","label":"Custom provider options - sealed headers and retryStreamErrors","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"done"},
+    {"id":"custom_headers_contract","label":"Custom headers - sealed values, hints, validation and merge","file_type":"document","source_file":"docs/contracts/custom-providers.md","status":"done"},
+    {"id":"stream_retry_errors","label":"StreamRetryAdapter - bounded retries for first-event stream errors","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"done"}
+  ],
+  "edges": [
+    {"source":"sp_custom_provider_options","target":"custom_providers_contract","relation":"references","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"custom_headers_contract","target":"provider_nodes_table","relation":"changes","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/custom-providers.md","weight":1},
+    {"source":"stream_retry_errors","target":"engine_with_retry","relation":"uses","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"stream_retry_errors","target":"custom_providers_contract","relation":"implements","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1}
+  ]
+}

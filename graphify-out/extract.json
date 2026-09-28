@@ -9918,7 +9918,7 @@
     },
     {
       "id": "sp_sp16c",
-      "label": "SP16c - OAuth gemini-cli and antigravity",
+      "label": "SP16c - OAuth gemini-cli (66 connectable)",
       "file_type": "document",
       "source_file": "docs/PROGRESS_HANDOFF.md",
       "source_location": null,
@@ -9926,7 +9926,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "status": "next",
+      "status": "done",
       "rationale": null
     },
     {
@@ -10019,6 +10019,104 @@
       "contributor": null,
       "status": "done",
       "rationale": null
+    },
+    {
+      "id": "sp_sp16c2",
+      "label": "SP16c2 - OAuth antigravity (67 connectable)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "done"
+    },
+    {
+      "id": "02_providers_auth_provider_antigravity_oauth",
+      "label": "provider.antigravity-oauth",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "status": "implemented"
+    },
+    {
+      "id": "antigravity_oauth_flow",
+      "label": "Antigravity Google OAuth, userinfo, loadCodeAssist and onboarding",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "status": "done"
+    },
+    {
+      "id": "antigravity_adapter",
+      "label": "AntigravityAdapter - daily Cloud Code envelope, Gemini/Claude/image requests",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "status": "done"
+    },
+    {
+      "id": "api_ui_map_row_sp16c2",
+      "label": "API_UI_MAP SP16c2 row - generic OAuth Connections UI",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "status": "done"
+    },
+    {
+      "id": "sp16c2_tests",
+      "label": "SP16c2 tests - Antigravity engine and server lanes",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "done"
+    },
+    {
+      "id": "sp_custom_provider_options",
+      "label": "Custom provider options - sealed headers and retryStreamErrors",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "done"
+    },
+    {
+      "id": "custom_headers_contract",
+      "label": "Custom headers - sealed values, hints, validation and merge",
+      "file_type": "document",
+      "source_file": "docs/contracts/custom-providers.md",
+      "status": "done"
+    },
+    {
+      "id": "stream_retry_errors",
+      "label": "StreamRetryAdapter - bounded retries for first-event stream errors",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "done"
+    },
+    {
+      "id": "settings_env",
+      "label": "Repository .env settings loader",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "done"
+    },
+    {
+      "id": "oauth_client_env",
+      "label": "Google OAuth client ids and secrets from environment",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "status": "done"
+    },
+    {
+      "id": "provider_thinking_contract",
+      "label": "Provider thinking defaults and model effort levels",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-thinking.md",
+      "status": "done"
+    },
+    {
+      "id": "provider_thinking_table",
+      "label": "provider_thinking table - built-in provider default level",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-thinking.md",
+      "status": "done"
+    },
+    {
+      "id": "custom_provider_thinking",
+      "label": "Custom provider thinking level",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "done"
     }
   ],
   "edges": [
@@ -32200,6 +32298,222 @@
       "confidence_score": 1,
       "source_file": "docs/PROGRESS_HANDOFF.md",
       "source_location": null,
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16c",
+      "target": "sp_sp16c2",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16c2",
+      "target": "oauth_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16c2",
+      "target": "02_providers_auth_provider_antigravity_oauth",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16c2",
+      "target": "antigravity_oauth_flow",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16c2",
+      "target": "antigravity_adapter",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16c2",
+      "target": "api_ui_map_row_sp16c2",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16c2",
+      "target": "sp16c2_tests",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "antigravity_oauth_flow",
+      "target": "engine_oauth_module",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "antigravity_oauth_flow",
+      "target": "02_providers_auth_provider_antigravity_oauth",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "antigravity_adapter",
+      "target": "02_providers_auth_provider_antigravity_oauth",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "antigravity_adapter",
+      "target": "gemini_adapter",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "api_ui_map_row_sp16c2",
+      "target": "oauth_controller",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "weight": 1
+    },
+    {
+      "source": "sp16c2_tests",
+      "target": "antigravity_adapter",
+      "relation": "verifies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_custom_provider_options",
+      "target": "custom_providers_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "custom_headers_contract",
+      "target": "provider_nodes_table",
+      "relation": "changes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/custom-providers.md",
+      "weight": 1
+    },
+    {
+      "source": "stream_retry_errors",
+      "target": "engine_with_retry",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "stream_retry_errors",
+      "target": "custom_providers_contract",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "settings_env",
+      "target": "ctx_settings",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "oauth_client_env",
+      "target": "engine_oauth_module",
+      "relation": "configures",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "settings_env",
+      "target": "oauth_client_env",
+      "relation": "protects",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "provider_thinking_contract",
+      "target": "ctx_catalog",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-thinking.md",
+      "weight": 1
+    },
+    {
+      "source": "provider_thinking_table",
+      "target": "provider_thinking_contract",
+      "relation": "stores",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-thinking.md",
+      "weight": 1
+    },
+    {
+      "source": "custom_provider_thinking",
+      "target": "provider_thinking_contract",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "custom_provider_thinking",
+      "target": "provider_nodes_table",
+      "relation": "changes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
       "weight": 1
     }
   ],

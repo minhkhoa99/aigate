@@ -35,9 +35,9 @@
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1790521904.7047775,
-    "ast_hash": "1874531d4278ff18975e91561e15d310",
-    "semantic_hash": "1874531d4278ff18975e91561e15d310"
+    "mtime": 1790580374.186916,
+    "ast_hash": "8c088602d82d25bc3066b44604d53025",
+    "semantic_hash": "8c088602d82d25bc3066b44604d53025"
   },
   "docs/design/UI_HANDOFF.md": {
     "mtime": 1790304403.8708513,
@@ -60,9 +60,9 @@
     "semantic_hash": "04c0c50e7da7000a83ce1379183f0975"
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1790522694.9202695,
-    "ast_hash": "d095f48239571b9676f3a550967167d7",
-    "semantic_hash": "d095f48239571b9676f3a550967167d7"
+    "mtime": 1790580553.9285307,
+    "ast_hash": "2e7c89a6fa2c28a2cfb50cac14c4aea1",
+    "semantic_hash": "2e7c89a6fa2c28a2cfb50cac14c4aea1"
   },
   "docs/contracts/transport.md": {
     "mtime": 1790343138.4076855,
@@ -70,9 +70,9 @@
     "semantic_hash": "a5b2650d0a980efe321985431e8fe3cc"
   },
   "docs/contracts/provider-openai.md": {
-    "mtime": 1790510061.3652384,
-    "ast_hash": "05aabf302a67109e4e57e1231cbea83f",
-    "semantic_hash": "05aabf302a67109e4e57e1231cbea83f"
+    "mtime": 1790528839.4961746,
+    "ast_hash": "88c4c49965bd7226c8c9bf2bd48832b0",
+    "semantic_hash": "88c4c49965bd7226c8c9bf2bd48832b0"
   },
   "docs/contracts/protocol-openai.md": {
     "mtime": 1790510061.3642294,
@@ -105,9 +105,9 @@
     "semantic_hash": "822850255f3a53d7455fd5749149dcce"
   },
   "docs/contracts/custom-providers.md": {
-    "mtime": 1790447542.9772687,
-    "ast_hash": "9a8a9fb3c5e5dd190393951389c133d3",
-    "semantic_hash": "9a8a9fb3c5e5dd190393951389c133d3"
+    "mtime": 1790567918.3057823,
+    "ast_hash": "e88c25a814b177c239084b06d535d322",
+    "semantic_hash": "e88c25a814b177c239084b06d535d322"
   },
   "docs/contracts/provider-anthropic.md": {
     "mtime": 1790398651.8124115,
@@ -165,9 +165,9 @@
     "semantic_hash": "d6b7d9191daab2f8d4429ca0b73f08ce"
   },
   "docs/contracts/oauth.md": {
-    "mtime": 1790521904.670438,
-    "ast_hash": "1706b1412331bb52a34816f897392306",
-    "semantic_hash": "1706b1412331bb52a34816f897392306"
+    "mtime": 1790580491.1717806,
+    "ast_hash": "026c1db3711bfde9ccf003352998c99d",
+    "semantic_hash": "026c1db3711bfde9ccf003352998c99d"
   },
   "docs/contracts/custom-models.md": {
     "mtime": 1790504148.32178,
