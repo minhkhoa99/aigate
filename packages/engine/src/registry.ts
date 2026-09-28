@@ -73,6 +73,8 @@ export interface ProviderDescriptor {
   // A custom provider that asks for it (docs/contracts/custom-providers.md): a request that fails before its first content
   // with a 429 or a stream error event is sent again, at most twice (adapters/stream-retry.ts).
   readonly retryStreamErrors?: boolean;
+  // The first wait of those retries (2 s unless the server is told otherwise, for tests); it doubles after each one.
+  readonly streamRetryDelayMs?: number;
   // A custom provider's own thinking level (docs/contracts/provider-thinking.md), applied to every model it serves.
   readonly defaultThinking?: ThinkingLevel;
 }

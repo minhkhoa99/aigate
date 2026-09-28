@@ -135,7 +135,7 @@ function NodeForm({ node, type, onType }: { node?: ProviderNode; type: NodeType;
       <select className="input" value={levels.some((level) => level === thinking) ? thinking : "auto"} onChange={(event) => { const value = event.target.value; const next = value === "auto" ? "auto" : levels.find((level) => level === value); if (next) setThinking(next); }}>
         <option value="auto">Auto</option>{levels.map((level) => <option key={level} value={level}>{level === "xhigh" ? "Extra high" : level.charAt(0).toUpperCase() + level.slice(1)}</option>)}
       </select></Field>
-    <div className="list-row"><div><strong>Retry stream errors</strong><small>Off by default. When on, a request that fails before any answer text (a 429 other than a spent quota, or an error the stream sends first) is sent again, at most twice.</small></div>
+    <div className="list-row"><div><strong>Retry stream errors</strong><small>Off by default. When on, a request that fails before any answer text (a 429 other than a spent quota, or an error the stream sends first) is sent again, up to five times, waiting 2 s and then twice as long each time (at most 30 s), as opencode does.</small></div>
       <input type="checkbox" checked={retry} onChange={(event) => setRetry(event.target.checked)} aria-label="Retry stream errors" /></div>
     <div className="row"><Link className="button" to="/providers">Cancel</Link><Button type="submit" variant="primary" disabled={pending}>{pending ? "Saving…" : node ? "Save changes" : "Save and add API key"}</Button></div>
   </div></form>;

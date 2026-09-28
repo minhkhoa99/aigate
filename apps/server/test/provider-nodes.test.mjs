@@ -284,19 +284,20 @@ test("custom headers are sealed, shown as a name and a hint, merged on update, a
     assert.equal(sealed.includes("kept-secret"), false, "the values are sealed at rest");
   }));
 
-test("retryStreamErrors is off by default; when on, a stream error before any content and a 429 are sent again, twice at most", () =>
+test("retryStreamErrors is off by default; when on, a stream error before any content and a 429 are sent again, five times at most", () =>
   withTempDb(async (file) => {
     const failing = { error: { message: "Temporary service interruption. Retry the last turn.", type: "server_error" } };
     const answer = [chunk({ role: "assistant" }), chunk({ content: "Hi" }), chunk({}, { finish_reason: "stop" }), "[DONE]"];
     const upstream = fakeUpstream(
       sse([failing]),
       sse([failing]), sse([failing]), sse(answer),
-      sse([failing]), sse([failing]), sse([failing]),
+      ...Array.from({ length: 6 }, () => sse([failing])),
       json(429, { error: { message: "slow down" } }), json(200, completion),
       json(429, { error: { message: "no credit", code: "insufficient_quota" } }),
       sse([chunk({ content: "partial" }), failing]),
     );
-    const { app, dash, chat } = await ready(file, upstream);
+    // 2 s, 4 s, 8 s, 16 s, 30 s in production (opencode's policy); 1 ms, doubling, here.
+    const { app, dash, chat } = await ready(file, upstream, { streamRetryDelayMs: 1 });
     const node = (await dash({ method: "POST", url: "/api/provider-nodes", body })).json();
     await dash({ method: "POST", url: "/api/connections", body: { provider: node.id, apiKey: "sk-local-key-1234" } });
     const stream = { ...hello, model: "local/llama-3", stream: true };
@@ -312,14 +313,14 @@ test("retryStreamErrors is off by default; when on, a stream error before any co
     assert.equal(received.filter((frame) => frame.choices?.[0]?.delta?.role === "assistant").length, 1, "one start, not one per attempt");
     assert.equal(received.map((frame) => frame.choices?.[0]?.delta?.content ?? "").join(""), "Hi");
     assert.equal(upstream.calls.length, 4, "two failures, then the answer");
-    assert.equal((await chat(stream)).statusCode, 502, "three failures: the error reaches the client");
-    assert.equal(upstream.calls.length, 7);
-    assert.equal((await chat({ ...hello, model: "local/llama-3" })).statusCode, 200, "a 429 is retried for a non-streaming request too");
-    assert.equal(upstream.calls.length, 9);
-    assert.equal((await chat({ ...hello, model: "local/llama-3" })).json().error.code, "insufficient_quota", "a spent quota is not retried");
+    assert.equal((await chat(stream)).statusCode, 502, "six failures (five retries): the error reaches the client");
     assert.equal(upstream.calls.length, 10);
+    assert.equal((await chat({ ...hello, model: "local/llama-3" })).statusCode, 200, "a 429 is retried for a non-streaming request too");
+    assert.equal(upstream.calls.length, 12);
+    assert.equal((await chat({ ...hello, model: "local/llama-3" })).json().error.code, "insufficient_quota", "a spent quota is not retried");
+    assert.equal(upstream.calls.length, 13);
     const partial = await chat(stream);
-    assert.equal(upstream.calls.length, 11, "an error after content is never retried");
+    assert.equal(upstream.calls.length, 14, "an error after content is never retried");
     assert.match(partial.body, /partial/);
     assert.equal((await dash({ method: "PATCH", url: `/api/provider-nodes/${node.id}`, body: { retryStreamErrors: "yes" } })).json().code, "INVALID_REQUEST");
     await app.close();

@@ -15,7 +15,7 @@ import { VertexAdapter, VertexPartnerAdapter } from "./vertex.js";
 // failures to be retried (docs/contracts/custom-providers.md).
 export function createAdapter(provider: ProviderDescriptor, transport: HttpTransportPort): AIProviderPort {
   const adapter = familyAdapter(provider, transport);
-  return provider.retryStreamErrors ? new StreamRetryAdapter(adapter) : adapter;
+  return provider.retryStreamErrors ? new StreamRetryAdapter(adapter, provider.streamRetryDelayMs) : adapter;
 }
 
 function familyAdapter(provider: ProviderDescriptor, transport: HttpTransportPort): AIProviderPort {

@@ -21,7 +21,7 @@ export { parseGoogleCredential, type GoogleCredential } from "./adapters/google-
 export { VertexAdapter, VertexPartnerAdapter } from "./adapters/vertex.js";
 export { CommandCodeAdapter } from "./adapters/commandcode.js";
 export { createAdapter } from "./adapters/index.js";
-export { StreamRetryAdapter } from "./adapters/stream-retry.js";
+export { STREAM_RETRY_DELAY_MS, StreamRetryAdapter } from "./adapters/stream-retry.js";
 export * from "./protocols/openai-chat.js";
 export * from "./protocols/anthropic-messages.js";
 export * from "./protocols/openai-responses.js";

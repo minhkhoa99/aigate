@@ -31,6 +31,8 @@ export interface ChatLimits {
   readonly streamIdleTimeoutMs: number;
   // The pause unit between the reactive refresh attempts after a 401/403 (oauth.refresh-lifecycle: 1 s, then 2 s).
   readonly refreshRetryDelayMs: number;
+  // The first wait before a custom provider's stream is retried (retryStreamErrors).
+  readonly streamRetryDelayMs: number;
 }
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000;
 export const DEFAULT_REFRESH_RETRY_DELAY_MS = 1_000;
@@ -499,7 +501,9 @@ export class ChatLane {
     // The connection id is the session id claude and codex send (9router derives one per connection); gemini-cli names
     // the project its sign-in found.
     const credential: Credential = { kind: "api-key", apiKey: stored.apiKey, sessionId: stored.id, ...(stored.projectId ? { projectId: stored.projectId } : {}) };
-    return { provider: withConnection(provider, stored), request: upstream, credential, connection: stored };
+    const connected = withConnection(provider, stored);
+    const retrying = connected.retryStreamErrors ? { ...connected, streamRetryDelayMs: this.limits.streamRetryDelayMs } : connected;
+    return { provider: retrying, request: upstream, credential, connection: stored };
   }
 
   private modelNotFound(ref: string): GatewayError {
