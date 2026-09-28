@@ -64,7 +64,7 @@ export interface OAuthState {
 }
 // The key (or access token) routing and the connection test use, with the row it came from. SP16c: projectId is the
 // Google Cloud Code project a gemini-cli sign-in found.
-export type StoredCredential = { id: string; apiKey: string; oauth?: OAuthState; projectId?: string } & ConnectionData;
+export type StoredCredential = { id: string; apiKey: string; oauth?: OAuthState; projectId?: string; providerData?: Readonly<Record<string, string>> } & ConnectionData;
 
 const secret = {
   id: t.id, sealed: t.apiKeySealed, authType: t.authType, refreshSealed: t.refreshTokenSealed, expiresAt: t.expiresAt, lastRefreshAt: t.lastRefreshAt, oauthData: t.oauthData, ...data,
@@ -142,7 +142,7 @@ export class ConnectionsRepository {
       const now = new Date();
       const { tokens } = input;
       const values = {
-        apiKeySealed: this.cipher.seal(tokens.accessToken, sealContext(id)), keyHint: keyHint(tokens.accessToken), authType: "oauth" as const,
+        apiKeySealed: this.cipher.seal(tokens.apiKey ?? tokens.accessToken, sealContext(id)), keyHint: keyHint(tokens.apiKey ?? tokens.accessToken), authType: "oauth" as const,
         refreshTokenSealed: tokens.refreshToken ? this.cipher.seal(tokens.refreshToken, refreshContext(id)) : null,
         expiresAt: expiry(now, tokens.expiresIn), email: tokens.email ?? null, oauthData: JSON.stringify(tokens.data), organization: input.organization ?? null,
         // A sign-in counts as a refresh (9router stamps lastRefreshAt on the codex sign-in).
@@ -162,7 +162,7 @@ export class ConnectionsRepository {
   async storeRefresh(id: string, tokens: OAuthTokens): Promise<void> {
     const now = new Date();
     await this.database.db.update(t).set({
-      apiKeySealed: this.cipher.seal(tokens.accessToken, sealContext(id)), keyHint: keyHint(tokens.accessToken),
+      apiKeySealed: this.cipher.seal(tokens.apiKey ?? tokens.accessToken, sealContext(id)), keyHint: keyHint(tokens.apiKey ?? tokens.accessToken),
       ...(tokens.refreshToken ? { refreshTokenSealed: this.cipher.seal(tokens.refreshToken, refreshContext(id)) } : {}),
       ...(tokens.expiresIn !== undefined ? { expiresAt: expiry(now, tokens.expiresIn) } : {}),
       lastRefreshAt: now, updatedAt: now,
@@ -224,6 +224,16 @@ export class ConnectionsRepository {
     const refreshToken = refreshSealed ? this.cipher.open(refreshSealed, refreshContext(id)) : undefined;
     const oauth = authType === "oauth" ? { oauth: { refreshToken, expiresAt, lastRefreshAt } } : {};
     const projectId = oauthField(oauthData, "projectId");
-    return { id, apiKey: this.cipher.open(sealed, sealContext(id)), ...oauth, ...(projectId ? { projectId } : {}), ...rest };
+    let providerData: Readonly<Record<string, string>> | undefined;
+    if (oauthData) {
+      try {
+        const parsed: unknown = JSON.parse(oauthData);
+        if (typeof parsed === "object" && parsed !== null) {
+          const entries = Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1] !== "");
+          if (entries.length > 0) providerData = Object.fromEntries(entries);
+        }
+      } catch { providerData = undefined; }
+    }
+    return { id, apiKey: this.cipher.open(sealed, sealContext(id)), ...oauth, ...(projectId ? { projectId } : {}), ...(providerData ? { providerData } : {}), ...rest };
   }
 }

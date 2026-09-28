@@ -1,13 +1,13 @@
 # Discovery coverage
 
-Entries: 334
+Entries: 338
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
 | routes | 166/166 |  |
 | pages | 6/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +14 |
-| providers | 24/124 | alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu, bazaarlink … +92 |
-| executors | 18/31 | devin-cli, grok-cli, grok-web, iflow, mimo-free, opencode, opencode-go, opencode-zen … +5 |
+| providers | 26/124 | alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu, bazaarlink … +90 |
+| executors | 20/31 | devin-cli, grok-web, mimo-free, opencode, opencode-go, opencode-zen, perplexity-web, windsurf … +3 |
 | translators | 44/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js |
 | repos | 11/11 |  |
 | settingsKeys | 47/52 | cloudEnabled, dnsToolEnabled, oidcLoginLabel, samlLoginLabel, tunnelProvider |
@@ -16,7 +16,7 @@ Entries: 334
 
 - apikeys: 9
 - catalog: 32
-- connections: 67
+- connections: 71
 - identity: 11
 - media: 15
 - routing: 108
@@ -28,7 +28,7 @@ Entries: 334
 ## Labels
 
 - IMPLEMENTATION_ACCIDENT: 18
-- REFERENCE_BEHAVIOR: 286
+- REFERENCE_BEHAVIOR: 290
 - SUSPECTED_BUG: 78
 
 ## Missing — pages
@@ -75,7 +75,6 @@ Entries: 334
 - cerebras
 - chutes
 - cline
-- codebuddy-intl
 - cohere
 - comfyui
 - coqui
@@ -98,7 +97,6 @@ Entries: 334
 - groq
 - huggingface
 - hyperbolic
-- iflow
 - inworld
 - jina-ai
 - jina-reader
@@ -162,9 +160,7 @@ Entries: 334
 ## Missing — executors
 
 - devin-cli
-- grok-cli
 - grok-web
-- iflow
 - mimo-free
 - opencode
 - opencode-go

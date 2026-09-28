@@ -64,8 +64,8 @@ test("model resolution: bare catalog id, provider prefix, unknown model, no acti
       assert.match(res.json().error.message, /DeepSeek/);
     }
     const blocked = await chat({ ...hello, model: "grok-cli/grok-4" });
-    assert.deepEqual([blocked.statusCode, blocked.json().error.code], [400, "provider_not_supported"]);
-    assert.match(blocked.json().error.message, /Needs OAuth sign-in/);
+    assert.deepEqual([blocked.statusCode, blocked.json().error.code], [404, "no_active_connection"]);
+    assert.match(blocked.json().error.message, /Grok CLI/);
     // Once connected, the alias routes to the provider's own chat URL with its own key.
     await dash({ method: "POST", url: "/api/connections", body: { provider: "deepseek", apiKey: "sk-deepseek-key-5555" } });
     assert.equal((await chat({ ...hello, model: "ds/deepseek-chat" })).statusCode, 200);

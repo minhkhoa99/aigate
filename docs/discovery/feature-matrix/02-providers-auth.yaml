@@ -303,6 +303,121 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
+- id: provider.kimi-oauth
+  group: OAuth providers
+  feature: Kimi Code sign-in
+  subFeature: "Kimi device-code OAuth, dual API-key/OAuth transport, and device headers"
+  trigger: "Dashboard device-code sign-in for kimi or kimi-coding; requests using Kimi OAuth"
+  input: "Kimi device authorization and an OAuth connection"
+  output: "An oauth connection with access/refresh tokens and a stable Kimi device id"
+  businessRules:
+    - "Device-code and token requests POST form data to auth.kimi.com with X-Msh headers built from one random UUID device id; pending states can arrive as HTTP 200 JSON errors"
+    - "The device id is carried from device-code response through poll and stored in providerSpecificData; refresh uses the same provider headers and keeps a returned refresh token or the old one"
+    - "OAuth requests use the Kimi coding Claude endpoint with x-api-key; API-key requests may use the OpenAI chat endpoint with Bearer; both add Kimi headers"
+    - "The catalog exposes Kimi Code and platform model ids; refresh is proactive five minutes before expiry"
+  state:
+    reads: ["providerConnections (OAuth/API key, expiry, device id)"]
+    writes: ["providerConnections on sign-in and refresh"]
+    runtimeOnly: ["device id generated per sign-in"]
+  dependencies: ["oauth.generic-provider-action-route", "oauth.refresh-lifecycle", "protocol-anthropic", "protocol-openai"]
+  providerInteraction: "auth.kimi.com device/token endpoints and api.kimi.com/coding endpoints"
+  fallback: { hasFallback: true, retry: "generic transport policy; reactive refresh on 401/403", timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "device/token request fails or token expires", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections oauth row with providerSpecificData.deviceId"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "HTTP 200 with authorization_pending or slow_down is not a successful connection"
+    - "Legacy kimi-coding sign-in is saved under provider kimi"
+  evidence:
+    - { file: open-sse/providers/registry/kimi.js, line: 24, note: "dual auth modes and transport endpoints" }
+    - { file: open-sse/providers/registry/kimi.js, line: 45, note: "OpenAI and Claude transport variants" }
+    - { file: src/lib/oauth/providers/kimi.js, line: 9, note: "device id and device-code request" }
+    - { file: src/lib/oauth/providers/kimi.js, line: 40, note: "poll, pending response and device id propagation" }
+    - { file: open-sse/services/tokenRefresh/providers.js, line: 146, note: "refresh delegates through Kimi profile headers" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: provider.codebuddy-oauth
+  group: OAuth providers
+  feature: CodeBuddy CN and international sign-in
+  subFeature: "CodeBuddy browser state flow, OAuth token refresh, and stream-only OpenAI chat"
+  trigger: "Dashboard sign-in for codebuddy-cn or codebuddy-intl; any request routed to CodeBuddy"
+  input: "Browser auth state and a polled CodeBuddy token"
+  output: "An oauth connection and streamed OpenAI-compatible answers"
+  businessRules:
+    - "device-code POSTs stateUrl?platform=CLI or ide with the product headers and an empty JSON body; its device_code is the returned state and verification_uri is the returned authUrl"
+    - "Polling GETs tokenUrl?state=<state> with product headers; code 11217 is pending, code 0 with accessToken succeeds, and missing refreshToken is stored as empty"
+    - "CN and international hosts use separate URLs, User-Agent/platform/domain headers, and refresh endpoints; refresh POSTs the refresh token in X-Refresh-Token JSON request headers"
+    - "Chat requests force stream=true; reasoning_effort none/off is omitted, an explicit effort adds reasoning_summary=auto; CN rewrites long or agent-like system prompts, while international prepends CodeBuddy Code and converts user strings to text blocks"
+  state:
+    reads: ["providerConnections (OAuth tokens and expiry)"]
+    writes: ["providerConnections on state/poll sign-in and refresh"]
+    runtimeOnly: ["browser state until poll succeeds"]
+  dependencies: ["oauth.generic-provider-action-route", "oauth.refresh-lifecycle", "provider.codebuddy-request-quirks"]
+  providerInteraction: "copilot.tencent.com or codebuddy.ai state/token/refresh and chat endpoints"
+  fallback: { hasFallback: true, retry: "generic transport retry; reactive refresh on 401/403", timeout: null, quota: "billing is provider-specific" }
+  errorCases:
+    - { code: AUTH_ERROR, when: "state/poll/refresh fails", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections oauth row"]
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The state flow is called device-code by the shared UI but has no user_code and requires browser completion"
+    - "Non-stream client requests are re-aggregated from the forced upstream stream"
+  evidence:
+    - { file: open-sse/providers/registry/codebuddy-cn.js, line: 22, note: "CN chat, headers and OAuth endpoints" }
+    - { file: open-sse/providers/registry/codebuddy-intl.js, line: 24, note: "international chat, headers and OAuth endpoints" }
+    - { file: src/lib/oauth/providers/codebuddy-cn.js, line: 10, note: "state request and authUrl" }
+    - { file: src/lib/oauth/providers/codebuddy-cn.js, line: 38, note: "state polling and pending code" }
+    - { file: open-sse/executors/codebuddy-cn.js, line: 17, note: "CN request quirks" }
+    - { file: open-sse/executors/codebuddy-intl.js, line: 16, note: "international request quirks" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]
+
+- id: provider.iflow-oauth
+  group: OAuth providers
+  feature: iFlow sign-in
+  subFeature: "iFlow authorization-code OAuth, user-info API-key minting, and signed chat requests"
+  trigger: "Dashboard authorization-code sign-in for iflow; any request routed to iFlow"
+  input: "Authorization code from iFlow callback"
+  output: "An oauth connection with a minted API key, identity, and iFlow chat answers"
+  businessRules:
+    - "Authorize uses loginMethod=phone, type=phone, redirect, state, and client_id; token exchange sends client_id/client_secret in the form and Basic authorization"
+    - "After exchange, GETs /api/oauth/getUserInfo?accessToken=...; the exchange fails unless the response is successful, success=true, apiKey is non-empty, and email or phone is present"
+    - "The saved access token and minted apiKey are both retained; email/phone and nickname/name become connection identity; refresh uses Basic client credentials and is due one day before expiry"
+    - "Chat requests use https://apis.iflow.cn/v1/chat/completions, User-Agent iFlow-Cli, a generated session-id, current timestamp, HMAC-SHA256 signature over userAgent:session-id:timestamp using the API key, and Bearer API-key auth"
+  state:
+    reads: ["providerConnections (OAuth tokens, minted apiKey, expiry, identity)"]
+    writes: ["providerConnections on sign-in and refresh"]
+    runtimeOnly: ["per-request session id and timestamp"]
+  dependencies: ["oauth.generic-provider-action-route", "oauth.refresh-lifecycle"]
+  providerInteraction: "iflow.cn OAuth/user-info endpoints and apis.iflow.cn chat endpoint"
+  fallback: { hasFallback: true, retry: "generic transport retry; reactive refresh on 401/403", timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "token exchange, user info, or refresh fails", partial: false }
+    - { code: INVALID_REQUEST, when: "user info lacks API key or account identity", partial: false }
+  sideEffects: ["iFlow user-info call returns the API key used by chat"]
+  persistence: ["providerConnections oauth row with apiKey and access token"]
+  performanceConcerns: ["one user-info call after exchange"]
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The separate iflow/cookie route mints and rotates an API key from BXAuth; it is traced but outside this standard OAuth port"
+  evidence:
+    - { file: open-sse/providers/registry/iflow.js, line: 17, note: "iFlow endpoint, models and OAuth config" }
+    - { file: src/lib/oauth/providers/iflow.js, line: 5, note: "authorization URL and Basic/form token exchange" }
+    - { file: src/lib/oauth/providers/iflow.js, line: 45, note: "mandatory user info and API-key validation" }
+    - { file: open-sse/executors/iflow.js, line: 43, note: "session, timestamp, HMAC signature and Bearer header" }
+    - { file: open-sse/services/tokenRefresh/providers.js, line: 459, note: "iFlow refresh path" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]
+
 - id: auth.transport-auth-combined-raw
   group: Provider authentication
   feature: Provider authentication
@@ -2600,3 +2715,43 @@
     expected: "Claude models keep the client's thinking and images; a tool without parameters is sent without them; onboarding runs when no project exists; the model list uses the chat host"
     actual: "The Claude path drops thinking and images, temperature 0 becomes 1, a parameterless tool gets a required reason argument, onboarding runs only when a project already exists, and models are listed from the sandbox host"
     impact: "Claude answers ignore reasoning settings and pictures; tool calls carry an extra argument; accounts without a project stay without one"
+
+- id: provider.grok-cli-oauth
+  group: OAuth providers
+  feature: Grok CLI (Grok Build) sign-in
+  subFeature: "xAI device-code OAuth and the cli-chat-proxy Responses API"
+  trigger: "Dashboard device-code sign-in for grok-cli; any request routed to grok-cli"
+  input: "Device code approval and an OAuth connection"
+  output: "An oauth connection with xAI tokens, optional identity, and Grok Responses answers"
+  businessRules:
+    - "Device-code request POSTs client_id, scope, and referrer=grok-build to https://auth.x.ai/oauth2/device/code without PKCE; polling POSTs grant_type=device_code, device_code, and client_id to https://auth.x.ai/oauth2/token"
+    - "authorization_pending and slow_down remain pending; after token success, user profile at cli-chat-proxy.grok.com/v1/user is best effort and email/user id are taken from the ID/access token or profile"
+    - "Requests use https://cli-chat-proxy.grok.com/v1/responses, force stream and store=false, send x-grok client/session/conversation/request/turn headers, and keep a bounded per-session turn counter"
+    - "Virtual model suffixes -low/-medium/-high/-xhigh select reasoning effort and are removed before upstream; reasoning.encrypted_content is included unless effort is none; unsupported Responses fields are dropped"
+    - "Refresh uses the xAI token endpoint five minutes before expiry; 429, 502, and 503 retry policies are provider-specific in the reference"
+  state:
+    reads: ["providerConnections (OAuth tokens, expiry, identity)"]
+    writes: ["providerConnections on device-code sign-in and refresh"]
+    runtimeOnly: ["bounded session turn store (5000 entries), request/session ids"]
+  dependencies: ["oauth.generic-provider-action-route", "oauth.refresh-lifecycle", "provider.openai-responses"]
+  providerInteraction: "auth.x.ai device/token endpoints and cli-chat-proxy.grok.com Responses/user endpoints"
+  fallback: { hasFallback: true, retry: "429/502/503 provider retry; reactive refresh on 401/403", timeout: null, quota: "402 spending-limit is surfaced as quota/payment" }
+  errorCases:
+    - { code: AUTH_ERROR, when: "device/token/profile failure or expired token", partial: false }
+    - { code: RATE_LIMIT, when: "provider retries are exhausted", partial: false }
+  sideEffects: []
+  persistence: ["providerConnections oauth row"]
+  performanceConcerns: ["session and request state are capped in memory"]
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Tool calls and outputs are normalized to the Responses API; invalid server item references are removed"
+    - "Grok Build models may reject reasoning.effort, so only the supported model family receives the effort field"
+  evidence:
+    - { file: open-sse/providers/registry/grok-cli.js, line: 44, note: "Responses endpoint, forceStream, client headers, retries and model suffixes" }
+    - { file: open-sse/executors/grok-cli.js, line: 362, note: "Grok headers, session identity and turn index" }
+    - { file: open-sse/executors/grok-cli.js, line: 419, note: "Responses request normalization, reasoning and allowlist" }
+    - { file: src/lib/oauth/providers/grok-cli.js, line: 8, note: "device-code request and poll" }
+    - { file: src/lib/oauth/providers/grok-cli.js, line: 65, note: "best-effort profile and token mapping" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]

@@ -13,6 +13,8 @@ export type OAuthFlow = "authorization_code" | "authorization_code_pkce" | "devi
 
 export interface OAuthTokens {
   readonly accessToken: string;
+  // Some providers issue a routing key separately from the OAuth access token (iFlow).
+  readonly apiKey?: string;
   readonly refreshToken?: string;
   // Seconds from now; undefined when the provider gives no expiry.
   readonly expiresIn?: number;
@@ -51,7 +53,7 @@ export interface OAuthProvider {
   deviceCode?(io: OAuthIO): Promise<DeviceCode>;
   poll?(deviceCode: string, io: OAuthIO): Promise<PollResult>;
   // null when the provider refused the refresh.
-  refresh?(refreshToken: string, io: OAuthIO): Promise<OAuthTokens | null>;
+  refresh?(refreshToken: string, io: OAuthIO, currentApiKey?: string, data?: Readonly<Record<string, string>>): Promise<OAuthTokens | null>;
   // A callback the provider accepts only at this address (codex: its CLI's fixed port); the dashboard pastes it back.
   readonly fixedRedirect?: string;
   // How long before expiry a proactive refresh runs (5 minutes when unset), and the age of the last refresh that forces
@@ -485,6 +487,184 @@ const github: OAuthProvider = {
   },
 };
 
+// ---- Grok CLI, Kimi, CodeBuddy, and iFlow (SP16d) ----
+
+const GROK_CLIENT_ID = "b1a00492-073a-47ea-816f-4c329264a828";
+const GROK_DEVICE_URL = "https://auth.x.ai/oauth2/device/code";
+const GROK_TOKEN_URL = "https://auth.x.ai/oauth2/token";
+const GROK_SCOPE = "openid profile email offline_access grok-cli:access api:access conversations:read conversations:write";
+const GROK_UA = "grok-pager/0.2.93 grok-shell/0.2.93 (linux; x86_64)";
+const GROK_AUTH_HEADERS = { accept: "application/json", "user-agent": GROK_UA };
+
+const grokTokens = async (root: Record<string, unknown>, io: OAuthIO): Promise<OAuthTokens> => {
+  const accessToken = text(root.access_token);
+  if (!accessToken) throw failed("grok-cli", "Grok CLI returned no access token");
+  const profileAnswer = await call(io, "GET", "https://cli-chat-proxy.grok.com/v1/user", {
+    accept: "application/json", authorization: `Bearer ${accessToken}`, "user-agent": GROK_UA,
+    "x-grok-client-version": "0.2.93", "x-xai-token-auth": "xai-grok-cli",
+  });
+  const profile = profileAnswer.ok ? record(parseJson(profileAnswer.text)) : {};
+  const id = jwtPayload(root.id_token);
+  const access = jwtPayload(accessToken);
+  const email = text(id.email) || text(access.email) || text(profile.email);
+  const userId = text(profile.userId) || text(profile.id) || text(id.sub) || text(access.sub);
+  const displayName = [text(profile.firstName), text(profile.lastName)].filter(Boolean).join(" ") || text(profile.name);
+  return {
+    accessToken,
+    ...(text(root.refresh_token) ? { refreshToken: text(root.refresh_token) } : {}),
+    ...(typeof root.expires_in === "number" ? { expiresIn: root.expires_in } : {}),
+    ...(email ? { email } : {}), ...(displayName ? { displayName } : {}),
+    data: strings({ authMethod: "device_code", idToken: text(root.id_token), email, userId, hasGrokCodeAccess: profile.hasGrokCodeAccess === true ? "true" : "false", subscriptionTier: profile.subscriptionTier }),
+  };
+};
+
+const grokCli: OAuthProvider = {
+  flow: "device_code",
+  async deviceCode(io) {
+    const form = new URLSearchParams({ client_id: GROK_CLIENT_ID, scope: GROK_SCOPE, referrer: "grok-build" });
+    const answer = await call(io, "POST", GROK_DEVICE_URL, GROK_AUTH_HEADERS, form.toString());
+    if (!answer.ok) throw failed("grok-cli", `Device code request failed: ${answer.text}`);
+    const root = record(parseJson(answer.text));
+    const device = text(root.device_code); const user = text(root.user_code); const uri = text(root.verification_uri);
+    if (!device || !user || !uri) throw failed("grok-cli", "Grok CLI returned no device code");
+    return { device_code: device, user_code: user, verification_uri: uri, verification_uri_complete: text(root.verification_uri_complete) ?? uri, expires_in: typeof root.expires_in === "number" ? root.expires_in : 900, interval: typeof root.interval === "number" ? root.interval : 5 };
+  },
+  async poll(deviceCode, io) {
+    const form = new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: deviceCode, client_id: GROK_CLIENT_ID });
+    const answer = await call(io, "POST", GROK_TOKEN_URL, GROK_AUTH_HEADERS, form.toString());
+    const root = record(parseJson(answer.text));
+    const token = text(root.access_token);
+    if (token) return { status: "approved", tokens: await grokTokens(root, io) };
+    const error = text(root.error) ?? (answer.ok ? "authorization_pending" : "poll_failed");
+    if (error === "authorization_pending" || error === "slow_down") return { status: "pending", ...(error === "slow_down" ? { slowDown: true } : {}) };
+    return { status: "error", error, ...(text(root.error_description) ? { description: text(root.error_description) } : {}) };
+  },
+  async refresh(refreshToken, io) {
+    const answer = await call(io, "POST", GROK_TOKEN_URL, GROK_AUTH_HEADERS, new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: GROK_CLIENT_ID }).toString());
+    return answer.ok ? grokTokens(record(parseJson(answer.text)), io) : null;
+  },
+};
+
+const KIMI_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
+const KIMI_DEVICE_URL = "https://auth.kimi.com/api/oauth/device_authorization";
+const KIMI_TOKEN_URL = "https://auth.kimi.com/api/oauth/token";
+const kimiDevices = new Map<string, string>();
+const kimiModel = (): string => {
+  const platform = typeof process !== "undefined" ? process.platform : "unknown";
+  const arch = typeof process !== "undefined" ? process.arch : "unknown";
+  return platform === "darwin" ? `macOS ${arch}` : platform === "win32" ? `Windows ${arch}` : platform === "linux" ? `Linux ${arch}` : `${platform} ${arch}`;
+};
+const kimiHeaders = (deviceId: string) => ({
+  "X-Msh-Platform": "9router", "X-Msh-Version": "0.1.0", "X-Msh-Device-Name": "unknown", "X-Msh-Device-Model": kimiModel(),
+  "X-Msh-Device-Id": deviceId,
+});
+
+const kimi: OAuthProvider = {
+  flow: "device_code",
+  async deviceCode(io) {
+    const deviceId = crypto.randomUUID();
+    const answer = await call(io, "POST", KIMI_DEVICE_URL, { ...FORM_HEADERS, ...kimiHeaders(deviceId) }, new URLSearchParams({ client_id: KIMI_CLIENT_ID }).toString());
+    if (!answer.ok) throw failed("kimi", `Device code request failed: ${answer.text}`);
+    const root = record(parseJson(answer.text));
+    const data = isRecord(root.data) ? root.data : root;
+    const device = text(data.device_code); const user = text(data.user_code); const uri = text(data.verification_uri) || "https://www.kimi.com/code/authorize_device";
+    if (!device) throw failed("kimi", "Kimi returned no device code");
+    if (kimiDevices.size >= 256) {
+      const oldest = kimiDevices.keys().next().value;
+      if (typeof oldest === "string") kimiDevices.delete(oldest);
+    }
+    kimiDevices.set(device, deviceId);
+    return { device_code: device, user_code: user ?? device, verification_uri: uri, verification_uri_complete: text(data.verification_uri_complete) ?? `${uri}?user_code=${encodeURIComponent(user ?? device)}`, expires_in: typeof data.expires_in === "number" ? data.expires_in : 900, interval: typeof data.interval === "number" ? data.interval : 5 };
+  },
+  async poll(deviceCode, io) {
+    const deviceId = kimiDevices.get(deviceCode);
+    if (!deviceId) return { status: "error", error: "device_code_lost", description: "The Kimi authorization session expired; start again" };
+    const answer = await call(io, "POST", KIMI_TOKEN_URL, { ...FORM_HEADERS, ...kimiHeaders(deviceId) }, new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: deviceCode, client_id: KIMI_CLIENT_ID }).toString());
+    const root = record(parseJson(answer.text));
+    const error = text(root.error) || text(record(root.data).error);
+    const token = text(root.access_token) || text(record(root.data).access_token);
+    if (token) { kimiDevices.delete(deviceCode); return { status: "approved", tokens: { accessToken: token, ...(text(root.refresh_token) ? { refreshToken: text(root.refresh_token) } : {}), ...(typeof root.expires_in === "number" ? { expiresIn: root.expires_in } : {}), data: strings({ authMethod: "device_code", deviceId }) } }; }
+    if (error === "authorization_pending" || error === "slow_down") return { status: "pending", ...(error === "slow_down" ? { slowDown: true } : {}) };
+    return { status: "error", error: error ?? "poll_failed", ...(text(root.error_description) ? { description: text(root.error_description) } : {}) };
+  },
+  async refresh(refreshToken, io, _currentApiKey, data) {
+    const deviceId = data?.deviceId;
+    if (!deviceId) return null;
+    const answer = await call(io, "POST", KIMI_TOKEN_URL, { ...FORM_HEADERS, ...kimiHeaders(deviceId) }, new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: KIMI_CLIENT_ID }).toString());
+    if (!answer.ok) return null;
+    const root = record(parseJson(answer.text)); const token = text(root.access_token);
+    return token ? { accessToken: token, refreshToken: text(root.refresh_token) || refreshToken, ...(typeof root.expires_in === "number" ? { expiresIn: root.expires_in } : {}), data: { deviceId } } : null;
+  },
+};
+
+interface CodeBuddyConfig { readonly id: string; readonly base: string; readonly product: string; readonly domain: string; readonly userAgent: string; readonly ide: string }
+const CODEBUDDY: Readonly<Record<string, CodeBuddyConfig>> = {
+  "codebuddy-cn": { id: "codebuddy-cn", base: "https://copilot.tencent.com", product: "SaaS", domain: "copilot.tencent.com", userAgent: "CLI/2.63.2 CodeBuddy/2.63.2", ide: "CLI" },
+  "codebuddy-intl": { id: "codebuddy-intl", base: "https://www.codebuddy.ai", product: "SaaS", domain: "www.codebuddy.ai", userAgent: "IDE/2.63.2 CodeBuddy/2.63.2", ide: "IDE" },
+};
+const codeBuddyHeaders = (config: CodeBuddyConfig) => ({ "user-agent": config.userAgent, "x-product": config.product, "x-domain": config.domain, "x-ide-type": config.ide, "x-ide-name": config.ide, "x-requested-with": "XMLHttpRequest", "x-no-authorization": "true", "x-no-user-id": "true" });
+function codeBuddy(id: string): OAuthProvider {
+  const config = CODEBUDDY[id]; const stateUrl = `${config.base}/v2/plugin/auth/state`; const tokenUrl = `${config.base}/v2/plugin/auth/token`; const refreshUrl = `${config.base}/v2/plugin/auth/token/refresh`;
+  return {
+    flow: "device_code",
+    async deviceCode(io) {
+      const answer = await call(io, "POST", `${stateUrl}?platform=${config.ide.toLowerCase()}`, { ...JSON_HEADERS, ...codeBuddyHeaders(config) }, "{}");
+      if (!answer.ok) throw failed(id, `Authorization state request failed: ${answer.text}`);
+      const root = record(parseJson(answer.text)); const data = record(root.data); const state = text(data.state); const url = text(data.authUrl);
+      if (root.code !== 0 || !state || !url) throw failed(id, "CodeBuddy returned no authorization state");
+      return { device_code: state, user_code: "", verification_uri: url, verification_uri_complete: url, expires_in: 900, interval: 5 };
+    },
+    async poll(deviceCode, io) {
+      const answer = await call(io, "GET", `${tokenUrl}?state=${encodeURIComponent(deviceCode)}`, codeBuddyHeaders(config));
+      if (!answer.ok) return { status: "error", error: "poll_failed", description: `Poll failed: ${answer.status}` };
+      const root = record(parseJson(answer.text)); const data = record(root.data);
+      if (root.code === 11217) return { status: "pending" };
+      const token = text(data.accessToken);
+      if (root.code !== 0 || !token) return { status: "error", error: "access_denied", description: text(root.message) };
+      return { status: "approved", tokens: { accessToken: token, ...(text(data.refreshToken) ? { refreshToken: text(data.refreshToken) } : {}), ...(typeof data.expiresIn === "number" ? { expiresIn: data.expiresIn } : { expiresIn: 86400 }), data: {} } };
+    },
+    async refresh(refreshToken, io) {
+      const answer = await call(io, "POST", refreshUrl, { ...JSON_HEADERS, ...codeBuddyHeaders(config), "x-refresh-token": refreshToken, "x-auth-refresh-source": "plugin" }, "{}");
+      if (!answer.ok) return null;
+      const root = record(parseJson(answer.text)); const data = record(root.data); const token = text(data.accessToken);
+      return root.code === 0 && token ? { accessToken: token, refreshToken: text(data.refreshToken) || refreshToken, ...(typeof data.expiresIn === "number" ? { expiresIn: data.expiresIn } : { expiresIn: 86400 }), data: {} } : null;
+    },
+  };
+}
+
+const IFLOW_CLIENT_ID = "10009311001";
+const IFLOW_SECRET_ENV = "AIGATE_IFLOW_OAUTH_CLIENT_SECRET";
+const iflowClient = (): { id: string; secret: string } => {
+  const secret = process.env[IFLOW_SECRET_ENV]?.trim();
+  if (!secret) throw new EngineError("INVALID_REQUEST", `iFlow sign-in needs ${IFLOW_SECRET_ENV} in AIGate's .env (see .env.example), then a restart`, { provider: "iflow" });
+  return { id: IFLOW_CLIENT_ID, secret };
+};
+const iflow: OAuthProvider = {
+  flow: "authorization_code",
+  refreshLeadMs: DAY_MS,
+  authUrl: (redirectUri, state) => { const client = iflowClient(); return `https://iflow.cn/oauth?${new URLSearchParams({ loginMethod: "phone", type: "phone", redirect: redirectUri, state, client_id: client.id }).toString()}`; },
+  async exchange(code, redirectUri, _verifier, _meta, io) {
+    const client = iflowClient();
+    const basic = btoa(`${client.id}:${client.secret}`);
+    const form = new URLSearchParams({ client_id: client.id, client_secret: client.secret, grant_type: "authorization_code", code, redirect_uri: redirectUri });
+    const answer = await call(io, "POST", "https://iflow.cn/oauth/token", { ...FORM_HEADERS, authorization: `Basic ${basic}` }, form.toString());
+    if (!answer.ok) throw failed("iflow", `Token exchange failed: ${answer.text}`);
+    const root = record(parseJson(answer.text)); const accessToken = text(root.access_token);
+    if (!accessToken) throw failed("iflow", "iFlow returned no access token");
+    const user = await call(io, "GET", `https://iflow.cn/api/oauth/getUserInfo?accessToken=${encodeURIComponent(accessToken)}`, { accept: "application/json" });
+    const info = record(parseJson(user.text)); const data = record(info.data); const apiKey = text(data.apiKey) || text(info.apiKey);
+    const email = text(data.email) || text(data.phone) || text(info.email) || text(info.phone);
+    if (!user.ok || info.success !== true || !apiKey || !email) throw failed("iflow", "iFlow returned an incomplete account");
+    return { accessToken, apiKey, ...(text(root.refresh_token) ? { refreshToken: text(root.refresh_token) } : {}), ...(typeof root.expires_in === "number" ? { expiresIn: root.expires_in } : {}), email, displayName: text(data.nickname) || text(data.name) || undefined, data: strings({ email, phone: data.phone, nickname: data.nickname, name: data.name }) };
+  },
+  async refresh(refreshToken, io, currentApiKey) {
+    const client = iflowClient(); const basic = btoa(`${client.id}:${client.secret}`);
+    const answer = await call(io, "POST", "https://iflow.cn/oauth/token", { ...FORM_HEADERS, authorization: `Basic ${basic}` }, new URLSearchParams({ client_id: client.id, client_secret: client.secret, grant_type: "refresh_token", refresh_token: refreshToken }).toString());
+    if (!answer.ok) return null; const root = record(parseJson(answer.text)); const accessToken = text(root.access_token);
+    return accessToken ? { accessToken, ...(currentApiKey ? { apiKey: currentApiKey } : {}), refreshToken: text(root.refresh_token) || refreshToken, ...(typeof root.expires_in === "number" ? { expiresIn: root.expires_in } : {}), data: {} } : null;
+  },
+};
+
 // ---- Google Cloud Code sign-ins (provider.gemini-cli-oauth), kept as 9router has them (user decision 2026-09-27) ----
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -602,6 +782,7 @@ async function onboardAntigravity(token: string, tierId: string, transport: Http
 
 export const OAUTH_PROVIDERS: Readonly<Record<string, OAuthProvider>> = {
   cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi, claude, codex, github, "gemini-cli": geminiCli, antigravity,
+  "grok-cli": grokCli, kimi, "codebuddy-cn": codeBuddy("codebuddy-cn"), "codebuddy-intl": codeBuddy("codebuddy-intl"), iflow,
 };
 
 // Cline OAuth access tokens are WorkOS JWTs sent as "workos:<jwt>"; a ClinePass API key (not a JWT) goes as is.

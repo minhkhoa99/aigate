@@ -256,6 +256,7 @@ export class OpenAIResponsesAdapter extends OpenAICompatibleAdapter implements A
   private responses(request: CanonicalRequest, credential: Credential, stream: boolean): HttpRequest {
     const timeoutMs = stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS;
     const body = toBody(request, stream);
+    this.transformResponsesBody(body, request, credential);
     if (this.codex) {
       // provider.codex-oauth: 9router's CodexExecutor body and headers; the session is the connection's.
       const session = credential.sessionId ?? "default";
@@ -268,5 +269,10 @@ export class OpenAIResponsesAdapter extends OpenAICompatibleAdapter implements A
       headers: { ...base.headers, "content-type": "application/json", accept: stream ? "text/event-stream" : "application/json" },
       body: JSON.stringify(body),
     };
+  }
+
+  // Vendor adapters may apply bounded request metadata without duplicating Responses translation.
+  protected transformResponsesBody(_body: Json, _request: CanonicalRequest, _credential: Credential): void {
+    void _body; void _request; void _credential;
   }
 }

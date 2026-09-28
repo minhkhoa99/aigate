@@ -500,7 +500,7 @@ export class ChatLane {
     // connection.ollama-local-host: a connection may point the provider at its own host.
     // The connection id is the session id claude and codex send (9router derives one per connection); gemini-cli names
     // the project its sign-in found.
-    const credential: Credential = { kind: "api-key", apiKey: stored.apiKey, sessionId: stored.id, ...(stored.projectId ? { projectId: stored.projectId } : {}) };
+    const credential: Credential = { kind: "api-key", apiKey: stored.apiKey, sessionId: stored.id, ...(stored.projectId ? { projectId: stored.projectId } : {}), ...(stored.providerData ? { providerData: stored.providerData } : {}) };
     const connected = withConnection(provider, stored);
     const retrying = connected.retryStreamErrors ? { ...connected, streamRetryDelayMs: this.limits.streamRetryDelayMs } : connected;
     return { provider: retrying, request: upstream, credential, connection: stored };

@@ -10117,6 +10117,48 @@
       "file_type": "document",
       "source_file": "docs/PROGRESS_HANDOFF.md",
       "status": "done"
+    },
+    {
+      "id": "sp_sp16d",
+      "label": "SP16d - OAuth grok-cli, kimi, CodeBuddy and iFlow (69 connectable)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "done"
+    },
+    {
+      "id": "02_providers_auth_sp16d",
+      "label": "SP16d provider OAuth matrix entries",
+      "file_type": "document",
+      "source_file": "docs/discovery/feature-matrix/02-providers-auth.yaml",
+      "status": "implemented"
+    },
+    {
+      "id": "sp16d_oauth_flows",
+      "label": "Grok device code, Kimi device flow, CodeBuddy state polling and iFlow auth code",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "status": "done"
+    },
+    {
+      "id": "sp16d_adapters",
+      "label": "Grok Responses, Kimi Messages and iFlow signed OpenAI adapters",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "status": "done"
+    },
+    {
+      "id": "oauth_provider_data",
+      "label": "OAuth provider data and API-key routing storage",
+      "file_type": "document",
+      "source_file": "docs/contracts/oauth.md",
+      "status": "done"
+    },
+    {
+      "id": "sp16d_tests_ui",
+      "label": "SP16d engine/server tests and generic Connections UI",
+      "file_type": "document",
+      "source_file": "docs/design/API_UI_MAP.md",
+      "status": "done"
     }
   ],
   "edges": [
@@ -32514,6 +32556,105 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1,
       "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16d",
+      "target": "oauth_contract",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16d",
+      "target": "02_providers_auth_sp16d",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16d",
+      "target": "sp16d_oauth_flows",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16d",
+      "target": "sp16d_adapters",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp_sp16d",
+      "target": "sp16d_tests_ui",
+      "relation": "verifies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "sp16d_oauth_flows",
+      "target": "engine_oauth_module",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "sp16d_oauth_flows",
+      "target": "oauth_provider_data",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "sp16d_adapters",
+      "target": "02_providers_auth_sp16d",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "sp16d_adapters",
+      "target": "oauth_provider_data",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "oauth_provider_data",
+      "target": "connections_repo",
+      "relation": "changes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/oauth.md",
+      "weight": 1
+    },
+    {
+      "source": "sp16d_tests_ui",
+      "target": "sp16d_adapters",
+      "relation": "verifies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
       "weight": 1
     }
   ],

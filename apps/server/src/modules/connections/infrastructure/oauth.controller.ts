@@ -11,7 +11,7 @@ import { ConnectionsRepository } from "./connections.repo.js";
 // dashboard guard, like every /api route.
 const FLOW_BUDGET_MS = 30_000;
 // 9router exchanges these without a PKCE verifier.
-const NO_PKCE = new Set(["cline", "clinepass", "kimchi"]);
+const NO_PKCE = new Set(["cline", "clinepass", "kimchi", "grok-cli"]);
 const DEFAULT_REDIRECT = "http://localhost:8080/callback";
 
 const invalid = (message: string) => new BadRequestException({ code: "INVALID_REQUEST", message });

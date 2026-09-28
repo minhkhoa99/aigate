@@ -1693,6 +1693,20 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Errors:** `PROVIDER_UNAVAILABLE` (the fallback token exchange fails)
 - **AIGate required behavior:** ClinePass offers only the sign-in that works (its API key)
 
+### CodeBuddy browser state flow, OAuth token refresh, and stream-only OpenAI chat
+
+- **id:** `provider.codebuddy-oauth` · **module:** `connections`
+- **Trigger:** Dashboard sign-in for codebuddy-cn or codebuddy-intl; any request routed to CodeBuddy
+- **Input:** Browser auth state and a polled CodeBuddy token
+- **Output:** An oauth connection and streamed OpenAI-compatible answers
+- **Rules:**
+  - device-code POSTs stateUrl?platform=CLI or ide with the product headers and an empty JSON body; its device_code is the returned state and verification_uri is the returned authUrl
+  - Polling GETs tokenUrl?state=<state> with product headers; code 11217 is pending, code 0 with accessToken succeeds, and missing refreshToken is stored as empty
+  - CN and international hosts use separate URLs, User-Agent/platform/domain headers, and refresh endpoints; refresh POSTs the refresh token in X-Refresh-Token JSON request headers
+  - Chat requests force stream=true; reasoning_effort none/off is omitted, an explicit effort adds reasoning_summary=auto; CN rewrites long or agent-like system prompts, while international prepends CodeBuddy Code and converts user strings to text blocks
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (state/poll/refresh fails)
+
 ### codex: PKCE sign-in at auth.openai.com with a fixed 1455 callback, Responses at chatgpt.com/backend-api/codex
 
 - **id:** `provider.codex-oauth` · **module:** `connections`
@@ -1765,6 +1779,35 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Chat: an OpenAI chat body POSTed to https://gitlab.com/api/v4/chat/completions with Authorization: Bearer — always gitlab.com, whatever baseUrl the connection was made on
 - **AIGate required behavior:** Chat goes to the connection's GitLab in the Duo Chat format, and the token is refreshed before it expires
 
+### xAI device-code OAuth and the cli-chat-proxy Responses API
+
+- **id:** `provider.grok-cli-oauth` · **module:** `connections`
+- **Trigger:** Dashboard device-code sign-in for grok-cli; any request routed to grok-cli
+- **Input:** Device code approval and an OAuth connection
+- **Output:** An oauth connection with xAI tokens, optional identity, and Grok Responses answers
+- **Rules:**
+  - Device-code request POSTs client_id, scope, and referrer=grok-build to https://auth.x.ai/oauth2/device/code without PKCE; polling POSTs grant_type=device_code, device_code, and client_id to https://auth.x.ai/oauth2/token
+  - authorization_pending and slow_down remain pending; after token success, user profile at cli-chat-proxy.grok.com/v1/user is best effort and email/user id are taken from the ID/access token or profile
+  - Requests use https://cli-chat-proxy.grok.com/v1/responses, force stream and store=false, send x-grok client/session/conversation/request/turn headers, and keep a bounded per-session turn counter
+  - Virtual model suffixes -low/-medium/-high/-xhigh select reasoning effort and are removed before upstream; reasoning.encrypted_content is included unless effort is none; unsupported Responses fields are dropped
+  - Refresh uses the xAI token endpoint five minutes before expiry; 429, 502, and 503 retry policies are provider-specific in the reference
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (device/token/profile failure or expired token), `RATE_LIMIT` (provider retries are exhausted)
+
+### iFlow authorization-code OAuth, user-info API-key minting, and signed chat requests
+
+- **id:** `provider.iflow-oauth` · **module:** `connections`
+- **Trigger:** Dashboard authorization-code sign-in for iflow; any request routed to iFlow
+- **Input:** Authorization code from iFlow callback
+- **Output:** An oauth connection with a minted API key, identity, and iFlow chat answers
+- **Rules:**
+  - Authorize uses loginMethod=phone, type=phone, redirect, state, and client_id; token exchange sends client_id/client_secret in the form and Basic authorization
+  - After exchange, GETs /api/oauth/getUserInfo?accessToken=...; the exchange fails unless the response is successful, success=true, apiKey is non-empty, and email or phone is present
+  - The saved access token and minted apiKey are both retained; email/phone and nickname/name become connection identity; refresh uses Basic client credentials and is due one day before expiry
+  - Chat requests use https://apis.iflow.cn/v1/chat/completions, User-Agent iFlow-Cli, a generated session-id, current timestamp, HMAC-SHA256 signature over userAgent:session-id:timestamp using the API key, and Bearer API-key auth
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (token exchange, user info, or refresh fails), `INVALID_REQUEST` (user info lacks API key or account identity)
+
 ### Kilo Code device sign-in and the organization header
 
 - **id:** `provider.kilocode-device-auth` · **module:** `connections`
@@ -1792,6 +1835,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Requests (both sign-ins): User-Agent kimchi/0.1.50; the top-level system is merged into the first system message; anthropic_version, anthropic_beta, client_metadata, mcp_servers, stop_sequences, thinking, top_k are dropped; cache_control and signature fields are removed from messages and tools; assistant reasoning_content longer than 8 characters is removed; for Claude/Anthropic models reasoning_effort, reasoning and thinking are dropped
 - **Streaming:** yes
 - **Errors:** `AUTH_ERROR` (the token validation answers non-2xx)
+
+### Kimi device-code OAuth, dual API-key/OAuth transport, and device headers
+
+- **id:** `provider.kimi-oauth` · **module:** `connections`
+- **Trigger:** Dashboard device-code sign-in for kimi or kimi-coding; requests using Kimi OAuth
+- **Input:** Kimi device authorization and an OAuth connection
+- **Output:** An oauth connection with access/refresh tokens and a stable Kimi device id
+- **Rules:**
+  - Device-code and token requests POST form data to auth.kimi.com with X-Msh headers built from one random UUID device id; pending states can arrive as HTTP 200 JSON errors
+  - The device id is carried from device-code response through poll and stored in providerSpecificData; refresh uses the same provider headers and keeps a returned refresh token or the old one
+  - OAuth requests use the Kimi coding Claude endpoint with x-api-key; API-key requests may use the OpenAI chat endpoint with Bearer; both add Kimi headers
+  - The catalog exposes Kimi Code and platform model ids; refresh is proactive five minutes before expiry
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (device/token request fails or token expires)
 
 ## Provider account management
 

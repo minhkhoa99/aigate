@@ -53,6 +53,9 @@ const EXECUTOR_QUIRKS: Readonly<Record<string, readonly string[]>> = {
   // provider.gemini-cli-oauth (SP16c, kept as 9router): the Cloud Code envelope around the Gemini protocol.
   "gemini-cli": ["geminiCli"],
   antigravity: ["antigravity"],
+  "grok-cli": ["grokCli"],
+  kimi: ["kimi"],
+  iflow: ["iflow"],
 };
 // provider.clinepass-headers-envelope: the Cline client headers, naming AIGate (user decision 2026-09-26; 9router names
 // itself). ponytail: AIGate has no release version yet; 0.1.0 until it does.

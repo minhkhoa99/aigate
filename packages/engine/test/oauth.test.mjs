@@ -152,3 +152,58 @@ test("the registry signs in to the SP16 providers; Cline tokens go as workos:, K
   const other = JSON.parse(kimchi.calls[1].body);
   assert.deepEqual([other.reasoning_effort, other.messages[0]], ["high", { role: "system", content: "x\ny" }], "effort stays for a non-Claude model; a system list is joined");
 });
+
+test("SP16d OAuth providers keep their native device, browser, and refresh contracts", async () => {
+  const grok = OAUTH_PROVIDERS["grok-cli"];
+  const grokStart = fakeTransport(reply(200, { device_code: "gd", user_code: "GU", verification_uri: "https://x.ai/device", expires_in: 600, interval: 2 }));
+  assert.deepEqual(await grok.deviceCode(io(grokStart)), { device_code: "gd", user_code: "GU", verification_uri: "https://x.ai/device", verification_uri_complete: "https://x.ai/device", expires_in: 600, interval: 2 });
+  const grokPoll = fakeTransport(reply(200, { access_token: JWT, refresh_token: "gr", id_token: JWT }), reply(200, { id: "u1", email: "g@x.dev", firstName: "G", lastName: "R" }));
+  assert.equal((await grok.poll("gd", io(grokPoll))).status, "approved");
+  assert.equal(grokPoll.calls[1].headers["x-xai-token-auth"], "xai-grok-cli");
+
+  const kimi = OAUTH_PROVIDERS.kimi;
+  const kimiStart = fakeTransport(reply(200, { device_code: "kd", user_code: "KU", verification_uri: "https://kimi/device" }));
+  await kimi.deviceCode(io(kimiStart));
+  const kimiPoll = fakeTransport(reply(200, { error: "authorization_pending" }));
+  assert.deepEqual(await kimi.poll("kd", io(kimiPoll)), { status: "pending" });
+  assert.equal(kimiPoll.calls[0].headers["X-Msh-Device-Id"].length > 10, true);
+
+  const cn = OAUTH_PROVIDERS["codebuddy-cn"];
+  const cbStart = fakeTransport(reply(200, { code: 0, data: { state: "state-1", authUrl: "https://codebuddy/login" } }));
+  assert.equal((await cn.deviceCode(io(cbStart))).verification_uri_complete, "https://codebuddy/login");
+  const cbPoll = fakeTransport(reply(200, { code: 0, data: { accessToken: "cb-token", refreshToken: "cb-refresh" } }));
+  assert.deepEqual((await cn.poll("state-1", io(cbPoll))).tokens, { accessToken: "cb-token", refreshToken: "cb-refresh", expiresIn: 86400, data: {} });
+
+  const oldSecret = process.env.AIGATE_IFLOW_OAUTH_CLIENT_SECRET;
+  process.env.AIGATE_IFLOW_OAUTH_CLIENT_SECRET = "test-secret";
+  try {
+    const iflow = OAUTH_PROVIDERS.iflow;
+    assert.match(iflow.authUrl("http://cb", "state", "", {}), /client_id=10009311001/);
+    const flow = fakeTransport(reply(200, { access_token: "iflow-access", refresh_token: "iflow-refresh", expires_in: 3600 }), reply(200, { success: true, data: { apiKey: "iflow-key", email: "i@x.dev", nickname: "I" } }));
+    assert.deepEqual(await iflow.exchange("code", "http://cb", "", {}, io(flow)), { accessToken: "iflow-access", apiKey: "iflow-key", refreshToken: "iflow-refresh", expiresIn: 3600, email: "i@x.dev", displayName: "I", data: { email: "i@x.dev", nickname: "I" } });
+    assert.match(flow.calls[0].headers.authorization, /^Basic /);
+    const refreshed = fakeTransport(reply(200, { access_token: "new-access" }));
+    assert.deepEqual(await iflow.refresh("iflow-refresh", io(refreshed), "iflow-key"), { accessToken: "new-access", apiKey: "iflow-key", refreshToken: "iflow-refresh", data: {} });
+  } finally {
+    if (oldSecret === undefined) delete process.env.AIGATE_IFLOW_OAUTH_CLIENT_SECRET;
+    else process.env.AIGATE_IFLOW_OAUTH_CLIENT_SECRET = oldSecret;
+  }
+});
+
+test("SP16d adapters add Grok, Kimi, and iFlow wire metadata", async () => {
+  const ctx = { signal: new AbortController().signal, requestId: "r" };
+  const request = { model: "grok-4.5-high", stream: true, messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }] };
+  const sse = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"usage\":{}}}\n\n";
+  const grokTransport = fakeTransport({ status: 200, headers: { "content-type": "text/event-stream" }, body: new Response(sse).body });
+  await createAdapter(builtinRegistry.provider("grok-cli"), grokTransport).execute(request, { kind: "api-key", apiKey: "grok-token", sessionId: "sess", providerData: { email: "g@x.dev" } }, ctx);
+  const grokBody = JSON.parse(grokTransport.calls[0].body);
+  assert.deepEqual([grokBody.model, grokBody.reasoning.effort, grokBody.store, grokTransport.calls[0].headers["x-grok-session-id"], grokTransport.calls[0].headers["x-email"]], ["grok-4.5", "high", false, "sess", "g@x.dev"]);
+
+  const kimiTransport = fakeTransport(reply(200, { id: "m", model: "kimi", content: [{ type: "text", text: "ok" }], stop_reason: "end_turn", usage: {} }));
+  await createAdapter(builtinRegistry.provider("kimi"), kimiTransport).execute({ model: "kimi-k3", stream: false, messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }] }, { kind: "api-key", apiKey: "kimi-token", providerData: { deviceId: "device-1" } }, ctx);
+  assert.equal(kimiTransport.calls[0].headers["X-Msh-Device-Id"], "device-1");
+
+  const iflowTransport = fakeTransport(reply(200, { id: "m", choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }));
+  await createAdapter(builtinRegistry.provider("iflow"), iflowTransport).execute({ model: "qwen3-max", stream: false, messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }] }, { kind: "api-key", apiKey: "iflow-key" }, ctx);
+  assert.match(iflowTransport.calls[0].headers["x-iflow-signature"], /^[0-9a-f]{64}$/);
+});

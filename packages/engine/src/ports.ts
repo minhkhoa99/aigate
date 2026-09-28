@@ -43,6 +43,8 @@ export interface Credential {
   readonly sessionId?: string;
   // SP16c: the Google Cloud Code project the connection signed in with (gemini-cli, antigravity).
   readonly projectId?: string;
+  // Provider-specific OAuth data needed after sign-in (Kimi device id, etc.).
+  readonly providerData?: Readonly<Record<string, string>>;
 }
 
 // One id from an upstream model list. `descriptor` is the registry entry when the id is known; an

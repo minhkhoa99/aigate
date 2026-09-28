@@ -19,7 +19,7 @@ const REACTIVE_BUDGET_MS = 90_000;
 export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger("TokenRefresher");
   // At most one entry per connection, removed when its refresh settles.
-  private readonly inflight = new Map<string, Promise<string | undefined>>();
+  private readonly inflight = new Map<string, Promise<OAuthTokens | undefined>>();
   private timer: NodeJS.Timeout | undefined;
 
   constructor(
@@ -42,8 +42,8 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
   async fresh<T extends StoredCredential>(provider: string, stored: T): Promise<T> {
     const refreshToken = stored.oauth?.refreshToken;
     if (!refreshToken || !this.due(provider, stored)) return stored;
-    const token = await this.locked(stored.id, provider, refreshToken);
-    return token ? { ...stored, apiKey: token } : stored;
+    const token = await this.locked(stored.id, provider, stored);
+    return token ? { ...stored, apiKey: token.apiKey ?? token.accessToken } : stored;
   }
 
   // 9router shouldRefreshCredentials.
@@ -64,9 +64,9 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
     try {
       // withRetry waits delayMs, then 2 × delayMs: 9router's 1 s and 2 s.
       return await withRetry(async () => {
-        const tokens = refreshToken ? await this.refresh(provider, stored.id, refreshToken) : null;
+        const tokens = refreshToken ? await this.refresh(provider, stored) : null;
         if (!tokens) throw new Error(refreshToken ? `${provider} refused the refresh` : `${provider} has no refresh token`);
-        return tokens.accessToken;
+        return tokens.apiKey ?? tokens.accessToken;
       }, { signal: AbortSignal.timeout(REACTIVE_BUDGET_MS), maxAttempts: REACTIVE_ATTEMPTS, baseDelayMs: delayMs, maxDelayMs: delayMs * 2, shouldRetry: () => true });
     } catch (error) {
       this.logger.warn(`${provider} reactive refresh failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -74,11 +74,10 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private locked(id: string, provider: string, refreshToken: string): Promise<string | undefined> {
+  private locked(id: string, provider: string, stored: StoredCredential): Promise<OAuthTokens | undefined> {
     const running = this.inflight.get(id);
     if (running) return running;
-    const pending = this.refresh(provider, id, refreshToken)
-      .then((tokens) => tokens?.accessToken)
+    const pending = this.refresh(provider, stored)
       .catch((error: unknown) => {
         this.logger.warn(`${provider} refresh failed: ${error instanceof Error ? error.message : String(error)}`);
         return undefined;
@@ -88,11 +87,11 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
     return pending;
   }
 
-  private async refresh(provider: string, id: string, refreshToken: string): Promise<OAuthTokens | null> {
+  private async refresh(provider: string, stored: StoredCredential): Promise<OAuthTokens | undefined> {
     const io = { transport: this.transport, ctx: { signal: AbortSignal.timeout(REFRESH_BUDGET_MS), requestId: randomUUID() } };
-    const tokens = await OAUTH_PROVIDERS[provider]?.refresh?.(refreshToken, io) ?? null;
-    if (tokens) await this.connections.storeRefresh(id, tokens);
-    return tokens;
+    const tokens = await OAUTH_PROVIDERS[provider]?.refresh?.(stored.oauth?.refreshToken ?? "", io, stored.apiKey, stored.providerData) ?? null;
+    if (tokens) await this.connections.storeRefresh(stored.id, tokens);
+    return tokens ?? undefined;
   }
 
   // One connection at a time; the query is bounded to 100 rows.
@@ -101,7 +100,8 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
       // provider.github-copilot-oauth: a provider that opts out (github's short Copilot token) is left to the other refreshes.
       const rows = (await this.connections.oauthExpiring(new Date(Date.now() + BACKGROUND_LEAD_MS))).filter((row) => OAUTH_PROVIDERS[row.provider]?.background !== false);
       for (const row of rows) {
-        await this.locked(row.id, row.provider, row.refreshToken);
+        const stored = await this.connections.activeCredential(row.provider);
+        if (stored?.id === row.id) await this.locked(row.id, row.provider, stored);
       }
     } catch (error) {
       this.logger.warn(`background refresh failed: ${error instanceof Error ? error.message : String(error)}`);

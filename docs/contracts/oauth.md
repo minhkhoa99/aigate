@@ -1,6 +1,6 @@
-# OAuth sign-in contract (M2 SP16, SP16b, SP16b2, SP16c, SP16c2)
+# OAuth sign-in contract (M2 SP16, SP16b, SP16b2, SP16c, SP16c2, SP16d)
 
-Scope, per spec §9 (SP16, OAuth providers): the OAuth core (sign-in flow, token storage, refresh) and the providers the existing adapters can serve: **cline, clinepass, gitlab, kilocode, kimchi**; SP16b adds **claude** and **codex**, SP16b2 **github** (Copilot), SP16c **gemini-cli**, SP16c2 **antigravity**. Next: SP16d grok-cli, kimi, codebuddy, iflow; later cursor, kiro, trae; qoder is not ported (SP14f).
+Scope, per spec §9 (SP16, OAuth providers): the OAuth core (sign-in flow, token storage, refresh) and the providers the existing adapters can serve: **cline, clinepass, gitlab, kilocode, kimchi**; SP16b adds **claude** and **codex**, SP16b2 **github** (Copilot), SP16c **gemini-cli**, SP16c2 **antigravity**, SP16d **grok-cli, kimi, codebuddy-cn, codebuddy-intl, iflow**. Later cursor, kiro, trae; qoder is not ported (SP14f).
 
 **User decisions (2026-09-27).** Scope as above. Keep 9router's official-client headers for OAuth providers (the user accepts the terms-of-service risk); cline's headers name AIGate, as ClinePass's do since SP14g, because 9router names itself there. A fixed-port callback (codex, later) is finished by pasting the callback URL, with no extra listener. Kept from 9router, on the second ask: state and the PKCE verifier live in the browser and are sent back unchecked (gitlab's secret travels in the authorize query); refresh as 9router (proactive single-flight, reactive three attempts without the lock, even for connections that cannot refresh, and the 5-minute background loop), which overrides the spec's "single-flight on every path"; ClinePass offers the Cline sign-in although its API rejects those tokens (#2333); GitLab Duo is ported with its OpenAI-body chat to gitlab.com and no refresh.
 
@@ -11,6 +11,8 @@ Scope, per spec §9 (SP16, OAuth providers): the OAuth core (sign-in flow, token
 **SP16c (2026-09-27), same rule.** gemini-cli keeps 9router's behavior, including its suspected bugs: a sign-in that finds no Cloud Code project still saves the connection and requests then name a random project, every request gets a new session id, and the three loadCodeAssist calls describe the client differently (mode 1 without headers at sign-in, Antigravity's ideType 9 on the request path, string enums in the test).
 
 **SP16c2 (2026-09-28), same rule.** Antigravity uses the IDE OAuth client from `.env`, local request-source headers, the daily Cloud Code host, the sandbox model list, an in-memory per-connection numeric session, the model-level suffix, Claude/Gemini envelope rules, image non-streaming, and bounded 429/5xx retries. The traced `cloakTools` path is dead and is not ported.
+
+**SP16d (2026-09-28), same rule.** Grok CLI uses xAI device code without PKCE and the Responses executor's bounded session/request metadata. Kimi keeps the device id in provider data and sends Kimi's `X-Msh-*` headers. CodeBuddy keeps its browser state polling and CN/Intl header split. iFlow requires `AIGATE_IFLOW_OAUTH_CLIENT_SECRET`, stores the minted API key as the routing key, and signs each request with Web Crypto HMAC-SHA256. All four use the existing dashboard flow and error mapping.
 
 ## Matrix entries
 
@@ -30,6 +32,10 @@ Scope, per spec §9 (SP16, OAuth providers): the OAuth core (sign-in flow, token
 | `provider.github-copilot-oauth` | `REFERENCE_BEHAVIOR`, `SUSPECTED_BUG` kept | See "github". |
 | `provider.gemini-cli-oauth` | `REFERENCE_BEHAVIOR`, `SUSPECTED_BUG` kept | See "gemini-cli". |
 | `provider.antigravity-oauth` | `REFERENCE_BEHAVIOR`, `SUSPECTED_BUG`, `IMPLEMENTATION_ACCIDENT` | See "antigravity". |
+| `provider.grok-cli-oauth` | `REFERENCE_BEHAVIOR` | See "grok-cli". |
+| `provider.kimi-oauth` | `REFERENCE_BEHAVIOR` | See "kimi". |
+| `provider.codebuddy-oauth` | `REFERENCE_BEHAVIOR` | See "codebuddy". |
+| `provider.iflow-oauth` | `REFERENCE_BEHAVIOR` | See "iflow". |
 
 ## Sign-in API
 
@@ -48,7 +54,7 @@ Dashboard routes (session required, `Cache-Control: no-store`), errors `{ code, 
 `provider_connections` (migration 0009, the first to rebuild the table; existing rows keep their values and become `api-key`):
 
 - `auth_type` (`api-key` | `oauth`, default `api-key`), `refresh_token_sealed`, `expires_at`, `last_refresh_at`, `email`, `oauth_data` (the provider's sign-in data as a JSON object of strings, read and written whole).
-- An oauth connection keeps its access token in `api_key_sealed`, sealed like a key (context `provider_connections:<id>:api_key`); the refresh token has its own context (`…:refresh_token`), so the two cannot be swapped. Views never return either; they add `authType`, `email`, `expiresAt`.
+- An oauth connection keeps its routing key in `api_key_sealed`, sealed like a key (context `provider_connections:<id>:api_key`); the refresh token has its own context (`…:refresh_token`), so the two cannot be swapped. iFlow's OAuth access token is used only for refresh and its minted API key is the routing key. Views never return either; they add `authType`, `email`, `expiresAt`.
 - A sign-in creates the provider's connection (name = display name, else email, else the provider name; test status `active`), or, when the provider already has an oauth connection for the same account (the same email, and the same username when either side has one), replaces its tokens. SP11 allows one connection per provider, so another account or an existing API-key connection is 409 `ALREADY_CONNECTED` (9router adds a second row; more accounts arrive in SP17).
 - `POST /api/connections` with an API key is refused for a provider that takes none (cline, gitlab, kilocode): "… connects by signing in, not with an API key". `PATCH` with `apiKey` on an oauth connection is refused: sign in again instead.
 - Kilo Code's organization is stored in `organization` and sent as `X-Kilocode-OrganizationID`.
@@ -58,7 +64,7 @@ Dashboard routes (session required, `Cache-Control: no-store`), errors `{ code, 
 - **Proactive**: before a chat request and before a connection test, a token that expires within the provider's lead (5 minutes; claude 4 hours; codex 5 days) is refreshed, and so is a codex token whose last refresh (or sign-in) is more than 8 days old; refreshes of one connection share one in-flight promise; a failed refresh keeps the old token.
 - **Reactive**: an upstream 401 or 403 before the first byte refreshes the connection (three attempts, 1 s then 2 s apart, through `withRetry`, without the lock), and the request is sent once more with the new token; otherwise the 401/403 reaches the client. As in 9router this runs for every connection, so a connection that cannot refresh (an API key, kilocode, kimchi, gitlab) waits the two pauses before the error. Other failures are not refreshed.
 - **Background**: every 5 minutes, each active oauth connection with a refresh token that expires within 30 minutes is refreshed, one at a time (at most 100).
-- A refresh stores the new access token, the new refresh token when one came back, the new expiry when one came back (else the old one stays), and `last_refresh_at`.
+- A refresh stores the new routing token (or provider API key), the new refresh token when one came back, the new expiry when one came back (else the old one stays), and `last_refresh_at`; Kimi's `deviceId` and other provider data remain in `oauth_data`.
 
 ## Providers
 
@@ -105,6 +111,27 @@ Dashboard routes (session required, `Cache-Control: no-store`), errors `{ code, 
 - **Requests** (quirk `antigravity`, `AntigravityAdapter` over the Gemini adapter): `POST https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent` or `:streamGenerateContent?alt=sse`, Bearer, and `antigravity/ide/2.11.0 darwin/arm64`. The catalog's `upstreamModelId` is sent without its `(low|medium|high)` suffix; that suffix becomes `generationConfig.thinkingConfig.thinkingLevel`. The envelope is `{ project, model, userAgent: "antigravity", requestId, request }`, with no safety settings on chat. Claude model ids use the Gemini contents shape, rewrite competing system branding, deduplicate/sanitize tools, add `toolConfig: VALIDATED`, and cap output at 64000. A session is a stable signed 63-bit number per connection, with at most 1000 cached sessions. The `image`/`imagen` path always uses non-streaming `generateContent`, text-only contents, `imageConfig`, and `requestType: image_gen`.
 - **Retries**: 429 and 5xx retry through the bounded helper; a numeric `Retry-After` is honored only up to 10 s, otherwise backoff is 2 s, 4 s, 8 s capped at 10 s. A longer `Retry-After` is final. **Test**: `loadCodeAssist` with User-Agent `google-api-nodejs-client/9.15.1 vscode-antigravity/1.107.0`. **Model list**: `POST https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:models {}`; the `models` array supplies ids.
 - Not ported: the 429 `RetryInfo.retryDelay` as the account cooldown (SP17).
+
+## grok-cli (SP16d)
+
+- **Sign-in** (`device_code`, no PKCE): xAI's device endpoint receives client id `b1a00492-073a-47ea-816f-4c329264a828`, the Grok CLI scope, and `referrer=grok-build`; polling uses the device grant. `authorization_pending` and `slow_down` stay pending. On approval the profile endpoint is best effort; identity is taken from profile or JWT claims.
+- **Requests** (quirk `grokCli`, `GrokCliAdapter` over Responses): the provider always streams and stores no response. Virtual `grok-4.5-(low|medium|high|xhigh)` ids become `grok-4.5`; the supported family gets a normalized effort, summary `concise`, encrypted reasoning include, and a 64000 output ceiling. Session, conversation, request, turn, model override, email and user id headers are bounded and derived from the connection.
+- **Retries**: 429 and 5xx are retried through the bounded helper; numeric `Retry-After` is capped at 10 s.
+
+## kimi (SP16d)
+
+- **Sign-in** (`device_code`): the auth and token calls use one random device id and the `X-Msh-*` headers. Kimi can answer HTTP 200 with `authorization_pending` or `slow_down`; approval stores the device id in `oauth_data`, and refresh sends it again.
+- **Requests** (quirk `kimi`, `KimiAdapter` over Anthropic): the catalog's raw `x-api-key` authentication is kept and every request adds the Kimi platform, version, device name, model, and id headers.
+
+## codebuddy (SP16d)
+
+- **Sign-in** (`device_code` in the shared dashboard, browser state in the provider): CN uses `https://copilot.tencent.com`, international uses `https://www.codebuddy.ai`; a state request returns an `authUrl`, polling GETs `token?state=…`, code 11217 is pending, and code 0 approves. Refresh posts `{}` with `X-Refresh-Token` and the product/domain headers.
+- **Requests**: both variants use the catalog's OpenAI-compatible endpoint and force streaming; existing CodeBuddy CN/international prompt and reasoning quirks remain in the shared adapter.
+
+## iflow (SP16d)
+
+- **Sign-in** (`authorization_code`): the iFlow authorize URL uses phone login metadata. Exchange sends client id and the secret from `AIGATE_IFLOW_OAUTH_CLIENT_SECRET` both as Basic credentials and form fields, then requires successful user info with a non-empty API key and email/phone. The minted API key is stored as the routing key; the OAuth access token remains available to refresh.
+- **Requests** (quirk `iflow`, `IFlowAdapter`): each request gets a fresh `session-id`, millisecond timestamp, and HMAC-SHA256 signature over `iFlow-Cli:<session-id>:<timestamp>` using the API key; chat uses Bearer API-key auth. Web Crypto is used so the framework-free engine imports no Node package.
 
 ## Dashboard
 

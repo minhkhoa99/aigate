@@ -9,6 +9,9 @@ import { GeminiCliAdapter } from "./gemini-cli.js";
 import { GithubAdapter } from "./github.js";
 import { OllamaAdapter } from "./ollama.js";
 import { OpenAIResponsesAdapter } from "./openai-responses.js";
+import { GrokCliAdapter } from "./grok-cli.js";
+import { IFlowAdapter } from "./iflow.js";
+import { KimiAdapter } from "./kimi.js";
 import { StreamRetryAdapter } from "./stream-retry.js";
 import { VertexAdapter, VertexPartnerAdapter } from "./vertex.js";
 
@@ -25,6 +28,9 @@ function familyAdapter(provider: ProviderDescriptor, transport: HttpTransportPor
   // provider.gemini-cli-oauth: the Gemini protocol inside Cloud Code's envelope.
   if (provider.quirks?.includes("geminiCli")) return new GeminiCliAdapter(provider, transport);
   if (provider.quirks?.includes("antigravity")) return new AntigravityAdapter(provider, transport);
+  if (provider.quirks?.includes("grokCli")) return new GrokCliAdapter(provider, transport);
+  if (provider.quirks?.includes("kimi")) return new KimiAdapter(provider, transport);
+  if (provider.quirks?.includes("iflow")) return new IFlowAdapter(provider, transport);
   switch (provider.protocol) {
     case "anthropic": return new AnthropicAdapter(provider, transport);
     case "openai-responses": return new OpenAIResponsesAdapter(provider, transport);

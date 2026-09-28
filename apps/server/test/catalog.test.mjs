@@ -22,11 +22,11 @@ test("the provider catalog lists every provider with its connectable status, beh
     const kilo = list.find((p) => p.id === "kilocode");
     assert.deepEqual([kilo.connectable, kilo.signIn, kilo.signInOnly], [true, "device_code", true], "SP16: a sign-in provider");
     const grok = list.find((p) => p.id === "grok-cli");
-    assert.deepEqual([grok.connectable, grok.reason], [false, "Needs OAuth sign-in (SP16)"]);
+    assert.deepEqual([grok.connectable, grok.signIn, grok.signInOnly], [true, "device_code", true]);
     const claude = list.find((p) => p.id === "claude");
     assert.deepEqual([claude.connectable, claude.signIn, claude.signInOnly], [true, "authorization_code_pkce", true], "SP16b: claude signs in");
     assert.ok(list.every((p) => p.connectable === (p.reason === null)), "a reason exactly when not connectable");
-    assert.equal(list.filter((p) => p.connectable).length, 67);
+    assert.equal(list.filter((p) => p.connectable).length, 69);
     await app.close();
   }));
 
