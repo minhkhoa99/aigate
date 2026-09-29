@@ -59,7 +59,7 @@ test("create stores the key sealed and never returns it", () =>
     assert.equal(view.isActive, true);
     assert.ok(!res.body.includes(SECRET));
     assert.deepEqual(Object.keys(view).sort(), [
-      "accountId", "apiVersion", "authType", "baseUrl", "createdAt", "deployment", "email", "expiresAt", "id", "isActive", "keyHint", "lastError", "lastErrorCode", "lastTestedAt", "name", "organization", "provider", "providerName", "testStatus", "updatedAt",
+      "accountId", "apiVersion", "authType", "baseUrl", "createdAt", "deployment", "email", "expiresAt", "id", "isActive", "keyHint", "lastError", "lastErrorCode", "lastTestedAt", "name", "organization", "priority", "provider", "providerName", "proxyPoolId", "testStatus", "updatedAt",
     ], "an allowlisted view: nothing sealed or secret");
     const list = await as({ url: "/api/connections" });
     assert.equal(list.json().length, 1);
@@ -69,13 +69,12 @@ test("create stores the key sealed and never returns it", () =>
     for (const name of readdirSync(dirname(file))) assert.ok(!readFileSync(join(dirname(file), name)).includes(SECRET), name);
   }));
 
-test("one connection per provider; unsupported providers and bad bodies name the problem", () =>
+test("multiple accounts append by priority; unsupported providers and bad bodies name the problem", () =>
   withTempDb(async (file) => {
     const { app, as } = await signedIn(file);
     assert.equal((await create(as)).statusCode, 201);
     const again = await create(as, { provider: "openai", apiKey: "sk-another-key-1234" });
-    assert.equal(again.statusCode, 409);
-    assert.equal(again.json().code, "ALREADY_CONNECTED");
+    assert.deepEqual([again.statusCode, again.json().priority], [201, 2]);
     const unsupported = await create(as, { provider: "grok-cli", apiKey: SECRET });
     assert.equal(unsupported.statusCode, 400);
     assert.equal(unsupported.json().code, "INVALID_REQUEST");

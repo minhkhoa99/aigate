@@ -1,187 +1,197 @@
 {
   "docs/superpowers/specs/2026-09-22-aigate-design.md": {
-    "mtime": 1790424770.755097,
+    "mtime": 1790361550.646515,
     "ast_hash": "1d685a7536b7ad0e571eb05c09d0402f",
     "semantic_hash": "1d685a7536b7ad0e571eb05c09d0402f"
   },
   "docs/superpowers/plans/2026-09-22-m1-discovery.md": {
-    "mtime": 1790293709.7142744,
+    "mtime": 1790304403.9357767,
     "ast_hash": "3baae75f4501ef012a710f76861ca220",
     "semantic_hash": "3baae75f4501ef012a710f76861ca220"
   },
   "docs/governance/rules.md": {
-    "mtime": 1790251405.1010528,
+    "mtime": 1790061879.9869454,
     "ast_hash": "fd0883d7f311d589f4a382fca0e6e48a",
     "semantic_hash": "fd0883d7f311d589f4a382fca0e6e48a"
   },
   "docs/governance/behavioral.md": {
-    "mtime": 1790251405.100054,
+    "mtime": 1790061880.0167954,
     "ast_hash": "8d260e36fabfcf308388d40e2546045a",
     "semantic_hash": "8d260e36fabfcf308388d40e2546045a"
   },
   "docs/design/stitch-briefs.md": {
-    "mtime": 1790251646.2382214,
+    "mtime": 1790066127.6917994,
     "ast_hash": "41589beb69ba8c1a57e8b6e108c64386",
     "semantic_hash": "41589beb69ba8c1a57e8b6e108c64386"
   },
   "docs/design/DESIGN.md": {
-    "mtime": 1790251646.2362905,
+    "mtime": 1790066455.8348658,
     "ast_hash": "f1e72ca90ab8664eb775a559a19a9ae2",
     "semantic_hash": "f1e72ca90ab8664eb775a559a19a9ae2"
   },
   "docs/design/stitch-audit.md": {
-    "mtime": 1790251646.2378,
+    "mtime": 1790070301.8460517,
     "ast_hash": "96aa81bf9be6f51b2a5eaa074833bac2",
     "semantic_hash": "96aa81bf9be6f51b2a5eaa074833bac2"
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1790609614.3403878,
-    "ast_hash": "d6b4cc9cfca748f233c9f3ee1f7d0fed",
-    "semantic_hash": "d6b4cc9cfca748f233c9f3ee1f7d0fed"
+    "mtime": 1790656997.9510705,
+    "ast_hash": "37e46f93c0898fe5fcc384793d1d956b",
+    "semantic_hash": "37e46f93c0898fe5fcc384793d1d956b"
   },
   "docs/design/UI_HANDOFF.md": {
-    "mtime": 1790261181.0787816,
+    "mtime": 1790304403.8708513,
     "ast_hash": "090573d34a2635767c76149ff87b2f93",
     "semantic_hash": "090573d34a2635767c76149ff87b2f93"
   },
   "docs/contracts/settings.md": {
-    "mtime": 1790424770.739568,
+    "mtime": 1790330660.2203417,
     "ast_hash": "fc10cce4b6b3f8b2551b63785e2ccc4b",
     "semantic_hash": "fc10cce4b6b3f8b2551b63785e2ccc4b"
   },
   "docs/contracts/identity-apikeys.md": {
-    "mtime": 1790424770.7360408,
+    "mtime": 1790339978.174816,
     "ast_hash": "823b270ef509f953a68ec098b82d8867",
     "semantic_hash": "823b270ef509f953a68ec098b82d8867"
   },
   "docs/contracts/engine.md": {
-    "mtime": 1790424770.7350407,
+    "mtime": 1790366850.849803,
     "ast_hash": "04c0c50e7da7000a83ce1379183f0975",
     "semantic_hash": "04c0c50e7da7000a83ce1379183f0975"
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1790608368.377952,
-    "ast_hash": "64289f344da76db0fd95c2a7a30e37ab",
-    "semantic_hash": "64289f344da76db0fd95c2a7a30e37ab"
+    "mtime": 1790665050.6665077,
+    "ast_hash": "c523ce6cc5ba9c3ff69dd043a7c89cd3",
+    "semantic_hash": "c523ce6cc5ba9c3ff69dd043a7c89cd3"
   },
   "docs/contracts/transport.md": {
-    "mtime": 1790424770.7405677,
-    "ast_hash": "a5b2650d0a980efe321985431e8fe3cc",
-    "semantic_hash": "a5b2650d0a980efe321985431e8fe3cc"
+    "mtime": 1790654725.1267107,
+    "ast_hash": "799f3f6b0d2b87891f7df23faf0a61aa",
+    "semantic_hash": "799f3f6b0d2b87891f7df23faf0a61aa"
   },
   "docs/contracts/provider-openai.md": {
-    "mtime": 1790599976.498523,
+    "mtime": 1790528839.4961746,
     "ast_hash": "88c4c49965bd7226c8c9bf2bd48832b0",
     "semantic_hash": "88c4c49965bd7226c8c9bf2bd48832b0"
   },
   "docs/contracts/protocol-openai.md": {
-    "mtime": 1790515779.6393638,
+    "mtime": 1790510061.3642294,
     "ast_hash": "d124cb020014f48f0529001697fc6e97",
     "semantic_hash": "d124cb020014f48f0529001697fc6e97"
   },
   "docs/contracts/connections.md": {
-    "mtime": 1790506614.2927537,
-    "ast_hash": "85c24565de5703bb3ff4c882d9be137b",
-    "semantic_hash": "85c24565de5703bb3ff4c882d9be137b"
+    "mtime": 1790647145.265839,
+    "ast_hash": "2dba4e05a38e64b06f89de9d2481d059",
+    "semantic_hash": "2dba4e05a38e64b06f89de9d2481d059"
   },
   "docs/contracts/chat-lane.md": {
-    "mtime": 1790506614.28724,
+    "mtime": 1790505156.0795984,
     "ast_hash": "faf3f17acf85e8d3bcaf0e72d8a94328",
     "semantic_hash": "faf3f17acf85e8d3bcaf0e72d8a94328"
   },
   "docs/contracts/parity.md": {
-    "mtime": 1790424770.7360408,
+    "mtime": 1790361488.8968892,
     "ast_hash": "af0d11902d0344dc23da137d91ef1b04",
     "semantic_hash": "af0d11902d0344dc23da137d91ef1b04"
   },
   "docs/contracts/registry-extract.md": {
-    "mtime": 1790424770.739568,
+    "mtime": 1790366850.851379,
     "ast_hash": "7dbf0ce39fc9eecb48ba8b829f40b777",
     "semantic_hash": "7dbf0ce39fc9eecb48ba8b829f40b777"
   },
   "docs/contracts/catalog-providers.md": {
-    "mtime": 1790506614.2802193,
-    "ast_hash": "822850255f3a53d7455fd5749149dcce",
-    "semantic_hash": "822850255f3a53d7455fd5749149dcce"
+    "mtime": 1790656997.9510705,
+    "ast_hash": "b19f5dab55e606e023c1780e6465fcc5",
+    "semantic_hash": "b19f5dab55e606e023c1780e6465fcc5"
   },
   "docs/contracts/custom-providers.md": {
-    "mtime": 1790599976.498523,
+    "mtime": 1790567918.3057823,
     "ast_hash": "e88c25a814b177c239084b06d535d322",
     "semantic_hash": "e88c25a814b177c239084b06d535d322"
   },
   "docs/contracts/provider-anthropic.md": {
-    "mtime": 1790424770.7375515,
+    "mtime": 1790398651.8124115,
     "ast_hash": "966aadf40ea0a6c6043a1929ce78b149",
     "semantic_hash": "966aadf40ea0a6c6043a1929ce78b149"
   },
   "docs/contracts/stream-only-providers.md": {
-    "mtime": 1790424770.739568,
+    "mtime": 1790401515.3933322,
     "ast_hash": "ff3cb1bc84d7c77f4a5f5239c627d85b",
     "semantic_hash": "ff3cb1bc84d7c77f4a5f5239c627d85b"
   },
   "docs/contracts/provider-openai-responses.md": {
-    "mtime": 1790424770.7385616,
+    "mtime": 1790411684.8212306,
     "ast_hash": "65304000279fa29ae93cab61d547a7fd",
     "semantic_hash": "65304000279fa29ae93cab61d547a7fd"
   },
   "docs/contracts/provider-ollama.md": {
-    "mtime": 1790424770.7375515,
+    "mtime": 1790416955.6250374,
     "ast_hash": "40089f80e09fba4d3499e5c4626928d9",
     "semantic_hash": "40089f80e09fba4d3499e5c4626928d9"
   },
   "docs/contracts/provider-gemini.md": {
-    "mtime": 1790424770.7375515,
+    "mtime": 1790423410.3695471,
     "ast_hash": "2be27a05d89635d1ce20b65e9e8d8dec",
     "semantic_hash": "2be27a05d89635d1ce20b65e9e8d8dec"
   },
   "docs/contracts/provider-vertex.md": {
-    "mtime": 1790437610.9304397,
+    "mtime": 1790434171.6344848,
     "ast_hash": "416d6d21e3b6a6c1bdcc73c3c57d1dc5",
     "semantic_hash": "416d6d21e3b6a6c1bdcc73c3c57d1dc5"
   },
   "docs/contracts/provider-connection-data.md": {
-    "mtime": 1790446087.1800435,
+    "mtime": 1790438215.5531056,
     "ast_hash": "2d7f0047ae405f3567154cdb66be3076",
     "semantic_hash": "2d7f0047ae405f3567154cdb66be3076"
   },
   "docs/contracts/provider-commandcode.md": {
-    "mtime": 1790446087.1714334,
+    "mtime": 1790442599.426833,
     "ast_hash": "1187960f9ef1d586205ddb5698b222d6",
     "semantic_hash": "1187960f9ef1d586205ddb5698b222d6"
   },
   "docs/contracts/protocol-anthropic.md": {
-    "mtime": 1790501488.0677116,
+    "mtime": 1790448550.137679,
     "ast_hash": "f516c5d6a59bdf272bd1c32dbaa06181",
     "semantic_hash": "f516c5d6a59bdf272bd1c32dbaa06181"
   },
   "docs/contracts/protocol-responses.md": {
-    "mtime": 1790501488.0677116,
+    "mtime": 1790469577.1878257,
     "ast_hash": "47493ef08bb2e724f498adcd61f4beb3",
     "semantic_hash": "47493ef08bb2e724f498adcd61f4beb3"
   },
   "docs/contracts/protocol-gemini.md": {
-    "mtime": 1790501488.0677116,
+    "mtime": 1790487363.5846338,
     "ast_hash": "d6b7d9191daab2f8d4429ca0b73f08ce",
     "semantic_hash": "d6b7d9191daab2f8d4429ca0b73f08ce"
   },
   "docs/contracts/oauth.md": {
-    "mtime": 1790609594.6131809,
-    "ast_hash": "01a5d555fbf130e62656b5f84a6a9d40",
-    "semantic_hash": "01a5d555fbf130e62656b5f84a6a9d40"
+    "mtime": 1790646771.193364,
+    "ast_hash": "1cb34e88d982ae44e1e6087f440669ac",
+    "semantic_hash": "1cb34e88d982ae44e1e6087f440669ac"
   },
   "docs/contracts/custom-models.md": {
-    "mtime": 1790506614.3018353,
+    "mtime": 1790504148.32178,
     "ast_hash": "70dd00576735e1ee40266c8b40ba390b",
     "semantic_hash": "70dd00576735e1ee40266c8b40ba390b"
   },
   "docs/contracts/provider-thinking.md": {
-    "mtime": 1790599976.4995236,
+    "mtime": 1790588919.455716,
     "ast_hash": "0d7448786593b5f39a5c9ab5c0445040",
     "semantic_hash": "0d7448786593b5f39a5c9ab5c0445040"
   },
   "docs/contracts/provider-trae.md": {
-    "mtime": 1790609604.066312,
-    "ast_hash": "b6a15cf3a185551c83206ac2a4785145",
-    "semantic_hash": "b6a15cf3a185551c83206ac2a4785145"
+    "mtime": 1790646771.2003605,
+    "ast_hash": "9d5f4653057d2df15260be4f7c657546",
+    "semantic_hash": "9d5f4653057d2df15260be4f7c657546"
+  },
+  "docs/contracts/multi-account.md": {
+    "mtime": 1790648157.2420626,
+    "ast_hash": "685eea3866a417dc1d240a11f268915e",
+    "semantic_hash": "685eea3866a417dc1d240a11f268915e"
+  },
+  "docs/contracts/proxy-pools.md": {
+    "mtime": 1790656997.9500685,
+    "ast_hash": "d9331ce417f9e55062779d89f7824556",
+    "semantic_hash": "d9331ce417f9e55062779d89f7824556"
   }
 }

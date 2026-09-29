@@ -1,6 +1,8 @@
 # Transport contract (M1 SP8)
 
-Scope, per spec §9: `HttpTransportPort`, direct branch and timeout only. Relay, proxy pools, the outbound proxy, and MITM-bypass DNS sit behind the same port later (SP18). SP8 has **no HTTP API and no UI**, and `docs/design/API_UI_MAP.md` says so.
+Scope, per spec §9: `HttpTransportPort`, direct branch and timeout. SP18 adds
+proxy pools, relays, outbound proxy, strict mode, and MITM-bypass DNS; see
+`docs/contracts/proxy-pools.md` for their public contract.
 
 - The port is in `packages/engine/src/ports.ts`. The bounded body reader `readBoundedText` is in `packages/engine/src/http.ts`.
 - The direct implementation, `DirectTransport`, is in `apps/server/src/modules/transport/infrastructure/direct-transport.ts`. `TransportModule` injects it under `HTTP_TRANSPORT`.
@@ -9,12 +11,19 @@ Scope, per spec §9: `HttpTransportPort`, direct branch and timeout only. Relay,
 
 | Entry | Rule in 9router | Label | AIGate |
 |---|---|---|---|
-| `transport.proxy-priority-chain` | With no relay and no proxy, the request goes to the unpatched global `fetch`. | `REFERENCE_BEHAVIOR` | Keep, as the direct branch. Status: `contracted`, because the relay and proxy branches come in SP18. |
+| `transport.proxy-priority-chain` | With no relay and no proxy, the request goes to the unpatched global `fetch`. | `REFERENCE_BEHAVIOR` | Keep as the direct branch; SP18 adds pool, relay, and strict-proxy selection. |
 | `transport.proxy-priority-chain` (`fallback.timeout: null`) | The direct chat fetch has no timeout. | `IMPLEMENTATION_ACCIDENT` | Every call states `timeoutMs` (1 to 600000 ms). It bounds the headers and the body, inside the shared `ctx.signal` deadline (spec §4.2). |
 | SP0.1 / spec §11.2 | "Retry không trần — chỉ cho phép qua helper duy nhất". | spec rule | Lint rule `aigate/retry-through-helper`: a loop around an awaited `try/catch` in the server or engine is rejected; use `withRetry`. |
 | SP0.1 / spec §4.2 | Raw `fetch` with an opaque signal stays rejected until a bounded helper exists. | spec rule | The transport is that helper. Lint rule `aigate/fetch-through-transport` rejects `fetch` anywhere in the server or packages except `modules/transport/infrastructure/`. `aigate/fetch-timeout` now accepts `AbortSignal.any([..., AbortSignal.timeout(n)])`. |
 
 ## Behavior: every failure has one mapping
+
+The seven hosts intercepted by IDE MITM use a per-host Google DNS resolver on
+direct requests. The transport matches exact hostnames, caches IPv4 results for
+five minutes, and pins the resolved address at connect time while retaining the
+original TLS SNI/Host. This applies to HTTPS and HTTP/2 direct paths; requests
+using an explicit relay/proxy stay on that route, and strict proxy failures do
+not fall back to direct.
 
 | Situation | Result |
 |---|---|
@@ -44,4 +53,5 @@ Error messages and details name the host only. Headers, including `Authorization
 ## Deferred
 
 - A streaming idle timeout (a gap between chunks) comes with SP12 streaming. Until then, `timeoutMs` bounds the whole stream.
-- Relay, proxy pools, `strictProxy`, and MITM bypass come in SP18.
+- HTTP/2 proxy tunnelling remains deferred until the Cursor transport needs a
+  proxy-aware HTTP/2 session.

@@ -5,7 +5,7 @@ import { DATABASE } from "../../../database.provider.js";
 import type { Settings, SettingsPatch } from "../domain/settings.js";
 
 const ROW_ID = 1;
-const columns = { requireLogin: settings.requireLogin, requireApiKey: settings.requireApiKey };
+const columns = { requireLogin: settings.requireLogin, requireApiKey: settings.requireApiKey, fallbackStrategy: settings.fallbackStrategy, comboStickyLimit: settings.comboStickyLimit };
 
 // Read on the request hot path, so the row is cached and replaced on every write.
 // ponytail: assumes this process is the only writer; other tools must change settings through the API.

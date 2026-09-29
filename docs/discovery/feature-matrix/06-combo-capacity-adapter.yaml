@@ -69,7 +69,7 @@
     - { file: open-sse/services/combo.js, line: 345, note: "transient 502/503/504 with cooldownMs<=5000 -> await cooldown before next member" }
     - { file: open-sse/services/combo.js, line: 367, note: "allDisabled ('no credentials' in lastError) forces status 503 on the aggregate error" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.mode-round-robin
@@ -106,7 +106,7 @@
     - { file: open-sse/services/combo.js, line: 220, note: "currentIndex = state.index % models.length" }
     - { file: open-sse/services/combo.js, line: 224, note: "nextUseCount >= normalizedStickyLimit -> advance index, reset counter" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.mode-fusion-panel-completion
@@ -144,7 +144,7 @@
     - { file: open-sse/services/combo.js, line: 518, note: "ok >= minPanel && !graceTimer -> start the stragglerGraceMs grace timer" }
     - { file: open-sse/services/combo.js, line: 562, note: "minPanel clamp: Math.min(Math.max(2, cfg.minPanel), panel.length)" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.fusion-panel-concurrency-unbounded
@@ -174,7 +174,7 @@
   evidence:
     - { file: open-sse/services/combo.js, line: 581, note: "panel.map(...) starts every panel member's handleSingleModel call with no concurrency limiter" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [IMPLEMENTATION_ACCIDENT]
 
 - id: combo.mode-fusion-degrade
@@ -216,7 +216,7 @@
     - { file: open-sse/services/combo.js, line: 618, note: "answers.length===1 -> handleSingleModel(body, answers[0].model) re-invoked with the original body" }
     - { file: open-sse/services/combo.js, line: 390, note: "extractPanelText — OpenAI/Claude/Gemini/Responses shapes; falls through to ''" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.judge-prompt-synthesis
@@ -253,7 +253,7 @@
     - { file: open-sse/services/combo.js, line: 563, note: "judge = judgeModel && judgeModel.trim() ? judgeModel.trim() : panel[0]" }
     - { file: open-sse/services/combo.js, line: 622, note: "judgeBody = appendUserTurn(body, buildJudgePrompt(answers)); handleSingleModel(judgeBody, judge)" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.tool-history-flatten
@@ -288,7 +288,7 @@
     - { file: open-sse/services/combo.js, line: 28, note: "assistant.tool_calls stripped, '[Called tools: ...]' suffix appended" }
     - { file: open-sse/services/combo.js, line: 41, note: "Claude content-block loop separating text / tool_use / tool_result parts" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.detect-required-capabilities
@@ -398,7 +398,7 @@
     - { file: "src/app/api/combos/[id]/route.js", line: 53, note: "PUT: resetComboRotation(prev.name) unconditionally, plus resetComboRotation(combo.name) if renamed" }
     - { file: "src/app/api/combos/[id]/route.js", line: 74, note: "DELETE: resetComboRotation(prev.name)" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.storage-shape
@@ -432,7 +432,7 @@
     - { file: src/lib/db/repos/combosRepo.js, line: 5, note: "rowToCombo — models parsed via parseJson(row.models, [])" }
     - { file: src/lib/db/repos/combosRepo.js, line: 56, note: "updateCombo — db.transaction: read, merge, write" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.api-crud
@@ -471,7 +471,7 @@
     - { file: open-sse/services/combo.js, line: 254, note: "getComboModelsFromData — the lookup fetch.js/search.js reuse outside the chat lane" }
     - { file: src/sse/handlers/fetch.js, line: 93, note: "fetch.js calling getComboModelsFromData(providerInput, combos)" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: capacity.capability-pool-config
@@ -677,3 +677,108 @@
   newModule: routing
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+
+# 2026-09-29 SP19 port: three rules found while contracting the combo lane (docs/contracts/combos.md).
+- id: combo.aggregate-status-first-failure
+  group: Combo / Vision Adapter
+  feature: Model combo
+  subFeature: Status of the all-members-failed answer comes from the first failure, its message from the last
+  trigger: Every member of a fallback or round-robin combo fails with a fallback-eligible error
+  input: The members' failing responses in attempt order
+  output: "One error Response: status = the FIRST failing member's status (variable named lastStatus), message = the LAST member's error text"
+  businessRules:
+    - "lastStatus is assigned only `if (!lastStatus)`, so it keeps the first failure; lastError is overwritten on every failure"
+    - "A thrown member error sets lastStatus to 500 only when no status was recorded before"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["combo.mode-fallback"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "every member failed; the status and message may describe different members", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "First member 429, last member 404: the client reads HTTP 429 with the 404's message"
+  evidence:
+    - { file: open-sse/services/combo.js, line: 353, note: "if (!lastStatus) lastStatus = result.status — keeps the first status" }
+    - { file: open-sse/services/combo.js, line: 352, note: "lastError overwritten with every member's error text" }
+    - { file: open-sse/services/combo.js, line: 368, note: "status = allDisabled ? 503 : (lastStatus || 503)" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "The aggregate error describes one member: the last failure's status and message together, as the variable name lastStatus says"
+    actual: "Status of the first failure, message of the last"
+    impact: "Clients branch on a status that does not match the message (for example retrying a 429 whose text says the model does not exist)"
+
+- id: combo.nested-member-recursion
+  group: Combo / Vision Adapter
+  feature: Model combo
+  subFeature: A combo member that names another combo is routed as that combo, with no depth or cycle bound
+  trigger: A combo member string without "/" that matches another combo's name (or the combo itself)
+  input: Member string, combos table
+  output: The nested combo's result, dispatched with its own strategy
+  businessRules:
+    - "Each member goes through handleSingleModelChat; when getModelInfo finds no provider for it, the member is looked up as a combo and dispatched with its own strategy (fallback, round-robin, or fusion)"
+    - "The dashboard aggregates nested combo capabilities, so nesting is a supported configuration"
+    - "Nothing tracks the combos already on the path: a combo that lists itself, or A -> B -> A, recurses until the process runs out of stack or requests"
+  state: { reads: ["combos table"], writes: [], runtimeOnly: [] }
+  dependencies: ["routing.combo-dispatch", "combo.mode-fallback"]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "a cyclic combo exhausts the stack", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "A cycle multiplies work without bound for one client request"
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Fusion inside fusion multiplies panel fan-out (panel size squared)"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 170, note: "provider null -> getComboModels(modelStr) inside handleSingleModelChat" }
+    - { file: src/sse/handlers/chat.js, line: 131, note: "combo members run through handleSingleModelChat" }
+    - { file: "src/app/(dashboard)/dashboard/combos/page.js", line: 600, note: "nested combo capabilities aggregated for a member that is a combo" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Nested combos keep working, but a self-reference or cycle stops with a client-visible error"
+    actual: "Unbounded recursion"
+    impact: "One request with a misconfigured combo can exhaust the server"
+
+- id: combo.strategy-keyed-by-name
+  group: Combo / Vision Adapter
+  feature: Model combo
+  subFeature: Per-combo strategy, judge, and fusion tuning live in settings.comboStrategies keyed by combo name
+  trigger: The combos page changes a combo's strategy or judge; a combo is renamed through PUT /api/combos/[id]
+  input: "Combo name; patch { fallbackStrategy, judgeModel }"
+  output: settings.comboStrategies updated; the combo row is unchanged
+  businessRules:
+    - "handleSetComboStrategy writes settings.comboStrategies[comboName]; a fallback strategy deletes the entry"
+    - "Renaming a combo does not move its entry: the renamed combo silently reverts to the global strategy, and the old name's entry is orphaned until a combo with that name exists again"
+    - "fusionTuning (minPanel, stragglerGraceMs, panelHardTimeoutMs) is read from the same entry but no dashboard control writes it"
+  state: { reads: ["settings.comboStrategies"], writes: ["settings.comboStrategies"], runtimeOnly: [] }
+  dependencies: ["combo.api-crud", "routing.combo-dispatch"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Every strategy change clears the round-robin state of every combo (settings.combo-rotation-reset)"]
+  persistence: ["settings.comboStrategies JSON map"]
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "A new combo created with the name of a deleted combo whose entry was not pruned inherits the old strategy"
+  evidence:
+    - { file: "src/app/(dashboard)/dashboard/combos/page.js", line: 313, note: "handleSetComboStrategy keyed by comboName" }
+    - { file: "src/app/(dashboard)/dashboard/combos/page.js", line: 218, note: "handleUpdate PUTs the combo without moving its strategy entry" }
+    - { file: src/sse/handlers/chat.js, line: 100, note: "comboStrategies[modelStr]?.fallbackStrategy read by name" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A combo keeps its strategy, judge, and tuning across a rename"
+    actual: "The settings entry stays under the old name; the renamed combo falls back to the global strategy"
+    impact: "A renamed fusion combo quietly becomes a fallback combo"

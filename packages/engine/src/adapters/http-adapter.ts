@@ -5,6 +5,7 @@ import { parseJson, record, text } from "../json.js";
 import type { Credential, ExecCtx, HttpRequest, HttpResponse, HttpTransportPort } from "../ports.js";
 import type { ModelDescriptor, ProviderDescriptor } from "../registry.js";
 import { withRetry } from "../retry.js";
+import { opencodeHeaders } from "./opencode-free.js";
 
 // The HTTP side every provider family shares (docs/contracts/provider-openai.md, provider-anthropic.md):
 // auth headers, bounded retries before the first byte, upstream error classification, and redaction.
@@ -51,6 +52,11 @@ export abstract class HttpProviderAdapter {
 
   // Catalog headers first, the key last: a static header can never replace the credential.
   protected request(method: HttpRequest["method"], url: string, credential: Credential, timeoutMs: number): HttpRequest {
+    if (this.provider.quirks?.includes("opencodeFree")) return {
+      method, url, timeoutMs,
+      headers: { ...this.provider.headers, ...opencodeHeaders() },
+    };
+    if (this.provider.auth.kind === "none") return { method, url, headers: { ...this.provider.headers }, timeoutMs };
     // connection.ollama-local-host: a keyless connection sends no auth header at all.
     if (credential.apiKey === "" && this.provider.auth.optional) return { method, url, headers: { ...this.provider.headers }, timeoutMs };
     if (!API_KEY.test(credential.apiKey)) {

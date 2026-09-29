@@ -1,0 +1,19 @@
+{
+  "nodes": [
+    {"id":"sp_multi_account","label":"M2 SP17 multi-account fallback","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"implemented"},
+    {"id":"multi_account_contract","label":"Multi-account routing contract","file_type":"document","source_file":"docs/contracts/multi-account.md","status":"implemented"},
+    {"id":"account_locks_storage","label":"Durable account and model lock storage","file_type":"code","source_file":"packages/database/src/schema/connections.ts","status":"implemented"},
+    {"id":"multi_account_selection","label":"Bounded priority and sticky round-robin selection","file_type":"code","source_file":"apps/server/src/modules/connections/infrastructure/connections.repo.ts","status":"implemented"},
+    {"id":"multi_account_failover","label":"Pre-response account fallback in chat lane","file_type":"code","source_file":"apps/server/src/modules/routing/infrastructure/chat-lane.ts","status":"implemented"},
+    {"id":"multi_account_ui","label":"Connection priority and account strategy UI","file_type":"code","source_file":"apps/web/src/features/providers/screens.tsx","status":"implemented"}
+  ],
+  "edges": [
+    {"source":"sp_multi_account","target":"multi_account_contract","relation":"documents","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"multi_account_contract","target":"connections_contract","relation":"extends","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/multi-account.md","weight":1},
+    {"source":"account_locks_storage","target":"entity_account_lock","relation":"implements","confidence":"EXTRACTED","confidence_score":1,"source_file":"packages/database/src/schema/connections.ts","weight":1},
+    {"source":"multi_account_selection","target":"account_locks_storage","relation":"uses","confidence":"EXTRACTED","confidence_score":1,"source_file":"apps/server/src/modules/connections/infrastructure/connections.repo.ts","weight":1},
+    {"source":"multi_account_failover","target":"multi_account_selection","relation":"uses","confidence":"EXTRACTED","confidence_score":1,"source_file":"apps/server/src/modules/routing/infrastructure/chat-lane.ts","weight":1},
+    {"source":"multi_account_failover","target":"chat_lane_service","relation":"extends","confidence":"EXTRACTED","confidence_score":1,"source_file":"apps/server/src/modules/routing/infrastructure/chat-lane.ts","weight":1},
+    {"source":"multi_account_ui","target":"screen_connections","relation":"wires","confidence":"EXTRACTED","confidence_score":1,"source_file":"apps/web/src/features/providers/screens.tsx","weight":1}
+  ]
+}

@@ -10299,6 +10299,153 @@
       "file_type": "code",
       "source_file": "apps/web/src/features/providers/sign-in.tsx",
       "status": "implemented"
+    },
+    {
+      "id": "sp_multi_account",
+      "label": "M2 SP17 multi-account fallback",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "implemented"
+    },
+    {
+      "id": "multi_account_contract",
+      "label": "Multi-account routing contract",
+      "file_type": "document",
+      "source_file": "docs/contracts/multi-account.md",
+      "status": "implemented"
+    },
+    {
+      "id": "account_locks_storage",
+      "label": "Durable account and model lock storage",
+      "file_type": "code",
+      "source_file": "packages/database/src/schema/connections.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "multi_account_selection",
+      "label": "Bounded priority and sticky round-robin selection",
+      "file_type": "code",
+      "source_file": "apps/server/src/modules/connections/infrastructure/connections.repo.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "multi_account_failover",
+      "label": "Pre-response account fallback in chat lane",
+      "file_type": "code",
+      "source_file": "apps/server/src/modules/routing/infrastructure/chat-lane.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "multi_account_ui",
+      "label": "Connection priority and account strategy UI",
+      "file_type": "code",
+      "source_file": "apps/web/src/features/providers/screens.tsx",
+      "status": "implemented"
+    },
+    {
+      "id": "sp18_hosted_relay_deploy",
+      "label": "SP18 hosted relay deploy (Vercel, Cloudflare, Deno)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "implemented"
+    },
+    {
+      "id": "hosted_relay_contract",
+      "label": "Hosted relay deploy API contract",
+      "file_type": "document",
+      "source_file": "docs/contracts/proxy-pools.md",
+      "status": "implemented"
+    },
+    {
+      "id": "relay_deploy_service",
+      "label": "Provider deployment, bounded polling, and cleanup",
+      "file_type": "code",
+      "source_file": "apps/server/src/modules/transport/infrastructure/relay-deploy.service.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "proxy_pool_deploy_routes",
+      "label": "Authenticated Vercel, Cloudflare, and Deno deploy endpoints",
+      "file_type": "code",
+      "source_file": "apps/server/src/modules/transport/infrastructure/proxy-pools.controller.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "proxy_pool_deploy_wizard",
+      "label": "Platform-specific hosted relay deploy wizard",
+      "file_type": "code",
+      "source_file": "apps/web/src/features/network/screens.tsx",
+      "status": "implemented"
+    },
+    {
+      "id": "sp18_mitm_dns_bypass",
+      "label": "SP18 exact-host MITM DNS bypass",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "implemented"
+    },
+    {
+      "id": "sp18_keyless_proxy_rotation",
+      "label": "SP18 keyless proxy rotation (no runtime provider yet)",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "status": "partial"
+    },
+    {
+      "id": "mitm_dns_bypass_transport",
+      "label": "Google DNS pinning for exact MITM hosts",
+      "file_type": "code",
+      "source_file": "apps/server/src/modules/transport/infrastructure/direct-transport.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "provider_proxy_strategy_storage",
+      "label": "Persisted provider proxy strategy migration 0017",
+      "file_type": "code",
+      "source_file": "packages/database/src/schema/proxy-pools.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "keyless_proxy_rotation_route",
+      "label": "Keyless proxy rotation API and resolver",
+      "file_type": "code",
+      "source_file": "apps/server/src/modules/transport/infrastructure/proxy-pools.controller.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "keyless_proxy_rotation_screen",
+      "label": "Keyless proxy strategy panel with empty state",
+      "file_type": "code",
+      "source_file": "apps/web/src/features/network/screens.tsx",
+      "status": "implemented"
+    },
+    {
+      "id": "sp18_keyless_opencode",
+      "label": "SP18 OpenCode Free keyless provider routing",
+      "file_type": "document",
+      "source_file": "docs/contracts/provider-opencode-free.md",
+      "status": "implemented"
+    },
+    {
+      "id": "opencode_adapter",
+      "label": "OpenCode Chat, Responses and Messages adapter selector",
+      "file_type": "code",
+      "source_file": "packages/engine/src/adapters/opencode.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "opencode_free_fingerprint",
+      "label": "Bounded OpenCode public session and fingerprint headers",
+      "file_type": "code",
+      "source_file": "packages/engine/src/adapters/opencode-free.ts",
+      "status": "implemented"
+    },
+    {
+      "id": "opencode_registry_entry",
+      "label": "Connectable OpenCode public registry descriptor",
+      "file_type": "code",
+      "source_file": "packages/engine/src/builtin-registry.ts",
+      "status": "implemented"
     }
   ],
   "edges": [
@@ -33038,6 +33185,213 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1,
       "source_file": "apps/web/src/features/providers/sign-in.tsx",
+      "weight": 1
+    },
+    {
+      "source": "sp_multi_account",
+      "target": "multi_account_contract",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "multi_account_contract",
+      "target": "connections_contract",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/multi-account.md",
+      "weight": 1
+    },
+    {
+      "source": "account_locks_storage",
+      "target": "entity_account_lock",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "packages/database/src/schema/connections.ts",
+      "weight": 1
+    },
+    {
+      "source": "multi_account_selection",
+      "target": "account_locks_storage",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/server/src/modules/connections/infrastructure/connections.repo.ts",
+      "weight": 1
+    },
+    {
+      "source": "multi_account_failover",
+      "target": "multi_account_selection",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/server/src/modules/routing/infrastructure/chat-lane.ts",
+      "weight": 1
+    },
+    {
+      "source": "multi_account_failover",
+      "target": "chat_lane_service",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/server/src/modules/routing/infrastructure/chat-lane.ts",
+      "weight": 1
+    },
+    {
+      "source": "multi_account_ui",
+      "target": "screen_connections",
+      "relation": "wires",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/web/src/features/providers/screens.tsx",
+      "weight": 1
+    },
+    {
+      "source": "sp18_hosted_relay_deploy",
+      "target": "hosted_relay_contract",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "hosted_relay_contract",
+      "target": "relay_deploy_service",
+      "relation": "implemented_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/proxy-pools.md",
+      "weight": 1
+    },
+    {
+      "source": "proxy_pool_deploy_routes",
+      "target": "relay_deploy_service",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/server/src/modules/transport/infrastructure/proxy-pools.controller.ts",
+      "weight": 1
+    },
+    {
+      "source": "proxy_pool_deploy_wizard",
+      "target": "proxy_pool_deploy_routes",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/web/src/features/network/api.ts",
+      "weight": 1
+    },
+    {
+      "source": "proxy_pool_deploy_wizard",
+      "target": "screen_proxy_pools",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/web/src/features/network/screens.tsx",
+      "weight": 1
+    },
+    {
+      "source": "sp18_mitm_dns_bypass",
+      "target": "mitm_dns_bypass_transport",
+      "relation": "implemented_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "mitm_dns_bypass_transport",
+      "target": "transport_module",
+      "relation": "part_of",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/server/src/modules/transport/infrastructure/direct-transport.ts",
+      "weight": 1
+    },
+    {
+      "source": "sp18_keyless_proxy_rotation",
+      "target": "provider_proxy_strategy_storage",
+      "relation": "persists_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/proxy-pools.md",
+      "weight": 1
+    },
+    {
+      "source": "sp18_keyless_proxy_rotation",
+      "target": "keyless_proxy_rotation_route",
+      "relation": "implemented_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "keyless_proxy_rotation_route",
+      "target": "keyless_proxy_rotation_screen",
+      "relation": "wired_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/design/API_UI_MAP.md",
+      "weight": 1
+    },
+    {
+      "source": "keyless_proxy_rotation_screen",
+      "target": "screen_proxy_pools",
+      "relation": "extends",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "apps/web/src/features/network/screens.tsx",
+      "weight": 1
+    },
+    {
+      "source": "sp18_keyless_opencode",
+      "target": "opencode_adapter",
+      "relation": "implemented_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/contracts/provider-opencode-free.md",
+      "weight": 1
+    },
+    {
+      "source": "opencode_adapter",
+      "target": "opencode_free_fingerprint",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "packages/engine/src/adapters/opencode.ts",
+      "weight": 1
+    },
+    {
+      "source": "opencode_registry_entry",
+      "target": "opencode_adapter",
+      "relation": "selects",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "packages/engine/src/adapters/index.ts",
+      "weight": 1
+    },
+    {
+      "source": "sp18_keyless_opencode",
+      "target": "sp18_keyless_proxy_rotation",
+      "relation": "activates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "docs/PROGRESS_HANDOFF.md",
+      "weight": 1
+    },
+    {
+      "source": "opencode_adapter",
+      "target": "transport_module",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "packages/engine/src/adapters/opencode.ts",
       "weight": 1
     }
   ],

@@ -576,7 +576,7 @@
     - { file: src/app/api/settings/route.js, line: 90, note: "PATCH — resetComboRotation() called when combo strategy keys are present in the body" }
     - { file: open-sse/services/combo.js, line: 243, note: "resetComboRotation — clears the whole comboRotationState Map when called with no argument" }
   newModule: settings
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 # --- Task 19a: gate gap-fill — auth, settings sub-routes, system routes ---

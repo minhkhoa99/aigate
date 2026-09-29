@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, isNotNull, lt } from "drizzle-orm";
-import { providerConnections, type AuthType, type DatabaseHandle, type TestStatus } from "@aigate/database";
+import { and, asc, eq, inArray, isNotNull, lt, or } from "drizzle-orm";
+import { accountLocks, providerConnections, type AuthType, type DatabaseHandle, type TestStatus } from "@aigate/database";
 import type { OAuthTokens } from "@aigate/engine";
 import { DATABASE } from "../../../database.provider.js";
 import { SECRET_CIPHER, type SecretCipherPort } from "../../../secret-cipher.js";
@@ -14,6 +14,7 @@ export interface ConnectionView {
   id: string;
   provider: string;
   name: string;
+  priority: number;
   keyHint: string;
   // The connection's own host (ollama-local) or endpoint (azure), or null for the catalog URL.
   baseUrl: string | null;
@@ -22,6 +23,7 @@ export interface ConnectionView {
   apiVersion: string | null;
   organization: string | null;
   accountId: string | null;
+  proxyPoolId: string | null;
   // SP16 (docs/contracts/oauth.md): how the connection authenticates, the account it signed in as, and when its token expires.
   authType: AuthType;
   email: string | null;
@@ -44,8 +46,8 @@ export interface TestOutcome {
 // A positive allowlist: the sealed key and tokens are not in it, so no read can return them (catalog.connection-listing).
 const t = providerConnections;
 const columns = {
-  id: t.id, provider: t.provider, name: t.name, keyHint: t.keyHint, baseUrl: t.baseUrl,
-  deployment: t.deployment, apiVersion: t.apiVersion, organization: t.organization, accountId: t.accountId, authType: t.authType, email: t.email,
+  id: t.id, provider: t.provider, name: t.name, priority: t.priority, keyHint: t.keyHint, baseUrl: t.baseUrl,
+  deployment: t.deployment, apiVersion: t.apiVersion, organization: t.organization, accountId: t.accountId, proxyPoolId: t.proxyPoolId, authType: t.authType, email: t.email,
   expiresAt: t.expiresAt, isActive: t.isActive, testStatus: t.testStatus, lastError: t.lastError, lastErrorCode: t.lastErrorCode, lastTestedAt: t.lastTestedAt,
   createdAt: t.createdAt, updatedAt: t.updatedAt,
 };
@@ -64,10 +66,10 @@ export interface OAuthState {
 }
 // The key (or access token) routing and the connection test use, with the row it came from. SP16c: projectId is the
 // Google Cloud Code project a gemini-cli sign-in found.
-export type StoredCredential = { id: string; apiKey: string; oauth?: OAuthState; projectId?: string; providerData?: Readonly<Record<string, string>> } & ConnectionData;
+export type StoredCredential = { id: string; apiKey: string; proxyPoolId: string | null; oauth?: OAuthState; projectId?: string; providerData?: Readonly<Record<string, string>> } & ConnectionData;
 
 const secret = {
-  id: t.id, sealed: t.apiKeySealed, authType: t.authType, refreshSealed: t.refreshTokenSealed, expiresAt: t.expiresAt, lastRefreshAt: t.lastRefreshAt, oauthData: t.oauthData, ...data,
+  id: t.id, sealed: t.apiKeySealed, authType: t.authType, refreshSealed: t.refreshTokenSealed, expiresAt: t.expiresAt, lastRefreshAt: t.lastRefreshAt, oauthData: t.oauthData, proxyPoolId: t.proxyPoolId, ...data,
 };
 
 const toView = (row: Row): ConnectionView => ({
@@ -111,7 +113,7 @@ export class ConnectionsRepository {
   ) {}
 
   async list(): Promise<ConnectionView[]> {
-    const rows = await this.database.db.select(columns).from(t).orderBy(asc(t.createdAt)).limit(MAX_CONNECTIONS);
+    const rows = await this.database.db.select(columns).from(t).orderBy(asc(t.provider), asc(t.priority)).limit(MAX_CONNECTIONS);
     return rows.map(toView);
   }
 
@@ -120,24 +122,27 @@ export class ConnectionsRepository {
     return row ? toView(row) : undefined;
   }
 
-  // Undefined when the provider already has a connection: the unique index decides, never a prior SELECT.
-  async create(input: { provider: string; name: string; apiKey: string; baseUrl?: string } & ConnectionFields): Promise<ConnectionView | undefined> {
+  async create(input: { provider: string; name: string; apiKey: string; baseUrl?: string; priority?: number; proxyPoolId?: string | null } & ConnectionFields): Promise<ConnectionView | undefined> {
     const id = randomUUID();
     const now = new Date();
-    const [row] = await this.database.db.insert(t).values({
-      id, provider: input.provider, name: input.name, apiKeySealed: this.cipher.seal(input.apiKey, sealContext(id)),
-      keyHint: keyHint(input.apiKey), baseUrl: input.baseUrl ?? null, deployment: input.deployment ?? null, apiVersion: input.apiVersion ?? null,
-      organization: input.organization ?? null, accountId: input.accountId ?? null, createdAt: now, updatedAt: now,
-    }).onConflictDoNothing({ target: t.provider }).returning(columns);
-    return row ? toView(row) : undefined;
+    return this.database.db.transaction(async (tx) => {
+      const prior = await tx.select({ priority: t.priority, name: t.name }).from(t).where(eq(t.provider, input.provider)).limit(MAX_CONNECTIONS);
+      if (prior.length >= MAX_CONNECTIONS) return undefined;
+      const name = prior.some((row) => row.name === input.name) ? `${input.name} ${prior.length + 1}` : input.name;
+      const [row] = await tx.insert(t).values({
+        id, provider: input.provider, name, priority: input.priority ?? Math.max(0, ...prior.map((row) => row.priority)) + 1, apiKeySealed: this.cipher.seal(input.apiKey, sealContext(id)),
+        keyHint: keyHint(input.apiKey), baseUrl: input.baseUrl ?? null, deployment: input.deployment ?? null, apiVersion: input.apiVersion ?? null,
+        organization: input.organization ?? null, accountId: input.accountId ?? null, proxyPoolId: input.proxyPoolId ?? null, createdAt: now, updatedAt: now,
+      }).returning(columns);
+      return row ? toView(row) : undefined;
+    });
   }
 
   // oauth.token-storage: create the oauth connection, or refresh the tokens of the same account's connection. The read
   // and the write share one transaction; no network I/O happens inside it.
   saveOAuth(input: { provider: string; name: string; tokens: OAuthTokens; organization?: string; accountId?: string }): Promise<ConnectionView | "conflict"> {
     return this.database.db.transaction(async (tx) => {
-      const existing = await tx.select({ id: t.id, authType: t.authType, email: t.email, oauthData: t.oauthData }).from(t).where(eq(t.provider, input.provider)).get();
-      if (existing && !sameAccount(existing, input.tokens)) return "conflict";
+      const existing = (await tx.select({ id: t.id, authType: t.authType, email: t.email, oauthData: t.oauthData }).from(t).where(eq(t.provider, input.provider)).limit(MAX_CONNECTIONS)).find((row) => sameAccount(row, input.tokens));
       const id = existing?.id ?? randomUUID();
       const now = new Date();
       const { tokens } = input;
@@ -151,7 +156,7 @@ export class ConnectionsRepository {
       };
       const [row] = existing
         ? await tx.update(t).set(values).where(eq(t.id, id)).returning(columns)
-        : await tx.insert(t).values({ id, provider: input.provider, name: input.name, createdAt: now, ...values }).returning(columns);
+        : await tx.insert(t).values({ id, provider: input.provider, name: input.name, priority: Math.max(0, ...(await tx.select({ priority: t.priority }).from(t).where(eq(t.provider, input.provider)).limit(MAX_CONNECTIONS)).map((row) => row.priority)) + 1, createdAt: now, ...values }).returning(columns);
       if (!row) throw new Error("the oauth connection was not saved");
       return toView(row);
     });
@@ -178,6 +183,7 @@ export class ConnectionsRepository {
 
   // A new key starts over as untested: the old result described a different key.
   async update(id: string, changes: ConnectionChanges): Promise<ConnectionView | undefined> {
+    if (changes.priority !== undefined) return this.reorder(id, changes.priority);
     const { apiKey, ...rest } = changes;
     const key = apiKey === undefined ? {} : {
       apiKeySealed: this.cipher.seal(apiKey, sealContext(id)), keyHint: keyHint(apiKey),
@@ -185,6 +191,20 @@ export class ConnectionsRepository {
     };
     const [row] = await this.database.db.update(t).set({ ...rest, ...key, updatedAt: new Date() }).where(eq(t.id, id)).returning(columns);
     return row ? toView(row) : undefined;
+  }
+
+  private async reorder(id: string, priority: number): Promise<ConnectionView | undefined> {
+    return this.database.db.transaction(async (tx) => {
+      const current = await tx.select({ provider: t.provider }).from(t).where(eq(t.id, id)).get();
+      if (!current) return undefined;
+      const rows = await tx.select({ id: t.id }).from(t).where(eq(t.provider, current.provider)).orderBy(asc(t.priority)).limit(MAX_CONNECTIONS);
+      const ids = rows.map((row) => row.id).filter((rowId) => rowId !== id);
+      ids.splice(Math.min(priority - 1, ids.length), 0, id);
+      const now = new Date();
+      for (const [index, rowId] of ids.entries()) await tx.update(t).set({ priority: index + 1, updatedAt: now }).where(eq(t.id, rowId));
+      const row = await tx.select(columns).from(t).where(eq(t.id, id)).get();
+      return row ? toView(row) : undefined;
+    });
   }
 
   async remove(id: string): Promise<boolean> {
@@ -201,13 +221,58 @@ export class ConnectionsRepository {
   // The key and connection data routing uses (SP12): only an active connection counts; its test status does not.
   // Throws SecretUnreadableError when the secret key changed since the key was saved.
   async activeCredential(provider: string): Promise<StoredCredential | undefined> {
-    const row = await this.database.db.select(secret).from(t).where(and(eq(t.provider, provider), eq(t.isActive, true))).get();
+    const row = await this.database.db.select(secret).from(t).where(and(eq(t.provider, provider), eq(t.isActive, true))).orderBy(asc(t.priority)).get();
     return row ? this.open(row) : undefined;
+  }
+
+  // The candidate selection and round-robin bookkeeping share a short SQLite transaction. No secret crosses this boundary.
+  async selectActive(provider: string, model: string, excluded: ReadonlySet<string>, strategy: "fill-first" | "round-robin"): Promise<{ credential?: StoredCredential; retryAt?: Date }> {
+    return this.database.db.transaction(async (tx) => {
+      const now = new Date();
+      await tx.delete(accountLocks).where(lt(accountLocks.until, now));
+      const rows = await tx.select({ ...secret, priority: t.priority, lastUsedAt: t.lastUsedAt, consecutiveUseCount: t.consecutiveUseCount }).from(t)
+        .where(and(eq(t.provider, provider), eq(t.isActive, true))).orderBy(asc(t.priority)).limit(MAX_CONNECTIONS);
+      if (rows.length === 0) return {};
+      const locks = await tx.select({ connectionId: accountLocks.connectionId, model: accountLocks.model, until: accountLocks.until }).from(accountLocks)
+        .where(and(inArray(accountLocks.connectionId, rows.map((row) => row.id)), or(eq(accountLocks.model, model), eq(accountLocks.model, "__all")))).limit(MAX_CONNECTIONS * 2);
+      const blocked = new Map<string, Date>();
+      for (const lock of locks) if (lock.model === model || lock.model === "__all") {
+        const old = blocked.get(lock.connectionId);
+        if (!old || lock.until < old) blocked.set(lock.connectionId, lock.until);
+      }
+      const available = rows.filter((row) => !excluded.has(row.id) && !blocked.has(row.id));
+      if (available.length === 0) return { retryAt: [...blocked.values()].sort((a, b) => a.getTime() - b.getTime())[0] };
+      let chosen = available[0];
+      if (strategy === "round-robin") {
+        const recent = [...available].sort((a, b) => (b.lastUsedAt?.getTime() ?? -1) - (a.lastUsedAt?.getTime() ?? -1) || a.priority - b.priority)[0];
+        chosen = recent.lastUsedAt && recent.consecutiveUseCount < 3
+          ? recent
+          : [...available].sort((a, b) => (a.lastUsedAt?.getTime() ?? -1) - (b.lastUsedAt?.getTime() ?? -1) || a.priority - b.priority)[0];
+        await tx.update(t).set({ lastUsedAt: now, consecutiveUseCount: chosen.id === recent.id && recent.lastUsedAt ? recent.consecutiveUseCount + 1 : 1, updatedAt: now }).where(eq(t.id, chosen.id));
+      }
+      return { credential: this.open(chosen) };
+    });
+  }
+
+  async lock(id: string, model: string, until: Date): Promise<void> {
+    await this.database.db.transaction(async (tx) => {
+      await tx.delete(accountLocks).where(and(eq(accountLocks.connectionId, id), eq(accountLocks.model, model)));
+      await tx.insert(accountLocks).values({ connectionId: id, model, until });
+    });
+  }
+
+  async clearLock(id: string, model: string): Promise<void> {
+    await this.database.db.delete(accountLocks).where(and(eq(accountLocks.connectionId, id), eq(accountLocks.model, model)));
   }
 
   async activeProviders(): Promise<Set<string>> {
     const rows = await this.database.db.select({ provider: t.provider }).from(t).where(eq(t.isActive, true)).limit(MAX_CONNECTIONS);
     return new Set(rows.map((row) => row.provider));
+  }
+
+  async activeCount(provider: string): Promise<number> {
+    const rows = await this.database.db.select({ id: t.id }).from(t).where(and(eq(t.provider, provider), eq(t.isActive, true))).limit(MAX_CONNECTIONS);
+    return rows.length;
   }
 
   // Written only if the key is still the one that was tested; a key replaced mid-test keeps its untested state.
@@ -218,7 +283,7 @@ export class ConnectionsRepository {
   }
 
   private open(row: {
-    id: string; sealed: string; authType: AuthType; refreshSealed: string | null; expiresAt: Date | null; lastRefreshAt: Date | null; oauthData: string | null;
+    id: string; sealed: string; authType: AuthType; refreshSealed: string | null; expiresAt: Date | null; lastRefreshAt: Date | null; oauthData: string | null; proxyPoolId: string | null;
   } & ConnectionData): StoredCredential {
     const { id, sealed, authType, refreshSealed, expiresAt, lastRefreshAt, oauthData, ...rest } = row;
     const refreshToken = refreshSealed ? this.cipher.open(refreshSealed, refreshContext(id)) : undefined;

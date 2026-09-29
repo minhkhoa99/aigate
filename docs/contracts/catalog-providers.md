@@ -13,11 +13,11 @@ Scope, per spec §9 ("SP13 | the 123-provider registry"): the SP4 `CATALOG` beco
 | `protocol` is `openai-compatible` | "Needs the \<protocol\> adapter (SP14)"; for `service`: "Media and search services come with SP22/SP23" |
 | `auth.kinds` includes `api-key` | "Needs OAuth sign-in (SP16)", "Needs a web session", or "Keyless providers come later" |
 | not `hidden` | "Hidden in the 9router catalog" |
-| `chatUrl` is set, has no `{placeholder}`, and ends in `/chat/completions` | "Each connection needs its own endpoint URL", "The endpoint needs per-account data", or "Non-standard endpoint (SP14)" |
+| `chatUrl` is set, has no `{placeholder}`, and ends in `/chat/completions` (or is OpenCode's documented multi-protocol public endpoint) | "Each connection needs its own endpoint URL", "The endpoint needs per-account data", or "Non-standard endpoint (SP14)" |
 | no blocking quirk: `clineEnvelope` | "Needs a provider-specific request envelope (SP14)" |
 | (SP14b) `forceStream` providers are connectable: a non-streaming client gets the collapsed stream (`stream-only-providers.md`) | — |
 
-- **Result:** 41 of the 121 catalog providers are connectable (46 since SP14a added the `anthropic` family, `provider-anthropic.md`; 49 since SP14b added the stream-only providers, `stream-only-providers.md`; 50 since SP14c added perplexity-agent, `provider-openai-responses.md`; 52 since SP14d added ollama and ollama-local, `provider-ollama.md`, and moved the speech-to-text assemblyai and deepgram to the media reason; 53 since SP14e added gemini, `provider-gemini.md`; 55 since SP14f added vertex and vertex-partner, `provider-vertex.md`, and gave qoder/qoder-cn the reason "Not supported: needs Qoder CLI impersonation"; 58 since SP14g added azure, cloudflare-ai, and clinepass, `provider-connection-data.md`; 59 since SP14h added commandcode, `provider-commandcode.md`; 62 since SP16 made cline, gitlab and kilocode connectable by signing in, `oauth.md`: a provider AIGate can sign in to skips the OAuth and hidden reasons, and the list adds `signIn` and `signInOnly`).
+- **Result:** 63 providers are connectable after SP18 adds the keyless OpenCode Free adapter (`provider-opencode-free.md`). Its dashboard card is Public rather than Connected and it is excluded from the Add Connection dialog.
 - **The OpenAI exception.** 9router forces streaming for OpenAI. The OpenAI API answers non-streaming requests, and SP3 tier 1 replays that way, so AIGate does not force it. It is labeled `IMPLEMENTATION_ACCIDENT` for OpenAI.
 - **Ignored fields.** `transport.usage`, `modelsFetcher`, `thinkingFormat`, `reasoningInject`, `regions`, and multi-`transports` do not stop a plain chat call. They stay in `unmodelled` for their SPs, and the default region URL is used.
 

@@ -229,6 +229,34 @@
       "output_tokens": 0,
       "files": 4,
       "mode": "Trae OAuth and SOLO provider family"
+    },
+    {
+      "date": "2026-09-29T02:17:45.420583+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "SP17 multi-account fallback"
+    },
+    {
+      "date": "2026-09-29T03:19:04.240628+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "SP18 Cloudflare and Deno hosted relay deploy"
+    },
+    {
+      "date": "2026-09-29T04:09:27.556962+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "SP18 exact-host DNS bypass and keyless rotation wiring"
+    },
+    {
+      "date": "2026-09-29T06:58:15.464389+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "SP18 OpenCode keyless provider routing"
     }
   ],
   "total_input_tokens": 574916,

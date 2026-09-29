@@ -7,12 +7,20 @@ import type { ModelDescriptor } from "./registry.js";
 export interface ExecCtx {
   readonly signal: AbortSignal;
   readonly requestId: string;
+  // Resolved by the server from an active connection or keyless-provider pool. The engine only carries this opaque transport choice.
+  readonly proxy?: ProxyConfig;
 }
 
-// Outbound HTTP (spec §4.2 HttpTransportPort). SP8 implements the direct branch; relay, proxy, and
-// MITM-bypass DNS are later branches behind the same port (SP18).
+export interface ProxyConfig {
+  readonly url: string;
+  readonly noProxy: readonly string[];
+  readonly relay: boolean;
+  readonly strict: boolean;
+}
+
+// Outbound HTTP (spec §4.2 HttpTransportPort). Relay, proxy, and MITM-bypass DNS are selected behind the same port (SP18).
 export interface HttpRequest {
-  readonly method: "GET" | "POST";
+  readonly method: "GET" | "POST" | "HEAD" | "PUT" | "PATCH" | "DELETE";
   readonly url: string;
   readonly headers: Readonly<Record<string, string>>;
   readonly body?: string | Uint8Array;

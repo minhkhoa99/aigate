@@ -9,6 +9,7 @@ export interface Connection {
   provider: string;
   providerName: string;
   name: string;
+  priority: number;
   keyHint: string;
   // The connection's own host (ollama-local) or endpoint (azure), or null.
   baseUrl: string | null;
@@ -17,6 +18,7 @@ export interface Connection {
   apiVersion: string | null;
   organization: string | null;
   accountId: string | null;
+  proxyPoolId: string | null;
   // SP16 (docs/contracts/oauth.md): a signed-in connection shows its account and token expiry.
   authType: "api-key" | "oauth";
   email: string | null;
@@ -101,9 +103,9 @@ export type ConnectionField = "baseUrl" | "deployment" | "apiVersion" | "organiz
 type FieldValues = Partial<Record<ConnectionField, string>>;
 
 export const useCreateConnection = () =>
-  useConnectionMutation((body: { provider: string; apiKey?: string; name?: string } & FieldValues) => api<Connection>("/api/connections", { method: "POST", body }));
+  useConnectionMutation((body: { provider: string; apiKey?: string; name?: string; priority?: number; proxyPoolId?: string } & FieldValues) => api<Connection>("/api/connections", { method: "POST", body }));
 export const useUpdateConnection = () =>
-  useConnectionMutation(({ id, ...body }: { id: string; name?: string; apiKey?: string; isActive?: boolean } & FieldValues) =>
+  useConnectionMutation(({ id, ...body }: { id: string; name?: string; apiKey?: string; isActive?: boolean; priority?: number; proxyPoolId?: string } & FieldValues) =>
     api<Connection>(path(id), { method: "PATCH", body }));
 export const useDeleteConnection = () => useConnectionMutation((id: string) => apiVoid(path(id), "DELETE"));
 export const useTestConnection = () =>

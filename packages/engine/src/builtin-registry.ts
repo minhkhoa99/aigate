@@ -140,13 +140,15 @@ export function unsupportedReason(provider: CatalogProvider): string | undefined
   if (!isProtocol(protocol)) return PROTOCOL_REASONS[provider.protocol] ?? `Needs the ${provider.protocol} adapter (SP14)`;
   // docs/contracts/oauth.md: a provider AIGate can sign in to is connectable without an API key.
   const signIn = OAUTH_PROVIDERS[provider.id] !== undefined;
-  if (!provider.auth.kinds.includes("api-key") && !signIn) {
+  if (!provider.auth.kinds.includes("api-key") && !signIn && !provider.auth.kinds.includes("none")) {
     if (provider.auth.kinds.includes("oauth")) return "Needs OAuth sign-in (SP16)";
     if (provider.auth.kinds.includes("cookie")) return "Needs a web session (later)";
     return "Keyless providers come later";
   }
   // gitlab is hidden in 9router's dashboard; it is ported by user decision (2026-09-27), so AIGate lists it.
   if (provider.hidden && !signIn) return "Hidden in the 9router catalog";
+  // provider.opencode-free: its public models select Chat, Responses, or Messages at runtime (adapters/opencode.ts).
+  if (provider.id === "opencode") return undefined;
   if (PER_CONNECTION[provider.id]) return undefined;
   if (provider.chatUrl === null) return "Each connection needs its own endpoint URL (later)";
   if (provider.chatUrl.includes("{")) return "The endpoint needs per-account data (later)";
@@ -160,8 +162,11 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
   const protocol: ProviderProtocol = isProtocol(named) ? named : "openai-compatible";
   const paths = PATHS[protocol];
   const headers = { ...Object.fromEntries(Object.entries(provider.headers).map(([name, value]) => [name.toLowerCase(), value])), ...EXTRA_HEADERS[provider.id] };
+  const opencode = provider.id === "opencode";
   // 9router authenticates every API key of the Anthropic family with a raw x-api-key, whatever the entry says.
-  const auth: ProviderDescriptor["auth"] = protocol === "anthropic"
+  const auth: ProviderDescriptor["auth"] = provider.auth.kinds.includes("none") && !provider.auth.kinds.includes("api-key") && !signIn
+    ? { kind: "none" }
+    : protocol === "anthropic"
     ? { kind: "api-key", header: "x-api-key", scheme: "raw" }
     // translator.openai-to-gemini-request: an API key goes in x-goog-api-key (the catalog records the OAuth header).
     : protocol === "gemini" ? { kind: "api-key", header: "x-goog-api-key", scheme: "raw" }
@@ -172,9 +177,9 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
     id: provider.id,
     name: provider.name,
     protocol,
-    chatUrl,
+    chatUrl: opencode ? "https://opencode.ai/zen/v1/chat/completions" : chatUrl,
     // The family layout when the catalog names no models endpoint.
-    modelsUrl: provider.modelsUrl ?? chatUrl.replace(paths.chat, paths.models),
+    modelsUrl: opencode ? "https://opencode.ai/zen/v1/models" : provider.modelsUrl ?? chatUrl.replace(paths.chat, paths.models),
     headers: protocol === "anthropic" ? { "anthropic-version": ANTHROPIC_VERSION, ...headers } : headers,
     aliases: provider.aliases,
     auth,
@@ -184,7 +189,7 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
       // gives a 262144 output. An output limit above the context window is not trusted, so it is unknown.
       maxOutputTokens: m.contextWindow !== null && m.maxOutputTokens !== null && m.maxOutputTokens > m.contextWindow ? null : m.maxOutputTokens,
     })),
-    quirks: [...provider.quirks, ...(EXECUTOR_QUIRKS[provider.id] ?? [])],
+    quirks: [...provider.quirks, ...(opencode ? ["opencodeFree"] : []), ...(EXECUTOR_QUIRKS[provider.id] ?? [])],
     ...(provider.id === "ollama-local" ? OLLAMA_LOCAL : {}),
     ...(provider.forceStream && !STREAM_OPTIONAL.has(provider.id) ? { streamOnly: true } : {}),
     ...PER_CONNECTION[provider.id]?.(provider),

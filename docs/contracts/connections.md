@@ -1,6 +1,6 @@
 # Connections contract (M1 SP11)
 
-Scope, per spec §9: the `connections` context with **one API-key account per provider**, and only providers in the engine registry (today: `openai`). OAuth comes in SP16; multi-account, priority order, and account locks in SP17; quota in SP24.
+Scope, per spec §9: the `connections` context with API-key and OAuth accounts for providers in the engine registry. Multi-account priority, selection and account locks are in `multi-account.md` (SP17); quota comes in SP24.
 
 - **UI:** the `/providers` screens, wired in this SP: `Connections`, `ProviderDetail`, and connected pills in `LlmProviders`.
 - **Decisions (user, 2026-09-25):**

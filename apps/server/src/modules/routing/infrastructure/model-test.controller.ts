@@ -1,12 +1,18 @@
-import { BadRequestException, Body, Controller, Header, HttpCode, HttpStatus, Post } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Header, HttpCode, HttpStatus, Post, Res } from "@nestjs/common";
+import type { FastifyReply } from "fastify";
 import { ChatLane, type ModelProbe } from "./chat-lane.js";
 
-// POST /api/models/test (docs/contracts/custom-models.md). Protected by the global dashboard guard.
-@Controller("api/models/test")
+// Dashboard model choices and POST /api/models/test (docs/contracts/custom-models.md). Protected by the global dashboard guard.
+@Controller("api/models")
 export class ModelTestController {
   constructor(private readonly lane: ChatLane) {}
 
-  @Post()
+  @Get()
+  models(@Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.lane.models(reply);
+  }
+
+  @Post("test")
   @HttpCode(HttpStatus.OK)
   @Header("Cache-Control", "no-store")
   test(@Body() body: unknown): Promise<ModelProbe> {

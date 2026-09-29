@@ -1,0 +1,18 @@
+{
+  "nodes": [
+    {"id":"sp18_mitm_dns_bypass","label":"SP18 exact-host MITM DNS bypass","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"implemented"},
+    {"id":"sp18_keyless_proxy_rotation","label":"SP18 keyless proxy rotation (no runtime provider yet)","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"partial"},
+    {"id":"mitm_dns_bypass_transport","label":"Google DNS pinning for exact MITM hosts","file_type":"code","source_file":"apps/server/src/modules/transport/infrastructure/direct-transport.ts","status":"implemented"},
+    {"id":"provider_proxy_strategy_storage","label":"Persisted provider proxy strategy migration 0017","file_type":"code","source_file":"packages/database/src/schema/proxy-pools.ts","status":"implemented"},
+    {"id":"keyless_proxy_rotation_route","label":"Keyless proxy rotation API and resolver","file_type":"code","source_file":"apps/server/src/modules/transport/infrastructure/proxy-pools.controller.ts","status":"implemented"},
+    {"id":"keyless_proxy_rotation_screen","label":"Keyless proxy strategy panel with empty state","file_type":"code","source_file":"apps/web/src/features/network/screens.tsx","status":"implemented"}
+  ],
+  "edges": [
+    {"source":"sp18_mitm_dns_bypass","target":"mitm_dns_bypass_transport","relation":"implemented_by","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"mitm_dns_bypass_transport","target":"transport_module","relation":"part_of","confidence":"EXTRACTED","confidence_score":1,"source_file":"apps/server/src/modules/transport/infrastructure/direct-transport.ts","weight":1},
+    {"source":"sp18_keyless_proxy_rotation","target":"provider_proxy_strategy_storage","relation":"persists_in","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/proxy-pools.md","weight":1},
+    {"source":"sp18_keyless_proxy_rotation","target":"keyless_proxy_rotation_route","relation":"implemented_by","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"keyless_proxy_rotation_route","target":"keyless_proxy_rotation_screen","relation":"wired_to","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/design/API_UI_MAP.md","weight":1},
+    {"source":"keyless_proxy_rotation_screen","target":"screen_proxy_pools","relation":"extends","confidence":"EXTRACTED","confidence_score":1,"source_file":"apps/web/src/features/network/screens.tsx","weight":1}
+  ]
+}

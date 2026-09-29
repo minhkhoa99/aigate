@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { withTempDb } from "./helpers.mjs";
-import { chunk, completion, errorOf, fakeUpstream, frames, hello, json, listening, openStream, ready, SECRET, sse } from "./lane-helpers.mjs";
+import { body, chunk, completion, errorOf, fakeUpstream, frames, hello, json, listening, openStream, ready, SECRET, sse } from "./lane-helpers.mjs";
 
 const encoder = new TextEncoder();
 
@@ -111,6 +111,37 @@ test("a bare id declared by several providers goes to the one with an active con
     await app.close();
   }));
 
+test("a failed account is skipped for the next account; round-robin keeps one account for three requests", () =>
+  withTempDb(async (file) => {
+    const second = "sk-second-account-key-9876";
+    const upstream = fakeUpstream(json(401, { error: { message: "bad key" } }), json(200, completion), json(200, completion), json(200, completion), json(200, completion), json(200, completion));
+    const { app, dash, chat } = await ready(file, upstream);
+    const added = await dash({ method: "POST", url: "/api/connections", body: { provider: "openai", apiKey: second, name: "Backup" } });
+    assert.deepEqual([added.statusCode, added.json().priority], [201, 2]);
+    assert.equal((await chat(hello)).statusCode, 200);
+    assert.deepEqual(upstream.calls.slice(0, 2).map((call) => call.request.headers.authorization), [`Bearer ${SECRET}`, `Bearer ${second}`]);
+    await dash({ method: "PATCH", url: "/api/settings", body: { fallbackStrategy: "round-robin" } });
+    for (let i = 0; i < 4; i++) assert.equal((await chat({ ...hello, model: "openai/gpt-5.5" })).statusCode, 200);
+    assert.deepEqual(upstream.calls.slice(2).map((call) => call.request.headers.authorization), [`Bearer ${SECRET}`, `Bearer ${SECRET}`, `Bearer ${SECRET}`, `Bearer ${second}`]);
+    await app.close();
+  }));
+
+test("an exhausted combo keeps the earliest upstream Retry-After", () =>
+  withTempDb(async (file) => {
+    const retry = (seconds) => (_request, ctx) => ({
+      status: 429, headers: { "content-type": "application/json", "retry-after": String(seconds) },
+      body: body(JSON.stringify({ error: { message: "rate limit" } }), ctx),
+    });
+    const upstream = fakeUpstream(retry(5), retry(1));
+    const { app, dash, chat } = await ready(file, upstream);
+    const created = await dash({ method: "POST", url: "/api/combos", body: { name: "limited", models: ["openai/gpt-4.1", "openai/gpt-5.5"] } });
+    assert.equal(created.statusCode, 201);
+    const result = await chat({ ...hello, model: "limited" });
+    assert.equal(result.statusCode, 429);
+    assert.equal(result.headers["retry-after"], "1");
+    await app.close();
+  }));
+
 test("every failure before the upstream answers in the OpenAI error shape", () =>
   withTempDb(async (file) => {
     const upstream = fakeUpstream(json(401, { error: { message: "Incorrect API key provided" } }), json(429, { error: { message: "slow down" } }));
@@ -138,8 +169,10 @@ test("/v1/models lists the models of connected providers and needs the key", () 
     const list = (await call({ url: "/v1/models", headers: { authorization: `Bearer ${key}` } })).json();
     assert.equal(list.object, "list");
     assert.ok(list.data.some((m) => m.id === "openai/gpt-4.1" && m.owned_by === "openai"));
+    assert.ok((await dash({ url: "/api/models" })).json().data.some((model) => model.id === "openai/gpt-4.1"));
     await dash({ method: "PATCH", url: `/api/connections/${connection.id}`, body: { isActive: false } });
-    assert.deepEqual((await call({ url: "/v1/models", headers: { authorization: `Bearer ${key}` } })).json().data, []);
+    const models = (await call({ url: "/v1/models", headers: { authorization: `Bearer ${key}` } })).json().data;
+    assert.ok(!models.some((model) => model.owned_by === "openai"));
     await app.close();
   }));
 

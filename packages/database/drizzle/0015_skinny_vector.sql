@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `fallback_strategy` text DEFAULT 'fill-first' NOT NULL;

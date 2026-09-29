@@ -1,0 +1,15 @@
+{
+  "nodes": [
+    {"id":"sp18_keyless_opencode","label":"SP18 OpenCode Free keyless provider routing","file_type":"document","source_file":"docs/contracts/provider-opencode-free.md","status":"implemented"},
+    {"id":"opencode_adapter","label":"OpenCode Chat, Responses and Messages adapter selector","file_type":"code","source_file":"packages/engine/src/adapters/opencode.ts","status":"implemented"},
+    {"id":"opencode_free_fingerprint","label":"Bounded OpenCode public session and fingerprint headers","file_type":"code","source_file":"packages/engine/src/adapters/opencode-free.ts","status":"implemented"},
+    {"id":"opencode_registry_entry","label":"Connectable OpenCode public registry descriptor","file_type":"code","source_file":"packages/engine/src/builtin-registry.ts","status":"implemented"}
+  ],
+  "edges": [
+    {"source":"sp18_keyless_opencode","target":"opencode_adapter","relation":"implemented_by","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/provider-opencode-free.md","weight":1},
+    {"source":"opencode_adapter","target":"opencode_free_fingerprint","relation":"uses","confidence":"EXTRACTED","confidence_score":1,"source_file":"packages/engine/src/adapters/opencode.ts","weight":1},
+    {"source":"opencode_registry_entry","target":"opencode_adapter","relation":"selects","confidence":"EXTRACTED","confidence_score":1,"source_file":"packages/engine/src/adapters/index.ts","weight":1},
+    {"source":"sp18_keyless_opencode","target":"sp18_keyless_proxy_rotation","relation":"activates","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"opencode_adapter","target":"transport_module","relation":"uses","confidence":"EXTRACTED","confidence_score":1,"source_file":"packages/engine/src/adapters/opencode.ts","weight":1}
+  ]
+}

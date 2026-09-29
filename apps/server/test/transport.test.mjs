@@ -48,6 +48,14 @@ test("upstream 4xx and 5xx are returned to the adapter, not thrown", () =>
     assert.equal(response.headers["retry-after"], "3");
   }));
 
+test("a failed proxy falls back only when strict mode is off", () =>
+  withUpstream((req, res) => { res.writeHead(200); res.end("direct"); }, async (base) => {
+    const proxy = { url: "http://127.0.0.1:1", noProxy: [], relay: false, strict: false };
+    const response = await transport.send(request(base), { ...ctx(), proxy });
+    assert.equal(await readBoundedText(response.body), "direct", "non-strict proxy may use direct fallback");
+    await assert.rejects(transport.send(request(base), { ...ctx(), proxy: { ...proxy, strict: true } }), isCode("PROVIDER_UNAVAILABLE"));
+  }));
+
 test("only https, or http to this machine, is allowed", async () => {
   await assert.rejects(transport.send(request("http://api.example.com/v1"), ctx()), isCode("INVALID_REQUEST"));
   await assert.rejects(transport.send(request("ftp://example.com"), ctx()), isCode("INVALID_REQUEST"));

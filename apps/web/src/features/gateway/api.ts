@@ -52,19 +52,67 @@ export const useChatReadiness = () => useQuery({
   },
 });
 
-interface RequireApiKey {
+// The settings this feature reads (docs/contracts/settings.md); the query holds the whole settings object.
+interface GatewaySettings {
   requireApiKey: boolean;
+  comboStickyLimit: number;
 }
+const readSettings = () => api<GatewaySettings>("/api/settings");
 
 export const useRequireApiKey = () =>
-  useQuery({ queryKey: settingsKey, queryFn: () => api<RequireApiKey>("/api/settings"), select: (settings) => settings.requireApiKey });
+  useQuery({ queryKey: settingsKey, queryFn: readSettings, select: (settings) => settings.requireApiKey });
+export const useComboStickyLimit = () =>
+  useQuery({ queryKey: settingsKey, queryFn: readSettings, select: (settings) => settings.comboStickyLimit });
 
-export function useSetRequireApiKey() {
+function useSettingsPatch<V>(body: (value: V) => Partial<GatewaySettings>) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (requireApiKey: boolean) => api<RequireApiKey>("/api/settings", { method: "PATCH", body: { requireApiKey } }),
+    mutationFn: (value: V) => api<GatewaySettings>("/api/settings", { method: "PATCH", body: body(value) }),
     onSuccess: (settings) => client.setQueryData(settingsKey, settings),
-    // A failed toggle re-reads the server so the checkbox never shows a value that was not saved.
+    // A failed change re-reads the server so the control never shows a value that was not saved.
     onError: () => client.invalidateQueries({ queryKey: settingsKey }),
   });
 }
+export const useSetRequireApiKey = () => useSettingsPatch((requireApiKey: boolean) => ({ requireApiKey }));
+export const useSetComboStickyLimit = () => useSettingsPatch((comboStickyLimit: number) => ({ comboStickyLimit }));
+
+// The dashboard's authenticated equivalent of GET /v1/models: only models the gateway can currently route to.
+export const useConnectedModels = () => useQuery({
+  queryKey: ["connected-models"],
+  queryFn: () => api<{ data: { id: string }[] }>("/api/models").then((result) => result.data),
+});
+
+// docs/contracts/combos.md
+export type ComboStrategy = "fallback" | "round-robin" | "fusion";
+export interface ComboFields {
+  name: string;
+  models: string[];
+  strategy: ComboStrategy;
+  judgeModel: string | null;
+  minPanel: number;
+  stragglerGraceMs: number;
+  panelTimeoutMs: number;
+}
+export interface Combo extends ComboFields {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const combosKey = ["combos"] as const;
+const comboPath = (id: string) => `/api/combos/${encodeURIComponent(id)}`;
+export const useCombos = () => useQuery({ queryKey: combosKey, queryFn: () => api<{ combos: Combo[] }>("/api/combos").then((r) => r.combos) });
+
+function useComboMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
+  const client = useQueryClient();
+  // Settled, not just success: a 404 or a name taken in another tab must refresh the list too.
+  return useMutation({ mutationFn, onSettled: () => client.invalidateQueries({ queryKey: combosKey }) });
+}
+export const useCreateCombo = () => useComboMutation((fields: ComboFields) => api<{ combo: Combo }>("/api/combos", { method: "POST", body: fields }).then((r) => r.combo));
+export const useUpdateCombo = () =>
+  useComboMutation(({ id, ...fields }: ComboFields & { id: string }) => api<{ combo: Combo }>(comboPath(id), { method: "PATCH", body: fields }).then((r) => r.combo));
+export const useDeleteCombo = () => useComboMutation((id: string) => apiVoid(comboPath(id), "DELETE"));
+
+// POST /api/models/test (docs/contracts/custom-models.md): the server bounds the probe at 15 s.
+export interface ModelProbe { ok: boolean; latencyMs: number; status: number; error: string | null; note?: string }
+export const testModel = (model: string) => api<ModelProbe>("/api/models/test", { method: "POST", body: { model }, timeoutMs: 20_000 });

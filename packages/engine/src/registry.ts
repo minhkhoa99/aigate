@@ -41,7 +41,7 @@ export interface ProviderDescriptor {
   readonly aliases: readonly string[];
   // optional: the connection may have no key, and then no auth header is sent (connection.ollama-local-host).
   // googleCloud: the key may also be a service-account or authorized_user JSON (provider.vertex-google-auth).
-  readonly auth: { readonly kind: "api-key"; readonly header: string; readonly scheme: "bearer" | "raw"; readonly optional?: boolean; readonly googleCloud?: boolean };
+  readonly auth: { readonly kind: "none" } | { readonly kind: "api-key"; readonly header: string; readonly scheme: "bearer" | "raw"; readonly optional?: boolean; readonly googleCloud?: boolean };
   // The connection may carry its own base URL (ollama-local's host); these paths are appended to it.
   readonly connectionBaseUrl?: { readonly chatPath: string; readonly modelsPath: string };
   // Data each connection supplies (connection.azure-openai-deployment, connection.cloudflare-account-id): chatUrl and

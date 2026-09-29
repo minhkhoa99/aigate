@@ -6,6 +6,7 @@ import type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpRequest
 import { MODEL_ID, type ProviderDescriptor } from "../registry.js";
 import { readSseData } from "../sse.js";
 import { classifyStatus, count, HttpProviderAdapter, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
+import { applyOpenCodeFingerprint } from "./opencode-free.js";
 
 // AIProviderPort for the openai-compatible family (docs/contracts/provider-openai.md).
 
@@ -243,6 +244,7 @@ function toBody(request: CanonicalRequest, stream: boolean, quirks: readonly str
   if (request.stop !== undefined) body.stop = request.stop;
   if (request.reasoning?.effort !== undefined) body.reasoning_effort = request.reasoning.effort;
   applyQuirks(body, quirks);
+  if (quirks.includes("opencodeFree")) applyOpenCodeFingerprint(body, false);
   return body;
 }
 

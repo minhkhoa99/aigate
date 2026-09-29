@@ -12,6 +12,7 @@ import {
 } from "./api";
 import { describeTest, needsAttention, statusPill } from "./test-result";
 import { SignIn } from "./sign-in";
+import { useProxyPools } from "../network/api";
 
 const formText = (form: HTMLFormElement, name: string) => {
   const value = new FormData(form).get(name);
@@ -51,7 +52,7 @@ export function LlmProviders() {
         if (!members.length) return null;
         const visible = group.id === "apikey" && !query && !showAllKeys ? members.slice(0, 20) : members;
         return <section className="catalog-section" key={group.id} aria-labelledby={`${group.id}-heading`}><div className="catalog-section-head"><div><h2 id={`${group.id}-heading`}>{group.title} <span className="muted mono">{members.length}</span></h2><p>{group.detail}</p></div></div>
-          <div className="catalog-grid">{visible.map((p) => <a className="catalog-card" href={`/providers/detail?provider=${encodeURIComponent(p.id)}`} key={p.id} title={p.reason ?? undefined}><span className="catalog-glyph" aria-hidden="true">{p.name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{p.name}</strong><small>{p.modelCount} model{p.modelCount === 1 ? "" : "s"}</small>{connected.has(p.id) ? <Pill tone="healthy">Connected</Pill> : !p.connectable && <Pill>{COMING_LATER}</Pill>}</span></a>)}</div>
+          <div className="catalog-grid">{visible.map((p) => <a className="catalog-card" href={`/providers/detail?provider=${encodeURIComponent(p.id)}`} key={p.id} title={p.reason ?? undefined}><span className="catalog-glyph" aria-hidden="true">{p.name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{p.name}</strong><small>{p.modelCount} model{p.modelCount === 1 ? "" : "s"}</small>{!p.connectable ? <Pill>{COMING_LATER}</Pill> : p.authKinds.includes("none") ? <Pill tone="info">Public</Pill> : connected.has(p.id) && <Pill tone="healthy">Connected</Pill>}</span></a>)}</div>
           {group.id === "apikey" && !query && members.length > 20 && <button className="catalog-more" type="button" onClick={() => setShowAllKeys(!showAllKeys)}>{showAllKeys ? "Show fewer" : `Show all ${members.length} providers`}</button>}
         </section>;
       })}
@@ -66,6 +67,7 @@ function ProviderConnection({ provider }: { provider: ProviderDetailView }) {
   if (connections.isPending) return <StateBlock state="loading" />;
   if (connections.isError) return <StateBlock state="error" code={toProblem(connections.error).code} action={<Button onClick={() => void connections.refetch()}>Retry</Button>} />;
   const connection = connections.data.find((c) => c.provider === provider.id);
+  if (provider.authKinds.includes("none")) return <div className="state-block"><strong>Public access</strong><p>No provider account or API key is stored. Requests use the configured keyless-provider proxy strategy.</p><Link className="button button-secondary" to="/network/proxy-pools">Configure proxy pools</Link></div>;
   if (!connection) {
     const how = provider.signInOnly ? "Sign in" : provider.signIn ? "Sign in or add an API key" : "Add an API key";
     return <div className="state-block"><strong>Not connected</strong><p>{how} to route requests to this provider.</p><a className="button button-primary" href={`/providers/connections?provider=${encodeURIComponent(provider.id)}`}>Add connection</a></div>;
@@ -165,12 +167,13 @@ function ConnectionFields({ provider, connection, keyLabel = "API key" }: { prov
   return <>{fields}{key}</>;
 }
 
-function AddConnection({ requested, connected, onClose, onCreated, onSignedIn }: {
-  requested: string | null; connected: ReadonlySet<string>; onClose: () => void; onCreated: (connection: Connection) => void; onSignedIn: () => void;
+function AddConnection({ requested, onClose, onCreated, onSignedIn }: {
+  requested: string | null; onClose: () => void; onCreated: (connection: Connection) => void; onSignedIn: () => void;
 }) {
   const catalog = useProviders();
   const nodes = useProviderNodes();
   const create = useCreateConnection();
+  const pools = useProxyPools();
   const [chosen, setChosen] = useState("");
   const showToast = useToast();
   if (catalog.isPending || nodes.isPending) return <Modal title="Add connection" onClose={onClose}><StateBlock state="loading" /></Modal>;
@@ -178,8 +181,8 @@ function AddConnection({ requested, connected, onClose, onCreated, onSignedIn }:
     return <Modal title="Add connection" onClose={onClose}><StateBlock state="error" code={toProblem(catalog.error ?? nodes.error).code} action={<Button onClick={() => { void catalog.refetch(); void nodes.refetch(); }}>Retry</Button>} /></Modal>;
   }
   // Built-in providers that can be connected, then custom providers (docs/contracts/custom-providers.md).
-  const builtins = catalog.data.filter((p) => p.connectable && !connected.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
-  const available = [...builtins, ...nodes.data.filter((n) => !connected.has(n.id)).map((n) => ({ id: n.id, name: `${n.name} (custom)` }))];
+  const builtins = catalog.data.filter((p) => p.connectable && !p.authKinds.includes("none")).sort((a, b) => a.name.localeCompare(b.name));
+  const available = [...builtins, ...nodes.data.map((n) => ({ id: n.id, name: `${n.name} (custom)` }))];
   const asked = requested ? catalog.data.find((p) => p.id === requested) : undefined;
   const custom = requested ? nodes.data.some((n) => n.id === requested) : false;
   const blocked = !requested || custom ? null : !asked ? `${requested} is not in the provider catalog or a custom provider.` : asked.connectable ? null : `${asked.name} cannot be connected yet: ${asked.reason}.`;
@@ -187,7 +190,8 @@ function AddConnection({ requested, connected, onClose, onCreated, onSignedIn }:
     event.preventDefault();
     const form = event.currentTarget;
     const [name, apiKey, chosenProvider] = [formText(form, "name"), formText(form, "apiKey"), formText(form, "provider")];
-    const body = { provider: chosenProvider, ...(apiKey ? { apiKey } : {}), ...(name ? { name } : {}), ...fieldValues(form, chosenProvider, false) };
+    const proxyPoolId = formText(form, "proxyPoolId");
+    const body = { provider: chosenProvider, ...(apiKey ? { apiKey } : {}), ...(name ? { name } : {}), ...(proxyPoolId ? { proxyPoolId } : {}), ...fieldValues(form, chosenProvider, false) };
     create.mutate(body, { onSuccess: onCreated, onError: (error) => showToast({ tone: "error", ...toProblem(error) }) });
   };
   const provider = available.some((p) => p.id === chosen) ? chosen : available.some((p) => p.id === requested) ? requested ?? "" : available[0]?.id ?? "";
@@ -196,13 +200,14 @@ function AddConnection({ requested, connected, onClose, onCreated, onSignedIn }:
   const picker = <Field label="Provider" hint={`${available.length} providers can be connected.`}><select className="input" name="provider" value={provider} onChange={(event) => setChosen(event.target.value)}>{available.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>;
   return <Modal title="Add connection" onClose={onClose}>
     {blocked && <Warning>{blocked}</Warning>}
-    {available.length === 0 ? <><p>Every connectable provider is already connected. Use Replace key on its row to change a key.</p><div className="modal-actions"><Button onClick={onClose}>Close</Button></div></>
+    {available.length === 0 ? <><p>No provider can be connected yet.</p><div className="modal-actions"><Button onClick={onClose}>Close</Button></div></>
       : <>
         {summary?.signIn && <div className="stack">{picker}<p>Sign in with your {summary.name} account. The tokens are encrypted before they are saved.</p><SignIn key={summary.id} provider={summary} onDone={onSignedIn} /></div>}
         {!summary?.signInOnly && <form onSubmit={submit}>{summary?.signIn ? <p className="section-gap">Or connect with an API key instead.</p> : <p>The key is encrypted before it is saved and is never shown again. AIGate tests it right after saving.</p>}
         <div className="stack">
           {summary?.signIn ? <input type="hidden" name="provider" value={provider} /> : picker}
           <Field label="Name" hint="Optional. Defaults to the provider name."><Input name="name" maxLength={64} placeholder="e.g. Work account" /></Field>
+          <Field label="Proxy pool" hint="Optional. Use the Network page to add or test pools."><select className="input" name="proxyPoolId" defaultValue=""><option value="">Direct / environment proxy</option>{(pools.data ?? []).filter((pool) => pool.isActive).map((pool) => <option key={pool.id} value={pool.id}>{pool.name} ({pool.type})</option>)}</select></Field>
           <ConnectionFields key={provider} provider={provider} />
         </div>
         <div className="modal-actions"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" disabled={create.isPending}>{create.isPending ? "Saving…" : "Save and test"}</Button></div></form>}
@@ -245,17 +250,17 @@ export function Connections() {
   const fail = (error: unknown) => showToast({ tone: "error", ...toProblem(error) });
   const runTest = (id: string) => testConnection.mutate(id, { onSuccess: (view) => showToast(describeTest(view)), onError: fail });
   const testing = (id: string) => testConnection.isPending && testConnection.variables === id;
-  const connected = new Set(connections.data?.map((c) => c.provider));
   const rows = (connections.data ?? []).filter((c) => tab === "All connections" || needsAttention(c));
 
   return <><PageHeading eyebrow="Providers / Connections" title="Connections" description="Provider accounts, their keys, and whether the last test passed." action={<Button variant="primary" onClick={() => setAdding(true)}>+ Add connection</Button>} />
     <div className="section-gap"><Tabs items={["All connections", "Needs attention"]} active={tab} onChange={setTab} /></div>
-    <Panel title={tab === "Needs attention" ? "Connections requiring action" : "Connected accounts"} detail="One account per provider in this version." className="section-gap panel-flush">
+    <Panel title={tab === "Needs attention" ? "Connections requiring action" : "Connected accounts"} detail="Accounts are tried by priority; add another account for fallback." className="section-gap panel-flush">
       {connections.isPending ? <StateBlock state="loading" />
         : connections.isError ? <StateBlock state="error" code={toProblem(connections.error).code} action={<Button onClick={() => void connections.refetch()}>Retry</Button>} />
         : <Table empty={tab === "Needs attention" ? "Every connection is enabled and its last test passed." : "No connections yet. Add one to route requests to a provider."}
           columns={["Account", "Key", "Status", "Last tested", "Actions"]} rows={rows.map((c) => {
             const pill = statusPill(c);
+            const sameProvider = (connections.data ?? []).filter((other) => other.provider === c.provider);
             return [
               <div><strong>{c.name}</strong>{c.name !== c.providerName && <small className="muted"> · {c.providerName}</small>}{c.baseUrl && <small className="muted"> · {c.baseUrl}</small>}{c.deployment && <small className="muted"> · {c.deployment}</small>}{c.accountId && <small className="muted"> · account {c.accountId}</small>}</div>,
               c.authType === "oauth"
@@ -264,6 +269,8 @@ export function Connections() {
               <div><Pill tone={pill.tone}>{pill.label}</Pill>{c.isActive && c.testStatus !== "active" && c.lastError && <small className="muted"> {c.lastError}</small>}</div>,
               c.lastTestedAt ? new Date(c.lastTestedAt).toLocaleString() : "Never",
               <><Button variant="ghost" disabled={testConnection.isPending} onClick={() => runTest(c.id)}>{testing(c.id) ? "Testing…" : "Test"}</Button>
+                <Button variant="ghost" disabled={update.isPending || c.priority === 1} onClick={() => update.mutate({ id: c.id, priority: c.priority - 1 }, { onError: fail })}>Priority ↑</Button>
+                <Button variant="ghost" disabled={update.isPending || c.priority === sameProvider.length} onClick={() => update.mutate({ id: c.id, priority: c.priority + 1 }, { onError: fail })}>Priority ↓</Button>
                 {c.authType === "oauth"
                   ? <Button variant="ghost" onClick={() => setSigningIn(c)}>Sign in again</Button>
                   : <Button variant="ghost" onClick={() => setReplacing(c)}>{fieldsOf(c.provider).length > 0 ? "Edit" : "Replace key"}</Button>}
@@ -272,10 +279,10 @@ export function Connections() {
             ];
           })} />}
     </Panel>
-    {adding && <AddConnection requested={requested} connected={connected} onClose={() => setAdding(false)} onCreated={(view) => { setAdding(false); runTest(view.id); }} onSignedIn={() => setAdding(false)} />}
+    {adding && <AddConnection requested={requested} onClose={() => setAdding(false)} onCreated={(view) => { setAdding(false); runTest(view.id); }} onSignedIn={() => setAdding(false)} />}
     {signingIn && <Modal title={`Sign in again · ${signingIn.name}`} onClose={() => setSigningIn(null)}>
       {(() => { const summary = catalog.data?.find((p) => p.id === signingIn.provider); return summary?.signIn ? <SignIn provider={summary} onDone={() => setSigningIn(null)} /> : <StateBlock state="loading" />; })()}
-      <p className="muted">Signing in with the same account replaces its tokens. Another account needs this connection deleted first.</p>
+      <p className="muted">Signing in with the same account replaces its tokens. A different account is added separately from Add connection.</p>
     </Modal>}
     {replacing && <ReplaceKey connection={replacing} onClose={() => setReplacing(null)} onSaved={(view) => { setReplacing(null); runTest(view.id); }} />}
     {removing && <ConfirmDialog name={removing.name} onClose={() => setRemoving(null)} onConfirm={() => remove.mutate(removing.id, {

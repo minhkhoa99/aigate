@@ -44,7 +44,7 @@
     - { file: src/sse/services/auth.js, line: 40, note: "await currentMutex — every call queues behind the previous one, whatever provider it was for" }
     - { file: src/sse/services/auth.js, line: 224, note: "finally { resolveMutex() } — mutex held for the full function body, including the round-robin DB write" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [IMPLEMENTATION_ACCIDENT]
 
 - id: account.select-noauth-virtual-connection
@@ -79,7 +79,7 @@
     - { file: src/sse/services/auth.js, line: 57, note: "returned object: id: \"noauth\", accessToken: \"public\" — no real credential fields" }
     - { file: src/lib/network/connectionProxy.js, line: 18, note: "pickProxyPoolId — round-robin/random/none strategies over the pool id list" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: account.select-fill-first-default
@@ -112,7 +112,7 @@
     - { file: src/sse/services/auth.js, line: 190, note: "else branch: connection = availableConnections[0] — the fill-first path" }
     - { file: src/lib/db/repos/connectionsRepo.js, line: 79, note: "list.sort by ascending priority — the ordering fill-first depends on" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: account.select-round-robin-sticky
@@ -150,7 +150,7 @@
     - { file: src/sse/services/auth.js, line: 175, note: "sortedByOldest — ascending lastUsedAt, priority tiebreak only for two unused connections" }
     - { file: src/sse/services/auth.js, line: 185, note: "updateProviderConnection — consecutiveUseCount reset to 1 for the rotated-to connection" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: account.select-preferred-pin
@@ -216,7 +216,7 @@
     - { file: src/sse/services/auth.js, line: 85, note: "availableConnections filter — excludeSet.has, isModelLockActive, Antigravity quota cache check" }
     - { file: open-sse/services/accountFallback.js, line: 119, note: "isModelLockActive — checks modelLock_${model} then modelLock___all fallback" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: account.select-all-unavailable-response
@@ -253,7 +253,7 @@
     - { file: src/sse/services/auth.js, line: 124, note: "allRateLimited response shape" }
     - { file: src/sse/handlers/chat.js, line: 244, note: "call site distinguishes 'never configured' vs 'exhausted' via excludeConnectionIds.size, not the return shape" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: account.mark-unavailable-lock-reasons
@@ -347,7 +347,7 @@
     - { file: src/lib/db/paths.js, line: 6, note: "DATA_FILE = DATA_DIR/db/data.sqlite — the on-disk file backing every adapter" }
     - { file: src/lib/db/adapters/sqljsAdapter.js, line: 26, note: "fs.writeFileSync(filePath, ...) — even the pure-JS in-memory adapter persists to the same disk file" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: account.clear-error-on-success
@@ -384,7 +384,7 @@
     - { file: src/sse/services/auth.js, line: 326, note: "conditional reset of testStatus/lastError/errorCode/lastErrorAt/backoffLevel only when remainingActiveLocks is empty" }
     - { file: src/sse/handlers/chat.js, line: 304, note: "onRequestSuccess callback — clearAccountError(credentials.connectionId, credentials, model) on success" }
   newModule: connections
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: account.antigravity-quota-prefilter

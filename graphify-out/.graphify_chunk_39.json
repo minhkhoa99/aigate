@@ -1,0 +1,16 @@
+{
+  "nodes": [
+    {"id":"sp18_hosted_relay_deploy","label":"SP18 hosted relay deploy (Vercel, Cloudflare, Deno)","file_type":"document","source_file":"docs/PROGRESS_HANDOFF.md","status":"implemented"},
+    {"id":"hosted_relay_contract","label":"Hosted relay deploy API contract","file_type":"document","source_file":"docs/contracts/proxy-pools.md","status":"implemented"},
+    {"id":"relay_deploy_service","label":"Provider deployment, bounded polling, and cleanup","file_type":"code","source_file":"apps/server/src/modules/transport/infrastructure/relay-deploy.service.ts","status":"implemented"},
+    {"id":"proxy_pool_deploy_routes","label":"Authenticated Vercel, Cloudflare, and Deno deploy endpoints","file_type":"code","source_file":"apps/server/src/modules/transport/infrastructure/proxy-pools.controller.ts","status":"implemented"},
+    {"id":"proxy_pool_deploy_wizard","label":"Platform-specific hosted relay deploy wizard","file_type":"code","source_file":"apps/web/src/features/network/screens.tsx","status":"implemented"}
+  ],
+  "edges": [
+    {"source":"sp18_hosted_relay_deploy","target":"hosted_relay_contract","relation":"documents","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/PROGRESS_HANDOFF.md","weight":1},
+    {"source":"hosted_relay_contract","target":"relay_deploy_service","relation":"implemented_by","confidence":"EXTRACTED","confidence_score":1,"source_file":"docs/contracts/proxy-pools.md","weight":1},
+    {"source":"proxy_pool_deploy_routes","target":"relay_deploy_service","relation":"uses","confidence":"EXTRACTED","confidence_score":1,"source_file":"apps/server/src/modules/transport/infrastructure/proxy-pools.controller.ts","weight":1},
+    {"source":"proxy_pool_deploy_wizard","target":"proxy_pool_deploy_routes","relation":"calls","confidence":"EXTRACTED","confidence_score":1,"source_file":"apps/web/src/features/network/api.ts","weight":1},
+    {"source":"proxy_pool_deploy_wizard","target":"screen_proxy_pools","relation":"extends","confidence":"EXTRACTED","confidence_score":1,"source_file":"apps/web/src/features/network/screens.tsx","weight":1}
+  ]
+}

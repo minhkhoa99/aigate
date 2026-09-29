@@ -22,7 +22,7 @@ Where the code lives:
 | `settings.hot-path-read-no-cache` | Settings are read from the database on every chat request. | `IMPLEMENTATION_ACCIDENT` | `SettingsRepository.get()` is cached and written through (SP5). |
 | `routing.lane-entry-routes` | Chat routes answer `OPTIONS` with `Access-Control-Allow-Origin: *`. | `SUSPECTED_BUG` (for a local gateway) | No CORS on `/v1`. Every call needs `Content-Type: application/json`, so a cross-site page cannot send a request without a preflight, and the preflight fails. SDKs and IDEs are not browsers and are unaffected. |
 | `routing.request-preflight` | Parse JSON, strip `[1m]`, check the key, then check the model. | `REFERENCE_BEHAVIOR` | Order: key (before the body is read), then JSON, then `parseOpenAIChatRequest`, then model resolution, then capability check. The Claude Code `[1m]` marker belongs to the Anthropic lane (SP15). |
-| `routing.model-resolution` | `x/y` resolves `x` as a provider alias; a bare name is looked up as a combo, then an alias. An unknown provider fails later with "No active credentials". | `REFERENCE_BEHAVIOR` | See "Model resolution" below. There are no combos until SP19. An unknown model is 404 `model_not_found` at once, and the message names both accepted forms. Status: `contracted`, because aliases come with SP13 and combos with SP19. |
+| `routing.model-resolution` | `x/y` resolves `x` as a provider alias; a bare name is looked up as a combo, then an alias. An unknown provider fails later with "No active credentials". | `REFERENCE_BEHAVIOR` | See "Model resolution" below. A bare name that names a combo is dispatched as that combo (SP19, `combos.md`). An unknown model is 404 `model_not_found` at once, and the message names both accepted forms. Status: `implemented`. |
 | `routing.stream-mode-decision` | An omitted `stream` means streaming. | `SUSPECTED_BUG` | Implemented in SP10: omitted means JSON. |
 | `routing.client-disconnect-propagation` | A disconnect is not propagated before the stream starts. Retries, token refreshes, and other accounts keep running after the client has left. | `SUSPECTED_BUG` | The response `close` event aborts one `AbortController`, which is part of the single `ExecCtx.signal`. It stops the transport, the retry wait, and the body read at any stage. Status: `implemented`. |
 | `routing.streaming-pipeline` | Stall watchdog: 360 s of upstream silence ends the stream. Non-JSON `data:` lines are dropped. `[DONE]` is appended. | `REFERENCE_BEHAVIOR` | The idle timeout between chunks is `AIGATE_STREAM_IDLE_TIMEOUT_MS`, 300 000 by default and allowed from 1 000 to 600 000. On expiry, the upstream is aborted with `TIMEOUT` and the client gets an error event. A non-JSON event fails the stream visibly (SP9). `[DONE]` is sent only on success. Status: `implemented`. |
@@ -48,6 +48,8 @@ Every response carries `x-request-id`. One `ExecCtx.signal` combines three sourc
 - for streams, the idle watchdog
 
 ## Model resolution
+
+SP19 rule (`combos.md`): 0. A string without `/` that is a combo's name is that combo; each member is then resolved by the rules below (or as a nested combo).
 
 SP13 rules (`catalog-providers.md`):
 

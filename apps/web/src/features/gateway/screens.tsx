@@ -4,7 +4,10 @@ import { type FormEvent } from "react";
 import { Button, ConfirmDialog, CopyField, Dot, Field, Input, Metric, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
-import { useApiKeys, useChatReadiness, useCreateKey, useDeleteKey, useRequireApiKey, useSetKeyActive, useSetRequireApiKey, type ApiKey, type ChatReadiness, type CreatedApiKey } from "./api";
+import {
+  useApiKeys, useChatReadiness, useComboStickyLimit, useCombos, useCreateKey, useDeleteCombo, useDeleteKey, useRequireApiKey, useSetComboStickyLimit, useSetKeyActive,
+  useSetRequireApiKey, type ApiKey, type ChatReadiness, type Combo, type ComboStrategy, type CreatedApiKey,
+} from "./api";
 
 const READINESS: Record<ChatReadiness, { tone: "healthy" | "warning"; label: string; hint?: string }> = {
   ready: { tone: "healthy", label: "Ready" },
@@ -86,12 +89,66 @@ export function EndpointKeys() {
   </>;
 }
 
+const STRATEGY_LABEL: Record<ComboStrategy, string> = { fallback: "Fallback", "round-robin": "Round robin", fusion: "Fusion" };
+
+// docs/contracts/combos.md: the saved combos and the round-robin rotation setting.
+function CombosTab() {
+  const combos = useCombos();
+  const deleteCombo = useDeleteCombo();
+  const stickyLimit = useComboStickyLimit();
+  const setStickyLimit = useSetComboStickyLimit();
+  const [removing, setRemoving] = useState<Combo | null>(null);
+  const showToast = useToast();
+  const fail = (error: unknown) => showToast({ tone: "error", ...toProblem(error) });
+  const copyName = (name: string) => navigator.clipboard.writeText(name).then(
+    () => showToast({ tone: "success", message: `Copied ${name}.` }),
+    () => showToast({ tone: "error", message: "The browser did not allow copying. Select the name and copy it." }),
+  );
+  const saveStickyLimit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const value = Number(new FormData(event.currentTarget).get("stickyLimit"));
+    setStickyLimit.mutate(value, {
+      onSuccess: () => showToast({ tone: "success", message: `Round-robin combos now move to the next member after ${value} request${value === 1 ? "" : "s"}.` }),
+      onError: fail,
+    });
+  };
+
+  return <div className="stack section-gap">
+    <Panel title="Combos" detail="Clients send a combo's name as the model; GET /v1/models lists combos first." className="panel-flush" action={<Link to="/gateway/routing/new" className="button button-primary">+ Create combo</Link>}>
+      {combos.isPending ? <StateBlock state="loading" />
+        : combos.isError ? <StateBlock state="error" code={toProblem(combos.error).code} action={<Button onClick={() => void combos.refetch()}>Retry</Button>} />
+        : combos.data.length === 0 ? <div className="state-block"><strong>No combos yet</strong><p>Group models under one name, then choose fallback, round robin, or fusion.</p><Link to="/gateway/routing/new" className="button button-primary">Create combo</Link></div>
+        : <Table columns={["Name", "Strategy", "Members", "Actions"]} rows={combos.data.map((combo) => [
+          <code>{combo.name}</code>,
+          <Pill tone={combo.strategy === "fusion" ? "info" : "muted"}>{STRATEGY_LABEL[combo.strategy]}</Pill>,
+          <span className="mono">{combo.models.slice(0, 3).join(combo.strategy === "fusion" ? " + " : " → ")}{combo.models.length > 3 ? ` +${combo.models.length - 3} more` : ""}{combo.strategy === "fusion" ? ` · judge ${combo.judgeModel ?? combo.models[0]}` : ""}</span>,
+          <><Button variant="ghost" onClick={() => void copyName(combo.name)}>Copy name</Button>
+            <a className="button button-ghost" href={`/gateway/routing/new?combo=${encodeURIComponent(combo.id)}`}>Edit</a>
+            <Button variant="ghost" onClick={() => setRemoving(combo)}>Delete</Button></>,
+        ])} />}
+    </Panel>
+    <Panel title="Round-robin rotation" detail="Applies to every round-robin combo. The other members stay in the fallback chain.">
+      <form className="list-row" onSubmit={saveStickyLimit}>
+        <div><strong>Requests per member before rotating</strong><small>1 moves to the next member on every request; up to 1000.</small></div>
+        {stickyLimit.data === undefined ? <Pill>{stickyLimit.isError ? "Unavailable" : "Loading…"}</Pill>
+          : <><input key={stickyLimit.data} className="input" style={{ maxWidth: 96 }} name="stickyLimit" type="number" min={1} max={1000} step={1} required defaultValue={stickyLimit.data} aria-label="Requests per member before rotating" />
+            <Button type="submit" disabled={setStickyLimit.isPending}>{setStickyLimit.isPending ? "Saving…" : "Save"}</Button></>}
+      </form>
+    </Panel>
+    {removing && <ConfirmDialog name={removing.name} detail="Clients that send this name as the model will no longer reach its members." onClose={() => setRemoving(null)} onConfirm={() => deleteCombo.mutate(removing.id, {
+      onSuccess: () => { setRemoving(null); showToast({ tone: "success", message: `Deleted ${removing.name}.` }); },
+      onError: (error) => { setRemoving(null); fail(error); },
+    })} />}
+  </div>;
+}
+
 export function Routing() {
   const [tab, setTab] = useState("Combo");
   return <>
     <PageHeading eyebrow="Gateway / Routing" title="Routing & fallback" description="Decide where traffic goes, when to retry, and how to recover from failure." action={<Link to="/gateway/routing/new" className="button button-primary">+ Create combo</Link>} />
     <Tabs items={["Combo", "Overview", "Fallback", "Capacity adapter", "Simulator"]} active={tab} onChange={setTab} />
-    {tab === "Combo" && <Panel title="Combos" detail="Saved model combinations will appear here after gateway integration." className="section-gap"><div className="state-block"><strong>No combos yet</strong><p>Start with a model order and routing strategy.</p><Link to="/gateway/routing/new" className="button button-primary">Create combo</Link></div></Panel>}
+    {tab === "Combo" && <CombosTab />}
+    {tab !== "Combo" && <div className="section-gap"><Warning>Preview with sample data: this tab is not connected to the gateway yet (capacity adapter and simulator: SP20). Account fallback runs as described; choose its strategy in Settings → Auth & Access.</Warning></div>}
     {tab === "Overview" && <div className="grid grid-2 section-gap"><Panel title="Active routes" detail="Current model resolution order">
       {["claude-3.5-sonnet → Anthropic primary", "gpt-4o → OpenAI primary", "gemini-2.5-pro → Google Vertex", "deepseek-r1 → DeepSeek pooled"].map((r, i) => <div className="list-row" key={r}><Dot tone={i === 3 ? "warning" : "healthy"} /><div><strong className="mono">{r}</strong><small>{i === 3 ? "Fallback available" : "Direct · healthy"}</small></div><Pill tone={i === 3 ? "warning" : "healthy"}>{i === 3 ? "Guarded" : "Active"}</Pill></div>)}
     </Panel><Panel title="Decision path" detail="Single request, from client to provider"><div className="flow-steps">{["Validate API key", "Resolve alias & capability", "Choose connection", "Translate request", "Dispatch with timeout", "Stream response"].map((s, i) => <div key={s}><span>{String(i + 1).padStart(2, "0")}</span><strong>{s}</strong><Dot /></div>)}</div></Panel></div>}

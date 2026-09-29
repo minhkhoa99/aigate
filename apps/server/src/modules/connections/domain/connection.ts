@@ -25,7 +25,9 @@ export interface NewConnection extends ConnectionFields {
   provider: string;
   apiKey: string;
   name?: string;
+  priority?: number;
   baseUrl?: string;
+  proxyPoolId?: string | null;
 }
 
 // null clears the connection's own base URL or data field.
@@ -33,7 +35,9 @@ export type ConnectionChanges = { [K in DataField]?: string | null } & {
   name?: string;
   apiKey?: string;
   isActive?: boolean;
+  priority?: number;
   baseUrl?: string | null;
+  proxyPoolId?: string | null;
 };
 
 type Body = Record<string, unknown>;
@@ -69,8 +73,20 @@ function parseField(field: DataField, value: unknown): Parsed<string | undefined
 // A missing or empty key is "" (connection.ollama-local-host); anything else must be a valid key.
 const parseOptionalKey = (value: unknown): Parsed<string> => (value === undefined || value === "" ? { ok: true, value: "" } : parseApiKey(value));
 
+function parsePriority(value: unknown): Parsed<number | undefined> {
+  if (value === undefined) return { ok: true, value: undefined };
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 100
+    ? { ok: true, value }
+    : fail("priority must be an integer from 1 to 100");
+}
+
+function proxyPoolId(value: unknown): Parsed<string | null> {
+  if (value === undefined || value === null || value === "" || value === "__none__") return { ok: true, value: null };
+  return typeof value === "string" && /^[0-9a-f-]{36}$/i.test(value) ? { ok: true, value } : fail("proxyPoolId must be a proxy pool id or __none__");
+}
+
 export function parseNewConnection(input: unknown): Parsed<NewConnection> {
-  const body = asBody(input, ["provider", "apiKey", "name", "baseUrl", ...DATA_FIELD_NAMES]);
+  const body = asBody(input, ["provider", "apiKey", "name", "priority", "baseUrl", "proxyPoolId", ...DATA_FIELD_NAMES]);
   if (!body.ok) return body;
   const { provider, apiKey, name, baseUrl } = body.value;
   if (typeof provider !== "string" || provider === "") return fail("provider must be a provider id");
@@ -82,11 +98,17 @@ export function parseNewConnection(input: unknown): Parsed<NewConnection> {
     if (!parsedName.ok) return parsedName;
     value.name = parsedName.value;
   }
+  const priority = parsePriority(body.value.priority);
+  if (!priority.ok) return priority;
+  if (priority.value !== undefined) value.priority = priority.value;
   if (baseUrl !== undefined && baseUrl !== "") {
     const parsedUrl = parseBaseUrl(baseUrl);
     if (!parsedUrl.ok) return parsedUrl;
     value.baseUrl = parsedUrl.value;
   }
+  const pool = proxyPoolId(body.value.proxyPoolId);
+  if (!pool.ok) return pool;
+  if (pool.value) value.proxyPoolId = pool.value;
   for (const field of DATA_FIELD_NAMES) {
     const parsed = parseField(field, body.value[field]);
     if (!parsed.ok) return parsed;
@@ -96,7 +118,7 @@ export function parseNewConnection(input: unknown): Parsed<NewConnection> {
 }
 
 export function parseChanges(input: unknown): Parsed<ConnectionChanges> {
-  const body = asBody(input, ["name", "apiKey", "isActive", "baseUrl", ...DATA_FIELD_NAMES]);
+  const body = asBody(input, ["name", "apiKey", "isActive", "priority", "baseUrl", "proxyPoolId", ...DATA_FIELD_NAMES]);
   if (!body.ok) return body;
   const changes: ConnectionChanges = {};
   const { name, apiKey, isActive, baseUrl } = body.value;
@@ -118,17 +140,25 @@ export function parseChanges(input: unknown): Parsed<ConnectionChanges> {
     if (!parsed.ok) return parsed;
     changes.apiKey = parsed.value;
   }
+  if (body.value.proxyPoolId !== undefined) {
+    const pool = proxyPoolId(body.value.proxyPoolId);
+    if (!pool.ok) return pool;
+    changes.proxyPoolId = pool.value;
+  }
   if (isActive !== undefined) {
     if (typeof isActive !== "boolean") return fail("isActive must be a boolean");
     changes.isActive = isActive;
   }
+  const priority = parsePriority(body.value.priority);
+  if (!priority.ok) return priority;
+  if (priority.value !== undefined) changes.priority = priority.value;
   for (const field of DATA_FIELD_NAMES) {
     if (body.value[field] === undefined) continue;
     const parsed = parseField(field, body.value[field]);
     if (!parsed.ok) return parsed;
     changes[field] = parsed.value ?? null;
   }
-  return Object.keys(changes).length > 0 ? { ok: true, value: changes } : fail(`Send at least one of name, apiKey, isActive, baseUrl, ${DATA_FIELD_NAMES.join(", ")}`);
+  return Object.keys(changes).length > 0 ? { ok: true, value: changes } : fail(`Send at least one of name, apiKey, isActive, priority, baseUrl, proxyPoolId, ${DATA_FIELD_NAMES.join(", ")}`);
 }
 
 // A JSON credential is named by its account, never by a piece of the key; anything else shows its last 4 characters.

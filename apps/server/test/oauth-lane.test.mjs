@@ -187,11 +187,10 @@ test("kilocode: the device code is polled; the organization header follows; one 
     assert.deepEqual([upstream.calls[4].request.headers["x-kilocode-organizationid"], upstream.calls[4].request.headers.authorization], ["org_7", "Bearer kilo-token-1"]);
 
     const other = await poll();
-    assert.deepEqual([other.statusCode, other.json().code], [409, "ALREADY_CONNECTED"]);
-    assert.match(other.json().message, /Kilo Code is already connected with another account/);
+    assert.equal(other.json().success, true);
     const again = await poll();
     assert.equal(again.json().success, true, "the same account signs in again");
-    assert.deepEqual((await dash({ url: "/api/connections" })).json().filter((c) => c.provider === "kilocode").map((c) => [c.id, c.organization]), [[row.id, "org_8"]]);
+    assert.deepEqual((await dash({ url: "/api/connections" })).json().filter((c) => c.provider === "kilocode").map((c) => [c.id, c.organization]), [[row.id, "org_8"], [other.json().connection.id, null]]);
 
     // An API-key connection has no refresh token: the 401 goes back after the three attempts, with no refresh call.
     const openai = await call({ method: "POST", url: "/v1/chat/completions", body: hello("openai/gpt-4.1"), headers: { authorization: `Bearer ${key}` } });

@@ -12,6 +12,7 @@ import { GeminiCliAdapter } from "./gemini-cli.js";
 import { GithubAdapter } from "./github.js";
 import { OllamaAdapter } from "./ollama.js";
 import { OpenAIResponsesAdapter } from "./openai-responses.js";
+import { OpenCodeAdapter } from "./opencode.js";
 import { GrokCliAdapter } from "./grok-cli.js";
 import { IFlowAdapter } from "./iflow.js";
 import { KimiAdapter } from "./kimi.js";
@@ -26,6 +27,7 @@ export function createAdapter(provider: ProviderDescriptor, transport: HttpTrans
 }
 
 function familyAdapter(provider: ProviderDescriptor, transport: HttpTransportPort): AIProviderPort {
+  if (provider.quirks?.includes("opencodeFree")) return new OpenCodeAdapter(provider, transport);
   // provider.github-copilot-oauth: Copilot routes each model to one of three families (9router GithubExecutor).
   if (provider.quirks?.includes("copilot")) return new GithubAdapter(provider, transport);
   // provider.gemini-cli-oauth: the Gemini protocol inside Cloud Code's envelope.
@@ -45,6 +47,6 @@ function familyAdapter(provider: ProviderDescriptor, transport: HttpTransportPor
     case "kiro": return new KiroAdapter(provider, transport);
     case "trae": return new TraeAdapter(provider, transport);
     // vertex-partner: the OpenAI chat protocol with Google Cloud credentials (routing.vertex-endpoints).
-    default: return provider.auth.googleCloud ? new VertexPartnerAdapter(provider, transport) : new OpenAICompatibleAdapter(provider, transport);
+    default: return provider.auth.kind === "api-key" && provider.auth.googleCloud ? new VertexPartnerAdapter(provider, transport) : new OpenAICompatibleAdapter(provider, transport);
   }
 }

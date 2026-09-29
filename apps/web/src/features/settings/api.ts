@@ -11,6 +11,8 @@ export interface AuthStatus {
 export interface Settings {
   requireLogin: boolean;
   requireApiKey: boolean;
+  fallbackStrategy: "fill-first" | "round-robin";
+  comboStickyLimit: number;
 }
 
 export const authStatusKey = ["auth-status"] as const;

@@ -1,6 +1,6 @@
 # AIGate progress handoff
 
-Updated: 2026-09-27. Read this before continuing the project plan.
+Updated: 2026-09-29. Read this before continuing the project plan.
 
 ## Task board
 
@@ -43,6 +43,8 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M2 SP16b2 OAuth github (Copilot; 65 connectable) | Done, UI wired | `docs/contracts/oauth.md` |
 | M2 SP16c OAuth gemini-cli (Cloud Code; 66 connectable) | Done, UI wired | `docs/contracts/oauth.md` |
 | M2 SP16c2 OAuth antigravity (67 connectable) | Done, UI wired | `docs/contracts/oauth.md` |
+| M2 SP17 multi-account fallback | Done, UI wired | `docs/contracts/multi-account.md` |
+| M2 SP18 proxy pools / relay transport | Done, UI wired | `docs/contracts/proxy-pools.md` |
 
 ## Completed and verified
 
@@ -743,3 +745,19 @@ Checks and status:
 - **Checks.** Full `pnpm test`: engine 184, server 118 pass/3 skipped, web 12, discovery 54, parity 5. `pnpm lint`, `pnpm build`, discovery coverage/capabilities/validate pass; matrix has 344 entries. Trae's focused adapter tests pass 2/2 and OAuth lane passes 7/7. A temporary mutation reversing cumulative thought updates was caught; script self-deleted and source was restored. Graph chunk 37 merged: 884 nodes, 2211 edges, 44 communities; `docs/PROJECT_MAP.md` regenerated.
 - **Browser/Git.** Production UI smoke was not run because the prior localhost browser action was explicitly denied; no alternate browser route was attempted. `git commit` fails before writing because `.git/index.lock` cannot be created (permission denied); no push or CI run exists for these local changes.
 - **Next.** Commit, push, and check CI for the Kiro and Trae work when `.git` is writable.
+
+**M2 SP17 multi-account fallback is complete.** Contract: `docs/contracts/multi-account.md`.
+
+- **Storage and selection.** Migration 0014 removes the one-provider unique index, adds per-provider priority and round-robin state, and creates durable account/model locks. Migration 0015 adds the `fill-first` / `round-robin` setting. Selection is serialized only by the existing SQLite transaction for that provider's short read-select-write path; every query is bounded to 100 accounts.
+- **Routing/UI.** A pre-response upstream auth, rate-limit, timeout, or 5xx error tries the next active account and locks the failed account for that model when another account is available; a sole account preserves its upstream response. Client validation errors are terminal: they neither lock an account nor repeat on another one (the documented correction to 9router's suspected blind-fallback bug). Connections now permit another account, expose and reorder priority, and Settings → API access selects the global strategy.
+- **Checks.** `pnpm --filter @aigate/server test` passes 122 tests (the focused check covers 401 failover and three-request sticky round robin); `pnpm lint`, server/web builds, web tests, database conformance, and `git diff --check` pass. Graph chunk 38 is merged: 890 nodes, 2218 edges, 48 communities; `docs/PROJECT_MAP.md` regenerated. `pnpm test` / discovery validation remain blocked by the pre-existing 9router inventory/evidence mismatch (local reference is `39e36d3d`, but inventory finds 154 routes vs the recorded 166).
+
+**M2 SP18 proxy pools / relay transport is complete.** Contract: `docs/contracts/proxy-pools.md`.
+
+- **Implemented foundation.** Migration 0016 adds relational `proxy_pools` and an optional, deletion-restricted connection assignment. The API offers pool CRUD and a bounded probe; the live `/network/proxy-pools` screen replaces its fixture table with Add/Manage/Delete/Test. Connections may choose an active pool while being created.
+- **Transport.** The direct transport resolves a connection pool before environment proxy variables, uses a bounded LRU+TTL `undici` dispatcher cache, supports relay request headers and `NO_PROXY`, and enforces strict fail-closed proxy behavior. It preserves Deno type on update and records health without silently disabling a live pool.
+- **Checks.** Server 124 total (121 pass, 3 skipped), including pool binding, Deno update, probe configuration, and strict fallback; web 12/12 and web build pass. The original full discovery blocker remains unchanged.
+- **Hosted relay.** Vercel, Cloudflare Workers, and Deno Deploy are wired through the Deploy wizard. Cloudflare uses bounded multipart upload + workers.dev lookup; Deno v2 creates an app and polls readiness for at most 60 seconds. Tokens are never saved, provider resources are cleaned up if deployment or pool creation fails.
+- **MITM DNS bypass.** Direct HTTPS and HTTP/2 calls for the exact seven IDE MITM hosts resolve IPv4 through Google DNS, pin the address for five minutes, and retain the original Host/SNI. Explicit relays/proxies keep their configured route, and strict proxy failures do not fall back.
+- **Keyless proxy routing.** Migration 0017 adds persisted per-provider strategy and optional pinned pool. The API/UI, synthetic no-auth chat connection, no-auth adapter path, and bounded fixed/round-robin/random selection are wired. OpenCode Free now makes the path operational: its public Chat/Responses/Messages protocol, fixed-size session/request identifiers, required tool fingerprint, and stream collection reuse AIGate's existing protocol adapters. No OpenCode credential is stored; Network → Proxy Pools now lists OpenCode for strategy selection. The mutable upstream model list deliberately remains outside the static catalog.
+- **Current check.** Engine/server and web production builds, `pnpm lint`, and `git diff --check` pass after OpenCode routing. Tests were not run for this continuation. Graph chunk 41 is merged (905 nodes, 2234 edges, 48 communities) and `docs/PROJECT_MAP.md` regenerated.

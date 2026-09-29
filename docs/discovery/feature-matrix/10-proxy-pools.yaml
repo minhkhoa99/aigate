@@ -61,7 +61,7 @@
     - { file: open-sse/utils/proxyFetch.js, line: 337, note: "generic if (proxyUrl) branch runs again after the MITM block, even on the second attempt path" }
     - { file: open-sse/utils/proxyFetch.js, line: 353, note: "final direct originalFetch(url, options) when nothing else applied" }
   newModule: transport
-  parityStatus: contracted
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: transport.strict-proxy-fallback
@@ -100,7 +100,7 @@
     - { file: "src/app/api/usage/[connectionId]/codex-reset-credits/route.js", line: 72, note: "third sibling call site, also forces strictProxy: false explicitly" }
     - { file: src/lib/network/connectionProxy.js, line: 184, note: "resolveConnectionProxyConfig's catch-all error path also defaults strictProxy: false" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "A proxy pool with strictProxy enabled should cause real model-traffic requests through that pool to fail (not silently go direct) when the proxy is unreachable, matching what the dashboard toggle promises and what the other three call sites (antigravityQuota, usage, codex-reset-credits) already do with the same field"
@@ -111,13 +111,13 @@
   group: Proxy Pools
   feature: Proxy-aware outbound fetch
   subFeature: MITM_BYPASS_HOSTS — manual DNS resolution + raw-socket TLS to dodge local DNS/hosts poisoning
-  trigger: proxyAwareFetch() called with a target URL whose hostname matches (via substring `includes`) one of MITM_BYPASS_HOSTS
+  trigger: proxy-aware transport receives a request for one of the exact MITM_BYPASS_HOSTS
   input: "target hostname"
   output: "A Response obtained either through the configured proxy (dispatcher) or, if no proxy, through a manually-constructed HTTPS request to the real (Google-DNS-resolved) IP"
   businessRules:
-    - "MITM_BYPASS_HOSTS = cloudcode-pa.googleapis.com, daily-cloudcode-pa.googleapis.com, api.individual.githubcopilot.com, q.us-east-1.amazonaws.com, codewhisperer.us-east-1.amazonaws.com, api2.cursor.sh — exactly the upstream API hosts used by 9router's own antigravity/cloudcode, GitHub Copilot, kiro/codewhisperer, and cursor executors"
+    - "The bypass host set is cloudcode-pa.googleapis.com, daily-cloudcode-pa.googleapis.com, api.individual.githubcopilot.com, runtime.us-east-1.kiro.dev, q.us-east-1.amazonaws.com, codewhisperer.us-east-1.amazonaws.com, api2.cursor.sh — the IDE upstream hosts also rewritten by the local MITM"
     - "These are the same hostnames src/mitm/ rewrites in the OS hosts file / local DNS (per src/shared/constants/mitmToolHosts.js) to intercept IDE traffic for its own capture feature. When 9router's own outbound executor calls hit the SAME hostnames on a machine where the MITM feature is active, the OS-level resolution would route them into the local MITM interceptor instead of the real provider — this bypass exists so the router's own provider traffic is unaffected by whatever DNS/hosts state the MITM capture feature has put the machine in"
-    - "DNS resolution uses a dedicated Node dns.Resolver pinned to Google's public servers (8.8.8.8, 8.8.4.4), not the system resolver, specifically to avoid the poisoned /etc/hosts or local resolver"
+    - "DNS resolution uses a dedicated Node dns.Resolver pinned to Google's public servers (8.8.8.8, 8.8.4.4), not the system resolver, specifically to avoid the poisoned /etc/hosts or local resolver; the five-minute IPv4 cache is bounded by the fixed host allow-list"
     - "TLS is still fully established and validated: the resolved real IP is used only for the raw TCP connect; the TLS `servername` (SNI) and the Host header are set to the ORIGINAL hostname, not the IP — confirmed empirically (see file header) that https.request() wraps the raw net.Socket in a genuine TLS session keyed to `servername`, and a mismatched servername causes a handshake failure. So certificate-hostname validation is preserved against the real target host; this bypass only sidesteps the DNS/hosts layer, not TLS trust"
   state:
     reads: ["DNS_CACHE (module-scope Map, TTL-bounded, see below)"]
@@ -134,7 +134,7 @@
     - "DNS_CACHE entries live 5 minutes (MEMORY_CONFIG.dnsCacheTtlMs) — a real DNS change for one of these six hosts can take up to 5 minutes to be picked up"
   behavior: { streaming: false, cancellation: null, concurrency: null }
   edgeCases:
-    - "shouldBypassMitmDns() matches via `hostname.includes(host)`, a substring match rather than an exact/suffix match — a hostname that merely CONTAINS one of the six strings (e.g. as a subdomain prefix an attacker controls, though none of the current six are attacker-triggerable substrings of common domains) would also match"
+    - "AIGate matches exact hostnames rather than reproducing 9router's substring match; HTTP/2 uses the same Google DNS lookup while preserving the original TLS authority"
   evidence:
     - { file: open-sse/utils/proxyFetch.js, line: 102, note: "MITM_BYPASS_HOSTS list" }
     - { file: open-sse/utils/proxyFetch.js, line: 110, note: "GOOGLE_DNS_SERVERS = 8.8.8.8, 8.8.4.4" }
@@ -143,7 +143,7 @@
     - { file: open-sse/utils/proxyFetch.js, line: 248, note: "createBypassRequest — raw net.Socket.connect(HTTPS_PORT, realIP, ...)" }
     - { file: open-sse/utils/proxyFetch.js, line: 257, note: "servername: parsedUrl.hostname passed into https.request — SNI/cert-hostname intent, empirically confirmed correct (see file header)" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: transport.proxy-dispatcher-cache
@@ -178,7 +178,7 @@
     - { file: open-sse/config/runtimeConfig.js, line: 31, note: "proxyDispatchersMaxSize: 20 — no TTL field exists alongside it" }
     - { file: src/lib/network/proxyTest.js, line: 86, note: "contrast: the one-off test dispatcher IS explicitly closed in a finally block" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: transport.connection-proxy-config-priority
@@ -216,7 +216,7 @@
     - { file: src/lib/network/connectionProxy.js, line: 141, note: "legacy fallback when no valid pool" }
     - { file: src/lib/network/connectionProxy.js, line: 168, note: "catch-all error branch degrades to fully-disabled config, never rejects" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.assign-to-connection
@@ -249,7 +249,7 @@
     - { file: src/app/api/providers/route.js, line: 172, note: "proxyPoolId merged into providerSpecificData only when non-null" }
     - { file: "src/app/api/providers/[id]/route.js", line: 36, note: "normalizeProxyPoolUpdate — same validation, update variant; hasProxyPoolField tracks presence-in-body" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.rotate-for-noauth
@@ -286,7 +286,7 @@
     - { file: src/lib/network/connectionProxy.js, line: 18, note: "pickProxyPoolId — single-pool short-circuit, round-robin index Map, random branch, 'none'/unknown falls to poolIds[0]" }
     - { file: src/lib/network/connectionProxy.js, line: 23, note: "round-robin: rotateState.get/set keyed by providerId, index incremented modulo pool count" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.crud-list-and-create
@@ -324,7 +324,7 @@
     - { file: src/app/api/proxy-pools/route.js, line: 58, note: "GET handler, includeUsage branch" }
     - { file: src/app/api/proxy-pools/route.js, line: 87, note: "POST handler — createProxyPool(normalized)" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.crud-get-update-delete
@@ -362,7 +362,7 @@
     - { file: src/app/api/proxy-pools/route.js, line: 10, note: "contrast: create-route VALID_PROXY_TYPES correctly includes 'deno'" }
     - { file: src/lib/network/connectionProxy.js, line: 101, note: "resolveConnectionProxyConfig's type check that a silently-downgraded 'deno'->'http' pool would fail to match" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "PUT /api/proxy-pools/[id] should accept the same four proxy types the create route and the deploy routes produce (http, vercel, cloudflare, deno), so editing/resaving an existing Deno-relay pool preserves its type"
@@ -403,7 +403,7 @@
     - { file: src/lib/network/proxyTest.js, line: 28, note: "testProxyUrl — one-off ProxyAgent, HEAD to google.com, timeout clamp" }
     - { file: src/lib/network/proxyTest.js, line: 86, note: "explicit dispatcher.close() in finally" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.vercel-relay-deploy
@@ -492,7 +492,7 @@
     - { file: src/app/api/proxy-pools/cloudflare-deploy/route.js, line: 123, note: "400 returned when deployUrl can't be resolved — script already live at this point, no rollback" }
     - { file: src/app/api/proxy-pools/cloudflare-deploy/route.js, line: 131, note: "createProxyPool — strictProxy: false hardcoded" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: proxypool.deno-relay-deploy
@@ -537,7 +537,7 @@
     - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 146, note: "rollback DELETE when final status !== 'succeeded' — this block is skipped entirely by the timeout throw at line 133" }
     - { file: src/app/api/proxy-pools/deno-deploy/route.js, line: 171, note: "single outer catch — logs and returns 500, no DELETE call, this is where the timeout throw lands" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [SUSPECTED_BUG]
   suspicion:
     expected: "Given that this route already rolls back on 2 of its 3 failure paths (deploy-call failure, bad-final-status), the timeout path should follow the same pattern — either DELETE before throwing, or set a sentinel status and let it fall through to the existing `if (status !== \"succeeded\")` rollback block, instead of throwing straight past it"
@@ -577,5 +577,39 @@
     - { file: src/lib/db/repos/proxyPoolsRepo.js, line: 30, note: "upsert — single INSERT ... ON CONFLICT(id) DO UPDATE, shared by create and update" }
     - { file: src/lib/db/repos/proxyPoolsRepo.js, line: 50, note: "getProxyPools — application-level sort by updatedAt desc after the SQL SELECT" }
   newModule: transport
-  parityStatus: traced
+  parityStatus: implemented
   labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: proxypool.keyless-opencode-runtime
+  group: Proxy Pools
+  feature: Keyless provider proxy routing
+  subFeature: OpenCode Free uses persisted fixed/round-robin/random pool selection on real chat traffic
+  trigger: A `/v1` request for `opencode/<model>`
+  input: "OpenCode catalog model, configured provider_proxy_strategies row, and up to 100 active proxy pools"
+  output: "A no-auth upstream request routed through the selected pool, or the ordinary environment/direct route when no pool applies"
+  businessRules:
+    - "OpenCode sends the public protocol markers plus a valid generated session/request id; it never stores a user token or provider connection"
+    - "Muse Spark uses Responses, Union Alpha uses Messages, and remaining chat models use Chat Completions; upstream streaming is collected for a non-streaming caller"
+    - "The required bash/glob/grep/read fingerprint is canonicalized and completed without an unbounded tool list"
+  state:
+    reads: ["provider_proxy_strategies", "proxy_pools", "runtime OpenCode session"]
+    writes: []
+    runtimeOnly: ["one process-scoped OpenCode public session"]
+  dependencies: ["proxypool.rotate-for-noauth", "account.select-noauth-virtual-connection"]
+  providerInteraction: "opencode.ai/zen/v1/{chat/completions,responses,messages}"
+  fallback: { hasFallback: false, retry: "shared bounded HTTP retry", timeout: "transport request deadline", quota: "upstream FreeTierError is returned" }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "OpenCode stream or endpoint fails", partial: false }
+  sideEffects: ["Consumes OpenCode Free tier through the selected network path"]
+  persistence: ["proxy strategy only; no OpenCode credential"]
+  performanceConcerns: ["Pool selection is bounded to 100 active rows; generated request ids are fixed-size"]
+  behavior: { streaming: true, cancellation: "shared transport signal", concurrency: "session is immutable; each request id is independent" }
+  edgeCases:
+    - "The live OpenCode model list is deliberately not imported; only static catalog models are routable"
+  evidence:
+    - { file: open-sse/providers/registry/opencode.js, line: 23, note: "noAuth and per-model target formats" }
+    - { file: open-sse/executors/opencode.js, line: 457, note: "Chat/Responses/Messages endpoint selection and public headers" }
+    - { file: open-sse/utils/opencodeFingerprint.js, line: 6, note: "required lowercase fingerprint quartet" }
+  newModule: transport
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR]

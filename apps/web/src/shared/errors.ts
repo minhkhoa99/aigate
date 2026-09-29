@@ -20,6 +20,8 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   SETUP_REQUIRED: "Set a dashboard password first.",
   LIMIT_REACHED: "You have reached the maximum of 100 API keys. Revoke one you no longer use.",
   NOT_FOUND: "That item no longer exists. The list was refreshed.",
+  CONFLICT: (body) => typeof body.message === "string" ? body.message : "That resource already exists. Choose another name.",
+  PROVIDER_UNAVAILABLE: (body) => typeof body.message === "string" ? body.message : "The relay provider could not complete this deployment. Try again.",
   // docs/contracts/connections.md. The server message gives the catalog reason.
   PROVIDER_NOT_SUPPORTED: (body) => typeof body.message === "string" ? body.message : "This provider cannot be connected yet.",
   ALREADY_CONNECTED: (body) => typeof body.message === "string" ? body.message : "This provider is already connected. Use Replace key on its row instead.",
@@ -30,6 +32,10 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   MODELS_FETCH_FAILED: (body) => typeof body.message === "string" ? `${body.message}. Test the connection to see why.` : "Failed to fetch models. Test the connection to see why.",
   // docs/contracts/custom-providers.md.
   NODE_LIMIT: "You have reached the maximum of 100 custom providers. Delete one you no longer use.",
+  PROXY_POOL_IN_USE: "This proxy pool is still assigned to a connection. Remove it from those connections first.",
+  // docs/contracts/combos.md.
+  COMBO_EXISTS: "A combo with this name already exists. Choose another name, or edit that combo.",
+  COMBO_LIMIT: "You have reached the maximum of 200 combos. Delete one you no longer use.",
 };
 
 export function toProblem(error: unknown): Problem {

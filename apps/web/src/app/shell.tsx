@@ -11,7 +11,7 @@ import { useToast } from "../shared/toast";
 
 function currentLabel(path: string): string {
   for (const group of navigation) for (const item of group.items) if (item.href === path) return item.label;
-  if (path === "/gateway/routing/new") return "Create combo";
+  if (path === "/gateway/routing/new") return new URLSearchParams(window.location.search).has("combo") ? "Edit combo" : "Create combo";
   if (path.startsWith("/providers/media/")) return "Media Provider";
   if (path.startsWith("/providers/")) return "Provider Detail";
   if (path.startsWith("/traffic/requests/")) return "Request Detail";
@@ -69,7 +69,7 @@ export function Shell() {
     <div className="app-main">
       <header className="topbar"><div className="breadcrumb"><button className="mobile-menu" aria-label="Open menu" onClick={() => setMobileOpen(true)}>☰</button>
         <span className="muted">gateway</span><span className="muted">/</span><strong>{currentLabel(path)}</strong></div>
-        <div className="top-actions"><label className="top-search"><span>⌕</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search pages" aria-label="Search pages" /><kbd>⌘ K</kbd></label>
+        <div className="top-actions"><label className="top-search"><span>⌕</span><input type="search" name="navigation-search" autoComplete="off" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search pages" aria-label="Search pages" /><kbd>⌘ K</kbd></label>
           <span className="latency"><Dot tone="info" /> RT --</span><button className="icon-button" aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? "☼" : "◐"}</button>
           <button className="icon-button" aria-label="Notifications">♧</button><span className="user-chip"><span>AL</span> admin@local</span></div>
       </header>

@@ -8,6 +8,7 @@ import { readSseData } from "../sse.js";
 import { codexBody, codexModelIds, codexUrl } from "./codex.js";
 import { collected } from "./collect.js";
 import { count, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
+import { applyOpenCodeFingerprint } from "./opencode-free.js";
 import { mediaUrl, OpenAICompatibleAdapter, userPart } from "./openai-compatible.js";
 
 // AIProviderPort for the openai-responses family (docs/contracts/provider-openai-responses.md). The request and
@@ -273,6 +274,9 @@ export class OpenAIResponsesAdapter extends OpenAICompatibleAdapter implements A
 
   // Vendor adapters may apply bounded request metadata without duplicating Responses translation.
   protected transformResponsesBody(_body: Json, _request: CanonicalRequest, _credential: Credential): void {
-    void _body; void _request; void _credential;
+    if (!this.provider.quirks?.includes("opencodeFree")) { void _body; void _request; void _credential; return; }
+    _body.store = false;
+    if (_request.model === "muse-spark-1.3-contributor-free" && _body.tool_choice !== undefined && _body.tool_choice !== "auto") _body.tool_choice = "auto";
+    applyOpenCodeFingerprint(_body, true);
   }
 }

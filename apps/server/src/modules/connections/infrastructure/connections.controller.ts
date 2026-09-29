@@ -4,10 +4,11 @@ import {
 } from "@nestjs/common";
 import {
   builtinRegistry, CATALOG, createAdapter, EngineError, OAUTH_PROVIDERS, parseGoogleCredential, withConnection, type AIProviderPort, type CredentialStatus,
-  type Credential, type HttpTransportPort, type OAuthIO, type ProviderDescriptor,
+  type Credential, type HttpTransportPort, type OAuthIO, type ProviderDescriptor, type ProxyConfig,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
-import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
+import { HTTP_TRANSPORT } from "../../transport/transport.token.js";
+import { ProxyPoolsRepository } from "../../transport/infrastructure/proxy-pools.repo.js";
 import { DATA_FIELD_NAMES, isJsonCredential, parseChanges, parseNewConnection, type ConnectionChanges } from "../domain/connection.js";
 import { ConnectionsRepository, type ConnectionView, type StoredCredential, type TestOutcome } from "./connections.repo.js";
 import { nodeDescriptor, ProviderNodesRepository } from "./provider-nodes.repo.js";
@@ -38,6 +39,7 @@ function checkForProvider(provider: ProviderDescriptor, fields: ConnectionChange
   if (fields.apiKey !== undefined && provider.oauth && CATALOG.find((entry) => entry.id === provider.id)?.auth.kinds.includes("api-key") === false) {
     throw invalid(`${provider.name} connects by signing in, not with an API key`);
   }
+  if (provider.auth.kind === "none") throw invalid(`${provider.name} does not use a saved connection`);
   if (fields.apiKey === "" && !provider.auth.optional) throw invalid("apiKey must be 8-4096 printable characters without spaces");
   const declared = provider.connectionFields;
   const takes = (field: string) => (field === "baseUrl" && provider.connectionBaseUrl !== undefined)
@@ -49,7 +51,7 @@ function checkForProvider(provider: ProviderDescriptor, fields: ConnectionChange
     if (required && (creating ? !value : value === null)) throw invalid(`${field} is required for a ${provider.name} connection`);
   }
   if (fields.apiKey !== undefined && isJsonCredential(fields.apiKey)) {
-    if (!provider.auth.googleCloud) throw invalid("apiKey must be 8-4096 printable characters without spaces");
+    if (provider.auth.kind !== "api-key" || !provider.auth.googleCloud) throw invalid("apiKey must be 8-4096 printable characters without spaces");
     const parsed = parseGoogleCredential(fields.apiKey);
     if ("error" in parsed) throw invalid(`apiKey is not a usable Google Cloud credential: ${parsed.error}`);
   }
@@ -59,8 +61,8 @@ function checkForProvider(provider: ProviderDescriptor, fields: ConnectionChange
 const credentialOf = (stored: StoredCredential): Credential => ({ kind: "api-key", apiKey: stored.apiKey, sessionId: stored.id, ...(stored.projectId ? { projectId: stored.projectId } : {}), ...(stored.providerData ? { providerData: stored.providerData } : {}) });
 
 // Only an answer about the key is invalid or no_quota; anything else means "not checked" (connection.test-single-connection).
-async function runTest(provider: ProviderDescriptor, transport: HttpTransportPort, credential: Credential): Promise<TestOutcome> {
-  const ctx = { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID() };
+async function runTest(provider: ProviderDescriptor, transport: HttpTransportPort, credential: Credential, proxy?: ProxyConfig): Promise<TestOutcome> {
+  const ctx = { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID(), proxy };
   try {
     const status = await createAdapter(provider, transport).validateCredential(credential, ctx);
     if (status.valid) return { testStatus: "active", lastError: null, lastErrorCode: null };
@@ -83,6 +85,7 @@ export class ConnectionsController {
   constructor(
     private readonly connections: ConnectionsRepository,
     private readonly nodes: ProviderNodesRepository,
+    private readonly pools: ProxyPoolsRepository,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
     private readonly refresher: TokenRefresher,
   ) {}
@@ -118,6 +121,8 @@ export class ConnectionsController {
     if (!parsed.ok) throw invalid(parsed.message);
     const provider = await this.provider(parsed.value.provider);
     if (!provider) throw notSupported(parsed.value.provider);
+    if (provider.auth.kind === "none") throw invalid(`${provider.name} is public and does not use a saved connection`);
+    if (parsed.value.proxyPoolId && !(await this.pools.get(parsed.value.proxyPoolId))) throw invalid("Proxy pool not found");
     checkForProvider(provider, parsed.value, true);
     // The id replaces the alias the client may have sent.
     const { name, ...fields } = parsed.value;
@@ -143,6 +148,7 @@ export class ConnectionsController {
       if (!provider) throw notSupported(current.provider);
       checkForProvider(provider, checked, false);
     }
+    if (parsed.value.proxyPoolId && !(await this.pools.get(parsed.value.proxyPoolId))) throw invalid("Proxy pool not found");
     const view = await this.connections.update(id, parsed.value);
     if (!view) throw notFound();
     return this.withName(view);
@@ -162,9 +168,10 @@ export class ConnectionsController {
     const { stored, provider, fresh } = await this.credential(id);
     const flowTest = OAUTH_PROVIDERS[provider.id]?.test;
     const refreshToken = fresh.oauth?.refreshToken;
+    const proxy = await this.pools.resolve(fresh.proxyPoolId);
     const outcome = provider.testByExpiry ? this.expiryTest(provider, stored, fresh)
-      : flowTest && refreshToken ? await this.flowTest((io) => flowTest(refreshToken, io))
-      : await runTest(withConnection(provider, fresh), this.transport, credentialOf(fresh));
+      : flowTest && refreshToken ? await this.flowTest((io) => flowTest(refreshToken, io), proxy)
+      : await runTest(withConnection(provider, fresh), this.transport, credentialOf(fresh), proxy);
     // After a refresh the sealed token changed, so the result is recorded against the new one.
     const sealed = fresh === stored ? stored.sealed : (await this.connections.readKey(id))?.sealed ?? stored.sealed;
     const view = await this.connections.recordTest(id, sealed, outcome);
@@ -177,7 +184,7 @@ export class ConnectionsController {
   @Header("Cache-Control", "no-store")
   async models(@Param("id") id: string) {
     const { provider, fresh } = await this.credential(id);
-    const ctx = { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID() };
+    const ctx = { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID(), proxy: await this.pools.resolve(fresh.proxyPoolId) };
     let listed: Awaited<ReturnType<AIProviderPort["getModels"]>>;
     try {
       listed = await createAdapter(withConnection(provider, fresh), this.transport).getModels(credentialOf(fresh), ctx);
@@ -192,9 +199,9 @@ export class ConnectionsController {
   }
 
   // provider.github-copilot-oauth (kept from 9router): the provider's own test (github: GET /user with the GitHub token).
-  private async flowTest(test: (io: OAuthIO) => Promise<CredentialStatus>): Promise<TestOutcome> {
+  private async flowTest(test: (io: OAuthIO) => Promise<CredentialStatus>, proxy?: ProxyConfig): Promise<TestOutcome> {
     try {
-      const status = await test({ transport: this.transport, ctx: { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID() } });
+      const status = await test({ transport: this.transport, ctx: { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID(), proxy } });
       if (status.valid) return { testStatus: "active", lastError: null, lastErrorCode: null };
       return { testStatus: "invalid", lastError: status.message, lastErrorCode: status.code };
     } catch (error) {

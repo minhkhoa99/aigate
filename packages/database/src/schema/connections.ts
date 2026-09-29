@@ -1,4 +1,5 @@
 import { THINKING_LEVEL_VALUES } from "./catalog.js";
+import { proxyPools } from "./proxy-pools.js";
 import { sql } from "drizzle-orm";
 import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
@@ -7,13 +8,16 @@ export type TestStatus = (typeof TEST_STATUSES)[number];
 export const AUTH_TYPES = ["api-key", "oauth"] as const;
 export type AuthType = (typeof AUTH_TYPES)[number];
 
-// docs/contracts/connections.md. SP11: one API-key account per provider (unique provider).
+// docs/contracts/multi-account.md. Accounts are ordered only within their provider.
 export const providerConnections = sqliteTable(
   "provider_connections",
   {
     id: text("id").primaryKey(),
-    provider: text("provider").notNull().unique(),
+    provider: text("provider").notNull(),
     name: text("name").notNull(),
+    priority: integer("priority").notNull().default(1),
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+    consecutiveUseCount: integer("consecutive_use_count").notNull().default(0),
     // SecretCipherPort output (v1.<base64url>); the plaintext key is never stored.
     apiKeySealed: text("api_key_sealed").notNull(),
     keyHint: text("key_hint").notNull(),
@@ -24,6 +28,8 @@ export const providerConnections = sqliteTable(
     apiVersion: text("api_version"),
     organization: text("organization"),
     accountId: text("account_id"),
+    // SP18: an optional, validated outbound path. Restrict deletion while a connection uses the pool.
+    proxyPoolId: text("proxy_pool_id").references(() => proxyPools.id, { onDelete: "restrict" }),
     // SP16 (docs/contracts/oauth.md): an oauth connection keeps its access token in api_key_sealed, sealed like a key.
     authType: text("auth_type", { enum: AUTH_TYPES }).notNull().default("api-key"),
     refreshTokenSealed: text("refresh_token_sealed"),
@@ -40,11 +46,20 @@ export const providerConnections = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
-  () => [
+  (t) => [
     check("provider_connections_test_status", sql.raw(`test_status IN (${TEST_STATUSES.map((s) => `'${s}'`).join(", ")})`)),
     check("provider_connections_auth_type", sql.raw(`auth_type IN (${AUTH_TYPES.map((s) => `'${s}'`).join(", ")})`)),
+    index("provider_connections_provider_active_priority").on(t.provider, t.isActive, t.priority),
+    index("provider_connections_proxy_pool").on(t.proxyPoolId),
   ],
 );
+
+// One row per temporarily unavailable account+model. __all means the account itself is unavailable.
+export const accountLocks = sqliteTable("account_locks", {
+  connectionId: text("connection_id").notNull().references(() => providerConnections.id, { onDelete: "cascade" }),
+  model: text("model").notNull(),
+  until: integer("until", { mode: "timestamp_ms" }).notNull(),
+}, (t) => [index("account_locks_connection_model").on(t.connectionId, t.model), index("account_locks_until").on(t.until)]);
 
 // docs/contracts/custom-providers.md (SP13b, SP14b). OpenAI- or Anthropic-compatible endpoints the user defines;
 // a connection under one stores this id as its provider. The prefix is how /v1 names it. Like 9router it may
