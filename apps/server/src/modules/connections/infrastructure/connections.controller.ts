@@ -3,7 +3,7 @@ import {
   BadRequestException, Body, ConflictException, Controller, Delete, Get, Header, HttpCode, HttpException, HttpStatus, Inject, NotFoundException, Param, Patch, Post,
 } from "@nestjs/common";
 import {
-  builtinRegistry, CATALOG, createAdapter, EngineError, OAUTH_PROVIDERS, parseGoogleCredential, withConnection, type AIProviderPort, type CredentialStatus,
+  builtinRegistry, CATALOG, createAdapter, EngineError, mediaServiceDescriptor, OAUTH_PROVIDERS, parseGoogleCredential, withConnection, type AIProviderPort, type CredentialStatus,
   type Credential, type HttpTransportPort, type OAuthIO, type ProviderDescriptor, type ProxyConfig,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
@@ -29,7 +29,7 @@ const notSupported = (id: string) => {
 };
 // Built-in names from the registry, custom ones from their node (docs/contracts/custom-providers.md).
 const named = (view: ConnectionView, nodeNames: ReadonlyMap<string, string>): Named =>
-  ({ ...view, providerName: builtinRegistry.provider(view.provider)?.name ?? nodeNames.get(view.provider) ?? view.provider });
+  ({ ...view, providerName: builtinRegistry.provider(view.provider)?.name ?? mediaServiceDescriptor(view.provider)?.name ?? nodeNames.get(view.provider) ?? view.provider });
 
 // connection.ollama-local-host: only a provider with optional auth may have no key. A connection field is taken only
 // by a provider that declares it (connectionBaseUrl, connectionFields), and a required one cannot be missing or cleared.
@@ -101,6 +101,8 @@ export class ConnectionsController {
   private async provider(id: string): Promise<ProviderDescriptor | undefined> {
     const builtin = builtinRegistry.provider(id);
     if (builtin) return builtin;
+    const media = mediaServiceDescriptor(id);
+    if (media) return media;
     const node = await this.nodes.stored(id);
     return node ? nodeDescriptor(node) : undefined;
   }

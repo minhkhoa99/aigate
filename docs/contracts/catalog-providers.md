@@ -46,7 +46,7 @@ Rule 3 replaces "the first provider that declares it". With 41 providers, `glm-5
 
 | Method and path | Response |
 |---|---|
-| `GET /api/providers` | `[{ id, name, category, protocol, authKinds, hidden, connectable, reason, modelCount }]`, all 121 catalog entries |
+| `GET /api/providers` | `[{ id, name, category, protocol, authKinds, hidden, connectable, reason, modelCount, serviceKinds, routeKinds }]`, all catalog entries. `serviceKinds` are claimed upstream capabilities; `routeKinds` are kinds AIGate can currently route. |
 | `GET /api/providers/:id` | The summary plus `chatUrl` and `models: [{ id, name, kind, capabilities, contextWindow, maxOutputTokens }]`; 404 `NOT_FOUND` |
 
 `GET /api/connections/providers` (SP11) is removed. Connections accept any connectable registry id.
@@ -61,7 +61,16 @@ Rule 3 replaces "the first provider that declares it". With 41 providers, `glm-5
 | `/providers/detail?provider=…` → `ProviderDetail` | Data from `GET /api/providers/:id`. The connection panel, or the reason it is not connectable. Since SP16a the Models panel of `custom-models.md`: the catalog models (name, the `/v1` id to copy and test, kind, context window, max output or "not declared", capabilities), the added models, a Model ID field, and Import from /models. A custom provider id opens its own detail page with the same panel. |
 | `Connections` Add modal | Lists the connectable providers. A `?provider=` that is not connectable shows its reason. |
 
-The static `features/providers/catalog.ts` stays for the media screens (SP23).
+The media screens use the catalog's `serviceKinds`; `features/providers/catalog.ts` only defines the nine endpoint paths.
+`routeKinds` is computed from the actual AIGate lane/adapter set, so a claimed capability without a working route is labeled unavailable even if the provider has a saved connection. Providers that are both LLM and web services (such as Ollama or GLM) remain in the LLM catalog.
+
+## SP23 media and TTS voices
+
+`GET /api/providers/:id/voices?model=...` returns `{ voices: [{ id, name, locale, gender }] }` from the built-in per-model voice catalog. An unknown provider is 404; an invalid TTS model is 400 `INVALID_REQUEST`; providers without a voice catalog return an empty list. The local-device picker reads the browser's installed voices directly because they belong to that browser, not the server.
+
+`POST /api/providers/:id/voice-preview` takes `{ model, voice }` under the dashboard session. It validates both against the catalog and uses an active saved connection to generate one short sample. It is available for the OpenAI and OpenRouter speech endpoints only. The result is MP3, at most 1 MiB, within 15 seconds, with no retry or cache. `INVALID_REQUEST` rejects a mismatched voice/model; `NO_ACTIVE_CONNECTION` asks the operator to add a connection; `VOICE_PREVIEW_FAILED` reports an upstream failure. The browser's own voices use `speechSynthesis` locally. Other catalog voices remain browseable with playback unavailable until their TTS adapter can generate a preview. This is a preset catalog; account-specific ElevenLabs/Deepgram/Inworld/MiniMax voice discovery is not yet supported because those providers lack a connectable AIGate TTS adapter.
+
+Image understanding uses `/v1/chat/completions` with image content. Music has no AIGate route and is shown as unavailable, without a copyable endpoint.
 
 ## Matrix
 

@@ -2,7 +2,7 @@
 
 A combo is a named list of models that a client sends as its `model`. The combo decides which members answer: one after another (fallback), starting from a rotating member (round-robin), or all at once with a judge that writes the final answer (fusion). Matrix: `docs/discovery/feature-matrix/06-combo-capacity-adapter.yaml` (`combo.*`), `routing.combo-dispatch`, `settings.combo-rotation-reset`.
 
-Out of scope: the capability auto-switch (`combo.reorder-by-capabilities-tiers`) and the capacity adapter come with SP20; combo presets (`combo.source-presets`, hidden in 9router's dashboard) and media/search combos (`kind`) are not ported.
+Since SP20, fallback and round-robin combos float capable members to the front and may be widened by the capacity pools (`capacity-adapter.md`). Out of scope: combo presets (`combo.source-presets`, hidden in 9router's dashboard) and media/search combos (`kind`) are not ported.
 
 ## Rules from the reference
 

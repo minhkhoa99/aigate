@@ -59,7 +59,7 @@ test("perplexity-agent is connectable through the Responses adapter; codex and g
   assert.equal(pplx.protocol, "openai-responses");
   assert.equal(pplx.chatUrl, "https://api.perplexity.ai/v1/responses");
   assert.ok(createAdapter(pplx, fakeTransport()) instanceof OpenAIResponsesAdapter);
-  assert.equal(builtinRegistry.providers.length, 72);
+  assert.equal(builtinRegistry.providers.length, 73);
   assert.equal(builtinRegistry.provider("codex").oauth, "authorization_code_pkce");
   assert.equal(builtinRegistry.provider("grok-cli").oauth, "device_code");
 });

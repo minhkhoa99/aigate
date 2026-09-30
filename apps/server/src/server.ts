@@ -24,6 +24,7 @@ function isSpaRoute(url: string): boolean {
 
 export interface ServerOptions {
   databaseFile: string;
+  dataDir?: string;
   webDist?: string;
   // AIGATE_SECRET_KEY; when unset, secret.key next to the database is used (created once).
   secretKey?: string;
@@ -38,7 +39,7 @@ export interface ServerOptions {
 }
 
 export async function createServer({
-  databaseFile, webDist, secretKey, transport, streamIdleTimeoutMs = DEFAULT_STREAM_IDLE_TIMEOUT_MS, refreshRetryDelayMs = DEFAULT_REFRESH_RETRY_DELAY_MS, streamRetryDelayMs = STREAM_RETRY_DELAY_MS,
+  databaseFile, dataDir = dirname(databaseFile), webDist, secretKey, transport, streamIdleTimeoutMs = DEFAULT_STREAM_IDLE_TIMEOUT_MS, refreshRetryDelayMs = DEFAULT_REFRESH_RETRY_DELAY_MS, streamRetryDelayMs = STREAM_RETRY_DELAY_MS,
 }: ServerOptions): Promise<NestFastifyApplication> {
   if (!Number.isInteger(streamIdleTimeoutMs) || streamIdleTimeoutMs < 1_000 || streamIdleTimeoutMs > 600_000) {
     throw new RangeError("AIGATE_STREAM_IDLE_TIMEOUT_MS must be an integer from 1000 to 600000");
@@ -50,16 +51,18 @@ export async function createServer({
   try {
     // bodyParser:false drops the urlencoded parser Nest adds, so a cross-site HTML form cannot produce a
     // body these handlers accept; Fastify's own JSON parser (prototype-poisoning safe) stays.
-    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, transport), new FastifyAdapter(), { bodyParser: false });
+    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, dataDir, transport), new FastifyAdapter(), { bodyParser: false });
   } catch (error) {
     await database.close();
     throw error;
   }
   app.enableShutdownHooks();
-  registerV1Routes(app.getHttpAdapter().getInstance(), app.get(ChatLane));
+  const fastify = app.getHttpAdapter().getInstance();
+  // STT needs the original multipart bytes (including its boundary) for the upstream OpenAI-compatible endpoint.
+  fastify.addContentTypeParser(/^multipart\/form-data/i, { parseAs: "buffer" }, (_request, body, done) => done(null, body));
+  registerV1Routes(fastify, app.get(ChatLane));
 
   if (webDist && existsSync(join(webDist, "index.html"))) {
-    const fastify = app.getHttpAdapter().getInstance();
     await fastify.register(fastifyStatic, { root: webDist, wildcard: false });
     fastify.get("/*", (request, reply) => (isSpaRoute(request.url) ? reply.sendFile("index.html") : reply.callNotFound()));
   }

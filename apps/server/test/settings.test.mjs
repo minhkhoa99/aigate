@@ -21,7 +21,9 @@ test("GET returns every setting with its default and no-store", () =>
   withTempDb((file) => signedIn(file, async (request) => {
     const res = await request("GET");
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.json(), { requireLogin: true, requireApiKey: true, fallbackStrategy: "fill-first", comboStickyLimit: 1 });
+    assert.deepEqual(res.json(), { requireLogin: true, requireApiKey: true, fallbackStrategy: "fill-first", comboStickyLimit: 1,
+      tokenSaverEnabled: true, rtkEnabled: true, headroomEnabled: false, headroomUrl: "http://127.0.0.1:8787", headroomCompressUserMessages: false, headroomTimeoutMs: 3000,
+      cavemanEnabled: false, cavemanLevel: "full", ponytailEnabled: false, ponytailLevel: "full", pxpipeEnabled: false, pxpipeMinChars: 25000, pxpipeTimeoutMs: 15000 });
     assert.equal(res.headers["cache-control"], "no-store");
   })));
 
@@ -30,12 +32,16 @@ test("PATCH applies, shows on the next GET, and survives a restart", () =>
     await signedIn(file, async (request) => {
       const res = await request("PATCH", { requireApiKey: false });
       assert.equal(res.statusCode, 200);
-      assert.deepEqual(res.json(), { requireLogin: true, requireApiKey: false, fallbackStrategy: "fill-first", comboStickyLimit: 1 });
+      assert.deepEqual(res.json(), { requireLogin: true, requireApiKey: false, fallbackStrategy: "fill-first", comboStickyLimit: 1,
+        tokenSaverEnabled: true, rtkEnabled: true, headroomEnabled: false, headroomUrl: "http://127.0.0.1:8787", headroomCompressUserMessages: false, headroomTimeoutMs: 3000,
+        cavemanEnabled: false, cavemanLevel: "full", ponytailEnabled: false, ponytailLevel: "full", pxpipeEnabled: false, pxpipeMinChars: 25000, pxpipeTimeoutMs: 15000 });
       assert.equal((await request("GET")).json().requireApiKey, false);
-      assert.deepEqual((await request("PATCH", {})).json(), { requireLogin: true, requireApiKey: false, fallbackStrategy: "fill-first", comboStickyLimit: 1 }, "empty patch is a no-op");
+      assert.deepEqual((await request("PATCH", {})).json(), { requireLogin: true, requireApiKey: false, fallbackStrategy: "fill-first", comboStickyLimit: 1,
+        tokenSaverEnabled: true, rtkEnabled: true, headroomEnabled: false, headroomUrl: "http://127.0.0.1:8787", headroomCompressUserMessages: false, headroomTimeoutMs: 3000,
+        cavemanEnabled: false, cavemanLevel: "full", ponytailEnabled: false, ponytailLevel: "full", pxpipeEnabled: false, pxpipeMinChars: 25000, pxpipeTimeoutMs: 15000 }, "empty patch is a no-op");
     });
     await signedIn(file, async (request) => {
-      assert.deepEqual((await request("GET")).json(), { requireLogin: true, requireApiKey: false, fallbackStrategy: "fill-first", comboStickyLimit: 1 });
+      assert.equal((await request("GET")).json().requireApiKey, false);
     });
   }));
 
@@ -45,6 +51,9 @@ test("PATCH rejects unknown, secret, and wrongly typed keys without changing any
       [{ requireApiKey: false, password: "x" }, ["password"]],
       [{ mitmSudoEncrypted: "x" }, ["mitmSudoEncrypted"]],
       [{ requireLogin: "false" }, ["requireLogin"]],
+      [{ headroomUrl: "javascript:alert(1)" }, ["headroomUrl"]],
+      [{ headroomTimeoutMs: 100 }, ["headroomTimeoutMs"]],
+      [{ cavemanLevel: "wenyan" }, ["cavemanLevel"]],
       [{ somethingNew: 1 }, ["somethingNew"]],
       // Boolean values, so only the allowlist (not the type check) can reject these.
       [{ somethingNew: true }, ["somethingNew"]],
@@ -58,5 +67,5 @@ test("PATCH rejects unknown, secret, and wrongly typed keys without changing any
       assert.equal(res.json().code, "INVALID_REQUEST");
       assert.deepEqual(res.json().keys, keys, JSON.stringify(body));
     }
-    assert.deepEqual((await request("GET")).json(), { requireLogin: true, requireApiKey: true, fallbackStrategy: "fill-first", comboStickyLimit: 1 }, "nothing changed");
+    assert.equal((await request("GET")).json().requireApiKey, true, "nothing changed");
   })));

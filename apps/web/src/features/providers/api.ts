@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, apiVoid } from "../../shared/api";
+import { api, apiBlob, apiVoid } from "../../shared/api";
 
 // docs/contracts/connections.md
 export type TestStatus = "untested" | "active" | "invalid" | "no_quota" | "unreachable";
@@ -47,6 +47,8 @@ export interface ProviderSummary {
   signIn: OAuthFlow | null;
   signInOnly: boolean;
   modelCount: number;
+  serviceKinds: string[];
+  routeKinds: string[];
 }
 
 export type OAuthFlow = "authorization_code" | "authorization_code_pkce" | "device_code" | "browser_token";
@@ -69,6 +71,12 @@ export interface ProviderDetailView extends ProviderSummary {
   models: ProviderModel[];
   thinking: ThinkingView;
 }
+
+export interface TtsVoice { id: string; name: string; locale: string; gender: string }
+export const useTtsVoices = (provider: string, model: string, enabled: boolean) =>
+  useQuery({ queryKey: ["tts-voices", provider, model], queryFn: () => api<{ voices: TtsVoice[] }>(`/api/providers/${encodeURIComponent(provider)}/voices?${new URLSearchParams({ model })}`), staleTime: Infinity, enabled });
+export const previewTtsVoice = (provider: string, model: string, voice: string, signal: AbortSignal) =>
+  apiBlob(`/api/providers/${encodeURIComponent(provider)}/voice-preview`, { model, voice }, 20_000, signal);
 
 // The server allows 20 s for a test (the provider has 15 s); the client waits a little longer.
 const TEST_TIMEOUT_MS = 25_000;

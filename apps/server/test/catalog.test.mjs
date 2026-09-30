@@ -18,6 +18,8 @@ test("the provider catalog lists every provider with its connectable status, beh
     assert.deepEqual({ ...openai, modelCount: openai.modelCount > 0 }, {
       id: "openai", name: "OpenAI", aliases: openai.aliases, category: openai.category, protocol: "openai-compatible", authKinds: openai.authKinds, hidden: false,
       connectable: true, reason: null, signIn: null, signInOnly: false, modelCount: true,
+      serviceKinds: CATALOG.find((p) => p.id === "openai").serviceKinds,
+      routeKinds: ["embedding", "tts", "stt", "image", "imageToText"],
     });
     const kilo = list.find((p) => p.id === "kilocode");
     assert.deepEqual([kilo.connectable, kilo.signIn, kilo.signInOnly], [true, "device_code", true], "SP16: a sign-in provider");
@@ -25,6 +27,9 @@ test("the provider catalog lists every provider with its connectable status, beh
     assert.deepEqual([grok.connectable, grok.signIn, grok.signInOnly], [true, "device_code", true]);
     const claude = list.find((p) => p.id === "claude");
     assert.deepEqual([claude.connectable, claude.signIn, claude.signInOnly], [true, "authorization_code_pkce", true], "SP16b: claude signs in");
+    const tavily = list.find((p) => p.id === "tavily");
+    assert.deepEqual(tavily, { id: "tavily", name: "Tavily", aliases: [], category: "service", protocol: "service", authKinds: ["api-key"], hidden: false, connectable: true, reason: null, signIn: null, signInOnly: false, modelCount: 0, serviceKinds: CATALOG.find((p) => p.id === "tavily").serviceKinds, routeKinds: ["webSearch", "webFetch"] }, "SP22 services are connectable from the real UI");
+    assert.notEqual(list.find((p) => p.id === "ollama").category, "service", "Ollama still appears in the LLM catalog while providing web fetch");
     assert.ok(list.every((p) => p.connectable === (p.reason === null)), "a reason exactly when not connectable");
     assert.ok(list.some((p) => p.connectable));
     await app.close();

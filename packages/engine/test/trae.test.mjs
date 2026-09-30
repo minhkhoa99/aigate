@@ -53,5 +53,5 @@ test("Trae SOLO maps auto mode and cumulative event thoughts into bounded canoni
   assert.deepEqual(chunks.filter((chunk) => chunk.type === "text_delta").map((chunk) => chunk.text), ["Hello", "!"]);
   assert.deepEqual(chunks.find((chunk) => chunk.type === "usage").usage, { inputTokens: 4, outputTokens: 2 });
   assert.equal((await adapter.getModels())[0].id, "auto");
-  assert.equal(builtinRegistry.providers.length, 72);
+  assert.equal(builtinRegistry.providers.length, 73);
 });

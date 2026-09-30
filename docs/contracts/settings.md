@@ -33,6 +33,7 @@ SP5 has only the two keys the M1 walking skeleton needs. Each later context adds
 | `requireApiKey` | boolean | `true` | apikeys and routing (SP6, SP12) |
 | `fallbackStrategy` | `"fill-first"` \| `"round-robin"` | `"fill-first"` | routing, account selection (SP17, `multi-account.md`) |
 | `comboStickyLimit` | integer 1–1000 | `1` | routing, round-robin combos: requests per member before rotating (SP19, `combos.md`; 9router `comboStickyRoundRobinLimit`) |
+| `tokenSaverEnabled`, `rtkEnabled`, `headroomEnabled`, `headroomUrl`, `headroomCompressUserMessages`, `headroomTimeoutMs`, `cavemanEnabled`, `cavemanLevel`, `ponytailEnabled`, `ponytailLevel`, `pxpipeEnabled`, `pxpipeMinChars`, `pxpipeTimeoutMs` | typed stage flags, URL, bounded timeouts/thresholds, or `lite`/`full`/`ultra` level | documented in migrations 0020–0021 | Token Saver request pipeline (SP21, `token-saver.md`) |
 
 Storage: a single row in table `settings` with `id = 1` enforced by a `CHECK`, one `NOT NULL` column per key with its default, created on first read.
 

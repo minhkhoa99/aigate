@@ -288,6 +288,40 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
+- id: media.tts-dashboard-browser
+  group: Media Providers
+  feature: Text To Speech
+  subFeature: Browser voice catalog, filters, and audible preview
+  trigger: Dashboard Media Providers TTS tab opens or a user selects a voice to preview
+  input: "Provider and model selection; preview voice id from the listed catalog"
+  output: "Voice rows with language, region, gender and a playable sample when the provider has a supported preview path"
+  businessRules:
+    - "REFERENCE_BEHAVIOR: OpenAI standard TTS models expose 9 preset voices; gpt-4o-mini-tts exposes 13; Gemini and MiMo have their own per-model voice lists."
+    - "REFERENCE_BEHAVIOR: Region and language names are rendered with Intl.DisplayNames, with raw codes as fallback."
+    - "REFERENCE_BEHAVIOR: A preview uses the selected provider, model, voice and a short input, and displays returned audio."
+    - "IMPLEMENTATION_ACCIDENT: The old UI passes an API key through its client example path; AIGate's dashboard preview reads an already-saved connection on the server."
+  state: { reads: ["catalog TTS models", "active connection for remote preview", "browser speechSynthesis voices for local preview"], writes: [], runtimeOnly: ["temporary audio object URL"] }
+  dependencies: ["media.tts-voice-listing", "media.tts-lane"]
+  providerInteraction: "AIGate preview calls only an existing OpenAI-compatible speech endpoint for a validated model/voice; local browser voices use speechSynthesis."
+  fallback: { hasFallback: false, retry: null, timeout: "15 s", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "model or voice does not belong to the selected provider", partial: false }
+    - { code: INVALID_REQUEST, when: "a remote preview has no active saved credential (dashboard code NO_ACTIVE_CONNECTION)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "upstream refuses or returns oversized audio (dashboard code VOICE_PREVIEW_FAILED)", partial: false }
+  sideEffects: ["Remote preview may consume provider credit"]
+  persistence: []
+  performanceConcerns: ["one remote call per click, 15 s deadline, 1 MiB maximum audio, no automatic retries or cache"]
+  behavior: { streaming: false, cancellation: "browser abort and server disconnect", concurrency: "one preview per browser control" }
+  edgeCases: ["Browser speechSynthesis may have no installed voices", "providers without an AIGate preview adapter list voices but disable playback"]
+  evidence:
+    - { file: open-sse/config/ttsModels.js, line: 23, note: "9 standard OpenAI voices and 13 extended voices" }
+    - { file: open-sse/config/ttsModels.js, line: 28, note: "Gemini preset voice list" }
+    - { file: src/app/api/media-providers/tts/voices/route.js, line: 5, note: "Intl.DisplayNames for region and language" }
+    - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/[id]/components/TtsExampleCard.js", line: 208, note: "run example with selected model and voice; returned binary audio becomes an object URL" }
+  newModule: media
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
+
 - id: media.stt-lane
   group: Media Providers
   feature: Speech To Text

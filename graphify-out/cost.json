@@ -257,6 +257,20 @@
       "output_tokens": 0,
       "files": 4,
       "mode": "SP18 OpenCode keyless provider routing"
+    },
+    {
+      "date": "2026-09-30T02:06:19.172348+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "hand-authored chunk 42 (SP19 combos + tests)"
+    },
+    {
+      "date": "2026-09-30T02:28:03.856721+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 4,
+      "mode": "hand-authored chunk 43 (SP20 capacity adapter)"
     }
   ],
   "total_input_tokens": 574916,

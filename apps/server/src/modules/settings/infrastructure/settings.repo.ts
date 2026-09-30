@@ -5,7 +5,14 @@ import { DATABASE } from "../../../database.provider.js";
 import type { Settings, SettingsPatch } from "../domain/settings.js";
 
 const ROW_ID = 1;
-const columns = { requireLogin: settings.requireLogin, requireApiKey: settings.requireApiKey, fallbackStrategy: settings.fallbackStrategy, comboStickyLimit: settings.comboStickyLimit };
+const columns = {
+  requireLogin: settings.requireLogin, requireApiKey: settings.requireApiKey, fallbackStrategy: settings.fallbackStrategy, comboStickyLimit: settings.comboStickyLimit,
+  tokenSaverEnabled: settings.tokenSaverEnabled, rtkEnabled: settings.rtkEnabled, headroomEnabled: settings.headroomEnabled,
+  headroomUrl: settings.headroomUrl, headroomCompressUserMessages: settings.headroomCompressUserMessages, headroomTimeoutMs: settings.headroomTimeoutMs,
+  cavemanEnabled: settings.cavemanEnabled, cavemanLevel: settings.cavemanLevel, ponytailEnabled: settings.ponytailEnabled,
+  ponytailLevel: settings.ponytailLevel, pxpipeEnabled: settings.pxpipeEnabled, pxpipeMinChars: settings.pxpipeMinChars,
+  pxpipeTimeoutMs: settings.pxpipeTimeoutMs,
+};
 
 // Read on the request hot path, so the row is cached and replaced on every write.
 // ponytail: assumes this process is the only writer; other tools must change settings through the API.

@@ -12,6 +12,14 @@ export function registerV1Routes(fastify: FastifyInstance, lane: ChatLane): void
     errorHandler: (error: Parameters<ChatLane["bodyError"]>[0], _request: unknown, reply: Parameters<ChatLane["bodyError"]>[1]) => lane.bodyError(error, reply),
   };
   fastify.post("/v1/chat/completions", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.chat(request, reply));
+  fastify.post("/v1/embeddings", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.embeddings(request, reply));
+  fastify.post("/v1/images/generations", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.imageGeneration(request, reply));
+  fastify.post("/v1/audio/speech", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.speech(request, reply));
+  fastify.post("/v1/audio/transcriptions", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.transcription(request, reply));
+  fastify.post("/v1/search", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.search(request, reply));
+  fastify.post("/v1/web/fetch", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.webFetch(request, reply));
+  fastify.post<{ Params: { action: string } }>("/v1/videos/:action", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.videoCreate(request, reply));
+  fastify.get<{ Params: { id: string } }>("/v1/videos/:id", common, (request, reply) => lane.videoGet(request, reply));
   // docs/contracts/protocol-anthropic.md: Anthropic clients (Claude Code, the Anthropic SDK).
   fastify.post("/v1/messages", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.messages(request, reply));
   fastify.post("/v1/messages/count_tokens", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.countTokens(request, reply));

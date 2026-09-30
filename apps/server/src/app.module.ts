@@ -15,12 +15,12 @@ import { SecretsModule, type SecretCipherPort } from "./secret-cipher.js";
 
 @Module({})
 export class AppModule {
-  static with(database: DatabaseHandle, cipher: SecretCipherPort, limits: ChatLimits, transport?: HttpTransportPort): DynamicModule {
+  static with(database: DatabaseHandle, cipher: SecretCipherPort, limits: ChatLimits, dataDir: string, transport?: HttpTransportPort): DynamicModule {
     return {
       module: AppModule,
       imports: [
         DatabaseModule.with(database), SecretsModule.with(cipher), TransportModule.with(transport),
-        SettingsModule, IdentityModule, ApiKeysModule, CatalogModule, ConnectionsModule, RoutingModule.with(limits),
+        SettingsModule, IdentityModule, ApiKeysModule, CatalogModule, ConnectionsModule, RoutingModule.with(limits, dataDir),
       ],
       controllers: [HealthController],
     };

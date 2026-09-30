@@ -225,6 +225,12 @@ export class ConnectionsRepository {
     return row ? this.open(row) : undefined;
   }
 
+  // Async jobs (SP22 video) are account-bound, so polling may pin the active creating connection.
+  async activeCredentialById(provider: string, id: string): Promise<StoredCredential | undefined> {
+    const row = await this.database.db.select(secret).from(t).where(and(eq(t.id, id), eq(t.provider, provider), eq(t.isActive, true))).get();
+    return row ? this.open(row) : undefined;
+  }
+
   // The candidate selection and round-robin bookkeeping share a short SQLite transaction. No secret crosses this boundary.
   async selectActive(provider: string, model: string, excluded: ReadonlySet<string>, strategy: "fill-first" | "round-robin"): Promise<{ credential?: StoredCredential; retryAt?: Date }> {
     return this.database.db.transaction(async (tx) => {

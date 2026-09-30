@@ -1,18 +1,22 @@
 import { randomUUID } from "node:crypto";
+import { Buffer } from "node:buffer";
+import { lookup } from "node:dns/promises";
 import { once } from "node:events";
 import type { ServerResponse } from "node:http";
+import { isIP } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import {
-  anthropicClientGetsMessage, anthropicRequestFor, AnthropicStreamEncoder, assertModelSupports, builtinRegistry, createAdapter, EngineError,
+  anthropicClientGetsMessage, anthropicRequestFor, AnthropicStreamEncoder, assertModelSupports, builtinRegistry, createAdapter, detectRequiredCapabilities, EngineError, mediaService, readBoundedText,
   estimateAnthropicInputTokens, geminiModelList, GeminiStreamEncoder, geminiTtsRequest, isGeminiTtsRequest, OpenAIChatStreamEncoder,
   parseAnthropicMessagesRequest, parseGeminiGenerateRequest, parseGeminiPath, parseOpenAIChatRequest, parseOpenAIResponsesRequest,
   responsesClientGetsObject, responsesRequestFor, ResponsesStreamEncoder, toAnthropicMessage, toGeminiResponse, toOpenAIChatCompletion, toOpenAIError,
-  splitThinkingSuffix, toResponsesObject, UnsupportedFeatureError, withClaudeCodePrompt, withConnection, withThinking, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Credential,
+  splitThinkingSuffix, toResponsesObject, UnsupportedFeatureError, withClaudeCodePrompt, withConnection, withThinking, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Capability, type Credential,
   type ExecCtx, type GeminiRoute, type HttpTransportPort, type OpenAIError, type ProviderDescriptor, type ProxyConfig, type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
+import type { Settings } from "../../settings/domain/settings.js";
 import { extractApiKey } from "../../apikeys/domain/api-key.js";
 import { CustomModelsRepository } from "../../catalog/infrastructure/custom-models.repo.js";
 import { ProviderThinkingRepository } from "../../catalog/infrastructure/provider-thinking.repo.js";
@@ -24,8 +28,12 @@ import { isLocalRequest } from "../../identity/domain/local-request.js";
 import { SettingsRepository } from "../../settings/infrastructure/settings.repo.js";
 import { HTTP_TRANSPORT } from "../../transport/transport.token.js";
 import { ProxyPoolsRepository } from "../../transport/infrastructure/proxy-pools.repo.js";
+import { modelFit, needsMedia, reorderByCapabilities, trimHistory, widen, type Widening } from "../domain/capacity.js";
+import { applyTokenSaver, headroomInput } from "../domain/token-saver.js";
 import { collectPanel, judgeRequest, MAX_COMBO_DEPTH, memberFailover, panelRequest, type Combo } from "../domain/combo.js";
+import { CapacityPoolsRepository } from "./capacity-pools.repo.js";
 import { CombosRepository } from "./combos.repo.js";
+import { PxpipeService } from "./pxpipe.service.js";
 
 // The /v1 chat lane (docs/contracts/chat-lane.md): key gate, parse, resolve, adapter, stream.
 
@@ -84,6 +92,50 @@ function errorOf(error: unknown): OpenAIError {
   return toOpenAIError(error);
 }
 
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+
+// The body stays opaque for forwarding. Only the small model field is read, before any binary file part.
+function multipartField(body: Uint8Array, name: string): string | undefined {
+  const source = Buffer.from(body).toString("latin1");
+  const part = source.indexOf(`name="${name}"`);
+  if (part < 0) return undefined;
+  const separator = source.indexOf("\r\n\r\n", part);
+  const start = separator < 0 ? source.indexOf("\n\n", part) : separator;
+  if (start < 0) return undefined;
+  const valueStart = start + (separator < 0 ? 2 : 4);
+  const end = source.indexOf(separator < 0 ? "\n--" : "\r\n--", valueStart);
+  return (end < 0 ? source.slice(valueStart) : source.slice(valueStart, end)).trim();
+}
+
+const privateAddress = (address: string): boolean => {
+  const normalized = address.toLowerCase();
+  if (isIP(normalized) === 6) return normalized === "::1" || normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe80:") || normalized.startsWith("::ffff:127.");
+  if (isIP(normalized) !== 4) return true;
+  const [a, b] = normalized.split(".").map(Number);
+  return a === 0 || a === 10 || a === 127 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a >= 224;
+};
+
+async function publicFetchUrl(raw: string, signal: AbortSignal): Promise<string> {
+  let url: URL;
+  try { url = new URL(raw); } catch { throw new GatewayError(400, "invalid_request_error", "invalid_url", "Fetch requires a valid public http(s) URL."); }
+  if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password || url.hostname === "localhost") {
+    throw new GatewayError(400, "invalid_request_error", "invalid_url", "Fetch requires a public http(s) URL without credentials.");
+  }
+  const direct = isIP(url.hostname);
+  const addresses = direct ? [{ address: url.hostname }] : await Promise.race([
+    lookup(url.hostname, { all: true, verbatim: true }),
+    delay(2_000, undefined, { signal }).then(() => { throw new GatewayError(400, "invalid_request_error", "url_resolution_timeout", "Could not resolve the fetch URL in time."); }),
+  ]);
+  signal.throwIfAborted();
+  if (addresses.length === 0 || addresses.some((entry) => privateAddress(entry.address))) {
+    throw new GatewayError(400, "invalid_request_error", "private_url", "Fetch requires a public URL.");
+  }
+  return url.toString();
+}
+
+const text = (value: unknown): string => typeof value === "string" ? value : "";
+const records = (value: unknown): Record<string, unknown>[] => Array.isArray(value) ? value.filter(isObject) : [];
+
 // An abort after `ms` whose reason is a TIMEOUT the client can read, not a bare DOMException.
 function deadline(ms: number, message: string): { signal: AbortSignal; clear: () => void } {
   const controller = new AbortController();
@@ -111,6 +163,9 @@ interface Target {
 const upstreamAuthFailure = (error: unknown): boolean =>
   error instanceof EngineError && error.code === "AUTH_ERROR" && (error.details.status === 401 || error.details.status === 403);
 
+const mediaCooldown = (status: number): number | undefined =>
+  status === 429 ? 2_000 : status === 401 || status === 403 ? 120_000 : status >= 500 ? 30_000 : undefined;
+
 // One client request on its way through the lane, shared by every combo member it reaches.
 interface Call {
   readonly parsed: ParsedClientRequest;
@@ -121,6 +176,7 @@ interface Call {
   readonly signal: AbortSignal;
   // A fusion panel or judge request: the combo lane changed it, so the client's raw body no longer describes it.
   readonly rewritten: boolean;
+  readonly pxpipe: { enabled: boolean; minChars: number; timeoutMs: number };
 }
 
 // What the lane does with a resolved target: answer the client, or (a fusion panel member) return the answer.
@@ -264,6 +320,8 @@ export class ChatLane {
     private readonly pools: ProxyPoolsRepository,
     private readonly refresher: TokenRefresher,
     private readonly combos: CombosRepository,
+    private readonly capacity: CapacityPoolsRepository,
+    private readonly pxpipe: PxpipeService,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
     @Inject(CHAT_LIMITS) private readonly limits: ChatLimits,
   ) {}
@@ -329,6 +387,376 @@ export class ChatLane {
     return reply.header("cache-control", "no-store").send({ input_tokens: estimateAnthropicInputTokens(request.body) });
   }
 
+  // SP22: OpenAI-compatible embedding providers share the chat connection, proxy, and credential lifecycle.
+  async embeddings(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const requestId = randomUUID();
+    const client = new AbortController();
+    reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
+    const budget = deadline(REQUEST_BUDGET_MS, `The request did not finish within ${REQUEST_BUDGET_MS / 1000} s`);
+    const signal = AbortSignal.any([client.signal, budget.signal]);
+    try {
+      if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
+        throw new GatewayError(415, "invalid_request_error", "unsupported_media_type", "Send the body as JSON with Content-Type: application/json.");
+      }
+      const body = request.body;
+      if (!isObject(body) || typeof body.model !== "string"
+        || !(typeof body.input === "string" || (Array.isArray(body.input) && body.input.every((item) => typeof item === "string")))) {
+        throw new GatewayError(400, "invalid_request_error", "invalid_embedding_request", "Embeddings require a model and string or string-array input.");
+      }
+      const input: Record<string, unknown> = { model: body.model, input: body.input };
+      for (const key of ["encoding_format", "dimensions", "user"] as const) if (body[key] !== undefined) input[key] = body[key];
+      const target = await this.resolve({ model: body.model, messages: [], stream: false }, new Set(), "embedding");
+      const model = builtinRegistry.model(target.provider.id, target.request.model);
+      if (target.provider.auth.kind !== "api-key") throw new GatewayError(400, "invalid_request_error", "embedding_provider_unsupported", `${target.provider.name} has no supported embedding authentication.`);
+      let endpoint: string;
+      let payload: Record<string, unknown>;
+      if (target.provider.protocol === "openai-compatible") {
+        endpoint = target.provider.chatUrl.replace(/\/chat\/completions(?:\?.*)?$/, "/embeddings");
+        if (endpoint === target.provider.chatUrl) throw new GatewayError(400, "invalid_request_error", "embedding_provider_unsupported", `${target.provider.name} has no configured embeddings endpoint.`);
+        payload = { ...input, model: model?.upstreamModelId ?? target.request.model };
+      } else if (target.provider.protocol === "gemini") {
+        const modelId = model?.upstreamModelId ?? target.request.model;
+        const geminiModel = modelId.startsWith("models/") ? modelId : `models/${modelId}`;
+        endpoint = `${target.provider.chatUrl.replace(/\/models$/, "")}/${geminiModel}:${Array.isArray(body.input) ? "batchEmbedContents" : "embedContent"}`;
+        const dimensions = typeof body.dimensions === "number" && Number.isFinite(body.dimensions) && body.dimensions > 0 ? { outputDimensionality: body.dimensions } : {};
+        payload = Array.isArray(body.input)
+          ? { requests: body.input.map((text) => ({ model: geminiModel, content: { parts: [{ text }] }, ...dimensions })) }
+          : { model: geminiModel, content: { parts: [{ text: body.input }] }, ...dimensions };
+      } else throw new GatewayError(400, "invalid_request_error", "embedding_provider_unsupported", `${target.provider.name} has no supported embeddings endpoint.`);
+      const headers = { ...target.provider.headers, "content-type": "application/json", [target.provider.auth.header]: target.provider.auth.scheme === "raw" ? target.credential.apiKey : `Bearer ${target.credential.apiKey}` };
+      const upstream = await this.transport.send({ method: "POST", url: endpoint, headers, body: JSON.stringify(payload), timeoutMs: REQUEST_BUDGET_MS }, {
+        signal, requestId, proxy: target.proxy,
+      });
+      const text = await readBoundedText(upstream.body, 16 * 1024 * 1024);
+      if (upstream.status >= 200 && upstream.status < 300 && target.provider.protocol === "gemini") {
+        const result: unknown = JSON.parse(text);
+        const rows = isObject(result) && Array.isArray(result.embeddings) ? result.embeddings.filter(isObject)
+          : isObject(result) && isObject(result.embedding) ? [result.embedding] : [];
+        return void reply.code(upstream.status).header("cache-control", "no-store").send({
+          object: "list", model: target.request.model,
+          data: rows.map((row, index) => ({ object: "embedding", index, embedding: Array.isArray(row.values) ? row.values : [] })),
+          usage: { prompt_tokens: 0, total_tokens: 0 },
+        });
+      }
+      reply.code(upstream.status).header("cache-control", "no-store").header("content-type", upstream.headers["content-type"] ?? "application/json").send(text);
+    } catch (error) {
+      if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
+      this.logUnexpected(error, requestId);
+      const { status, body } = errorOf(error);
+      reply.code(status).header("cache-control", "no-store").send(body);
+    } finally {
+      budget.clear();
+    }
+  }
+
+  // SP22: OpenAI-compatible image generation, with the same bounded connection lifecycle as embeddings.
+  async imageGeneration(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const requestId = randomUUID();
+    const client = new AbortController();
+    reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
+    const budget = deadline(REQUEST_BUDGET_MS, `The request did not finish within ${REQUEST_BUDGET_MS / 1000} s`);
+    const signal = AbortSignal.any([client.signal, budget.signal]);
+    try {
+      const body = request.body;
+      if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
+        throw new GatewayError(415, "invalid_request_error", "unsupported_media_type", "Send the body as JSON with Content-Type: application/json.");
+      }
+      if (!isObject(body) || typeof body.model !== "string" || typeof body.prompt !== "string" || body.prompt.trim() === "") {
+        throw new GatewayError(400, "invalid_request_error", "invalid_image_request", "Image generation requires a model and non-empty prompt.");
+      }
+      const target = await this.resolve({ model: body.model, messages: [], stream: false }, new Set(), "image");
+      if (target.provider.protocol !== "openai-compatible" || target.provider.auth.kind !== "api-key") {
+        throw new GatewayError(400, "invalid_request_error", "image_provider_unsupported", `${target.provider.name} does not have an OpenAI-compatible image endpoint.`);
+      }
+      const endpoint = target.provider.chatUrl.replace(/\/chat\/completions(?:\?.*)?$/, "/images/generations");
+      if (endpoint === target.provider.chatUrl) throw new GatewayError(400, "invalid_request_error", "image_provider_unsupported", `${target.provider.name} has no configured image endpoint.`);
+      const descriptor = builtinRegistry.model(target.provider.id, target.request.model);
+      const upstreamBody: Record<string, unknown> = { model: descriptor?.upstreamModelId ?? target.request.model, prompt: body.prompt };
+      for (const key of ["n", "size", "quality", "style", "response_format"] as const) if (body[key] !== undefined) upstreamBody[key] = body[key];
+      const headers = { ...target.provider.headers, "content-type": "application/json", [target.provider.auth.header]: target.provider.auth.scheme === "raw" ? target.credential.apiKey : `Bearer ${target.credential.apiKey}` };
+      const upstream = await this.transport.send({ method: "POST", url: endpoint, headers, body: JSON.stringify(upstreamBody), timeoutMs: REQUEST_BUDGET_MS }, {
+        signal, requestId, proxy: target.proxy,
+      });
+      const text = await readBoundedText(upstream.body, 16 * 1024 * 1024);
+      reply.code(upstream.status).header("cache-control", "no-store").header("content-type", upstream.headers["content-type"] ?? "application/json").send(text);
+    } catch (error) {
+      if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
+      this.logUnexpected(error, requestId);
+      const { status, body } = errorOf(error);
+      reply.code(status).header("cache-control", "no-store").send(body);
+    } finally {
+      budget.clear();
+    }
+  }
+
+  // SP22: OpenAI-compatible text-to-speech; binary output stays streamed instead of buffering audio in memory.
+  async speech(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const requestId = randomUUID();
+    const client = new AbortController();
+    reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
+    const budget = deadline(REQUEST_BUDGET_MS, `The request did not finish within ${REQUEST_BUDGET_MS / 1000} s`);
+    const signal = AbortSignal.any([client.signal, budget.signal]);
+    try {
+      const body = request.body;
+      if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
+        throw new GatewayError(415, "invalid_request_error", "unsupported_media_type", "Send the body as JSON with Content-Type: application/json.");
+      }
+      if (!isObject(body) || typeof body.model !== "string" || typeof body.input !== "string" || body.input.trim() === "") {
+        throw new GatewayError(400, "invalid_request_error", "invalid_tts_request", "Speech requires a model and non-empty input.");
+      }
+      const target = await this.resolve({ model: body.model, messages: [], stream: false }, new Set(), "tts");
+      if (target.provider.protocol !== "openai-compatible" || target.provider.auth.kind !== "api-key") {
+        throw new GatewayError(400, "invalid_request_error", "tts_provider_unsupported", `${target.provider.name} does not have an OpenAI-compatible speech endpoint.`);
+      }
+      const endpoint = target.provider.chatUrl.replace(/\/chat\/completions(?:\?.*)?$/, "/audio/speech");
+      if (endpoint === target.provider.chatUrl) throw new GatewayError(400, "invalid_request_error", "tts_provider_unsupported", `${target.provider.name} has no configured speech endpoint.`);
+      const descriptor = builtinRegistry.model(target.provider.id, target.request.model);
+      const upstreamBody: Record<string, unknown> = { model: descriptor?.upstreamModelId ?? target.request.model, input: body.input };
+      for (const key of ["voice", "response_format", "speed", "instructions"] as const) if (body[key] !== undefined) upstreamBody[key] = body[key];
+      const headers = { ...target.provider.headers, "content-type": "application/json", [target.provider.auth.header]: target.provider.auth.scheme === "raw" ? target.credential.apiKey : `Bearer ${target.credential.apiKey}` };
+      const upstream = await this.transport.send({ method: "POST", url: endpoint, headers, body: JSON.stringify(upstreamBody), timeoutMs: REQUEST_BUDGET_MS }, {
+        signal, requestId, proxy: target.proxy,
+      });
+      reply.hijack();
+      reply.raw.writeHead(upstream.status, {
+        "cache-control": "no-store", "content-type": upstream.headers["content-type"] ?? "audio/mpeg", "x-request-id": requestId,
+        ...(upstream.headers["content-length"] ? { "content-length": upstream.headers["content-length"] } : {}),
+      });
+      if (upstream.body) for await (const chunk of upstream.body) if (!reply.raw.write(chunk)) await once(reply.raw, "drain", { signal });
+      reply.raw.end();
+    } catch (error) {
+      if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
+      this.logUnexpected(error, requestId);
+      const { status, body } = errorOf(error);
+      reply.code(status).header("cache-control", "no-store").send(body);
+    } finally {
+      budget.clear();
+    }
+  }
+
+  // SP22: multipart stays byte-for-byte intact for Whisper-compatible upstreams; Fastify caps it at the route boundary.
+  async transcription(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const contentType = request.headers["content-type"];
+    const body = request.body;
+    if (typeof contentType !== "string" || !contentType.toLowerCase().startsWith("multipart/form-data") || !Buffer.isBuffer(body)) {
+      return void this.fail(reply, new GatewayError(415, "invalid_request_error", "unsupported_media_type", "Send transcription as multipart/form-data."));
+    }
+    const model = multipartField(body, "model");
+    if (!model || !multipartField(body, "file")) return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_transcription_request", "Transcription requires model and file multipart fields."));
+    const requestId = randomUUID();
+    const client = new AbortController();
+    reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
+    const budget = deadline(REQUEST_BUDGET_MS, `The request did not finish within ${REQUEST_BUDGET_MS / 1000} s`);
+    try {
+      const target = await this.resolve({ model, messages: [], stream: false }, new Set(), "stt");
+      if (target.provider.protocol !== "openai-compatible" || target.provider.auth.kind !== "api-key") {
+        throw new GatewayError(400, "invalid_request_error", "stt_provider_unsupported", `${target.provider.name} does not have an OpenAI-compatible transcription endpoint.`);
+      }
+      const endpoint = target.provider.chatUrl.replace(/\/chat\/completions(?:\?.*)?$/, "/audio/transcriptions");
+      if (endpoint === target.provider.chatUrl) throw new GatewayError(400, "invalid_request_error", "stt_provider_unsupported", `${target.provider.name} has no configured transcription endpoint.`);
+      const headers = { ...target.provider.headers, "content-type": contentType, [target.provider.auth.header]: target.provider.auth.scheme === "raw" ? target.credential.apiKey : `Bearer ${target.credential.apiKey}` };
+      const upstream = await this.transport.send({ method: "POST", url: endpoint, headers, body, timeoutMs: REQUEST_BUDGET_MS }, {
+        signal: AbortSignal.any([client.signal, budget.signal]), requestId, proxy: target.proxy,
+      });
+      const text = await readBoundedText(upstream.body, 16 * 1024 * 1024);
+      reply.code(upstream.status).header("cache-control", "no-store").header("content-type", upstream.headers["content-type"] ?? "application/json").send(text);
+    } catch (error) {
+      if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
+      this.logUnexpected(error, requestId);
+      const { status, body: response } = errorOf(error);
+      reply.code(status).header("cache-control", "no-store").send(response);
+    } finally {
+      budget.clear();
+    }
+  }
+
+  // SP22: dedicated search APIs normalize their varied payloads into one bounded result envelope.
+  async search(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const body = request.body;
+    if (!isObject(body) || typeof body.query !== "string" || body.query.trim() === "" || body.query.length > 8_192) {
+      return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_search_request", "Search requires a query up to 8192 characters."));
+    }
+    const providerId = typeof body.provider === "string" ? body.provider : typeof body.model === "string" ? body.model : "";
+    const service = mediaService(providerId);
+    if (!service?.search) return void this.fail(reply, new GatewayError(400, "invalid_request_error", "search_provider_unsupported", `Provider "${providerId}" does not support dedicated web search.`));
+    const maxResults = typeof body.max_results === "number" && Number.isInteger(body.max_results) ? body.max_results : 5;
+    if (maxResults < 1 || maxResults > 20) return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_search_request", "max_results must be an integer from 1 to 20."));
+    const requestId = randomUUID();
+    const started = Date.now();
+    const client = new AbortController();
+    reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
+    const budget = deadline(15_000, "The search provider did not respond within 15 s");
+    const signal = AbortSignal.any([client.signal, budget.signal]);
+    try {
+      const query = body.query.normalize("NFKC").trim().replace(/\s+/g, " ");
+      if (!query) throw new GatewayError(400, "invalid_request_error", "invalid_search_request", "Query is empty after normalization.");
+      const type = body.search_type === "news" ? "news" : "web";
+      let url = service.search.url;
+      let payload: Record<string, unknown> | undefined;
+      if (service.search.format === "brave") {
+        const params = new URLSearchParams({ q: query, count: String(maxResults) });
+        url += `${type === "news" ? "/news/search" : "/web/search"}?${params}`;
+      } else if (service.search.format === "serper") { url += type === "news" ? "/news" : "/search"; payload = { q: query, num: maxResults }; }
+      else if (service.search.format === "linkup") payload = { q: query, depth: "standard", outputType: "searchResults", maxResults };
+      else if (service.search.format === "searchapi") url += `?${new URLSearchParams({ engine: type === "news" ? "google_news" : "google", q: query, api_key: "__key__" })}`;
+      else if (service.search.format === "youcom") url += `?${new URLSearchParams({ query, count: String(maxResults) })}`;
+      else if (service.search.format === "xquik") url += `?${new URLSearchParams({ q: query, limit: String(maxResults) })}`;
+      else if (service.search.format === "glm") payload = { jsonrpc: "2.0", id: requestId, method: "tools/call", params: { name: "web_search_prime", arguments: { search_query: query, count: maxResults } } };
+      else if (service.search.format === "tavily") payload = { query, max_results: maxResults, topic: type === "news" ? "news" : "general" };
+      else if (service.search.format === "exa") payload = { query, numResults: maxResults, type: "auto", text: true, highlights: true, ...(type === "news" ? { category: "news" } : {}) };
+      else payload = { query, max_results: maxResults };
+      const { status, raw } = await this.mediaResponse(service.id, `websearch:${service.id}`, requestId, signal, (target) => {
+        const key = target.credential.apiKey;
+        const auth: Record<string, string> = service.authHeader === "authorization" ? { authorization: `Bearer ${key}` } : { [service.authHeader]: key };
+        const searchUrl = service.search!.format === "searchapi" ? url.replace("__key__", encodeURIComponent(key)) : url;
+        return this.transport.send({ method: ["brave", "searchapi", "youcom", "xquik"].includes(service.search!.format) ? "GET" : "POST", url: searchUrl,
+          headers: { accept: "application/json", ...auth, ...(payload ? { "content-type": "application/json" } : {}) }, ...(payload ? { body: JSON.stringify(payload) } : {}), timeoutMs: 15_000 }, { signal, requestId, proxy: target.proxy });
+      });
+      if (status < 200 || status >= 300) return void reply.code(status).header("cache-control", "no-store").send(raw);
+      const parsed: unknown = JSON.parse(raw);
+      const root = isObject(parsed) ? parsed : {};
+      let normalized = root;
+      if (service.search.format === "glm") {
+        const content = isObject(root.result) ? records(root.result.content)[0] : undefined;
+        try {
+          const parsedContent: unknown = typeof content?.text === "string" ? JSON.parse(content.text) : root;
+          normalized = isObject(parsedContent) ? parsedContent : {};
+        } catch { normalized = {}; }
+      }
+      const source = service.search.format === "brave" ? records(isObject(root[type]) ? root[type].results : undefined)
+        : service.search.format === "serper" ? records(root[type === "news" ? "news" : "organic"])
+        : service.search.format === "searchapi" ? records(root[type === "news" ? "top_stories" : "organic_results"])
+        : service.search.format === "youcom" ? records(isObject(root.results) ? root.results[type === "news" ? "news" : "web"] : undefined)
+        : service.search.format === "xquik" ? records(root.tweets)
+        : records(normalized.results).length > 0 ? records(normalized.results) : records(normalized.news);
+      const results = source.slice(0, maxResults).map((item, index) => ({
+        title: service.search?.format === "xquik" ? `${text(isObject(item.author) ? item.author.username : undefined) || "X"} on X` : text(item.title) || text(item.name),
+        url: service.search?.format === "xquik" ? `https://x.com/${encodeURIComponent(text(isObject(item.author) ? item.author.username : ""))}/status/${encodeURIComponent(text(item.id))}` : text(item.url) || text(item.link),
+        snippet: service.search?.format === "brave" ? text(item.description) : text(item.content) || text(item.snippet) || text(item.description) || text(Array.isArray(item.highlights) ? item.highlights[0] : undefined) || text(item.text),
+        position: index + 1, score: typeof item.score === "number" ? Math.max(0, Math.min(1, item.score)) : null,
+      }));
+      reply.header("cache-control", "no-store").send({ provider: service.id, query, results, answer: null, usage: { queries_used: 1 }, metrics: { response_time_ms: Date.now() - started, total_results_available: results.length }, errors: [] });
+    } catch (error) {
+      if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
+      this.logUnexpected(error, requestId);
+      const { status, body: response } = errorOf(error);
+      reply.code(status).header("cache-control", "no-store").send(response);
+    } finally { budget.clear(); }
+  }
+
+  // SP22: the requested page is checked before a remote extraction provider is asked to fetch it.
+  async webFetch(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const body = request.body;
+    const providerId = isObject(body) ? (typeof body.provider === "string" ? body.provider : typeof body.model === "string" ? body.model : "") : "";
+    const service = mediaService(providerId);
+    if (!isObject(body) || typeof body.url !== "string" || !service?.fetch) return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_fetch_request", "Fetch requires a supported provider and URL."));
+    const maxCharacters = typeof body.max_characters === "number" && Number.isInteger(body.max_characters) ? body.max_characters : 100_000;
+    if (maxCharacters < 1 || maxCharacters > 200_000) return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_fetch_request", "max_characters must be an integer from 1 to 200000."));
+    const requestId = randomUUID();
+    const started = Date.now();
+    const client = new AbortController();
+    reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
+    const budget = deadline(30_000, "The fetch provider did not respond within 30 s");
+    const signal = AbortSignal.any([client.signal, budget.signal]);
+    try {
+      const url = await publicFetchUrl(body.url, signal);
+      const format = body.format === "html" || body.format === "text" ? body.format : "markdown";
+      const payload = service.fetch.format === "firecrawl" ? { url, formats: [format] }
+        : service.fetch.format === "jina" ? { url }
+        : service.fetch.format === "tavily" ? { urls: [url], extract_depth: "basic" }
+        : service.fetch.format === "exa" ? { ids: [url], text: true }
+        : { url, format };
+      const { status, raw } = await this.mediaResponse(service.id, `webfetch:${service.id}`, requestId, signal, (target) => {
+        const key = target.credential.apiKey;
+        const auth: Record<string, string> = service.authHeader === "authorization" ? { authorization: `Bearer ${key}` } : { [service.authHeader]: key };
+        return this.transport.send({ method: "POST", url: service.fetch!.url, headers: { "content-type": "application/json", ...auth }, body: JSON.stringify(payload), timeoutMs: 30_000 }, { signal, requestId, proxy: target.proxy });
+      });
+      if (status < 200 || status >= 300) return void reply.code(status).header("cache-control", "no-store").send(raw);
+      const parsed: unknown = service.fetch.format === "jina" ? raw : JSON.parse(raw);
+      const root = isObject(parsed) ? parsed : {};
+      const textBody = service.fetch.format === "jina" ? raw : service.fetch.format === "firecrawl" ? text(isObject(root.data) ? root.data.markdown : undefined) || text(isObject(root.data) ? root.data.html : undefined)
+        : service.fetch.format === "tavily" ? text(isObject(records(root.results)[0]) ? records(root.results)[0].raw_content : undefined)
+        : service.fetch.format === "exa" ? text(records(root.results)[0]?.text) : text(root.content);
+      reply.header("cache-control", "no-store").send({ provider: service.id, url, title: null, content: { format, text: textBody.slice(0, maxCharacters), length: Math.min(textBody.length, maxCharacters) }, links: [], metrics: { response_time_ms: Date.now() - started } });
+    } catch (error) {
+      if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
+      this.logUnexpected(error, requestId);
+      const { status, body: response } = errorOf(error);
+      reply.code(status).header("cache-control", "no-store").send(response);
+    } finally { budget.clear(); }
+  }
+
+  // SP22: xAI's asynchronous video jobs. Other catalog video entries lack a usable video endpoint (matrix records that bug).
+  async videoCreate(request: FastifyRequest<{ Params: { action: string } }>, reply: FastifyReply): Promise<void> {
+    const action = request.params.action;
+    const body = request.body;
+    if (!["generations", "edits", "extensions"].includes(action)) return void this.fail(reply, new GatewayError(404, "invalid_request_error", "not_found", "Unknown video action."));
+    if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json") || !isObject(body) || typeof body.model !== "string") {
+      return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_video_request", "Video generation requires a JSON body with a model."));
+    }
+    const requestId = randomUUID();
+    const client = new AbortController();
+    reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
+    const budget = deadline(120_000, "The video upstream did not respond within 120 s");
+    const signal = AbortSignal.any([client.signal, budget.signal]);
+    try {
+      const target = await this.resolve({ model: body.model, messages: [], stream: false }, new Set(), "video");
+      if (target.provider.id !== "xai" || target.provider.auth.kind !== "api-key") {
+        throw new GatewayError(400, "invalid_request_error", "video_provider_unsupported", `${target.provider.name} does not have a supported video endpoint.`);
+      }
+      const headers = {
+        ...target.provider.headers, "content-type": "application/json", [target.provider.auth.header]: target.provider.auth.scheme === "raw" ? target.credential.apiKey : `Bearer ${target.credential.apiKey}`,
+        ...(typeof request.headers["idempotency-key"] === "string" ? { "idempotency-key": request.headers["idempotency-key"] } : {}),
+      };
+      const upstream = await this.transport.send({ method: "POST", url: target.provider.chatUrl.replace(/\/chat\/completions(?:\?.*)?$/, `/videos/${action}`), headers,
+        body: JSON.stringify({ ...body, model: target.request.model }), timeoutMs: 120_000 }, { signal, requestId, proxy: target.proxy });
+      const text = await readBoundedText(upstream.body, 16 * 1024 * 1024);
+      reply.code(upstream.status).header("cache-control", "no-store").header("content-type", upstream.headers["content-type"] ?? "application/json")
+        .header("x-aigate-connection-id", target.connection.id).send(text);
+    } catch (error) {
+      if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
+      this.logUnexpected(error, requestId);
+      const { status, body: response } = errorOf(error);
+      reply.code(status).header("cache-control", "no-store").send(response);
+    } finally {
+      budget.clear();
+    }
+  }
+
+  async videoGet(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply): Promise<void> {
+    const id = request.params.id;
+    if (!/^[A-Za-z0-9_-]{1,200}$/.test(id)) return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_video_id", "Invalid video request id."));
+    const requestId = randomUUID();
+    const client = new AbortController();
+    reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
+    const budget = deadline(120_000, "The video upstream did not respond within 120 s");
+    const signal = AbortSignal.any([client.signal, budget.signal]);
+    try {
+      const pinned = request.headers["x-aigate-connection-id"];
+      const stored = typeof pinned === "string" ? await this.connections.activeCredentialById("xai", pinned) : await this.connections.activeCredential("xai");
+      if (!stored) throw new GatewayError(404, "not_found_error", "no_active_connection", "xAI has no active connection for video polling.");
+      const base = builtinRegistry.provider("xai");
+      if (!base || base.auth.kind !== "api-key") throw new GatewayError(500, "server_error", "video_provider_unavailable", "xAI video is not configured.");
+      const auth = base.auth;
+      const fresh = await this.refresher.fresh("xai", stored);
+      const provider = withConnection(base, fresh);
+      const headers = { ...provider.headers, [auth.header]: auth.scheme === "raw" ? fresh.apiKey : `Bearer ${fresh.apiKey}` };
+      const upstream = await this.transport.send({ method: "GET", url: provider.chatUrl.replace(/\/chat\/completions(?:\?.*)?$/, `/videos/${encodeURIComponent(id)}`), headers, timeoutMs: 120_000 }, {
+        signal, requestId, proxy: await this.pools.resolve(fresh.proxyPoolId),
+      });
+      const text = await readBoundedText(upstream.body, 16 * 1024 * 1024);
+      reply.code(upstream.status).header("cache-control", "no-store").header("content-type", upstream.headers["content-type"] ?? "application/json")
+        .header("x-aigate-connection-id", fresh.id).send(text);
+    } catch (error) {
+      if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
+      this.logUnexpected(error, requestId);
+      const { status, body } = errorOf(error);
+      reply.code(status).header("cache-control", "no-store").send(body);
+    } finally {
+      budget.clear();
+    }
+  }
+
   private async serve(request: FastifyRequest, reply: FastifyReply, protocol: ClientProtocol): Promise<void> {
     const requestId = randomUUID();
     const client = new AbortController();
@@ -344,9 +772,19 @@ export class ChatLane {
       }
       const accept = request.headers.accept;
       const parsed = protocol.parse(request.body, typeof accept === "string" ? accept : undefined);
+      const settings = await this.settings.get();
+      const tokenHeader = request.headers["x-aigate-token-saver"];
+      const tokenSaverOptOut = typeof tokenHeader === "string" && tokenHeader.toLowerCase() === "off";
+      const savedRequest = await applyTokenSaver(
+        parsed.request, settings, tokenSaverOptOut,
+        (body, config, signal) => this.headroom(body, config, signal, requestId), AbortSignal.any([client.signal, budget.signal]),
+      );
       const ids = { created: Math.floor(Date.now() / 1000), fallbackId: `chatcmpl-${requestId.replaceAll("-", "")}`, requestId };
-      const call: Call = { parsed, protocol, reply, requestId, signal: AbortSignal.any([client.signal, budget.signal]), rewritten: false };
-      await this.route(call, parsed.request, async (target, adapter, credential) => {
+      const call: Call = {
+        parsed, protocol, reply, requestId, signal: AbortSignal.any([client.signal, budget.signal]), rewritten: savedRequest !== parsed.request,
+        pxpipe: { enabled: settings.tokenSaverEnabled && settings.pxpipeEnabled && !tokenSaverOptOut, minChars: settings.pxpipeMinChars, timeoutMs: settings.pxpipeTimeoutMs },
+      };
+      await this.route(call, savedRequest, async (target, adapter, credential) => {
         if (!target.request.stream) {
           const response = await answerOf(target, adapter, credential, call);
           reply.code(200).header("cache-control", "no-store").send(parsed.respond(response, target.provider, ids));
@@ -374,14 +812,40 @@ export class ChatLane {
   // routed again (a member may be a combo too); anything else is one model.
   private async route<T>(call: Call, request: CanonicalRequest, deliver: Deliver<T>, depth = 0): Promise<T> {
     const combo = request.model.includes("/") ? undefined : await this.combos.byName(request.model);
-    if (!combo) return this.single(call, request, deliver);
+    // routing.capacity-adapter-solo: only the client's own model widens; a combo member widens with its combo.
+    if (!combo) return depth === 0 ? this.adapted(call, request, deliver) : this.single(call, request, deliver);
     if (depth >= MAX_COMBO_DEPTH) {
       throw new GatewayError(400, "invalid_request_error", "combo_too_deep",
         `Combo "${combo.name}" nests combos more than ${MAX_COMBO_DEPTH} deep or reaches itself. Change its members in AIGate: Gateway → Routing.`);
     }
     if (combo.strategy === "fusion") return this.fuse(call, request, combo, deliver, depth + 1);
-    const members = combo.strategy === "round-robin" ? this.combos.order(combo, (await this.settings.get()).comboStickyLimit) : combo.models;
-    return this.firstAnswer(call, members, (model) => this.route(call, { ...request, model }, deliver, depth + 1));
+    const rotated = combo.strategy === "round-robin" ? this.combos.order(combo, (await this.settings.get()).comboStickyLimit) : combo.models;
+    // combo.reorder-by-capabilities-tiers after capacity.augment-models-priority-prepend (docs/contracts/capacity-adapter.md).
+    const required = detectRequiredCapabilities(request);
+    const widened = await this.widening(combo.models, required);
+    const members = reorderByCapabilities([...(widened?.pool ?? []), ...rotated], required);
+    return this.firstAnswer(call, members, (model) => this.member(call, request, model, widened, deliver, depth + 1));
+  }
+
+  // The client's own model cannot read the media: capable pool models first, the model itself last.
+  private async adapted<T>(call: Call, request: CanonicalRequest, deliver: Deliver<T>): Promise<T> {
+    const widened = await this.widening([request.model], detectRequiredCapabilities(request));
+    if (!widened) return this.single(call, request, deliver);
+    const pool = widened.rotate ? this.capacity.order(widened.rotate, widened.pool) : widened.pool;
+    return this.firstAnswer(call, [...pool, request.model], (model) => this.member(call, request, model, widened, deliver, 1));
+  }
+
+  // Most requests carry no media, so the pools are read only when one could apply.
+  private async widening(originals: readonly string[], required: ReadonlySet<Capability>): Promise<Widening | undefined> {
+    return needsMedia(required) ? widen(originals, required, await this.capacity.list()) : undefined;
+  }
+
+  // capacity.wrap-stripping-per-model: a pool model gets the history trimmed to its own window; a trimmed request no
+  // longer matches the client's body (see Call.rewritten).
+  private member<T>(call: Call, request: CanonicalRequest, model: string, widened: Widening | undefined, deliver: Deliver<T>, depth: number): Promise<T> {
+    if (!widened?.pool.includes(model)) return this.route(call, { ...request, model }, deliver, depth);
+    const trimmed = trimHistory(request, modelFit(model).contextWindow);
+    return this.route(trimmed === request ? call : { ...call, rewritten: true }, { ...trimmed, model }, deliver, depth);
   }
 
   // combo.mode-fallback: members in order until one answers. A client error is the answer at once; so is anything after
@@ -435,7 +899,26 @@ export class ChatLane {
       const prepared = await this.thought(call.parsed.prepare(resolved.request, resolved.provider, call.rewritten), resolved.provider);
       // provider.claude-oauth (kept from 9router): a non-Claude client's request to claude gets the Claude Code prompt.
       const target = { ...resolved, request: call.protocol === ANTHROPIC_MESSAGES ? prepared : claudeCodePrompt(prepared, resolved.provider) };
-      const adapter = createAdapter(target.provider, this.transport);
+      let transport = this.transport;
+      if (call.pxpipe.enabled && call.protocol === ANTHROPIC_MESSAGES && target.provider.protocol === "anthropic") {
+        const base = this.transport;
+        transport = {
+          send: async (http, ctx) => {
+            if (http.method !== "POST" || typeof http.body !== "string") return base.send(http, ctx);
+            let body: string;
+            try {
+              const parsedBody: unknown = JSON.parse(http.body);
+              const model = typeof parsedBody === "object" && parsedBody !== null && "model" in parsedBody && typeof parsedBody.model === "string"
+                ? parsedBody.model : target.request.model;
+              body = await this.pxpipe.apply(http.body, model, call.pxpipe.minChars, call.pxpipe.timeoutMs);
+            } catch {
+              body = http.body;
+            }
+            return base.send(body === http.body ? http : { ...http, body }, ctx);
+          },
+        };
+      }
+      const adapter = createAdapter(target.provider, transport);
       try {
         const result = await this.withRefresh(target, (credential) => deliver(target, adapter, credential, call), () => !call.reply.sent && !call.signal.aborted);
         await this.connections.clearLock(target.connection.id, splitThinkingSuffix(target.request.model).model);
@@ -502,6 +985,19 @@ export class ChatLane {
   private async thought(request: CanonicalRequest, provider: ProviderDescriptor): Promise<CanonicalRequest> {
     const level = provider.defaultThinking ?? await this.thinking.get(provider.id);
     return withThinking(request, provider, level);
+  }
+
+  private async headroom(request: CanonicalRequest, settings: Settings, signal: AbortSignal, requestId: string): Promise<unknown> {
+    const { headroomUrl, headroomTimeoutMs, headroomCompressUserMessages } = settings;
+    const input = headroomInput(request, headroomCompressUserMessages);
+    if (!input) return undefined;
+    const response = await this.transport.send({
+      method: "POST", url: `${headroomUrl}/v1/compress`, headers: { "content-type": "application/json" },
+      body: JSON.stringify(input), timeoutMs: headroomTimeoutMs,
+    }, { signal, requestId });
+    if (response.status < 200 || response.status >= 300) return undefined;
+    const body = await readBoundedText(response.body, 16 * 1024 * 1024);
+    return JSON.parse(body);
   }
 
   // oauth.refresh-lifecycle (9router, kept): a 401/403 before the first byte refreshes the connection's token, for every
@@ -586,7 +1082,7 @@ export class ChatLane {
 
   // docs/contracts/catalog-providers.md "Resolving a model": "<provider or alias>/<model>" names the provider;
   // a bare id goes to the first catalog provider that declares it and has an active connection.
-  private async resolve(request: CanonicalRequest, excluded = new Set<string>()): Promise<Target> {
+  private async resolve(request: CanonicalRequest, excluded = new Set<string>(), expectedKind: "chat" | "embedding" | "image" | "tts" | "stt" | "video" = "chat"): Promise<Target> {
     const ref = request.model;
     const slash = ref.indexOf("/");
     const prefix = slash > 0 ? ref.slice(0, slash) : undefined;
@@ -617,7 +1113,10 @@ export class ChatLane {
       }
     }
     const upstream: CanonicalRequest = { ...request, model: modelId };
-    assertModelSupports({ ...upstream, model: catalogModelId }, provider.id, builtinRegistry.model(provider.id, catalogModelId), catalogModelId);
+    const descriptor = builtinRegistry.model(provider.id, catalogModelId);
+    if (expectedKind !== "chat") {
+      if (descriptor?.kind !== expectedKind) throw new GatewayError(400, "invalid_request_error", "model_not_found", `${provider.id}/${catalogModelId} is not a known ${expectedKind} model.`);
+    } else assertModelSupports({ ...upstream, model: catalogModelId }, provider.id, descriptor, catalogModelId);
     if (provider.auth.kind === "none") {
       const connection: StoredCredential = { id: "noauth", apiKey: "", proxyPoolId: null, baseUrl: null, deployment: null, apiVersion: null, organization: null, accountId: null };
       return { provider, request: upstream, connection, credential: { kind: "api-key", apiKey: "" }, proxy: await this.pools.resolveNoAuth(provider.id) };
@@ -637,6 +1136,49 @@ export class ChatLane {
     const connected = withConnection(provider, stored);
     const retrying = connected.retryStreamErrors ? { ...connected, streamRetryDelayMs: this.limits.streamRetryDelayMs } : connected;
     return { provider: retrying, request: upstream, credential, connection: stored, proxy: await this.pools.resolve(stored.proxyPoolId) };
+  }
+
+  private async mediaCredential(serviceId: string, lockKey: string, excluded: ReadonlySet<string> = new Set()): Promise<{ credential: StoredCredential; proxy?: ProxyConfig }> {
+    const service = mediaService(serviceId);
+    if (!service) throw new GatewayError(400, "invalid_request_error", "media_provider_unsupported", `Provider "${serviceId}" is not a supported media service.`);
+    const providerId = service.credentialProviderId ?? service.id;
+    const selected = await this.connections.selectActive(providerId, lockKey, excluded, (await this.settings.get()).fallbackStrategy);
+    if (!selected.credential) {
+      if (selected.retryAt) throw new GatewayError(503, "api_error", "provider_unavailable", `${service.name} is temporarily unavailable.`, selected.retryAt.getTime() - Date.now());
+      throw new GatewayError(404, "not_found_error", "no_active_connection", `${service.name} has no active connection. Add or enable one in AIGate: Providers → Connections.`);
+    }
+    const credential = await this.refresher.fresh(providerId, selected.credential);
+    return { credential, proxy: await this.pools.resolve(credential.proxyPoolId) };
+  }
+
+  // Search and fetch share their normal account rotation, but lock only the lane-specific key.
+  private async mediaResponse(
+    serviceId: string, lockKey: string, requestId: string, signal: AbortSignal,
+    send: (target: { credential: StoredCredential; proxy?: ProxyConfig }) => ReturnType<HttpTransportPort["send"]>,
+  ): Promise<{ status: number; raw: string }> {
+    const service = mediaService(serviceId)!;
+    const credentialProviderId = service.credentialProviderId ?? service.id;
+    const excluded = new Set<string>();
+    // eslint-disable-next-line aigate/retry-through-helper -- candidates change account; this is not an in-place retry.
+    for (;;) {
+      const target = await this.mediaCredential(serviceId, lockKey, excluded);
+      try {
+        const response = await send(target);
+        const raw = await readBoundedText(response.body, 16 * 1024 * 1024);
+        const cooldown = mediaCooldown(response.status);
+        if (!cooldown || (await this.connections.activeCount(credentialProviderId)) < 2) {
+          if (response.status >= 200 && response.status < 300) await this.connections.clearLock(target.credential.id, lockKey);
+          return { status: response.status, raw };
+        }
+        await this.connections.lock(target.credential.id, lockKey, new Date(Date.now() + cooldown));
+        excluded.add(target.credential.id);
+      } catch (error) {
+        const cooldown = fallbackCooldown(error);
+        if (!cooldown || signal.aborted || (await this.connections.activeCount(credentialProviderId)) < 2) throw error;
+        await this.connections.lock(target.credential.id, lockKey, new Date(Date.now() + cooldown));
+        excluded.add(target.credential.id);
+      }
+    }
   }
 
   private modelNotFound(ref: string): GatewayError {

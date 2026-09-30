@@ -32,3 +32,5 @@ export type { AIProviderPort, Credential, CredentialStatus, ExecCtx, HttpBytesRe
 export { ANTHROPIC_VERSION, builtinRegistry, toDescriptor, unsupportedReason } from "./builtin-registry.js";
 export * from "./catalog/schema.js";
 export { CATALOG } from "./catalog/providers.generated.js";
+export { mediaService, mediaServiceDescriptor, mediaServices, type MediaService } from "./media-services.js";
+export { ttsVoices, type TtsVoice } from "./tts-voices.js";

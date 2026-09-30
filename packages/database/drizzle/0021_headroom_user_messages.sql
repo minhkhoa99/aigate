@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `headroom_compress_user_messages` integer DEFAULT false NOT NULL;

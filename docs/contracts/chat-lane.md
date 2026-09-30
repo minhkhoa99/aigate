@@ -51,6 +51,8 @@ Every response carries `x-request-id`. One `ExecCtx.signal` combines three sourc
 
 SP19 rule (`combos.md`): 0. A string without `/` that is a combo's name is that combo; each member is then resolved by the rules below (or as a nested combo).
 
+SP20 rule (`capacity-adapter.md`): when the request carries media the client's model cannot read, capable models from the enabled capacity pools are tried first, each with a trimmed history, and the client's model last.
+
 SP13 rules (`catalog-providers.md`):
 
 1. `provider/model`, where `provider` is a registry id **or alias** (`ds/deepseek-chat`), calls that provider with `model` as given. It may be a model the registry does not declare; such a model gets the default capabilities.

@@ -225,7 +225,7 @@
     - { file: src/sse/handlers/chat.js, line: 147, note: "length > 1 -> handleComboChat with the adapter strategy" }
     - { file: open-sse/services/capacityAdapter.js, line: 95, note: "returns models unchanged when any model already satisfies the hard caps" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: routing.model-resolution

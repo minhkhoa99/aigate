@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { type FormEvent } from "react";
-import { Button, ConfirmDialog, CopyField, Dot, Field, Input, Metric, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
+import { Button, ConfirmDialog, CopyField, Dot, Field, Input, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
+import { CapacityTab } from "./capacity-pools";
 import {
   useApiKeys, useChatReadiness, useComboStickyLimit, useCombos, useCreateKey, useDeleteCombo, useDeleteKey, useRequireApiKey, useSetComboStickyLimit, useSetKeyActive,
-  useSetRequireApiKey, type ApiKey, type ChatReadiness, type Combo, type ComboStrategy, type CreatedApiKey,
+  usePatchTokenSaverSettings, useTokenSaverSettings, usePxpipeStatus, useInstallPxpipe,
+  useSetRequireApiKey, type ApiKey, type ChatReadiness, type Combo, type ComboStrategy, type CreatedApiKey, type GatewaySettings,
 } from "./api";
 
 const READINESS: Record<ChatReadiness, { tone: "healthy" | "warning"; label: string; hint?: string }> = {
@@ -148,7 +150,8 @@ export function Routing() {
     <PageHeading eyebrow="Gateway / Routing" title="Routing & fallback" description="Decide where traffic goes, when to retry, and how to recover from failure." action={<Link to="/gateway/routing/new" className="button button-primary">+ Create combo</Link>} />
     <Tabs items={["Combo", "Overview", "Fallback", "Capacity adapter", "Simulator"]} active={tab} onChange={setTab} />
     {tab === "Combo" && <CombosTab />}
-    {tab !== "Combo" && <div className="section-gap"><Warning>Preview with sample data: this tab is not connected to the gateway yet (capacity adapter and simulator: SP20). Account fallback runs as described; choose its strategy in Settings → Auth & Access.</Warning></div>}
+    {tab === "Capacity adapter" && <CapacityTab />}
+    {tab !== "Combo" && tab !== "Capacity adapter" && <div className="section-gap"><Warning>Preview with sample data: this tab is not connected to the gateway yet. Account fallback runs as described; choose its strategy in Settings → Auth & Access.</Warning></div>}
     {tab === "Overview" && <div className="grid grid-2 section-gap"><Panel title="Active routes" detail="Current model resolution order">
       {["claude-3.5-sonnet → Anthropic primary", "gpt-4o → OpenAI primary", "gemini-2.5-pro → Google Vertex", "deepseek-r1 → DeepSeek pooled"].map((r, i) => <div className="list-row" key={r}><Dot tone={i === 3 ? "warning" : "healthy"} /><div><strong className="mono">{r}</strong><small>{i === 3 ? "Fallback available" : "Direct · healthy"}</small></div><Pill tone={i === 3 ? "warning" : "healthy"}>{i === 3 ? "Guarded" : "Active"}</Pill></div>)}
     </Panel><Panel title="Decision path" detail="Single request, from client to provider"><div className="flow-steps">{["Validate API key", "Resolve alias & capability", "Choose connection", "Translate request", "Dispatch with timeout", "Stream response"].map((s, i) => <div key={s}><span>{String(i + 1).padStart(2, "0")}</span><strong>{s}</strong><Dot /></div>)}</div></Panel></div>}
@@ -158,17 +161,47 @@ export function Routing() {
       ["Provider outage · 503", "Retry, then next route", "30 seconds", <Pill tone="warning">Fallback</Pill>],
       ["Client abort · 499", "Cancel upstream", "None", <Pill tone="healthy">Terminal</Pill>],
     ]} /></Panel></div>}
-    {tab === "Capacity adapter" && <div className="grid grid-2 section-gap"><Panel title="Strategy"><Field label="Distribution"><select className="input" defaultValue="fill"><option value="fill">Fill first</option><option value="round">Round robin</option><option value="sticky">Sticky</option></select></Field><div className="list-row"><div><strong>Concurrent request limit</strong><small>Bound panel fan-out before dispatch.</small></div><Input type="number" defaultValue="8" /></div></Panel><Panel title="Current capacity"><Metric label="Available connections" value="41 / 80" delta="51% headroom" bars={[24,38,45,52,58,72,65,54,40,45]} /></Panel></div>}
     {tab === "Simulator" && <div className="split section-gap"><Panel title="Test a route" detail="Preview decisions without sending a provider request"><div className="stack"><Field label="Model"><Input defaultValue="claude-3.5-sonnet" /></Field><Field label="Input tokens"><Input type="number" defaultValue="2048" /></Field><Button variant="primary">Run simulation</Button></div></Panel><Panel title="Expected route"><div className="flow-steps"><div><span>01</span><strong>Anthropic primary</strong><Pill tone="healthy">Selected</Pill></div><div><span>02</span><strong>Anthropic secondary</strong><Pill>Standby</Pill></div></div></Panel></div>}
   </>;
 }
 
 export function TokenSaver() {
+  const query = useTokenSaverSettings();
+  const pxpipe = usePxpipeStatus();
+  const installPxpipe = useInstallPxpipe();
+  const save = usePatchTokenSaverSettings();
+  const showToast = useToast();
+  const [headroomUrl, setHeadroomUrl] = useState("");
+  if (query.isPending) return <StateBlock state="loading" />;
+  if (query.isError || !query.data) return <StateBlock state="error" code={toProblem(query.error).code} action={<Button onClick={() => void query.refetch()}>Retry</Button>} />;
+  const config = query.data;
+  const pxpipeReady = pxpipe.data?.installed === true && pxpipe.data.loaded;
+  const patch = (fields: Partial<GatewaySettings>) => save.mutate(fields, { onError: (error) => showToast({ tone: "error", ...toProblem(error) }) });
+  const toggle = (label: string, description: string, checked: boolean, field: string, disabled = false) =>
+    <div className="list-row" key={field}><div><strong>{label}</strong><small>{description}</small></div><input type="checkbox" checked={checked} disabled={disabled || save.isPending} aria-label={`Enable ${label}`} onChange={(event) => patch({ [field]: event.target.checked })} /></div>;
+  const stage = (name: string, enabled: boolean) => <div key={name}><span>{String(["RTK", "Headroom", "Caveman", "Ponytail", "PXPIPE"].indexOf(name) + 1).padStart(2, "0")}</span><strong>{name}</strong><Pill tone={enabled ? "healthy" : "muted"}>{enabled ? "Enabled" : "Off"}</Pill></div>;
   return <>
-    <PageHeading eyebrow="Gateway / Token Saver" title="Token Saver" description="Reduce token usage without changing the meaning of a request." action={<Pill tone="healthy">Enabled</Pill>} />
-    <div className="grid grid-3"><Metric label="Tokens saved 24h" value="182.4K" delta="12.8% of eligible traffic" bars={[20,29,32,45,41,58,65,61,73,81]} /><Metric label="Requests optimized" value="12,481" delta="↗ +6.2%" /><Metric label="Average reduction" value="14.6%" delta="Across enabled stages" /></div>
-    <Warning tone="warning">A request with <code>x-9router-token-saver: off</code> must bypass every optimization stage, including PXPIPE.</Warning>
-    <Panel title="Optimization pipeline" detail="Stages run in order. Each stage may be disabled independently." className="section-gap"><div className="pipeline">{["RTK", "Headroom", "Caveman", "Ponytail", "PXPIPE"].map((name, i) => <div key={name}><span>{String(i + 1).padStart(2, "0")}</span><strong>{name}</strong><Pill tone="healthy">Enabled</Pill></div>)}</div></Panel>
-    <Panel title="Stage controls" className="section-gap">{["RTK · tool response compression", "Headroom · context reduction", "Caveman · concise transforms", "Ponytail · low-cost rewrites", "PXPIPE · image block extraction"].map((name) => <div className="list-row" key={name}><div><strong>{name}</strong><small>Runs only when the master Token Saver switch allows it.</small></div><input type="checkbox" defaultChecked aria-label={`Enable ${name}`} /></div>)}</Panel>
+    <PageHeading eyebrow="Gateway / Token Saver" title="Token Saver" description="Compression may reduce input tokens; style prompts add some, so net savings depend on the request and provider." action={<Pill tone={config.tokenSaverEnabled ? "healthy" : "warning"}>{config.tokenSaverEnabled ? "Enabled" : "Disabled"}</Pill>} />
+    <Panel title="Master switch" detail="Send x-aigate-token-saver: off to bypass every Token Saver stage for one request.">
+      {toggle("Enable Token Saver", "Apply enabled stages before provider dispatch.", config.tokenSaverEnabled, "tokenSaverEnabled")}
+    </Panel>
+    <Panel title="Optimization pipeline" detail="Stages run in this order. Optional services fail open." className="section-gap"><div className="pipeline">
+      {stage("RTK", config.tokenSaverEnabled && config.rtkEnabled)}{stage("Headroom", config.tokenSaverEnabled && config.headroomEnabled)}
+      {stage("Caveman", config.tokenSaverEnabled && config.cavemanEnabled)}{stage("Ponytail", config.tokenSaverEnabled && config.ponytailEnabled)}
+      {stage("PXPIPE", config.tokenSaverEnabled && config.pxpipeEnabled && pxpipeReady)}
+    </div></Panel>
+    <Panel title="Stage controls" className="section-gap">
+      {toggle("RTK · tool output compression", "Removes consecutive duplicate lines from large, non-error tool results.", config.rtkEnabled, "rtkEnabled", !config.tokenSaverEnabled)}
+      {toggle("Headroom · context compression", "Sends plain-text conversations to the configured local or remote Headroom endpoint.", config.headroomEnabled, "headroomEnabled", !config.tokenSaverEnabled)}
+      {config.headroomEnabled && <div className="list-row token-saver-url"><div><strong>Headroom URL</strong><small>POST /v1/compress; failures leave the request unchanged.</small></div><input className="input" type="url" aria-label="Headroom URL" value={headroomUrl || config.headroomUrl} onChange={(event) => setHeadroomUrl(event.target.value)} onBlur={() => { if (headroomUrl && headroomUrl !== config.headroomUrl) { patch({ headroomUrl }); setHeadroomUrl(""); } }} /></div>}
+      {config.headroomEnabled && toggle("Compress user messages", "Off by default; when on, Headroom may rewrite user-provided text too.", config.headroomCompressUserMessages, "headroomCompressUserMessages")}
+      {toggle("Caveman · concise response style", "Adds an instruction (and input tokens); shorter output is not guaranteed.", config.cavemanEnabled, "cavemanEnabled", !config.tokenSaverEnabled)}
+      {config.cavemanEnabled && <div className="list-row"><strong>Caveman level</strong><select className="input" aria-label="Caveman level" value={config.cavemanLevel} onChange={(event) => { const level = event.target.value; if (level === "lite" || level === "full" || level === "ultra") patch({ cavemanLevel: level }); }}>{["lite", "full", "ultra"].map((level) => <option key={level}>{level}</option>)}</select></div>}
+      {toggle("Ponytail · minimal coding style", "Adds coding instructions (and input tokens); shorter output is not guaranteed.", config.ponytailEnabled, "ponytailEnabled", !config.tokenSaverEnabled)}
+      {config.ponytailEnabled && <div className="list-row"><strong>Ponytail level</strong><select className="input" aria-label="Ponytail level" value={config.ponytailLevel} onChange={(event) => { const level = event.target.value; if (level === "lite" || level === "full" || level === "ultra") patch({ ponytailLevel: level }); }}>{["lite", "full", "ultra"].map((level) => <option key={level}>{level}</option>)}</select></div>}
+      <div className="list-row"><div><strong>PXPIPE · image block extraction</strong><small>{pxpipeReady ? "Installed" + (pxpipe.data?.version ? " · v" + pxpipe.data.version : "") + "; transforms eligible Anthropic requests in-process." : "Install pxpipe-proxy into AIGate's data directory. It is used only for Anthropic Messages requests."}</small></div>
+        {!pxpipeReady ? <Button disabled={installPxpipe.isPending || pxpipe.data?.installing} onClick={() => installPxpipe.mutate(undefined, { onError: (error) => showToast({ tone: "error", ...toProblem(error) }) })}>{installPxpipe.isPending ? "Installing…" : "Install PXPIPE"}</Button> : <input type="checkbox" checked={config.pxpipeEnabled} disabled={!config.tokenSaverEnabled || save.isPending} aria-label="Enable PXPIPE image block extraction" onChange={(event) => patch({ pxpipeEnabled: event.target.checked })} />}
+      </div>
+    </Panel>
   </>;
 }

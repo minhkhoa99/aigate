@@ -20,7 +20,7 @@ export class ApiError extends Error {
   }
 }
 
-async function send(path: string, method: string, body: unknown, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
+async function send(path: string, method: string, body: unknown, timeoutMs = REQUEST_TIMEOUT_MS, signal?: AbortSignal): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(path, {
@@ -28,7 +28,7 @@ async function send(path: string, method: string, body: unknown, timeoutMs = REQ
       credentials: "same-origin",
       headers: body === undefined ? undefined : { "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: AbortSignal.any([signal ?? AbortSignal.timeout(timeoutMs), AbortSignal.timeout(timeoutMs)]),
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "TimeoutError") {
@@ -59,6 +59,10 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
 // For 204 No Content responses.
 export async function apiVoid(path: string, method: string): Promise<void> {
   await send(path, method, undefined);
+}
+
+export async function apiBlob(path: string, body: unknown, timeoutMs = REQUEST_TIMEOUT_MS, signal?: AbortSignal): Promise<Blob> {
+  return (await send(path, "POST", body, timeoutMs, signal)).blob();
 }
 
 export const isApiError = (error: unknown, code?: string): error is ApiError =>

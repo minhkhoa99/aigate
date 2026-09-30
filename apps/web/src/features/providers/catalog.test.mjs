@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { mediaGroups } from "./catalog.ts";
 
-test("9Router media provider lists baseline", () => {
-  assert.deepEqual(mediaGroups.map((group) => group.providers.length), [15, 20, 15, 7, 1, 19, 4]);
-  for (const group of mediaGroups) assert.equal(new Set(group.providers.map(([id]) => id)).size, group.providers.length);
+test("media catalog lists all nine endpoints", () => {
+  assert.deepEqual(mediaGroups.map((group) => group.id), ["embedding", "image", "imageToText", "tts", "stt", "webSearch", "webFetch", "video", "music"]);
+  assert.equal(new Set(mediaGroups.map((group) => group.id)).size, 9);
+  assert.ok(mediaGroups.filter((group) => group.endpoint).every((group) => group.endpoint.startsWith("/v1/")));
+  assert.equal(mediaGroups.find((group) => group.id === "music").endpoint, null);
 });

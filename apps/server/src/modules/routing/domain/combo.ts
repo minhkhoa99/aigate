@@ -25,8 +25,8 @@ export interface Combo extends ComboFields {
   updatedAt: string;
 }
 export type Parsed<T> = { ok: true; value: T } | { ok: false; message: string };
-const ok = <T>(value: T): Parsed<T> => ({ ok: true, value });
-const fail = (message: string): Parsed<never> => ({ ok: false, message });
+export const ok = <T>(value: T): Parsed<T> => ({ ok: true, value });
+export const fail = (message: string): Parsed<never> => ({ ok: false, message });
 
 // combo.mode-fusion-panel-completion: 9router's FUSION_DEFAULTS.
 const DEFAULTS: Omit<ComboFields, "name" | "models"> = { strategy: "fallback", judgeModel: null, minPanel: 2, stragglerGraceMs: 8000, panelTimeoutMs: 90000 };
@@ -35,8 +35,9 @@ function integer(value: unknown, field: string, min: number, max: number): Parse
   return typeof value === "number" && Number.isSafeInteger(value) && value >= min && value <= max ? ok(value) : fail(`${field} must be a whole number from ${min} to ${max}`);
 }
 
-function models(value: unknown): Parsed<string[]> {
-  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_COMBO_MEMBERS) return fail(`models must list 1 to ${MAX_COMBO_MEMBERS} models`);
+// Combo members and capacity pools (capacity-adapter.md): distinct model strings, at most 16.
+export function parseModelList(value: unknown, min: 0 | 1): Parsed<string[]> {
+  if (!Array.isArray(value) || value.length < min || value.length > MAX_COMBO_MEMBERS) return fail(`models must list ${min} to ${MAX_COMBO_MEMBERS} models`);
   const list: string[] = [];
   for (const item of value) {
     const model = typeof item === "string" ? item.trim() : "";
@@ -49,7 +50,7 @@ function models(value: unknown): Parsed<string[]> {
 
 const PARSERS: { [K in keyof ComboFields]: (value: unknown) => Parsed<ComboFields[K]> } = {
   name: (value) => (typeof value === "string" && NAME.test(value.trim()) ? ok(value.trim()) : fail("name must be 1-64 letters, digits, underscores, periods, or hyphens")),
-  models,
+  models: (value) => parseModelList(value, 1),
   strategy: (value) => {
     const found = COMBO_STRATEGIES.find((strategy) => strategy === value);
     return found ? ok(found) : fail(`strategy must be one of ${COMBO_STRATEGIES.join(", ")}`);

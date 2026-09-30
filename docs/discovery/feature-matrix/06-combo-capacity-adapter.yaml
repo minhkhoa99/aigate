@@ -362,7 +362,7 @@
     - { file: open-sse/services/combo.js, line: 80, note: "stable sort by (tier, original index)" }
     - { file: open-sse/services/combo.js, line: 285, note: "handleComboChat's autoSwitch call site into reorderByCapabilities" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: combo.rotation-state-lifecycle
@@ -484,7 +484,7 @@
   businessRules:
     - "normalizeCapEntry accepts two shapes: the legacy bare array [{model, enabled}] (treated as enabled:true, roundRobin:false, models mapped from entry.model||entry), or the current object shape {enabled, roundRobin, models}; anything else (undefined, wrong type) normalizes to fully disabled with an empty pool"
     - "Object-shape `enabled` defaults to true unless explicitly `false` (entry.enabled !== false) — an object with no 'enabled' key at all is treated as enabled"
-    - "getCapacityAdapterConfig upgrades an enabled-but-empty-models pool to models:[DEFAULT_FALLBACK_MODEL] ('oc/mimo-v2.5-free') so turning the toggle on is never a silent no-op"
+    - "getCapacityAdapterConfig upgrades an enabled-but-empty-models pool to models:[DEFAULT_FALLBACK_MODEL] ('oc/mimo-v2.6-flash-free'; a stored 'oc/mimo-v2.5-free' is rewritten to it on read) so turning the toggle on is never a silent no-op (defaults: capacity.default-pools-free-model)"
   state:
     reads: ["settings.capacityAdapter"]
     writes: []
@@ -501,12 +501,12 @@
     - "DEFAULT_FALLBACK_MODEL is a single hardcoded model string; there is no validation here that it still exists in the provider registry — if it were ever removed, an enabled-but-unconfigured pool would simply fail at request time with no earlier warning"
   evidence:
     - { file: open-sse/services/capacityAdapter.js, line: 13, note: "CAPABILITY_KEYS = [vision, pdf, audioInput, videoInput]" }
-    - { file: open-sse/services/capacityAdapter.js, line: 15, note: "DEFAULT_FALLBACK_MODEL = \"oc/mimo-v2.5-free\"" }
+    - { file: open-sse/services/capacityAdapter.js, line: 15, note: "DEFAULT_FALLBACK_MODEL = \"oc/mimo-v2.6-flash-free\"; line 16 upgrades the legacy oc/mimo-v2.5-free" }
     - { file: open-sse/services/capacityAdapter.js, line: 19, note: "normalizeCapEntry — legacy array vs object-shape handling" }
     - { file: open-sse/services/capacityAdapter.js, line: 37, note: "enabled+empty-models pool upgraded to [DEFAULT_FALLBACK_MODEL]" }
   newModule: routing
-  parityStatus: traced
-  labels: [REFERENCE_BEHAVIOR]
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
 
 - id: capacity.pool-models-and-strategy
   group: Combo / Vision Adapter
@@ -536,8 +536,8 @@
     - { file: open-sse/services/capacityAdapter.js, line: 44, note: "getCapacityAdapterModels — fixed key order, dedup by string identity" }
     - { file: open-sse/services/capacityAdapter.js, line: 68, note: "getActiveAdapterStrategy — first enabled+non-empty hard capability wins" }
   newModule: routing
-  parityStatus: traced
-  labels: [REFERENCE_BEHAVIOR]
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
 
 - id: capacity.augment-models-priority-prepend
   group: Combo / Vision Adapter
@@ -569,7 +569,7 @@
     - { file: open-sse/services/capacityAdapter.js, line: 88, note: "function docstring: 'Adapter models go FIRST (priority)' — contradicts line 5" }
     - { file: open-sse/services/capacityAdapter.js, line: 99, note: "return [...pool, ...models] — pool models placed first" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: capacity.strip-history-budget-formula
@@ -610,7 +610,7 @@
     - { file: open-sse/services/capacityAdapter.js, line: 149, note: "while total > budgetChars: head.pop() — drop from the end of head (closest to the middle) first" }
     - { file: open-sse/services/capacityAdapter.js, line: 154, note: "no-op return when head.length === older.length (nothing actually dropped)" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 
 - id: capacity.wrap-stripping-per-model
@@ -642,7 +642,7 @@
     - { file: open-sse/services/capacityAdapter.js, line: 160, note: "withCapacityAdapterStripping — empty-pool passthrough, per-call adapterSet.has(modelStr) check" }
     - { file: open-sse/services/capacityAdapter.js, line: 168, note: "contextWindow looked up per call from getCapabilitiesForModel(provider, model)" }
   newModule: routing
-  parityStatus: traced
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
 # 2026-09-24 delta against 9Router v0.5.86: source-specific combo presets.
 - id: combo.source-presets
@@ -782,3 +782,101 @@
     expected: "A combo keeps its strategy, judge, and tuning across a rename"
     actual: "The settings entry stays under the old name; the renamed combo falls back to the global strategy"
     impact: "A renamed fusion combo quietly becomes a fallback combo"
+
+# 2026-09-30 SP20 port: rules found while contracting the capacity adapter (docs/contracts/capacity-adapter.md).
+- id: capacity.default-pools-free-model
+  group: Combo / Vision Adapter
+  feature: Capacity adapter
+  subFeature: Vision and audio pools ship enabled and empty, so they route to a hard-coded free public model
+  trigger: A fresh install receives an image or audio request for a model (or combo) without that capability
+  input: Default settings.capacityAdapter
+  output: The request is answered by oc/mimo-v2.6-flash-free (OpenCode's keyless public endpoint), with the requested model as the last fallback
+  businessRules:
+    - "settingsRepo defaults vision and audioInput to { enabled: true, models: [] }; pdf and videoInput default to disabled"
+    - "getCapacityAdapterConfig turns an enabled empty pool into [DEFAULT_FALLBACK_MODEL], and the dashboard shows the same default"
+  state: { reads: ["settings.capacityAdapter"], writes: [], runtimeOnly: [] }
+  dependencies: ["capacity.capability-pool-config", "routing.capacity-adapter-solo"]
+  providerInteraction: "OpenCode Free public endpoint (no account)"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Client images, audio, and conversation history reach a third-party service"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The client's own model is tried only after the free model, and no response header says a different model answered"
+  evidence:
+    - { file: src/lib/db/repos/settingsRepo.js, line: 20, note: "capacityAdapter defaults: vision and audioInput enabled with empty models" }
+    - { file: open-sse/services/capacityAdapter.js, line: 36, note: "enabled + empty models -> [DEFAULT_FALLBACK_MODEL]" }
+    - { file: "src/app/(dashboard)/dashboard/combos/page.js", line: 19, note: "only Vision and Audio are shown; pdf and videoInput hidden (line 21)" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "No pool routes anywhere until the user turns it on with at least one model they chose"
+    actual: "Out of the box, image and audio requests a model cannot take go to OpenCode's free public endpoint first"
+    impact: "Client content leaves for a service the user never configured; in AIGate that model is not in the catalog either, so its capabilities are unknown"
+
+- id: capacity.strip-orphans-tool-calls
+  group: Combo / Vision Adapter
+  feature: Capacity adapter
+  subFeature: History trimming cuts between a tool call and its results
+  trigger: A capacity-adapter pool model is called with a history of more than six turns before the current one that uses tools
+  input: The request messages; the pool model's context window
+  output: A trimmed message list that can pair tool results with no call, or a call with no results
+  businessRules:
+    - "tail starts after the last assistant/model message, so a trailing run of tool results is kept while the assistant turn that called the tools may be dropped with the middle"
+    - "head is a prefix of the older turns cut at a fixed count (and popped from its end), so it can end with an assistant tool call whose results were dropped"
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["capacity.strip-history-budget-formula"]
+  providerInteraction: "Providers validate tool pairing (OpenAI: messages with role tool must follow a tool_calls message)"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "the trimmed history is rejected upstream as malformed", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "The failure shows only when trimming happens, so the adapter fails for exactly the long agent sessions it was meant to rescue"
+  evidence:
+    - { file: open-sse/services/capacityAdapter.js, line: 135, note: "tail = rest after the last assistant message" }
+    - { file: open-sse/services/capacityAdapter.js, line: 145, note: "headKept = older.slice(0, HEAD_KEEP), then popped from the end (line 150)" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Trimming keeps every tool result with the assistant turn that called it; the kept tail starts at the current user turn"
+    actual: "The kept history can hold a tool result without its call, or a call without its results"
+    impact: "The trimmed request is rejected upstream, so the pool model fails and the chain moves on or errors"
+
+- id: capacity.solo-rotation-keyed-by-model
+  group: Combo / Vision Adapter
+  feature: Capacity adapter
+  subFeature: Round-robin state for a single-model adapter run is keyed by the client's model string
+  trigger: A single-model request is widened by a round-robin capacity pool
+  input: The requested model string (client input)
+  output: An entry in the in-memory combo rotation Map named after the requested model
+  businessRules:
+    - "handleComboChat is called with comboName = the requested model, so every distinct model string a client sends with media adds a rotation entry that is never removed"
+  state: { reads: [], writes: [], runtimeOnly: ["comboRotationState Map"] }
+  dependencies: ["routing.capacity-adapter-solo", "combo.rotation-state-lifecycle"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns:
+    - "Memory grows with the number of distinct model strings clients send"
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases:
+    - "Two requested models share one pool but rotate it independently"
+  evidence:
+    - { file: src/sse/handlers/chat.js, line: 143, note: "soloAugmented -> handleComboChat({ comboName: modelStr, comboStrategy: getActiveAdapterStrategy(...) })" }
+  newModule: routing
+  parityStatus: implemented
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "The rotation belongs to the pool: one state per capability, bounded by the four capabilities"
+    actual: "One state per requested model string, unbounded"
+    impact: "Client input grows server memory; the same pool rotates differently per requested model"

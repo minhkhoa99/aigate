@@ -100,7 +100,8 @@ test("a custom provider gets a connection, is tested at its own URL, and serves 
     // A custom provider declares no models, so it never serves a bare id and /v1/models does not list it.
     assert.equal((await chat({ ...hello, model: "llama-3" })).json().error.code, "model_not_found");
     const listed = (await call({ url: "/v1/models", headers: { authorization: `Bearer ${key}` } })).json().data;
-    assert.ok(listed.length > 0 && listed.every((m) => m.owned_by === "openai"));
+    // Keyless providers (SP18 opencode) are always listed too; the custom provider never is.
+    assert.ok(listed.some((m) => m.owned_by === "openai") && !listed.some((m) => m.owned_by === "local" || m.id.startsWith("local/")));
     await app.close();
   }));
 
