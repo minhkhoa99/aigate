@@ -66,9 +66,7 @@ The media screens use the catalog's `serviceKinds`; `features/providers/catalog.
 
 ## SP23 media and TTS voices
 
-`GET /api/providers/:id/voices?model=...` returns `{ voices: [{ id, name, locale, gender }] }` from the built-in per-model voice catalog. An unknown provider is 404; an invalid TTS model is 400 `INVALID_REQUEST`; providers without a voice catalog return an empty list. The local-device picker reads the browser's installed voices directly because they belong to that browser, not the server.
-
-`POST /api/providers/:id/voice-preview` takes `{ model, voice }` under the dashboard session. It validates both against the catalog and uses an active saved connection to generate one short sample. It is available for the OpenAI and OpenRouter speech endpoints only. The result is MP3, at most 1 MiB, within 15 seconds, with no retry or cache. `INVALID_REQUEST` rejects a mismatched voice/model; `NO_ACTIVE_CONNECTION` asks the operator to add a connection; `VOICE_PREVIEW_FAILED` reports an upstream failure. The browser's own voices use `speechSynthesis` locally. Other catalog voices remain browseable with playback unavailable until their TTS adapter can generate a preview. This is a preset catalog; account-specific ElevenLabs/Deepgram/Inworld/MiniMax voice discovery is not yet supported because those providers lack a connectable AIGate TTS adapter.
+The voice list and preview moved to the speech contract (`docs/contracts/speech.md`, "Dashboard API"): preset or live account voices, preview for every provider with a TTS route. A provider's `routeKinds` has `tts` exactly when `tts.ts` has a route for it; a TTS-only service (ElevenLabs, Inworld, Fish Audio) has no catalog models, so its detail lists the speech models from `tts.ts`.
 
 Image understanding uses `/v1/chat/completions` with image content. Music has no AIGate route and is shown as unavailable, without a copyable endpoint.
 

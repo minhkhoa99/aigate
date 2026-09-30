@@ -33,3 +33,10 @@ test("connection codes tell the user what to do next", () => {
   assert.match(toProblem(new ApiError(409, "CREDENTIAL_UNREADABLE", "x")).message, /secret key file changed/);
   assert.match(toProblem(new ApiError(0, "TIMEOUT", "x", { timeoutSeconds: 25 })).message, /within 25 seconds/);
 });
+
+test("voice codes name the provider's failure and the next step (docs/contracts/speech.md)", () => {
+  assert.equal(toProblem(new ApiError(502, "VOICES_FETCH_FAILED", "x", { message: "Could not load the elevenlabs voices: HTTP 401, invalid key." })).message,
+    "Could not load the elevenlabs voices: HTTP 401, invalid key. Check the connection's key, then retry.");
+  assert.match(toProblem(new ApiError(502, "VOICES_FETCH_FAILED", "x")).message, /voice list could not be loaded/);
+  assert.equal(toProblem(new ApiError(400, "NO_ACTIVE_CONNECTION", "x", { message: "elevenlabs has no active connection." })).message, "elevenlabs has no active connection.");
+});

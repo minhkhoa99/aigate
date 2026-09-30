@@ -11,19 +11,20 @@ import { CombosRepository } from "./infrastructure/combos.repo.js";
 import { ModelTestController } from "./infrastructure/model-test.controller.js";
 import { PxpipeController } from "./infrastructure/pxpipe.controller.js";
 import { PXPIPE_DATA_DIR, PxpipeService } from "./infrastructure/pxpipe.service.js";
-import { VoicePreviewController } from "./infrastructure/voice-preview.controller.js";
+import { SpeechLane } from "./infrastructure/speech-lane.js";
+import { VoicesController } from "./infrastructure/voices.controller.js";
 
 // The routing context (spec §4.4). SP12: the OpenAI chat lane, one provider, one account. SP16a: the dashboard's model test.
-// SP19: model combos (docs/contracts/combos.md). SP20: capacity pools (docs/contracts/capacity-adapter.md).
+// SP19: model combos (docs/contracts/combos.md). SP20: capacity pools (docs/contracts/capacity-adapter.md). SP23: speech (docs/contracts/speech.md).
 @Module({})
 export class RoutingModule {
   static with(limits: ChatLimits, dataDir: string): DynamicModule {
     return {
       module: RoutingModule,
       imports: [SettingsModule, ApiKeysModule, ConnectionsModule, CatalogModule],
-      controllers: [ModelTestController, CombosController, CapacityPoolsController, PxpipeController, VoicePreviewController],
-      providers: [ChatLane, CombosRepository, CapacityPoolsRepository, PxpipeService, { provide: PXPIPE_DATA_DIR, useValue: dataDir }, { provide: CHAT_LIMITS, useValue: limits }],
-      exports: [ChatLane],
+      controllers: [ModelTestController, CombosController, CapacityPoolsController, PxpipeController, VoicesController],
+      providers: [ChatLane, SpeechLane, CombosRepository, CapacityPoolsRepository, PxpipeService, { provide: PXPIPE_DATA_DIR, useValue: dataDir }, { provide: CHAT_LIMITS, useValue: limits }],
+      exports: [ChatLane, SpeechLane],
     };
   }
 }

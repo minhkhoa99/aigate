@@ -6,10 +6,12 @@ export type MediaService = {
   readonly authHeader: string;
   readonly search?: { readonly url: string; readonly format: "brave" | "tavily" | "exa" | "ollama" | "serper" | "linkup" | "searchapi" | "youcom" | "xquik" | "glm" };
   readonly fetch?: { readonly url: string; readonly format: "firecrawl" | "jina" | "tavily" | "exa" | "ollama" };
+  // SP23 TTS-only services; synthesis and voice lists live in tts.ts, this is only their credential.
+  readonly tts?: { readonly url: string };
   readonly credentialProviderId?: string;
 };
 
-// SP22's dedicated HTTP services. Chat providers keep their protocol adapters; these only own search/fetch credentials.
+// SP22's dedicated HTTP services. Chat providers keep their protocol adapters; these only own search/fetch/TTS credentials.
 const SERVICES: readonly MediaService[] = [
   { id: "brave-search", name: "Brave Search", authHeader: "x-subscription-token", search: { url: "https://api.search.brave.com/res/v1", format: "brave" } },
   { id: "tavily", name: "Tavily", authHeader: "authorization", search: { url: "https://api.tavily.com/search", format: "tavily" }, fetch: { url: "https://api.tavily.com/extract", format: "tavily" } },
@@ -23,6 +25,9 @@ const SERVICES: readonly MediaService[] = [
   { id: "firecrawl", name: "Firecrawl", authHeader: "authorization", fetch: { url: "https://api.firecrawl.dev/v1/scrape", format: "firecrawl" } },
   { id: "jina-reader", name: "Jina Reader", authHeader: "authorization", fetch: { url: "https://r.jina.ai/", format: "jina" } },
   { id: "ollama", name: "Ollama Cloud", authHeader: "authorization", fetch: { url: "https://ollama.com/api/web_fetch", format: "ollama" } },
+  { id: "elevenlabs", name: "ElevenLabs", authHeader: "xi-api-key", tts: { url: "https://api.elevenlabs.io/v1/text-to-speech" } },
+  { id: "inworld", name: "Inworld TTS", authHeader: "authorization", tts: { url: "https://api.inworld.ai/tts/v1/voice" } },
+  { id: "fish-audio", name: "Fish Audio", authHeader: "authorization", tts: { url: "https://api.fish.audio/v1/tts" } },
   { id: "ollama-search", name: "Ollama Search", authHeader: "authorization", credentialProviderId: "ollama", search: { url: "https://ollama.com/api/web_search", format: "ollama" } },
 ];
 
@@ -33,7 +38,7 @@ export const mediaService = (id: string): MediaService | undefined => SERVICES.f
 export const mediaServiceDescriptor = (id: string): ProviderDescriptor | undefined => {
   const service = mediaService(id);
   if (!service) return undefined;
-  const url = service.search?.url ?? service.fetch?.url;
+  const url = service.search?.url ?? service.fetch?.url ?? service.tts?.url;
   if (!url) return undefined;
   return { id: service.id, name: service.name, protocol: "openai-compatible", chatUrl: url, modelsUrl: url, headers: {}, aliases: [], auth: { kind: "api-key", header: service.authHeader, scheme: "bearer" }, models: [] };
 };

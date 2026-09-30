@@ -31,6 +31,8 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   // docs/contracts/custom-models.md: 9router's words, the upstream status only (kept by user decision).
   MODELS_FETCH_FAILED: (body) => typeof body.message === "string" ? `${body.message}. Test the connection to see why.` : "Failed to fetch models. Test the connection to see why.",
   NO_ACTIVE_CONNECTION: (body) => typeof body.message === "string" ? body.message : "Add or enable a provider connection to hear this voice.",
+  // docs/contracts/speech.md: the provider refused or failed the account's voice list.
+  VOICES_FETCH_FAILED: (body) => typeof body.message === "string" ? `${body.message} Check the connection's key, then retry.` : "The provider's voice list could not be loaded. Check the connection's key, then retry.",
   VOICE_PREVIEW_FAILED: (body) => typeof body.message === "string" ? body.message : "The provider could not generate a voice preview.",
   // docs/contracts/custom-providers.md.
   NODE_LIMIT: "You have reached the maximum of 100 custom providers. Delete one you no longer use.",

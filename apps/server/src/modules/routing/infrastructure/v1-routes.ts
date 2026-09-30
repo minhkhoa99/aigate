@@ -1,12 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import type { ChatLane } from "./chat-lane.js";
+import type { SpeechLane } from "./speech-lane.js";
 
 // Room for base64 images and long histories; everything else on the server keeps Fastify's 1 MiB default.
 export const CHAT_BODY_LIMIT = 16 * 1024 * 1024;
 
 // Registered on Fastify directly, not as a Nest controller: the lane owns the raw response for
 // streaming, and the dashboard session guard does not apply (the API-key gate does).
-export function registerV1Routes(fastify: FastifyInstance, lane: ChatLane): void {
+export function registerV1Routes(fastify: FastifyInstance, lane: ChatLane, speech: SpeechLane): void {
   const common = {
     onRequest: lane.authorize.bind(lane),
     errorHandler: (error: Parameters<ChatLane["bodyError"]>[0], _request: unknown, reply: Parameters<ChatLane["bodyError"]>[1]) => lane.bodyError(error, reply),
@@ -14,7 +15,10 @@ export function registerV1Routes(fastify: FastifyInstance, lane: ChatLane): void
   fastify.post("/v1/chat/completions", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.chat(request, reply));
   fastify.post("/v1/embeddings", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.embeddings(request, reply));
   fastify.post("/v1/images/generations", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.imageGeneration(request, reply));
-  fastify.post("/v1/audio/speech", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.speech(request, reply));
+  // docs/contracts/speech.md
+  type Query = { Querystring: Record<string, string | string[] | undefined> };
+  fastify.post<Query>("/v1/audio/speech", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => speech.speech(request, reply));
+  fastify.get<Query>("/v1/audio/voices", common, (request, reply) => speech.voiceList(request, reply));
   fastify.post("/v1/audio/transcriptions", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.transcription(request, reply));
   fastify.post("/v1/search", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.search(request, reply));
   fastify.post("/v1/web/fetch", { ...common, bodyLimit: CHAT_BODY_LIMIT }, (request, reply) => lane.webFetch(request, reply));

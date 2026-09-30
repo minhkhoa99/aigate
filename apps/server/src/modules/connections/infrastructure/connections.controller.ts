@@ -3,7 +3,7 @@ import {
   BadRequestException, Body, ConflictException, Controller, Delete, Get, Header, HttpCode, HttpException, HttpStatus, Inject, NotFoundException, Param, Patch, Post,
 } from "@nestjs/common";
 import {
-  builtinRegistry, CATALOG, createAdapter, EngineError, mediaServiceDescriptor, OAUTH_PROVIDERS, parseGoogleCredential, withConnection, type AIProviderPort, type CredentialStatus,
+  builtinRegistry, CATALOG, createAdapter, EngineError, mediaServiceDescriptor, OAUTH_PROVIDERS, parseGoogleCredential, ttsProbe, withConnection, type AIProviderPort, type CredentialStatus, type HttpRequest,
   type Credential, type HttpTransportPort, type OAuthIO, type ProviderDescriptor, type ProxyConfig,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
@@ -75,6 +75,23 @@ async function runTest(provider: ProviderDescriptor, transport: HttpTransportPor
     if (ctx.signal.aborted) {
       return { testStatus: "unreachable", lastError: `${provider.name} did not answer within ${TEST_BUDGET_MS / 1000} s`, lastErrorCode: "TIMEOUT" };
     }
+    throw error;
+  }
+}
+
+// docs/contracts/speech.md: a TTS-only service is tested with a GET of its own list, never a synthesis that bills
+// (media.tts-lane, 9router's POST "ping" not reproduced). 401/403 is a bad key, 2xx active, anything else unreachable.
+async function probeTest(name: string, request: HttpRequest, transport: HttpTransportPort, proxy?: ProxyConfig): Promise<TestOutcome> {
+  const ctx = { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID(), proxy };
+  try {
+    const response = await transport.send(request, ctx);
+    await response.body?.cancel().catch(() => undefined);
+    if (response.status >= 200 && response.status < 300) return { testStatus: "active", lastError: null, lastErrorCode: null };
+    if (response.status === 401 || response.status === 403) return { testStatus: "invalid", lastError: `${name} refused the key (HTTP ${response.status}).`, lastErrorCode: "AUTH_ERROR" };
+    return { testStatus: "unreachable", lastError: `${name} answered HTTP ${response.status}.`, lastErrorCode: "PROVIDER_UNAVAILABLE" };
+  } catch (error) {
+    if (error instanceof EngineError) return { testStatus: "unreachable", lastError: error.message, lastErrorCode: error.code };
+    if (ctx.signal.aborted) return { testStatus: "unreachable", lastError: `${name} did not answer within ${TEST_BUDGET_MS / 1000} s`, lastErrorCode: "TIMEOUT" };
     throw error;
   }
 }
@@ -171,7 +188,9 @@ export class ConnectionsController {
     const flowTest = OAUTH_PROVIDERS[provider.id]?.test;
     const refreshToken = fresh.oauth?.refreshToken;
     const proxy = await this.pools.resolve(fresh.proxyPoolId);
-    const outcome = provider.testByExpiry ? this.expiryTest(provider, stored, fresh)
+    const probe = ttsProbe(provider.id, fresh.apiKey, TEST_BUDGET_MS);
+    const outcome = probe ? await probeTest(provider.name, probe, this.transport, proxy)
+      : provider.testByExpiry ? this.expiryTest(provider, stored, fresh)
       : flowTest && refreshToken ? await this.flowTest((io) => flowTest(refreshToken, io), proxy)
       : await runTest(withConnection(provider, fresh), this.transport, credentialOf(fresh), proxy);
     // After a refresh the sealed token changed, so the result is recorded against the new one.

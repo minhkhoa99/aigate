@@ -8,6 +8,7 @@ import { openDatabase } from "@aigate/database";
 import { STREAM_RETRY_DELAY_MS, type HttpTransportPort } from "@aigate/engine";
 import { AppModule } from "./app.module.js";
 import { ChatLane, DEFAULT_REFRESH_RETRY_DELAY_MS, DEFAULT_STREAM_IDLE_TIMEOUT_MS } from "./modules/routing/infrastructure/chat-lane.js";
+import { SpeechLane } from "./modules/routing/infrastructure/speech-lane.js";
 import { registerV1Routes } from "./modules/routing/infrastructure/v1-routes.js";
 import { AesGcmCipher, loadSecretKey } from "./secret-cipher.js";
 
@@ -60,7 +61,7 @@ export async function createServer({
   const fastify = app.getHttpAdapter().getInstance();
   // STT needs the original multipart bytes (including its boundary) for the upstream OpenAI-compatible endpoint.
   fastify.addContentTypeParser(/^multipart\/form-data/i, { parseAs: "buffer" }, (_request, body, done) => done(null, body));
-  registerV1Routes(fastify, app.get(ChatLane));
+  registerV1Routes(fastify, app.get(ChatLane), app.get(SpeechLane));
 
   if (webDist && existsSync(join(webDist, "index.html"))) {
     await fastify.register(fastifyStatic, { root: webDist, wildcard: false });

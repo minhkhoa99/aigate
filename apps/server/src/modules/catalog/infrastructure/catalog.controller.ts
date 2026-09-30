@@ -1,5 +1,5 @@
-import { BadRequestException, Body, Controller, Get, Header, NotFoundException, Param, Put, Query } from "@nestjs/common";
-import { builtinRegistry, CATALOG, isThinkingLevel, mediaService, thinkingLevels, ttsVoices, type CatalogProvider, type MediaService, type ThinkingLevel } from "@aigate/engine";
+import { BadRequestException, Body, Controller, Get, Header, NotFoundException, Param, Put } from "@nestjs/common";
+import { builtinRegistry, CATALOG, isThinkingLevel, mediaService, thinkingLevels, ttsModels, ttsRoute, type CatalogProvider, type MediaService, type ThinkingLevel } from "@aigate/engine";
 import { ProviderThinkingRepository } from "./provider-thinking.repo.js";
 
 // docs/contracts/catalog-providers.md. The whole catalog for the dashboard, with each provider's
@@ -34,7 +34,9 @@ function routeKinds(provider: CatalogProvider): string[] {
     if (kind === "video") return provider.id === "xai" && Boolean(runtime);
     if (kind === "imageToText") return Boolean(runtime?.models.some((model) => model.kind === "chat" && model.capabilities.vision));
     if (kind === "embedding") return Boolean(provider.id === "gemini" || (chatMedia && runtime?.models.some((model) => model.kind === "embedding")));
-    if (kind === "image" || kind === "tts" || kind === "stt") return Boolean(chatMedia && runtime?.models.some((model) => model.kind === kind));
+    // docs/contracts/speech.md: every provider tts.ts has a request builder for.
+    if (kind === "tts") return Boolean(ttsRoute(provider.id));
+    if (kind === "image" || kind === "stt") return Boolean(chatMedia && runtime?.models.some((model) => model.kind === kind));
     return false;
   });
 }
@@ -102,18 +104,12 @@ export class CatalogController {
     const models = (runtime?.models ?? provider.models).map((m) => ({
       id: m.id, name: m.name, kind: m.kind === "llm" ? "chat" : m.kind, capabilities: m.capabilities, contextWindow: m.contextWindow, maxOutputTokens: m.maxOutputTokens,
     }));
+    // A TTS-only service has no catalog models; its speech models live in tts.ts (ElevenLabs, Inworld, Fish Audio).
+    if (models.length === 0) {
+      for (const m of ttsModels(provider.id)) models.push({ id: m.id, name: m.name, kind: "tts", capabilities: { vision: false, pdf: false, audioInput: false, videoInput: false, tools: false, reasoning: false }, contextWindow: null, maxOutputTokens: null });
+    }
     const thinking: ThinkingView = { level: (await this.thinking.get(provider.id)) ?? "auto", levels: levelsOf(provider) };
     return { ...summary(provider), chatUrl: provider.chatUrl, models, thinking };
-  }
-
-  @Get(":id/voices")
-  @Header("Cache-Control", "no-store")
-  voices(@Param("id") id: string, @Query("model") model = "") {
-    const provider = find(id);
-    if (!provider.serviceKinds.includes("tts") || (model && !provider.models.some((entry) => entry.kind === "tts" && entry.id === model))) {
-      throw new BadRequestException({ code: "INVALID_REQUEST", message: "Choose a TTS model from this provider." });
-    }
-    return { voices: ttsVoices(id, model) };
   }
 
   // PUT /api/providers/{id}/thinking { level }: auto, or one of the provider's levels (routing.provider-thinking-default).

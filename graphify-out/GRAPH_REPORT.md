@@ -1,16 +1,16 @@
 # Graph Report - AIgate  (2026-09-30)
 
 ## Corpus Check
-- 270 files · ~672,296 words
+- 274 files · ~683,966 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2793 nodes · 6647 edges · 144 communities (131 shown, 13 thin omitted)
-- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 599 edges (avg confidence: 0.83)
+- 2852 nodes · 6826 edges · 157 communities (147 shown, 10 thin omitted)
+- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 630 edges (avg confidence: 0.83)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `47f6d4d2`
+- Built from commit: `2aa6754c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -92,12 +92,12 @@
 - [[_COMMUNITY_Community 74|Community 74]]
 - [[_COMMUNITY_Community 75|Community 75]]
 - [[_COMMUNITY_Community 76|Community 76]]
-- [[_COMMUNITY_Community 77|Community 77]]
 - [[_COMMUNITY_Community 78|Community 78]]
+- [[_COMMUNITY_Community 79|Community 79]]
 - [[_COMMUNITY_Community 80|Community 80]]
 - [[_COMMUNITY_Community 81|Community 81]]
-- [[_COMMUNITY_Community 82|Community 82]]
 - [[_COMMUNITY_Community 83|Community 83]]
+- [[_COMMUNITY_Community 84|Community 84]]
 - [[_COMMUNITY_Community 85|Community 85]]
 - [[_COMMUNITY_Community 86|Community 86]]
 - [[_COMMUNITY_Community 87|Community 87]]
@@ -115,35 +115,47 @@
 - [[_COMMUNITY_Community 99|Community 99]]
 - [[_COMMUNITY_Community 100|Community 100]]
 - [[_COMMUNITY_Community 101|Community 101]]
+- [[_COMMUNITY_Community 102|Community 102]]
 - [[_COMMUNITY_Community 103|Community 103]]
+- [[_COMMUNITY_Community 104|Community 104]]
 - [[_COMMUNITY_Community 105|Community 105]]
 - [[_COMMUNITY_Community 106|Community 106]]
 - [[_COMMUNITY_Community 107|Community 107]]
 - [[_COMMUNITY_Community 108|Community 108]]
 - [[_COMMUNITY_Community 109|Community 109]]
 - [[_COMMUNITY_Community 110|Community 110]]
-- [[_COMMUNITY_Community 111|Community 111]]
 - [[_COMMUNITY_Community 112|Community 112]]
 - [[_COMMUNITY_Community 113|Community 113]]
-- [[_COMMUNITY_Community 114|Community 114]]
+- [[_COMMUNITY_Community 115|Community 115]]
+- [[_COMMUNITY_Community 116|Community 116]]
 - [[_COMMUNITY_Community 117|Community 117]]
+- [[_COMMUNITY_Community 118|Community 118]]
 - [[_COMMUNITY_Community 119|Community 119]]
 - [[_COMMUNITY_Community 120|Community 120]]
+- [[_COMMUNITY_Community 121|Community 121]]
 - [[_COMMUNITY_Community 122|Community 122]]
 - [[_COMMUNITY_Community 123|Community 123]]
-- [[_COMMUNITY_Community 127|Community 127]]
+- [[_COMMUNITY_Community 124|Community 124]]
+- [[_COMMUNITY_Community 125|Community 125]]
+- [[_COMMUNITY_Community 126|Community 126]]
+- [[_COMMUNITY_Community 129|Community 129]]
+- [[_COMMUNITY_Community 130|Community 130]]
+- [[_COMMUNITY_Community 132|Community 132]]
+- [[_COMMUNITY_Community 133|Community 133]]
+- [[_COMMUNITY_Community 136|Community 136]]
+- [[_COMMUNITY_Community 139|Community 139]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `parseJson()` - 66 edges
-2. `readBoundedText()` - 50 edges
+2. `readBoundedText()` - 53 edges
 3. `ChatLane` - 49 edges
 4. `OpenAICompatibleAdapter (AIProviderPort for openai-compatible)` - 39 edges
 5. `Identity and API keys contract (M1 SP6)` - 37 edges
 6. `Bounded context: routing (core)` - 36 edges
-7. `withTempDb()` - 32 edges
-8. `ChatLane (modules/routing/infrastructure/chat-lane.ts)` - 29 edges
-9. `ready()` - 27 edges
-10. `Feature Matrix — mandatory 17-column artifact` - 27 edges
+7. `withTempDb()` - 34 edges
+8. `ready()` - 29 edges
+9. `ChatLane (modules/routing/infrastructure/chat-lane.ts)` - 29 edges
+10. `ConnectionsRepository` - 27 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Durable account and model lock storage` --implements--> `AccountLock entity`  [EXTRACTED]
@@ -189,423 +201,483 @@
 - **Vertex family: Google Cloud auth, Vertex and partner adapters, JSON credential connections and field** — google_auth, vertex_adapter, vertex_partner_adapter, json_credential_connections, screen_connections_google_key [EXTRACTED 1.00]
 - **Per-connection data: descriptor fields, withConnection, chat probe, migration 0008, connection fields UI** — connection_fields_descriptor, chat_probe_test, connection_data_columns, screen_connections_fields, clinepass_envelope_headers [EXTRACTED 1.00]
 
-## Communities (144 total, 13 thin omitted)
+## Communities (157 total, 10 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.05
-Nodes (38): body(), bool(), fail(), name(), noProxy(), parseNewProxyPool(), parseProxyPoolChanges(), parseProxyPoolId() (+30 more)
+Cohesion: 0.07
+Nodes (46): streamRequested(), array(), cacheMark(), errorBody(), frame(), invalid(), mediaSource(), messageMark() (+38 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.05
-Nodes (69): oauth.dashboard-flow, oauth.refresh-lifecycle, oauth.token-storage, provider.antigravity-oauth, provider.claude-oauth, provider.cline-oauth, provider.codex-oauth, provider.github-copilot-oauth (+61 more)
+Cohesion: 0.07
+Nodes (26): body(), bool(), fail(), name(), noProxy(), parseNewProxyPool(), parseProxyPoolChanges(), parseProxyPoolId() (+18 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.09
-Nodes (22): collected(), effortOf(), GrokCliAdapter, deviceModel(), KimiAdapter, format(), textOf(), toBody() (+14 more)
+Cohesion: 0.05
+Nodes (68): oauth.dashboard-flow, oauth.refresh-lifecycle, oauth.token-storage, provider.antigravity-oauth, provider.claude-oauth, provider.cline-oauth, provider.codex-oauth, provider.github-copilot-oauth (+60 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.08
-Nodes (26): AntigravityAdapter, imageAspect(), imageModel(), normalizeContents(), rewrite(), sanitize(), sessionId(), toolsOf() (+18 more)
+Cohesion: 0.06
+Nodes (25): cacheKey(), googleAccessToken(), remember(), authorize(), catalogModels(), GoogleCloud, isKeyAnswer(), rememberProject() (+17 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.07
-Nodes (52): connection.anthropic-compatible-node, connection.ollama-local-host, connection.vertex-credential-test, provider.qoder-agent-transport (traced, not ported), provider.vertex-google-auth, routing.vertex-endpoints, translator.claude-to-openai-response, translator.gemini-to-openai-response (+44 more)
+Cohesion: 0.13
+Nodes (22): collected(), parseGoogleCredential(), count(), isTransient(), request(), shouldRetry(), mediaUrl(), userPart() (+14 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.06
-Nodes (52): catalog.connection-detail-crud, catalog.connection-listing, connection.azure-openai-deployment, connection.client-listing-sanitized, connection.cloudflare-account-id, connection.test-single-connection, provider.clinepass-headers-envelope, connection.create-dedup-and-priority-assignment (+44 more)
+Cohesion: 0.08
+Nodes (23): AntigravityAdapter, imageAspect(), imageModel(), normalizeContents(), rewrite(), sanitize(), sessionId(), toolsOf() (+15 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.07
-Nodes (50): Status → ErrorCode by status + error.code/type only (never message text), API_UI_MAP row: M0 SP3 parity harness, No UI, Branding sweep to the bottom of the stack, capabilities.md — parity coverage denominator, Definition of Done — 13 items, not self-awarded, Error taxonomy (8 ErrorCodes), Stated limits of tape-based parity, Parity verification — 3 tiers (+42 more)
-
-### Community 7 - "Community 7"
-Cohesion: 0.07
-Nodes (31): CommandCodeAdapter, eventOf(), finishOf(), joinText(), reasoningEffort(), toEnvelope(), toMessages(), toolInput() (+23 more)
-
-### Community 8 - "Community 8"
-Cohesion: 0.11
-Nodes (36): array(), cacheMark(), errorBody(), frame(), invalid(), mediaSource(), messageMark(), object() (+28 more)
-
-### Community 9 - "Community 9"
-Cohesion: 0.12
-Nodes (14): extractApiKey(), ChatLane, deadline(), errorOf(), fallbackCooldown(), geminiGenerate(), googleKey(), isObject() (+6 more)
-
-### Community 10 - "Community 10"
 Cohesion: 0.08
 Nodes (27): adjustMaxTokens(), anthropicRequestFor(), AnthropicStreamEncoder, blocksOf(), blockText(), countBlock(), countChars(), effortFor() (+19 more)
 
-### Community 11 - "Community 11"
-Cohesion: 0.07
-Nodes (45): fallback.error-classification, fallback.partial-stream-failure, fallback.upstream-error-result, routing.default-executor-openai-fallback, routing.non-streaming-response, routing.request-translation, routing.source-format-detection, routing.stream-mode-decision (+37 more)
+### Community 7 - "Community 7"
+Cohesion: 0.08
+Nodes (46): fallback.error-classification, fallback.partial-stream-failure, fallback.upstream-error-result, routing.default-executor-openai-fallback, routing.non-streaming-response, routing.request-translation, routing.source-format-detection, routing.stream-mode-decision (+38 more)
 
-### Community 12 - "Community 12"
-Cohesion: 0.1
-Nodes (15): asBase64(), catText(), clean(), errorFor(), KiroAdapter, requestBody(), stopReason(), OllamaAdapter (+7 more)
-
-### Community 13 - "Community 13"
+### Community 8 - "Community 8"
 Cohesion: 0.1
 Nodes (27): golden(), main(), option(), report(), capabilityIds(), coverage(), parityStatuses(), live() (+19 more)
 
-### Community 14 - "Community 14"
+### Community 9 - "Community 9"
 Cohesion: 0.11
-Nodes (43): /network/* → ProxyPools, DeployWizard, Tunnel, Mitm, /settings/auth OIDC and SAML tabs, Audit finding: Console shown in sidebar regardless of Developer mode, Audit PASS: no credential leaked across 27 HTML exports, Audit FAIL: only the happy path was drawn (state rules §10.7), Audit finding: MITM CA buttons adjacent, type-to-confirm modal missing, Audit finding: settings-auth regenerated as settings-auth-v2, Audit FAIL: sidebar not identical across screens (+35 more)
+Nodes (44): /network/* → ProxyPools, DeployWizard, Tunnel, Mitm, Audit PASS: no credential leaked across 27 HTML exports, Audit finding: MITM CA buttons adjacent, type-to-confirm modal missing, Audit finding: settings-auth regenerated as settings-auth-v2, Audit FAIL: sidebar not identical across screens, §7 Trace the behavior — never conclude from a function name, Minimal frontend state management, The Tracing Protocol (6 steps, applied by Tasks 6–18) (+36 more)
 
-### Community 15 - "Community 15"
+### Community 10 - "Community 10"
 Cohesion: 0.12
 Nodes (9): asRecord(), TraeAdapter, usageOf(), flowError(), invalid(), OAuthController, objectRecord(), stringifyQuery() (+1 more)
 
+### Community 11 - "Community 11"
+Cohesion: 0.09
+Nodes (40): fallback.executor-retry-budget, transport.test.mjs: adapter streams end to end over DirectTransport, Upstream message ≤300 chars, credential redacted, HTML pages dropped; bad API key → AUTH_ERROR before I/O, In-place retry: 502/503/504 + unreachable host, ≤3 attempts via withRetry, before first chunk, API_UI_MAP row: SP8 transport, No UI, Error taxonomy (8 ErrorCodes), Parity verification — 3 tiers, assertModelSupports() — MODEL_UNAVAILABLE / INVALID_REQUEST (+32 more)
+
+### Community 12 - "Community 12"
+Cohesion: 0.1
+Nodes (28): readSettings(), testModel(), useApiKeys(), useCapacityPools(), useChatReadiness(), useComboMutation(), useCombos(), useComboStickyLimit() (+20 more)
+
+### Community 13 - "Community 13"
+Cohesion: 0.12
+Nodes (30): cursorAutoImport(), customKey(), fetchConnectionModels(), kiroApiKeyImport(), kiroAutoImport(), kiroCliProxyImport(), kiroImport(), oauthAuthorize() (+22 more)
+
+### Community 14 - "Community 14"
+Cohesion: 0.1
+Nodes (39): docs/capabilities.md (GENERATED capability specification), docs/discovery/coverage.md, docs/discovery/gaps.md (Gap register), docs/discovery/inventory.json, §3 The 20 behavioral questions (trigger…edge cases), §2 Core principles — never port, rename, or translate 9router line by line, §14 Feature parity is not code parity, Final principle — 9router says WHAT, never HOW (+31 more)
+
+### Community 15 - "Community 15"
+Cohesion: 0.15
+Nodes (7): extractApiKey(), ChatLane, deadline(), errorOf(), isObject(), write(), geminiModelList()
+
 ### Community 16 - "Community 16"
-Cohesion: 0.14
-Nodes (26): agentBody(), agentValue(), bytes(), checksum(), CursorAdapter, cursorHeaders(), decode(), decodeAgentValue() (+18 more)
+Cohesion: 0.16
+Nodes (25): agentBody(), agentValue(), bytes(), checksum(), CursorAdapter, cursorHeaders(), decode(), decodeAgentValue() (+17 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.1
-Nodes (21): isCapacityCapability(), parsePool(), answerText(), assign(), fail(), flattenToolTurn(), integer(), isField() (+13 more)
+Cohesion: 0.09
+Nodes (18): classifyStatus(), clean(), invalid(), sseBody(), streamError(), upstreamError(), asBase64(), catText() (+10 more)
 
 ### Community 18 - "Community 18"
-Cohesion: 0.13
-Nodes (39): validateCredential(): one call; valid:false only for AUTH_ERROR / QUOTA_EXHAUSTED, /providers/quota → Quota; custom provider form; multi-account, §10 New architecture independent of 9router (API/Application/Domain/Ports/Infra), §9 Build an explicit domain model (Provider, Quota, RoutingPolicy…), §5 Feature discovery — inventory every group, do not trust the UI menu, §11 Providers reached only through a port (AIProviderPort), The 23 feature groups required by behavioral.md §5, AuthFlow — declarative, data-driven auth step framework (+31 more)
+Cohesion: 0.12
+Nodes (12): LoginLimiter, AuthController, invalid(), rateLimited(), setupRequired(), DashboardAuth, DashboardAuthGuard, isLocal() (+4 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.07
-Nodes (38): fallback.executor-retry-budget, routing.streaming-pipeline, transport.proxy-priority-chain, transport.test.mjs: adapter streams end to end over DirectTransport, Upstream message ≤300 chars, credential redacted, HTML pages dropped; bad API key → AUTH_ERROR before I/O, In-place retry: 502/503/504 + unreachable host, ≤3 attempts via withRetry, before first chunk, readSseData() — bounded SSE reader (1 Mi chars per line/event, cancels body), §8 Business rule beats old implementation (+30 more)
-
-### Community 20 - "Community 20"
-Cohesion: 0.13
-Nodes (28): cursorAutoImport(), customKey(), kiroApiKeyImport(), kiroAutoImport(), kiroCliProxyImport(), kiroImport(), oauthAuthorize(), oauthDeviceCode() (+20 more)
-
-### Community 21 - "Community 21"
-Cohesion: 0.11
-Nodes (12): hostnameOf(), isLocalRequest(), isLoopbackIp(), DashboardAuth, DashboardAuthGuard, isLocal(), IdentityBootstrap, IdentityRepository (+4 more)
-
-### Community 22 - "Community 22"
-Cohesion: 0.11
-Nodes (36): docs/capabilities.md (GENERATED capability specification), docs/discovery/coverage.md, docs/discovery/gaps.md (Gap register), docs/discovery/inventory.json, §3 The 20 behavioral questions (trigger…edge cases), §2 Core principles — never port, rename, or translate 9router line by line, §14 Feature parity is not code parity, Final principle — 9router says WHAT, never HOW (+28 more)
-
-### Community 23 - "Community 23"
-Cohesion: 0.09
-Nodes (35): catalog.registry-build, catalog.registry-entry-shape, routing.forced-stream-json-collapse, provider.anthropic-auth-and-headers, provider.codebuddy-request-quirks, Adapter: catalog headers first, key last; raw or Bearer scheme; chatUrl/modelsUrl called directly, ListedModel { id, descriptor? } — getModels never invents limits (≤1000 ids), GET /api/providers (all 121, connectable + reason) (+27 more)
-
-### Community 24 - "Community 24"
-Cohesion: 0.12
-Nodes (35): catalog.capability-refine-additive-only, catalog.capability-tier-fallback, catalog.capability-vision-pattern-order, catalog.model-registry-global, API ↔ UI map (docs/design/API_UI_MAP.md), docs/PROJECT_MAP.md (generated U-project ownership map), API_UI_MAP row: M0 SP4 tools/extract + CATALOG, No UI yet (SP13 serves /providers), API_UI_MAP row: SP7 packages/engine, No UI (+27 more)
-
-### Community 25 - "Community 25"
-Cohesion: 0.17
+Cohesion: 0.16
 Nodes (9): body(), errorOf(), fakeUpstream(), frames(), json(), listening(), openStream(), ready() (+1 more)
 
-### Community 26 - "Community 26"
+### Community 20 - "Community 20"
 Cohesion: 0.09
-Nodes (23): base64url(), call(), claudeTokens(), clineTokens(), copilotToken(), decodeClineCode(), failed(), generatePkce() (+15 more)
+Nodes (19): AnthropicAdapter, nodeBetas(), stopReasonOf(), usageOf(), claudeCodeBody(), cloak(), cloakTools(), copilotMessagesBody() (+11 more)
+
+### Community 21 - "Community 21"
+Cohesion: 0.1
+Nodes (24): parseJson(), base64url(), call(), claudeTokens(), clineTokens(), copilotToken(), decodeClineCode(), failed() (+16 more)
+
+### Community 22 - "Community 22"
+Cohesion: 0.13
+Nodes (19): exhausted(), GatewayError, audioType(), badRequest(), decodeFailure(), formatOf(), isObject(), optionalText() (+11 more)
+
+### Community 23 - "Community 23"
+Cohesion: 0.13
+Nodes (33): §10 New architecture independent of 9router (API/Application/Domain/Ports/Infra), §9 Build an explicit domain model (Provider, Quota, RoutingPolicy…), §5 Feature discovery — inventory every group, do not trust the UI menu, §6 Feature Matrix requirement — nothing is understood until fully traced, §20 No blind fallback — fallback follows error semantics, §11 Providers reached only through a port (AIProviderPort), §13 Translator/protocol separation — canonical vs vendor formats, The 23 feature groups required by behavioral.md §5 (+25 more)
+
+### Community 24 - "Community 24"
+Cohesion: 0.11
+Nodes (33): API ↔ UI map (docs/design/API_UI_MAP.md), GET /health, API_UI_MAP row: SP16 OAuth sign-in, API_UI_MAP row SP16b, API_UI_MAP SP16b2 row (device sign-in slow_down), API_UI_MAP row: M0 SP4 tools/extract + CATALOG, No UI yet (SP13 serves /providers), API_UI_MAP row: SP7 packages/engine, No UI, API_UI_MAP row: SP9 OpenAICompatibleAdapter, No UI (+25 more)
+
+### Community 25 - "Community 25"
+Cohesion: 0.09
+Nodes (33): catalog.registry-build, catalog.registry-entry-shape, Adapter: catalog headers first, key last; raw or Bearer scheme; chatUrl/modelsUrl called directly, ListedModel { id, descriptor? } — getModels never invents limits (≤1000 ids), GET /api/providers/:id (chatUrl + models; 404 NOT_FOUND), GET /api/providers (all 121, connectable + reason), UI error code: PROVIDER_NOT_SUPPORTED (400), API_UI_MAP row: SP14a AnthropicAdapter — no new screen; /providers pills follow connectable (+25 more)
+
+### Community 26 - "Community 26"
+Cohesion: 0.13
+Nodes (22): parsePool(), answerText(), assign(), collectPanel(), fail(), flattenToolTurn(), integer(), isField() (+14 more)
 
 ### Community 27 - "Community 27"
-Cohesion: 0.1
-Nodes (12): ApiKeysModule, CatalogModule, ConnectionsModule, IdentityModule, ModelTestController, PxpipeController, isPxpipeTransform(), PxpipeService (+4 more)
+Cohesion: 0.09
+Nodes (31): connection.azure-openai-deployment, connection.cloudflare-account-id, connection.vertex-credential-test, provider.clinepass-headers-envelope, provider.qoder-agent-transport (traced, not ported), provider.vertex-google-auth, routing.vertex-endpoints, translator.cloudflare-content-flatten (+23 more)
 
 ### Community 28 - "Community 28"
 Cohesion: 0.11
-Nodes (9): maskHint(), refreshContext(), sealContext(), ConnectionsRepository, expiry(), oauthField(), sameAccount(), toView() (+1 more)
+Nodes (31): catalog.connection-detail-crud, catalog.connection-listing, connection.client-listing-sanitized, connection.test-single-connection, connection.create-dedup-and-priority-assignment, connection.delete-and-reorder, connection.storage-shape-json-blob, DELETE /api/connections/:id (+23 more)
 
 ### Community 29 - "Community 29"
-Cohesion: 0.14
-Nodes (14): cell(), renderCapabilities(), loadOrExit(), computeCoverage(), renderCoverage(), buildInventory(), glob(), settingsKeys() (+6 more)
+Cohesion: 0.12
+Nodes (9): keyHint(), maskHint(), refreshContext(), sealContext(), ConnectionsRepository, expiry(), oauthField(), sameAccount() (+1 more)
 
 ### Community 30 - "Community 30"
-Cohesion: 0.1
-Nodes (8): authorize(), catalogModels(), GoogleCloud, isKeyAnswer(), rememberProject(), staleToken(), VertexAdapter, VertexPartnerAdapter
+Cohesion: 0.14
+Nodes (15): createAdapter(), familyAdapter(), isJsonCredential(), checkForProvider(), ConnectionsController, credentialOf(), invalid(), named() (+7 more)
 
 ### Community 31 - "Community 31"
-Cohesion: 0.09
-Nodes (31): catalog.v1beta-generate-content-dispatch, catalog.v1beta-models-listing, routing.responses-non-stream-answer, translator.gemini-client-request, translator.openai-to-gemini-client-response, translator.openai-to-responses-client-response, translator.openai-to-responses-request, translator.responses-client-request (+23 more)
+Cohesion: 0.15
+Nodes (21): Shell(), CliTools(), useAuthStatus(), useChangePassword(), useLogin(), useLogout(), usePatchSettings(), useSessionMutation() (+13 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.13
-Nodes (16): claudeCodeBody(), cloak(), cloakTools(), copilotMessagesBody(), decode(), derivedUuid(), fixToolUseOrdering(), hoistToolResultImages() (+8 more)
+Cohesion: 0.14
+Nodes (30): usage.write-not-synchronous, GET /overview/summary, SSE /events/requests, / → Overview, /traffic/usage, /traffic/requests* → Usage, Requests, RequestDetail, Audit FAIL: only the happy path was drawn (state rules §10.7), §23 Observability per request; never log keys, tokens or secrets, §21 Quota must be understood fully, not copied from the UI tracker (+22 more)
 
 ### Community 33 - "Community 33"
-Cohesion: 0.08
-Nodes (30): settings.combo-rotation-reset, routing.capacity-adapter-solo, routing.client-disconnect-propagation, routing.model-resolution, Durable account and model lock storage, §18 Streaming is first-class (TTFT, cancellation, backpressure), ChatLane.adapted / widening / member: solo and combo widening, trimmed pool calls, Backpressure: a false write() waits for drain; the upstream read pauses with it (+22 more)
+Cohesion: 0.1
+Nodes (30): endpoint.rewrite-lanes, settings.combo-rotation-reset, catalog.model-listing-live-override, fallback.accounts-exhausted-response, routing.capacity-adapter-solo, routing.client-disconnect-propagation, routing.lane-entry-routes, routing.model-resolution (+22 more)
 
 ### Community 34 - "Community 34"
-Cohesion: 0.15
-Nodes (14): createAdapter(), familyAdapter(), checkForProvider(), ConnectionsController, credentialOf(), invalid(), named(), notFound() (+6 more)
-
-### Community 35 - "Community 35"
-Cohesion: 0.11
-Nodes (29): connection.provider-node-api-type, connection.provider-node-create-list, connection.provider-node-repo-storage, connection.provider-node-update-delete, connection.provider-node-validate-partial-ssrf (stays traced: no validate route), DELETE /api/provider-nodes/:id (cascades the connection), GET /api/provider-nodes, PATCH /api/provider-nodes/:id (+21 more)
-
-### Community 36 - "Community 36"
-Cohesion: 0.13
-Nodes (29): usage.write-not-synchronous, GET /overview/summary, SSE /events/requests, / → Overview, /traffic/usage, /traffic/requests* → Usage, Requests, RequestDetail, §23 Observability per request; never log keys, tokens or secrets, §21 Quota must be understood fully, not copied from the UI tracker, §22 Usage fields to trace per request (tokens, cost, latency, fallback attempts) (+21 more)
-
-### Community 37 - "Community 37"
-Cohesion: 0.13
-Nodes (17): applyThinking(), budgetFloor(), cachedSignature(), familyOf(), functionResponse(), GeminiAdapter, intentOf(), normalize() (+9 more)
-
-### Community 38 - "Community 38"
-Cohesion: 0.15
-Nodes (15): AnthropicAdapter, assistantBlock(), imageBlock(), nodeBetas(), openaiExtensions(), source(), stopReasonOf(), textBlock() (+7 more)
-
-### Community 39 - "Community 39"
-Cohesion: 0.16
-Nodes (27): catalog.model-connectivity-test, /gateway/routing*, /gateway/token-saver → Routing (Combo and Capacity adapter tabs wired), ComboCreate, TokenSaver, §20 No blind fallback — fallback follows error semantics, §12 Router is its own business engine, not controller logic, Routing → Capacity adapter tab (Vision, Audio input pools), Routing → Combo tab + ComboCreate create/edit, sticky limit, Routing simulator (decision-tree dry run), Bounded context: routing (core) (+19 more)
-
-### Community 40 - "Community 40"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (17): callsTools(), fits(), hardNeeds(), messagesLength(), modelFit(), needsMedia(), partsLength(), reorderByCapabilities() (+9 more)
 
-### Community 41 - "Community 41"
+### Community 35 - "Community 35"
+Cohesion: 0.12
+Nodes (19): reasoningEffort(), applyThinking(), budgetFloor(), budgetToLevel(), cachedSignature(), familyOf(), functionResponse(), GeminiAdapter (+11 more)
+
+### Community 36 - "Community 36"
+Cohesion: 0.16
+Nodes (27): /gateway/routing*, /gateway/token-saver → Routing (Combo and Capacity adapter tabs wired), ComboCreate, TokenSaver, /settings/auth OIDC and SAML tabs, Audit finding: routing-fallback merged 4 tabs into one 3886px screen, §12 Router is its own business engine, not controller logic, Routing → Combo tab + ComboCreate create/edit, sticky limit, AIGate domain model (Provider, Credential, RoutingPolicy, AccountLock, …), Routing simulator (decision-tree dry run), Bounded context: routing (core) (+19 more)
+
+### Community 37 - "Community 37"
+Cohesion: 0.11
+Nodes (27): catalog.capability-refine-additive-only, catalog.capability-tier-fallback, catalog.capability-vision-pattern-order, catalog.compatible-models-import-ui, catalog.custom-models-orphan-on-node-delete, catalog.model-registry-global, API_UI_MAP row SP16a, §8 Business rule beats old implementation (+19 more)
+
+### Community 38 - "Community 38"
 Cohesion: 0.16
 Nodes (11): signedIn(), as(), create(), run(), signedIn(), boot(), sessionCookie(), setUp() (+3 more)
 
-### Community 42 - "Community 42"
+### Community 39 - "Community 39"
 Cohesion: 0.09
 Nodes (9): exec(), openBetterSqlite(), openBunSqlite(), openNodeSqlite(), toSqlJsValues(), toSqlValues(), fallbackOrder(), openClient() (+1 more)
 
+### Community 40 - "Community 40"
+Cohesion: 0.16
+Nodes (26): validateCredential(): one call; valid:false only for AUTH_ERROR / QUOTA_EXHAUSTED, /providers/media* → MediaProviders, /providers/quota → Quota; custom provider form; multi-account, AuthFlow — declarative, data-driven auth step framework, New IA — 7 groups organised by user job, Critique of 9router's information architecture, Screen state conventions (loading, refetch, empty, error, live, destructive, optimistic), Bounded context: media (+18 more)
+
+### Community 41 - "Community 41"
+Cohesion: 0.15
+Nodes (26): endpoint.enforce-require-api-key, settings.database-export-import, settings.defaults-and-merge, settings.get-secret-stripping, settings.hot-path-read-no-cache, settings.outbound-proxy-live-apply, settings.patch-protected-keys, settings.proxy-test-outbound-probe (+18 more)
+
+### Community 42 - "Community 42"
+Cohesion: 0.15
+Nodes (14): checkThinking(), invalid(), notFound(), ProviderNodesController, levelColumn(), nodeDescriptor(), nodeProtocol(), takesThinking() (+6 more)
+
 ### Community 43 - "Community 43"
-Cohesion: 0.17
-Nodes (26): /traffic/console → Console (Developer mode only), /integrations/* → CliTools, CliToolDetail, Skills, Mcp, §6 Feature Matrix requirement — nothing is understood until fully traced, §13 Translator/protocol separation — canonical vs vendor formats, Canonical Internal Protocol, CLI-tool config writes require diff preview + backup, Feature Matrix — mandatory 17-column artifact, Bounded context: tooling (+18 more)
+Cohesion: 0.11
+Nodes (7): isCapacityCapability(), rotate(), CapacityPoolsController, CapacityPoolsRepository, CombosRepository, isUniqueViolation(), view()
 
 ### Community 44 - "Community 44"
-Cohesion: 0.18
-Nodes (22): readSettings(), useApiKeys(), useChatReadiness(), useComboMutation(), useCombos(), useComboStickyLimit(), useCreateCombo(), useCreateKey() (+14 more)
-
-### Community 45 - "Community 45"
 Cohesion: 0.14
 Nodes (10): isWellFormedKey(), maskKey(), onlyKey(), parseKeyName(), parseKeyStatus(), ApiKeysController, notFound(), ApiKeysRepository (+2 more)
 
-### Community 46 - "Community 46"
+### Community 45 - "Community 45"
 Cohesion: 0.12
-Nodes (8): CatalogController, find(), levelsOf(), routeKinds(), summary(), ProviderThinkingRepository, thinkingLevels(), ttsVoices()
+Nodes (15): previewTtsVoice(), useProvider(), useTtsVoices(), fail(), fail(), importToken(), save(), VoiceBrowser() (+7 more)
+
+### Community 46 - "Community 46"
+Cohesion: 0.13
+Nodes (15): codexBody(), codexModelIds(), codexUrl(), normalizeEffort(), normalizeTools(), placeholder(), upstreamModel(), callId() (+7 more)
 
 ### Community 47 - "Community 47"
-Cohesion: 0.14
-Nodes (14): previewTtsVoice(), useConnections(), useProvider(), useProviders(), useSetThinking(), useTtsVoices(), CustomProviderDetail(), formText() (+6 more)
+Cohesion: 0.15
+Nodes (24): connection.provider-node-api-type, connection.provider-node-create-list, connection.provider-node-repo-storage, connection.provider-node-update-delete, connection.provider-node-validate-partial-ssrf (stays traced: no validate route), DELETE /api/provider-nodes/:id (cascades the connection), GET /api/provider-nodes, PATCH /api/provider-nodes/:id (+16 more)
 
 ### Community 48 - "Community 48"
+Cohesion: 0.15
+Nodes (13): allowedUrl(), classifiedBody(), classify(), DirectTransport, dispatcher(), envProxy(), fetchBody(), googleAddress() (+5 more)
+
+### Community 49 - "Community 49"
 Cohesion: 0.11
 Nodes (23): combo.detect-required-capabilities, Capacity adapter contract (SP20), Capacity rules: pool validation, model capability lookup, widen, 3-tier reorder, Corrected 9router capacity bugs: default free-model pools, orphaned tool calls, rotation keyed by model, trimHistory: 80% window budget, first 6 older turns, tool calls kept with results, Combo rules: validation, rotation, member failover, panel/judge requests, collectPanel: 4 literal workers, quorum-grace, hard timeout, straggler cancel, Corrected 9router combo bugs: first-failure status, unbounded nesting, strategy keyed by name (+15 more)
 
-### Community 49 - "Community 49"
-Cohesion: 0.17
-Nodes (10): testModel(), useCapacityPools(), useConnectedModels(), useSaveCapacityPool(), CapacityTab(), fail(), Button(), PageHeading() (+2 more)
-
 ### Community 50 - "Community 50"
-Cohesion: 0.14
-Nodes (14): codexBody(), codexModelIds(), codexUrl(), normalizeEffort(), normalizeTools(), placeholder(), upstreamModel(), callId() (+6 more)
+Cohesion: 0.13
+Nodes (15): UpstreamReply, VoicePreviewController, authHeaders(), connectedUrl(), first(), geminiPrompt(), noAudio(), text() (+7 more)
 
 ### Community 51 - "Community 51"
 Cohesion: 0.14
-Nodes (12): Shell(), fail(), fail(), importToken(), save(), apiBlob(), ApiError, apiVoid() (+4 more)
+Nodes (22): apikey.legacy-format-unenforced, apikey.list-keys, apikey.validate-lookup, identity.auth-status-disclosure, identity.machine-id-derivation, identity.reset-password-local-only, identity.session-cookie-lifecycle, settings.patch-password-change (+14 more)
 
 ### Community 52 - "Community 52"
+Cohesion: 0.13
+Nodes (22): GET/POST/PATCH/DELETE /api/combos, UI error code: ALREADY_CONNECTED (409), UI error code: BAD_RESPONSE, UI error code: COMBO_EXISTS (409), UI error code: COMBO_LIMIT (409), UI error code: HTTP_5xx, UI error code: NETWORK_ERROR, UI error code: any other code (fallback) (+14 more)
+
+### Community 53 - "Community 53"
+Cohesion: 0.22
+Nodes (21): /traffic/console → Console (Developer mode only), /integrations/* → CliTools, CliToolDetail, Skills, Mcp, Audit finding: Console shown in sidebar regardless of Developer mode, CLI-tool config writes require diff preview + backup, Bounded context: tooling, Type scale (12/13/14/16/20/32) and mono for identifiers, Feature group: CLI Tools, Feature group: Console Log (+13 more)
+
+### Community 54 - "Community 54"
 Cohesion: 0.14
 Nodes (10): useCreateNode(), useDeleteNode(), useNodeMutation(), useProviderNodes(), useUpdateNode(), apiTypeParam(), submit(), text() (+2 more)
 
-### Community 53 - "Community 53"
-Cohesion: 0.17
-Nodes (13): customInput(), inputItems(), invalid(), messageParts(), num(), optionalNumber(), optionalPositiveInteger(), parseOpenAIResponsesRequest() (+5 more)
-
 ### Community 55 - "Community 55"
-Cohesion: 0.19
-Nodes (14): fetchConnectionModels(), path(), useAddCustomModels(), useCustomMutation(), useDeleteCustomModel(), describeProbe(), importChoices(), importMessage() (+6 more)
+Cohesion: 0.16
+Nodes (7): CatalogController, find(), levelsOf(), routeKinds(), summary(), ProviderThinkingRepository, thinkingLevels()
 
 ### Community 56 - "Community 56"
-Cohesion: 0.22
-Nodes (16): CliTools(), useAuthStatus(), useChangePassword(), useLogin(), useLogout(), usePatchSettings(), useSessionMutation(), useSettings() (+8 more)
+Cohesion: 0.14
+Nodes (11): ClientGone, fallbackCooldown(), geminiGenerate(), googleKey(), mediaCooldown(), multipartField(), publicFetchUrl(), records() (+3 more)
 
 ### Community 57 - "Community 57"
-Cohesion: 0.2
-Nodes (15): applyQuirks(), assistantMessage(), compact(), copilotChatBody(), kimchiBody(), mediaUrl(), messageMark(), textJson() (+7 more)
+Cohesion: 0.15
+Nodes (19): apikey.delete-key, apikey.generate-key, apikey.update-key-status, GET /api/capacity-pools, PUT /api/capacity-pools/:capability, DELETE /api/keys/:id, UI error code: LIMIT_REACHED (409), UI error code: NOT_FOUND (404), useCreateKey (features/gateway/api.ts) (+11 more)
 
 ### Community 58 - "Community 58"
-Cohesion: 0.16
-Nodes (19): connection.commandcode-key-test, routing.count-tokens-estimate, translator.claude-client-request, translator.commandcode-to-openai-response, translator.openai-to-claude-client-response, translator.openai-to-commandcode-request, protocols/anthropic-messages.ts — parse to CIP, anthropicRequestFor (passthrough for Anthropic, claude→openai rules otherwise), message, SSE encoder, count_tokens, API_UI_MAP row: SP14h Command Code adapter (no new screen) (+11 more)
+Cohesion: 0.18
+Nodes (8): ApiKeysModule, CatalogModule, ConnectionsModule, IdentityModule, ModelTestController, RoutingModule, SettingsModule, AppModule
 
 ### Community 59 - "Community 59"
-Cohesion: 0.16
-Nodes (19): apikey.delete-key, apikey.generate-key, apikey.update-key-status, GET /api/capacity-pools, PUT /api/capacity-pools/:capability, DELETE /api/keys/:id, UI error code: INVALID_REQUEST (400), UI error code: LIMIT_REACHED (409), UI error code: NOT_FOUND (404) (+11 more)
-
-### Community 60 - "Community 60"
-Cohesion: 0.2
-Nodes (19): identity.password-login-lockout, identity.session-cookie-lifecycle, UI error code: INVALID_CREDENTIALS (401), UI error code: RATE_LIMITED (429), UI error code: SETUP_REQUIRED (409), useChangePassword (features/settings/api.ts), useLogin (features/settings/api.ts), useLogout (features/settings/api.ts) (+11 more)
-
-### Community 61 - "Community 61"
-Cohesion: 0.23
-Nodes (19): settings.database-export-import, /settings/general → SettingsGeneral, Audit finding: login-callback / deploy-wizard / authflow-modals are showcases, not routes, §7 Trace the behavior — never conclude from a function name, The Tracing Protocol (6 steps, applied by Tasks 6–18), Hard constraint: tunnel requires 'Require API key' enabled, Bounded context: apikeys, Bounded context: identity (+11 more)
-
-### Community 62 - "Community 62"
 Cohesion: 0.24
 Nodes (12): mutation(), useCreateProxyPool(), useDeleteProxyPool(), useDeployCloudflareRelay(), useDeployDenoRelay(), useDeployVercelRelay(), useProxyPools(), useProxyRotations() (+4 more)
 
+### Community 60 - "Community 60"
+Cohesion: 0.26
+Nodes (18): identity.password-login-lockout, UI error code: INVALID_CREDENTIALS (401), UI error code: RATE_LIMITED (429), UI error code: SETUP_REQUIRED (409), GET /api/keys, useLogin (features/settings/api.ts), POST /api/auth/login, /login → Login (+10 more)
+
+### Community 61 - "Community 61"
+Cohesion: 0.16
+Nodes (18): API_UI_MAP row: M0 SP3 parity harness, No UI, Branding sweep to the bottom of the stack, capabilities.md — parity coverage denominator, Stated limits of tape-based parity, Recording proxy + 4-part tape, Normalizer + semantic SSE diff (not chunk diff), pnpm parity record | replay | live | gate, Parity harness contract (M0 SP3) and the M1 acceptance gate (+10 more)
+
+### Community 62 - "Community 62"
+Cohesion: 0.21
+Nodes (12): useAddCustomModels(), useCustomMutation(), useDeleteCustomModel(), describeProbe(), importChoices(), importMessage(), useAs(), addIds() (+4 more)
+
 ### Community 63 - "Community 63"
 Cohesion: 0.15
-Nodes (18): endpoint.enforce-require-api-key, endpoint.extract-header-order, endpoint.rewrite-lanes, fallback.accounts-exhausted-response, routing.lane-entry-routes, routing.request-preflight, routing.responses-compact-lane, API_UI_MAP row: SP10 OpenAI Chat protocol, No UI (+10 more)
+Nodes (10): CommandCodeAdapter, eventOf(), finishOf(), joinText(), toEnvelope(), toMessages(), toolInput(), unsupported() (+2 more)
 
 ### Community 64 - "Community 64"
-Cohesion: 0.24
-Nodes (7): checkThinking(), invalid(), notFound(), ProviderNodesController, nodeProtocol(), takesThinking(), familyLevels()
+Cohesion: 0.17
+Nodes (12): checkUrl(), positiveOrNull(), validateCatalog(), isProtocol(), protocolOf(), toDescriptor(), unsupportedReason(), checkProvider() (+4 more)
 
 ### Community 65 - "Community 65"
-Cohesion: 0.13
-Nodes (10): collectPanel(), judgePrompt(), judgeRequest(), panelRequest(), ClientGone, GatewayError, multipartField(), publicFetchUrl() (+2 more)
-
-### Community 66 - "Community 66"
-Cohesion: 0.15
-Nodes (17): catalog.provider-models-live-fetch, catalog.compatible-models-import-ui, catalog.custom-models-orphan-on-node-delete, catalog.model-custom-registration, catalog.model-listing-live-override, API_UI_MAP row SP16a, GET /api/connections/:id/models (adapter getModels, MODELS_FETCH_FAILED), Model import and custom models contract (M2 SP16a) (+9 more)
-
-### Community 67 - "Community 67"
-Cohesion: 0.15
-Nodes (17): GET /health, Feature-based frontend structure with import boundaries, Hexagonal architecture, granularity = bounded context, Split: machines block mechanics, skills teach judgement, Monorepo layout (apps/server, apps/web, apps/cli, packages/engine, contracts, database, tools), Open decisions not settled by this spec, Iron law: no skill without a failing test first (RED → GREEN → REFACTOR), UI performance constraints (+9 more)
-
-### Community 68 - "Community 68"
-Cohesion: 0.18
-Nodes (17): GET/POST/PATCH/DELETE /api/combos, UI error code: BAD_RESPONSE, UI error code: COMBO_EXISTS (409), UI error code: COMBO_LIMIT (409), UI error code: HTTP_5xx, UI error code: NETWORK_ERROR, UI error code: any other code (fallback), UI error code: TIMEOUT (+9 more)
-
-### Community 69 - "Community 69"
-Cohesion: 0.18
-Nodes (17): apikey.legacy-format-unenforced, apikey.list-keys, apikey.validate-lookup, identity.auth-status-disclosure, identity.machine-id-derivation, identity.reset-password-local-only, settings.patch-password-change, settings.require-login-public-status (+9 more)
-
-### Community 70 - "Community 70"
 Cohesion: 0.16
 Nodes (6): autodetect(), compact(), compressToolOutput(), filterFind(), filterSearchList(), groupPaths()
 
-### Community 71 - "Community 71"
-Cohesion: 0.2
+### Community 66 - "Community 66"
+Cohesion: 0.21
+Nodes (10): useConnections(), useProviders(), useSetThinking(), CustomProviderDetail(), formText(), LlmProviders(), submit(), describeTest() (+2 more)
+
+### Community 67 - "Community 67"
+Cohesion: 0.19
+Nodes (7): send(), StreamRetryAdapter, onboardAntigravity(), abortReason(), delay(), validate(), withRetry()
+
+### Community 68 - "Community 68"
+Cohesion: 0.16
+Nodes (16): connection.anthropic-compatible-node, routing.forced-stream-json-collapse, provider.codebuddy-request-quirks, Claude Code anthropic-beta list for claude-* models on an Anthropic node (claude-code flag only on the official host), Anthropic node connection test: POST <base>/v1/messages, claude-3-haiku, only 401/403 invalid (9router), API_UI_MAP row: SP14b stream-only providers (no new screen) and the protocol select on /providers/new, CodeBuddy quirks: reasoningSummary (cn, intl), neutralAgentPrompt (cn) via EXECUTOR_QUIRKS, User decision 2026-09-26: SP14b keeps 9router on every suspected bug asked (+8 more)
+
+### Community 69 - "Community 69"
+Cohesion: 0.19
 Nodes (4): CustomModelsController, filled(), invalid(), CustomModelsRepository
 
-### Community 72 - "Community 72"
-Cohesion: 0.19
-Nodes (16): /providers/media* → MediaProviders, Audit finding: routing-fallback merged 4 tabs into one 3886px screen, New IA — 7 groups organised by user job, Critique of 9router's information architecture, Screen state conventions (loading, refetch, empty, error, live, destructive, optimistic), Bounded context: media, Feature group: Media Providers, 09-media-providers.yaml (+8 more)
-
-### Community 73 - "Community 73"
+### Community 70 - "Community 70"
 Cohesion: 0.23
 Nodes (9): body(), check(), chunk(), ctx(), fakeTransport(), json(), run(), sent() (+1 more)
 
-### Community 74 - "Community 74"
+### Community 71 - "Community 71"
 Cohesion: 0.18
 Nodes (15): §30 The 12 pre-implementation questions, §29 Definition of Done — 13 checklist items, no self-declared DONE, §28 Per-feature process: DISCOVER→TRACE→DOCUMENT→…→REVIEW, §25 Golden scenarios (13 critical flows), Phase model A→F (Discovery, Behavior Extraction, Contract, Design, Implementation, Parity Verification), §24 Characterization/contract tests prove old ≈ new at contract level, parityStatus lifecycle (not-started → traced → contracted → implemented → verified), Constraint — no Phase C contracts during discovery (+7 more)
 
-### Community 75 - "Community 75"
-Cohesion: 0.28
-Nodes (15): settings.defaults-and-merge, settings.get-secret-stripping, settings.hot-path-read-no-cache, settings.outbound-proxy-live-apply, settings.patch-protected-keys, settings.proxy-test-outbound-probe, GET /api/settings, useRequireApiKey (features/gateway/api.ts) (+7 more)
-
-### Community 76 - "Community 76"
-Cohesion: 0.42
-Nodes (13): asBody(), fail(), isJsonCredential(), keyHint(), parseApiKey(), parseChanges(), parseField(), parseName() (+5 more)
-
-### Community 78 - "Community 78"
+### Community 72 - "Community 72"
 Cohesion: 0.22
 Nodes (4): parseSettingsPatch(), validHttpUrl(), SettingsController, SettingsRepository
 
+### Community 73 - "Community 73"
+Cohesion: 0.16
+Nodes (3): IdentityBootstrap, IdentityRepository, sha256()
+
+### Community 74 - "Community 74"
+Cohesion: 0.22
+Nodes (3): PxpipeController, isPxpipeTransform(), PxpipeService
+
+### Community 76 - "Community 76"
+Cohesion: 0.15
+Nodes (3): post(), tts(), chunk()
+
+### Community 78 - "Community 78"
+Cohesion: 0.24
+Nodes (8): format(), OllamaAdapter, textOf(), toBody(), toMessages(), toolArguments(), unsupported(), usageOf()
+
+### Community 79 - "Community 79"
+Cohesion: 0.25
+Nodes (12): geminiTtsRequest(), invalid(), isGeminiTtsRequest(), optionalNumber(), optionalPositiveInteger(), parseGeminiGenerateRequest(), parseGeminiPath(), partsText() (+4 more)
+
 ### Community 80 - "Community 80"
-Cohesion: 0.18
-Nodes (5): children(), cleanGeminiSchema(), eachSchema(), flattenUnion(), score()
+Cohesion: 0.16
+Nodes (14): connection.ollama-local-host, routing.streaming-pipeline, translator.ollama-to-openai-response, translator.openai-to-ollama-request, readSseData() — bounded SSE reader (1 Mi chars per line/event, cancels body), API_UI_MAP row: SP14d Ollama adapter and ollama-local connections, createAdapter(provider, transport) — adapter chosen by protocol family, User decision 2026-09-26: SP14d corrects the ollama request drops and the stream error/cut-off handling; gemini deferred (+6 more)
 
 ### Community 81 - "Community 81"
-Cohesion: 0.26
-Nodes (12): geminiTtsRequest(), invalid(), isGeminiTtsRequest(), optionalNumber(), optionalPositiveInteger(), parseGeminiGenerateRequest(), partsText(), toGeminiResponse() (+4 more)
-
-### Community 82 - "Community 82"
 Cohesion: 0.37
 Nodes (12): asBody(), fail(), isApiType(), isNodeType(), mergeHeaders(), parseFields(), parseHeaders(), parseName() (+4 more)
 
 ### Community 83 - "Community 83"
-Cohesion: 0.24
-Nodes (8): claudeCodePrompt(), upstreamAuthFailure(), levelColumn(), isThinkingLevel(), reasons(), splitThinkingSuffix(), withoutThinking(), withThinking()
+Cohesion: 0.18
+Nodes (4): children(), eachSchema(), flattenUnion(), score()
+
+### Community 84 - "Community 84"
+Cohesion: 0.36
+Nodes (3): GithubAdapter, isClaude(), servesResponses()
 
 ### Community 85 - "Community 85"
 Cohesion: 0.35
 Nodes (11): body(), bodyOf(), check(), collect(), ctx(), error(), fakeTransport(), headersFor() (+3 more)
 
 ### Community 86 - "Community 86"
+Cohesion: 0.21
+Nodes (13): docs/PROJECT_MAP.md (generated U-project ownership map), Rule: an API is done only when its UI screen is wired in the same SP, Feature-based frontend structure with import boundaries, Hexagonal architecture, granularity = bounded context, Monorepo layout (apps/server, apps/web, apps/cli, packages/engine, contracts, database, tools), AIGate Design Spec (2026-09-22), Decision 3 (user, 2026-09-25): sessions stored in the database, not a JWT, Decision: CLAUDE.md requires wiring the screen in the same SP as its API (+5 more)
+
+### Community 87 - "Community 87"
+Cohesion: 0.19
+Nodes (13): routing.responses-compact-lane, translator.openai-to-responses-client-response, translator.responses-client-request, API_UI_MAP row: SP14c Responses adapter (no new screen for perplexity-agent) and the API select on /providers/new, API_UI_MAP row: SP15b OpenAI Responses client protocol, User decision 2026-09-27: SP15b keeps 9router on all four asks (request pivot drops/leaks, SSE shapes, non-stream answer, compact), protocols/openai-responses.ts — Responses → chat pivot in CIP, passthrough to Responses providers, response object, response.* SSE encoder, OpenAI Responses client protocol contract (M2 SP15b) (+5 more)
+
+### Community 88 - "Community 88"
+Cohesion: 0.23
+Nodes (13): provider.anthropic-auth-and-headers, translator.claude-to-openai-response, translator.openai-to-claude-request, AnthropicAdapter — CIP <-> Messages (max_tokens rules, thinking budgets, tool_use, SSE events), packages/engine/test/anthropic-adapter.test.mjs (10) + apps/server/test/anthropic-lane.test.mjs (4); 23 mutations caught, Deviations not ported: stop/top_p kept, none stays none, no Claude Code line, stream errors fail, same stop/usage mapping, 403 invalid, Anthropic node descriptor: <base>/messages, x-api-key, Bearer for third-party hosts, anthropicNode { official }, HttpProviderAdapter — shared auth headers, retry before first byte, error classification, redaction (+5 more)
+
+### Community 89 - "Community 89"
 Cohesion: 0.18
 Nodes (4): Public(), DatabaseModule, DatabaseShutdown, HealthController
 
-### Community 87 - "Community 87"
-Cohesion: 0.32
-Nodes (5): AuthController, invalid(), rateLimited(), setupRequired(), setSessionCookie()
+### Community 90 - "Community 90"
+Cohesion: 0.52
+Nodes (11): asBody(), fail(), parseApiKey(), parseChanges(), parseField(), parseName(), parseNewConnection(), parseOptionalKey() (+3 more)
 
-### Community 88 - "Community 88"
-Cohesion: 0.27
-Nodes (7): checkUrl(), positiveOrNull(), validateCatalog(), isProtocol(), protocolOf(), toDescriptor(), unsupportedReason()
+### Community 91 - "Community 91"
+Cohesion: 0.24
+Nodes (11): assistantBlock(), imageBlock(), openaiExtensions(), source(), textBlock(), toMessages(), toolChoice(), toolInput() (+3 more)
 
-### Community 89 - "Community 89"
+### Community 92 - "Community 92"
 Cohesion: 0.48
 Nodes (11): collect(), ctx(), done(), early(), effortOf(), fakeTransport(), json(), ndjson() (+3 more)
 
-### Community 90 - "Community 90"
-Cohesion: 0.26
-Nodes (12): UI error code: ALREADY_SET_UP (409), UI error code: NOT_LOCAL (403), useSetup (features/settings/api.ts), POST /api/auth/setup, /welcome → Onboarding (one step), AIGATE_INITIAL_PASSWORD (first password at boot), Decision 2 (user, 2026-09-25): first password set from the local machine; no default password, Decision 4 (user, 2026-09-25): requireLogin = false exempts local clients only (+4 more)
-
-### Community 91 - "Community 91"
-Cohesion: 0.25
-Nodes (3): CombosRepository, isUniqueViolation(), view()
-
 ### Community 93 - "Community 93"
+Cohesion: 0.21
+Nodes (12): endpoint.extract-header-order, transport.proxy-priority-chain, API_UI_MAP row: SP10 OpenAI Chat protocol, No UI, /gateway/endpoint readiness pill (Ready / Connect a provider / Check connection) + curl test, POST /v1/chat/completions + GET /v1/models (/v1 Chat API), Idle timeout between chunks (AIGATE_STREAM_IDLE_TIMEOUT_MS, default 300 s) → TIMEOUT error event, extractApiKey() (Authorization: Bearer first, then x-api-key), SP12 — routing: chat lane + Fastify raw streaming, backpressure, cancellation (+4 more)
+
+### Community 94 - "Community 94"
+Cohesion: 0.24
+Nodes (12): catalog.v1beta-generate-content-dispatch, catalog.v1beta-models-listing, translator.gemini-client-request, translator.openai-to-gemini-client-response, API_UI_MAP row: SP15c Gemini client protocol, User decision 2026-09-27: SP15c keeps 9router on request, response and auth/path; TTS passthrough ported now, protocols/gemini-generate.ts — path parsing, text-only request, GenerateContentResponse, Gemini SSE encoder, model list, TTS request, TTS passthrough: body to Google unchanged with the gemini connection key; only content-type forwarded (+4 more)
+
+### Community 95 - "Community 95"
+Cohesion: 0.25
+Nodes (11): applyQuirks(), assistantMessage(), compact(), copilotChatBody(), kimchiBody(), messageMark(), textJson(), textParts() (+3 more)
+
+### Community 96 - "Community 96"
+Cohesion: 0.27
+Nodes (7): body(), frames(), relay(), reply(), send(), streamOf(), user()
+
+### Community 97 - "Community 97"
 Cohesion: 0.25
 Nodes (5): json(), reply(), sse(), stream(), token()
 
-### Community 94 - "Community 94"
+### Community 98 - "Community 98"
+Cohesion: 0.31
+Nodes (11): translator.gemini-to-openai-response, translator.openai-to-gemini-request, API_UI_MAP row: SP14e Gemini adapter (no new screen; Key rejected on a 400), CIP image_delta chunk (delta.images) and vendorExtensions.openai.finish_reason honoured by the OpenAI renderer, User decision 2026-09-26: SP14e keeps 9router's Gemini request drops and answer mapping; only the schema cleaner is corrected, GeminiAdapter — CIP <-> generateContent / streamGenerateContent?alt=sse (x-goog-api-key, safety off, thinking level/budget, 400 key test = invalid), cleanGeminiSchema() — corrected: walks schema positions only, no invented reason parameter, depth 64, Thought-signature cache (in memory, 1 h, 2000, same family) and the borrowed 9router signature on the first call (+3 more)
+
+### Community 99 - "Community 99"
 Cohesion: 0.27
 Nodes (4): registerV1Routes(), readPort(), createServer(), start()
 
-### Community 95 - "Community 95"
+### Community 100 - "Community 100"
 Cohesion: 0.4
 Nodes (9): body(), collect(), ctx(), fakeTransport(), json(), reply(), run(), sentBody() (+1 more)
 
-### Community 96 - "Community 96"
+### Community 101 - "Community 101"
+Cohesion: 0.33
+Nodes (10): UI error code: ALREADY_SET_UP (409), UI error code: INVALID_REQUEST (400), UI error code: NOT_LOCAL (403), useSetup (features/settings/api.ts), POST /api/auth/setup, /welcome → Onboarding (one step), AIGATE_INITIAL_PASSWORD (first password at boot), Decision 2 (user, 2026-09-25): first password set from the local machine; no default password (+2 more)
+
+### Community 102 - "Community 102"
+Cohesion: 0.29
+Nodes (10): routing.count-tokens-estimate, translator.claude-client-request, translator.openai-to-claude-client-response, protocols/anthropic-messages.ts — parse to CIP, anthropicRequestFor (passthrough for Anthropic, claude→openai rules otherwise), message, SSE encoder, count_tokens, API_UI_MAP row: SP15 Anthropic Messages client protocol, User decision 2026-09-27: SP15 Anthropic first; OpenAI-shaped errors and 9router non-stream/stream-default kept; real usage, live tool args, signature_delta corrected, Anthropic Messages client protocol contract (M2 SP15), Endpoint screen: OpenAI and Anthropic chips, Claude Code and Anthropic curl copy fields (+2 more)
+
+### Community 103 - "Community 103"
+Cohesion: 0.22
+Nodes (10): 9router as Behavioral Source of Truth (not a template to port), Definition of Done — 13 items, not self-awarded, IMPLEMENTATION_ACCIDENT — debt not inherited from 9router, Split: machines block mechanics, skills teach judgement, Mandatory 6-phase feature process (A Discovery → F Parity), Iron law: no skill without a failing test first (RED → GREEN → REFACTOR), UI performance constraints, Skill: porting-behavior-not-code (+2 more)
+
+### Community 104 - "Community 104"
+Cohesion: 0.24
+Nodes (10): catalog.provider-models-live-fetch, catalog.model-connectivity-test, catalog.model-custom-registration, Routing → Capacity adapter tab (Vision, Audio input pools), GET /api/connections/:id/models (adapter getModels, MODELS_FETCH_FAILED), Model import and custom models contract (M2 SP16a), CustomModelsRepository + /api/models/custom, Migration 0010: custom_models table (+2 more)
+
+### Community 105 - "Community 105"
 Cohesion: 0.31
 Nodes (5): chat(), hello(), inSeconds(), JWT(), slowRefresh()
 
-### Community 97 - "Community 97"
-Cohesion: 0.39
-Nodes (8): b64url(), cacheKey(), googleAccessToken(), jsonPart(), parseGoogleCredential(), remember(), signedAssertion(), count()
-
-### Community 100 - "Community 100"
+### Community 108 - "Community 108"
 Cohesion: 0.28
 Nodes (3): crc32(), eventFrame(), join()
 
-### Community 101 - "Community 101"
+### Community 109 - "Community 109"
 Cohesion: 0.36
 Nodes (6): findInScope(), isBoundedSignal(), isFetch(), isMember(), isRetryShapedTry(), isTimeoutCall()
 
-### Community 103 - "Community 103"
+### Community 110 - "Community 110"
+Cohesion: 0.36
+Nodes (9): connection.commandcode-key-test, translator.commandcode-to-openai-response, translator.openai-to-commandcode-request, API_UI_MAP row: SP14h Command Code adapter (no new screen), CommandCodeAdapter — envelope, NDJSON events via readJsonLines, peek with in-band error classification and 5xx retries, collapse for non-streaming clients, ping test, User decision 2026-09-27: SP14h keeps 9router request drops/defaults and stream error/end/finish/usage behavior; corrects the connection test; URL images refused and workingDir neutral for security, Command Code provider contract (M2 SP14h), SP14h tests: engine commandcode-adapter.test.mjs (8), server commandcode-lane.test.mjs; 39 mutations caught (+1 more)
+
+### Community 113 - "Community 113"
 Cohesion: 0.39
 Nodes (5): f(), frame(), frames(), join(), v()
 
-### Community 106 - "Community 106"
+### Community 116 - "Community 116"
 Cohesion: 0.5
 Nodes (7): body(), collect(), ctx(), fakeTransport(), json(), ndjson(), run()
 
-### Community 107 - "Community 107"
+### Community 117 - "Community 117"
 Cohesion: 0.5
 Nodes (7): body(), collect(), ctx(), fakeTransport(), json(), run(), sse()
 
-### Community 111 - "Community 111"
+### Community 118 - "Community 118"
+Cohesion: 0.38
+Nodes (4): bytes(), jsonAnswer(), setUp(), upstream()
+
+### Community 122 - "Community 122"
 Cohesion: 0.38
 Nodes (3): answer(), json(), stream()
 
-### Community 112 - "Community 112"
+### Community 123 - "Community 123"
 Cohesion: 0.38
 Nodes (3): fakeTransport(), io(), poll()
 
-### Community 113 - "Community 113"
+### Community 124 - "Community 124"
 Cohesion: 0.29
 Nodes (7): §17 Latency — clean architecture must not add hot-path I/O, §16 Do not inherit performance issues; all large workloads bounded, Constraint — every filesystem scan uses fast-glob with an explicit ignore list, Rule 4 — Every workload must be BOUNDED, Rule 11 — Review questions beyond "does it run?" (10x/100x traffic, unbounded work), Rule 5 — Low latency: parallelize independent awaits, only when bounded, Rule 3 — Optimize performance at design time, not micro-optimization
 
-### Community 117 - "Community 117"
+### Community 125 - "Community 125"
+Cohesion: 0.29
+Nodes (7): Custom provider thinking level, Provider Models Use as, Copy and Test suffix, model(level) suffix contract and unknown suffix caveat, Provider thinking defaults and model effort levels, provider_thinking table - built-in provider default level, M2 provider thinking part 2 - model-level suffixes, Framework-free thinking suffix parser and override
+
+### Community 126 - "Community 126"
+Cohesion: 0.38
+Nodes (7): routing.responses-non-stream-answer, translator.openai-to-responses-request, translator.responses-to-openai-stream, User decision 2026-09-26: SP14c corrects the non-stream answer, keeps 9router request drops and stream error handling, OpenAIResponsesAdapter — CIP <-> Responses API (extends OpenAICompatibleAdapter; 9router request and stream, corrected non-stream), Non-streaming Responses answer: stream false, output[] read (reasoning, text, refusal, tool calls, incomplete, failed, usage), Responses stream as 9router: deltas, parallel tool calls by item id, [Error] text, cut-off ends normally
+
+### Community 129 - "Community 129"
 Cohesion: 0.4
 Nodes (5): Hosted relay deploy API contract, Authenticated Vercel, Cloudflare, and Deno deploy endpoints, Platform-specific hosted relay deploy wizard, Provider deployment, bounded polling, and cleanup, SP18 hosted relay deploy (Vercel, Cloudflare, Deno)
 
-### Community 119 - "Community 119"
+### Community 130 - "Community 130"
+Cohesion: 0.83
+Nodes (3): hostnameOf(), isLocalRequest(), isLoopbackIp()
+
+### Community 132 - "Community 132"
 Cohesion: 0.5
 Nodes (4): §15 Code quality — shortest CLEAR implementation, not shortest possible, Rule 1 — Write LEAN code, no over-engineering, Rule 2 — Code must be maintainable, no magic values or hidden side effects, Rule 12 — Priority order: Correctness → Simplicity → Maintainability → Predictable resources → Latency → Throughput → Optimization
 
-### Community 120 - "Community 120"
-Cohesion: 0.5
-Nodes (4): 9router as Behavioral Source of Truth (not a template to port), AIGate Design Spec (2026-09-22), Decision 1 (user, 2026-09-25): API keys are random and stored as a hash, Decision 3 (user, 2026-09-25): sessions stored in the database, not a JWT
+### Community 136 - "Community 136"
+Cohesion: 1.0
+Nodes (3): b64url(), jsonPart(), signedAssertion()
 
 ## Ambiguous Edges - Review These
 - `ErrorCode: TIMEOUT` → `UI error code: TIMEOUT`  [AMBIGUOUS]
@@ -622,7 +694,7 @@ Nodes (4): 9router as Behavioral Source of Truth (not a template to port), AIGat
 ## Knowledge Gaps
 - **101 isolated node(s):** `Database`, `vendorExtensions — typed carry-through field`, `AIGate domain model (Provider, Credential, RoutingPolicy, AccountLock, …)`, `ErrorCode: INTERNAL_ERROR`, `Stated limits of tape-based parity` (+96 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **13 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -637,7 +709,7 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `Open decision (user confirmation pending): scan every message + system prompt for required capabilities` and `detectRequiredCapabilities()`?**
   _Edge tagged AMBIGUOUS (relation: rationale_for) - confidence is low._
-- **Why does `validateMatrix()` connect `Community 29` to `Community 30`?**
-  _High betweenness centrality (0.093) - this node is a cross-community bridge._
-- **Why does `toProblem()` connect `Community 51` to `Community 44`, `Community 47`, `Community 49`, `Community 52`, `Community 20`, `Community 55`, `Community 56`, `Community 29`, `Community 62`?**
+- **Why does `toProblem()` connect `Community 45` to `Community 66`, `Community 3`, `Community 12`, `Community 13`, `Community 54`, `Community 59`, `Community 62`, `Community 31`?**
   _High betweenness centrality (0.090) - this node is a cross-community bridge._
+- **Why does `entry()` connect `Community 3` to `Community 45`?**
+  _High betweenness centrality (0.089) - this node is a cross-community bridge._

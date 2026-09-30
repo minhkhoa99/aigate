@@ -48,7 +48,7 @@ export interface ChatLimits {
 }
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000;
 export const DEFAULT_REFRESH_RETRY_DELAY_MS = 1_000;
-const REQUEST_BUDGET_MS = 600_000;
+export const REQUEST_BUDGET_MS = 600_000;
 // catalog.model-connectivity-test: 9router's 15 s per probe.
 const PROBE_TIMEOUT_MS = 15_000;
 
@@ -62,7 +62,7 @@ export interface ModelProbe {
 }
 
 // A failure AIGate itself decides, already in OpenAI terms.
-class GatewayError extends Error {
+export class GatewayError extends Error {
   readonly status: number;
   readonly type: string;
   readonly code: string;
@@ -75,13 +75,13 @@ class GatewayError extends Error {
   }
 }
 
-class ClientGone extends Error {
+export class ClientGone extends Error {
   constructor() {
     super("The client closed the connection");
   }
 }
 
-function errorOf(error: unknown): OpenAIError {
+export function errorOf(error: unknown): OpenAIError {
   if (error instanceof GatewayError) {
     return { status: error.status, body: { error: { message: error.message, type: error.type, code: error.code, param: null } } };
   }
@@ -137,7 +137,7 @@ const text = (value: unknown): string => typeof value === "string" ? value : "";
 const records = (value: unknown): Record<string, unknown>[] => Array.isArray(value) ? value.filter(isObject) : [];
 
 // An abort after `ms` whose reason is a TIMEOUT the client can read, not a bare DOMException.
-function deadline(ms: number, message: string): { signal: AbortSignal; clear: () => void } {
+export function deadline(ms: number, message: string): { signal: AbortSignal; clear: () => void } {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new EngineError("TIMEOUT", message, { timeoutMs: ms })), ms);
   return { signal: controller.signal, clear: () => clearTimeout(timer) };
@@ -163,7 +163,7 @@ interface Target {
 const upstreamAuthFailure = (error: unknown): boolean =>
   error instanceof EngineError && error.code === "AUTH_ERROR" && (error.details.status === 401 || error.details.status === 403);
 
-const mediaCooldown = (status: number): number | undefined =>
+export const mediaCooldown = (status: number): number | undefined =>
   status === 429 ? 2_000 : status === 401 || status === 403 ? 120_000 : status >= 500 ? 30_000 : undefined;
 
 // One client request on its way through the lane, shared by every combo member it reaches.
@@ -187,7 +187,7 @@ const answerOf: Deliver<CanonicalResponse> = (target, adapter, credential, call)
 
 // combo.mode-fallback, combo.aggregate-status-first-failure (corrected): every member failed, so the last member's error is
 // the answer, with the earliest Retry-After any member gave; no active connection anywhere is 503, as 9router's rule.
-function exhausted(last: unknown, retryAfter: number | undefined): Error {
+export function exhausted(last: unknown, retryAfter: number | undefined): Error {
   const { status, body } = errorOf(last);
   const noConnection = last instanceof GatewayError && last.code === "no_active_connection";
   if (!noConnection && retryAfter === undefined && last instanceof Error) return last;
@@ -197,7 +197,7 @@ function exhausted(last: unknown, retryAfter: number | undefined): Error {
 }
 
 // Only errors caused by an upstream account get another account. Client validation errors are terminal.
-function fallbackCooldown(error: unknown): number | undefined {
+export function fallbackCooldown(error: unknown): number | undefined {
   if (!(error instanceof EngineError)) return undefined;
   if (error.code === "AUTH_ERROR") return 120_000;
   if (error.code === "RATE_LIMIT") return 2_000;
@@ -479,51 +479,6 @@ export class ChatLane {
       });
       const text = await readBoundedText(upstream.body, 16 * 1024 * 1024);
       reply.code(upstream.status).header("cache-control", "no-store").header("content-type", upstream.headers["content-type"] ?? "application/json").send(text);
-    } catch (error) {
-      if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
-      this.logUnexpected(error, requestId);
-      const { status, body } = errorOf(error);
-      reply.code(status).header("cache-control", "no-store").send(body);
-    } finally {
-      budget.clear();
-    }
-  }
-
-  // SP22: OpenAI-compatible text-to-speech; binary output stays streamed instead of buffering audio in memory.
-  async speech(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-    const requestId = randomUUID();
-    const client = new AbortController();
-    reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
-    const budget = deadline(REQUEST_BUDGET_MS, `The request did not finish within ${REQUEST_BUDGET_MS / 1000} s`);
-    const signal = AbortSignal.any([client.signal, budget.signal]);
-    try {
-      const body = request.body;
-      if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
-        throw new GatewayError(415, "invalid_request_error", "unsupported_media_type", "Send the body as JSON with Content-Type: application/json.");
-      }
-      if (!isObject(body) || typeof body.model !== "string" || typeof body.input !== "string" || body.input.trim() === "") {
-        throw new GatewayError(400, "invalid_request_error", "invalid_tts_request", "Speech requires a model and non-empty input.");
-      }
-      const target = await this.resolve({ model: body.model, messages: [], stream: false }, new Set(), "tts");
-      if (target.provider.protocol !== "openai-compatible" || target.provider.auth.kind !== "api-key") {
-        throw new GatewayError(400, "invalid_request_error", "tts_provider_unsupported", `${target.provider.name} does not have an OpenAI-compatible speech endpoint.`);
-      }
-      const endpoint = target.provider.chatUrl.replace(/\/chat\/completions(?:\?.*)?$/, "/audio/speech");
-      if (endpoint === target.provider.chatUrl) throw new GatewayError(400, "invalid_request_error", "tts_provider_unsupported", `${target.provider.name} has no configured speech endpoint.`);
-      const descriptor = builtinRegistry.model(target.provider.id, target.request.model);
-      const upstreamBody: Record<string, unknown> = { model: descriptor?.upstreamModelId ?? target.request.model, input: body.input };
-      for (const key of ["voice", "response_format", "speed", "instructions"] as const) if (body[key] !== undefined) upstreamBody[key] = body[key];
-      const headers = { ...target.provider.headers, "content-type": "application/json", [target.provider.auth.header]: target.provider.auth.scheme === "raw" ? target.credential.apiKey : `Bearer ${target.credential.apiKey}` };
-      const upstream = await this.transport.send({ method: "POST", url: endpoint, headers, body: JSON.stringify(upstreamBody), timeoutMs: REQUEST_BUDGET_MS }, {
-        signal, requestId, proxy: target.proxy,
-      });
-      reply.hijack();
-      reply.raw.writeHead(upstream.status, {
-        "cache-control": "no-store", "content-type": upstream.headers["content-type"] ?? "audio/mpeg", "x-request-id": requestId,
-        ...(upstream.headers["content-length"] ? { "content-length": upstream.headers["content-length"] } : {}),
-      });
-      if (upstream.body) for await (const chunk of upstream.body) if (!reply.raw.write(chunk)) await once(reply.raw, "drain", { signal });
-      reply.raw.end();
     } catch (error) {
       if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
       this.logUnexpected(error, requestId);

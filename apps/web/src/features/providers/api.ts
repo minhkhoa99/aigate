@@ -74,7 +74,7 @@ export interface ProviderDetailView extends ProviderSummary {
 
 export interface TtsVoice { id: string; name: string; locale: string; gender: string }
 export const useTtsVoices = (provider: string, model: string, enabled: boolean) =>
-  useQuery({ queryKey: ["tts-voices", provider, model], queryFn: () => api<{ voices: TtsVoice[] }>(`/api/providers/${encodeURIComponent(provider)}/voices?${new URLSearchParams({ model })}`), staleTime: Infinity, enabled });
+  useQuery({ queryKey: ["tts-voices", provider, model], queryFn: () => api<{ voices: TtsVoice[]; live: boolean }>(`/api/providers/${encodeURIComponent(provider)}/voices?${new URLSearchParams({ model })}`), staleTime: Infinity, enabled });
 export const previewTtsVoice = (provider: string, model: string, voice: string, signal: AbortSignal) =>
   apiBlob(`/api/providers/${encodeURIComponent(provider)}/voice-preview`, { model, voice }, 20_000, signal);
 

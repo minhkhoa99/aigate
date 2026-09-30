@@ -34,3 +34,7 @@ export * from "./catalog/schema.js";
 export { CATALOG } from "./catalog/providers.generated.js";
 export { mediaService, mediaServiceDescriptor, mediaServices, type MediaService } from "./media-services.js";
 export { ttsVoices, type TtsVoice } from "./tts-voices.js";
+export {
+  pcmToWav, splitTtsModel, ttsErrorMessage, ttsJsonAudio, ttsModels, ttsProbe, ttsProviders, ttsRequest, ttsRoute, ttsStreamChunk, ttsVoiceSource,
+  type TtsAnswer, type TtsCall, type TtsFormat, type TtsModel, type TtsPayload, type TtsRoute, type TtsVoiceSource,
+} from "./tts.js";

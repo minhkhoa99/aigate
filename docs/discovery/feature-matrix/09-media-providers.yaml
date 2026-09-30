@@ -214,38 +214,59 @@
   feature: Text To Speech
   subFeature: "POST /v1/audio/speech — combo expansion + account-selection loop + ttsCore provider dispatch"
   trigger: POST /v1/audio/speech
-  input: "{ model, input: string, language?, style? }, ?response_format=mp3|json"
+  input: "{ model, input: string, voice?, language?, style?, speed?, instructions?, response_format? }, ?response_format=mp3|json"
   output: "Raw audio bytes (default) or { audio: base64, format } JSON"
   businessRules:
-    - "model may name a combo, not just a provider/model pair: getComboModels(modelStr) expands it and the request is dispatched through handleComboChat (open-sse/services/combo.js) across the combo's member models before the single-provider account-selection loop ever runs — the same combo-expansion module the chat lane uses, reused here rather than duplicated"
-    - "handleTtsCore first tries a special-case adapter (getTtsAdapter — google-tts, edge-tts, local-device, elevenlabs, openai, openrouter, gemini, xiaomi-mimo); providers without one instead go through synthesizeViaConfig, a generic config-driven path keyed off the registry's ttsConfig (hyperbolic, deepgram, nvidia, huggingface, inworld, cartesia, playht, coqui, tortoise, qwen, ...) — two independent implementation strategies for the same endpoint, chosen per-provider"
-    - "response_format=json wraps the synthesized audio as base64 in a JSON body instead of returning it as a binary response — both code paths funnel through the same createTtsResponse formatter regardless of which adapter/config path produced the audio"
+    - "REFERENCE_BEHAVIOR: model may name a combo, not just a provider/model pair: getComboModels(modelStr) expands it and the request is dispatched through handleComboChat (open-sse/services/combo.js) across the combo's member models before the single-provider account-selection loop ever runs — the same combo-expansion module the chat lane uses. AIGate: fallback and round-robin combos run their members in order with the chat lane's member-failover rules and nesting bound; a fusion combo is rejected (400 combo_strategy_unsupported) because a panel of audio answers cannot be judged."
+    - "REFERENCE_BEHAVIOR: handleTtsCore first tries a special-case adapter (google-tts, edge-tts, local-device, elevenlabs, openai, openrouter, gemini, xiaomi-mimo, selfhosted-tts); providers without one go through synthesizeViaConfig keyed off the registry's ttsConfig.format. AIGate serves one request/decoder per upstream format: openai speech (per-connection base URL), openrouter chat-completions audio stream, xiaomi-mimo chat-completions audio (text in the assistant message, language/style hints in a user message), nvidia {input:{text},voice,model}, gemini generateContent AUDIO (PCM wrapped as WAV), minimax/minimax-cn t2a_v2 (hex audio, base_resp status), elevenlabs text-to-speech/{voice} (xi-api-key), inworld (Basic, audioContent base64), fish-audio (model header, reference_id voice)."
+    - "REFERENCE_BEHAVIOR: the model string carries the voice: <provider>/<model>/<voice>, the model matched against the provider's known TTS models (longest prefix wins, _base.js parseModelVoice); a string that names no known model is a voice for the default model. AIGate additionally accepts the OpenAI voice field, which wins over the voice in the model string."
+    - "REFERENCE_BEHAVIOR: the gemini adapter prefixes \"Say: \" or \"Say in <language>: \" unless the text already contains \": \"; MiMo adds \"Speak in <language>.\" and the style as a user message."
+    - "REFERENCE_BEHAVIOR: response_format=json (query) wraps the synthesized audio as base64 in { audio, format }; otherwise raw bytes. AIGate names mp3 audio/mpeg instead of 9router's non-standard audio/mp3."
+    - "REFERENCE_BEHAVIOR: credentialed providers run the per-request account rotation (getProviderCredentials / markAccountUnavailable). AIGate locks tts:<model> on the chosen connection with the media cooldowns and moves to the next connection."
+    - "AIGate addition (user decision 2026-09-30): the TTS account loop has no token refresh in 9router (only markAccountUnavailable). AIGate refreshes a connection that holds an OAuth refresh token once after a 401/403 and resends, as the chat lane does (oauth.refresh-lifecycle); API-key connections skip it. No TTS provider signs in with OAuth in AIGate yet (xiaomi-mimo's catalog lists oauth, but its sign-in is not ported), so this applies once one does."
+    - "IMPLEMENTATION_ACCIDENT: every adapter buffers the whole audio as base64 before responding. AIGate streams binary passthrough upstreams with backpressure and buffers only the formats that must be decoded, up to 16 MiB."
+    - "SUSPECTED_BUG: the connection test of a media-only provider (validate/route.js probeMediaProvider) POSTs {input,text,prompt:\"ping\"} to the ttsConfig synthesis URL and calls anything but 401/403 valid, so a test can bill a synthesis, and a 404/5xx/network answer passes. AIGate (user plan 2026-09-30) tests elevenlabs and inworld with a GET of their voice list and fish-audio with a GET of its model list: 401/403 invalid, 2xx active, anything else unreachable."
+    - "Deferred by user decision (2026-09-30): edge-tts and google-tts (scraped Bing/Google Translate tokens), selfhosted-tts, and server-side local-device (the dashboard plays installed browser voices instead). cartesia, playht, coqui and tortoise stay hidden as in 9router."
   state:
     reads: ["providerConnections (via getProviderCredentials)", "combos table (via getComboModels)"]
     writes: ["providerConnections (lock/testStatus)"]
     runtimeOnly: []
   dependencies: ["routing.account-fallback-loop", "combo.mode-fallback", "combo.mode-round-robin"]
   providerInteraction: "POST to the provider's TTS endpoint (adapter- or config-built request)"
-  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  fallback: { hasFallback: true, retry: "next connection after a rate/auth/server failure; next combo member by member-failover rules", timeout: "request budget, cancelled when the client disconnects", quota: "all connections cooling down: 503 with retry-after" }
   errorCases:
-    - { code: INVALID_REQUEST, when: "missing model or input", partial: false }
+    - { code: INVALID_REQUEST, when: "missing model or input (AIGate also rejects input over 10000 characters)", partial: false }
     - { code: INVALID_REQUEST, when: "provider has neither a special-case adapter nor synthesizeViaConfig support", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "upstream answers without audio, with a MiniMax base_resp error, or with audio over the decode bound", partial: false }
   sideEffects: []
   persistence: []
-  performanceConcerns: []
-  behavior: { streaming: false, cancellation: null, concurrency: null }
+  performanceConcerns: ["decoded formats are buffered (16 MiB cap); binary passthrough is streamed"]
+  behavior: { streaming: true, cancellation: "client disconnect aborts the upstream call", concurrency: null }
   edgeCases:
     - "19 providers declare ttsConfig, the largest of any media kind's dedicated-config count — but CREDENTIALED_PROVIDERS (the set requiring a stored connection) is derived separately by filtering serviceKinds+noAuth+ttsConfig.authType, so a provider can be in the config set yet route through the noAuth-style skip if its ttsConfig.authType is explicitly \"none\""
+    - "synthesizeViaConfig matches the model against PROVIDER_MODELS, which has no inworld or fish-audio entries, so a bare value becomes both model and voice; AIGate matches against each provider's own model list and treats a bare value as the voice of the default model."
   evidence:
     - { file: src/sse/handlers/tts.js, line: 17, note: "CREDENTIALED_PROVIDERS derived from serviceKinds+noAuth+ttsConfig.authType" }
     - { file: src/sse/handlers/tts.js, line: 48, note: "getComboModels(modelStr) — combo expansion before the single-provider loop" }
+    - { file: src/sse/handlers/tts.js, line: 87, note: "credentialed while(true) account loop with markAccountUnavailable" }
     - { file: open-sse/handlers/ttsCore.js, line: 57, note: "getTtsAdapter special-case dispatch comment listing google-tts/edge-tts/local-device/elevenlabs/openai/openrouter/gemini/xiaomi-mimo" }
     - { file: open-sse/handlers/ttsCore.js, line: 67, note: "synthesizeViaConfig fallback — generic config-driven path" }
     - { file: open-sse/handlers/ttsCore.js, line: 15, note: "createTtsResponse — json vs binary response, shared by both paths" }
+    - { file: open-sse/handlers/ttsProviders/_base.js, line: 29, note: "parseModelVoice — longest known model prefix, then last slash" }
+    - { file: open-sse/handlers/ttsProviders/index.js, line: 43, note: "synthesizeViaConfig parses against PROVIDER_MODELS tts entries" }
+    - { file: open-sse/handlers/ttsProviders/xiaomi-mimo.js, line: 28, note: "text as the assistant message, hints as a user message" }
+    - { file: open-sse/handlers/ttsProviders/gemini.js, line: 56, note: "buildPrompt Say: prefix unless the text has ': '" }
+    - { file: open-sse/handlers/ttsProviders/gemini.js, line: 87, note: "PCM wrapped as WAV" }
+    - { file: open-sse/handlers/ttsProviders/elevenlabs.js, line: 31, note: "text-to-speech/{voiceId} with xi-api-key" }
+    - { file: open-sse/handlers/ttsProviders/genericFormats.js, line: 32, note: "nvidia body { input: { text }, voice, model }" }
+    - { file: open-sse/handlers/ttsProviders/genericFormats.js, line: 55, note: "fish-audio model header and reference_id" }
+    - { file: open-sse/handlers/ttsProviders/genericFormats.js, line: 74, note: "inworld Basic auth, audioContent" }
+    - { file: open-sse/handlers/ttsProviders/minimax.js, line: 13, note: "minimax t2a_v2 hex audio with base_resp check" }
+    - { file: src/app/api/providers/validate/route.js, line: 47, note: "probeMediaProvider POSTs ping to the synthesis URL; only 401/403 fail" }
     - { file: src/app/api/v1/audio/speech/route.js, line: 15, note: "POST /v1/audio/speech -> handleTts(request)" }
   newModule: media
-  parityStatus: traced
-  labels: [REFERENCE_BEHAVIOR]
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
 
 - id: media.tts-voice-listing
   group: Media Providers
@@ -255,38 +276,46 @@
   input: "GET /api/media-providers/tts/voices?provider=edge-tts|local-device|elevenlabs&apiKey=... ; GET /api/media-providers/tts/{deepgram|elevenlabs|inworld|minimax}/voices"
   output: "{ voices, languages, byLang } (generic route) or { languages, byLang } (dedicated routes)"
   businessRules:
-    - "The generic /api/media-providers/tts/voices route dispatches through VOICE_FETCHERS[provider] (re-exported from ttsCore.js) and needs no stored connection for edge-tts/local-device; for elevenlabs it instead reads apiKey from the query string, not from a stored providerConnections row — the only voice route that accepts a credential as a request parameter rather than looking one up"
-    - "The four dedicated routes (deepgram, elevenlabs, inworld, minimax) all read the FIRST active connection for that exact provider id via getProviderConnections({ provider, isActive: true }) and 400 with \"No <Provider> connection found\" if none exists — no account rotation, no mutex, and no fallback to a second connection of the same provider if the first one's key is invalid"
-    - "GET /v1/audio/voices (the OpenAI-style public listing) proxies to a hardcoded PROVIDER_API map covering elevenlabs/deepgram/inworld/edge-tts/local-device but omits minimax — minimax's own dedicated voices route exists and works when called directly, but is not reachable through the public /v1/audio/voices listing endpoint"
+    - "IMPLEMENTATION_ACCIDENT: The generic /api/media-providers/tts/voices route dispatches through VOICE_FETCHERS[provider] and needs no stored connection for edge-tts/local-device; for elevenlabs it instead reads apiKey from the query string, not from a stored providerConnections row. AIGate never takes a credential as a query parameter: GET /api/providers/:id/voices reads the saved connection on the server."
+    - "REFERENCE_BEHAVIOR: The dedicated routes (elevenlabs, inworld, minimax, minimax-cn) read the FIRST active connection for that provider and fail with \"No <Provider> connection found\" when none exists — no rotation for a read-only listing. AIGate keeps this (dashboard code NO_ACTIVE_CONNECTION) and maps each list to { id, name, locale, gender }: elevenlabs voice_id/name/labels.language/labels.gender, inworld voiceId/displayName/languages[0]/gender, minimax system/cloned/generated/music groups (cloned and generated names suffixed with their group)."
+    - "REFERENCE_BEHAVIOR: elevenlabs voice lists are cached (24 h per key in 9router). AIGate caches each connection's list for 10 minutes, at most 64 lists, keyed by connection and key so a replaced key is fetched again; failures are not cached."
+    - "REFERENCE_BEHAVIOR: GET /v1/audio/voices returns an OpenAI-style { object: \"list\", data: [{ id, name, lang, gender, model }] } whose model field is ready for /v1/audio/speech. AIGate's model is the full <provider>/<model>/<voice>, it covers every provider with a voice catalog (preset or live), honors ?lang=, and requires the same API key as the rest of /v1 (user decision 2026-09-30; 9router's route is unauthenticated and sends Access-Control-Allow-Origin: *)."
+    - "Preset catalogs (openai 9 or 13 voices by model, openrouter the same, gemini 30 with gender, xiaomi-mimo 9) come from open-sse/config/ttsModels.js and gemini.js PREBUILT_VOICES."
   state:
-    reads: ["providerConnections (first active row per provider, for deepgram/elevenlabs/inworld/minimax)"]
+    reads: ["providerConnections (first active row per provider, for elevenlabs/inworld/minimax)"]
     writes: []
-    runtimeOnly: []
+    runtimeOnly: ["per-connection voice list cache (10 min, 64 entries)"]
   dependencies: ["media.tts-lane"]
-  providerInteraction: "GET to each provider's voices/models listing API (deepgram /v1/models, inworld /tts/v1/voices, elevenlabs's own voices endpoint via fetchElevenLabsVoices, minimax's get_voice endpoint)"
-  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  providerInteraction: "GET to each provider's voices/models listing API (inworld /tts/v1/voices, elevenlabs /v1/voices, minimax's POST get_voice)"
+  fallback: { hasFallback: false, retry: null, timeout: "15 s per listing call", quota: null }
   errorCases:
-    - { code: INVALID_REQUEST, when: "generic route's provider query param has no matching VOICE_FETCHERS entry", partial: false }
+    - { code: INVALID_REQUEST, when: "generic route's provider query param has no matching VOICE_FETCHERS entry (AIGate: a provider or model without TTS)", partial: false }
     - { code: AUTH_ERROR, when: "dedicated route's provider has no active stored connection", partial: false }
-    - { code: PROVIDER_UNAVAILABLE, when: "the upstream voices/models call itself fails (non-ok response)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "the upstream voices/models call itself fails (non-ok response; dashboard code VOICES_FETCH_FAILED)", partial: false }
   sideEffects: []
   persistence: []
   performanceConcerns:
-    - "Dedicated routes' getProviderConnections({provider, isActive:true}) reads the whole active-connections list and takes connections[0] rather than round-robining or preferring a healthy one — an expired/invalid first connection blocks voice listing even when a second, valid connection for the same provider exists"
+    - "Dedicated routes' getProviderConnections({provider, isActive:true}) takes connections[0] rather than preferring a healthy one — an expired/invalid first connection blocks voice listing even when a second, valid connection for the same provider exists"
+    - "AIGate reads at most 4 MiB of listing JSON and returns at most 2000 voices"
   behavior: { streaming: false, cancellation: null, concurrency: null }
   edgeCases:
     - "The dedicated routes comment themselves as intentionally bypassing the auth mutex used for TTS inference (\"Direct DB read - bypass auth mutex ... to avoid blocking on concurrent TTS requests\") — a deliberate consistency/latency tradeoff for a read-only listing call"
+    - "MiniMax languages are inferred from the voice id prefix (English_…), so they are names, not language codes; AIGate leaves locale empty for them and the dashboard's text search finds them"
   evidence:
     - { file: src/app/api/media-providers/tts/voices/route.js, line: 29, note: "VOICE_FETCHERS[provider] dispatch" }
     - { file: src/app/api/media-providers/tts/voices/route.js, line: 35, note: "elevenlabs reads apiKey from the query string, not from stored connections" }
     - { file: src/app/api/media-providers/tts/elevenlabs/voices/route.js, line: 18, note: "getProviderConnections({provider:\"elevenlabs\", isActive:true}) — first active connection" }
-    - { file: src/app/api/media-providers/tts/deepgram/voices/route.js, line: 16, note: "same first-active-connection pattern for deepgram" }
+    - { file: src/app/api/media-providers/tts/elevenlabs/voices/route.js, line: 38, note: "voice_id, name, labels.gender mapping" }
     - { file: src/app/api/media-providers/tts/inworld/voices/route.js, line: 15, note: "same first-active-connection pattern for inworld" }
+    - { file: src/app/api/media-providers/tts/inworld/voices/route.js, line: 43, note: "voiceId, displayName, gender mapping" }
     - { file: src/app/api/media-providers/tts/minimax/voices/route.js, line: 72, note: "same first-active-connection pattern for minimax" }
-    - { file: src/app/api/v1/audio/voices/route.js, line: 4, note: "PROVIDER_API map — omits minimax" }
+    - { file: src/app/api/media-providers/tts/minimax/voices/route.js, line: 16, note: "inferLanguage from the voice id prefix" }
+    - { file: open-sse/handlers/ttsProviders/elevenlabs.js, line: 4, note: "24 h voice list cache per API key" }
+    - { file: open-sse/config/ttsModels.js, line: 52, note: "TTS_MODELS_CONFIG preset models and voices" }
+    - { file: src/app/api/v1/audio/voices/route.js, line: 51, note: "public list items { id, name, lang, gender, model }" }
   newModule: media
-  parityStatus: traced
-  labels: [REFERENCE_BEHAVIOR]
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
 
 - id: media.tts-dashboard-browser
   group: Media Providers
@@ -298,19 +327,21 @@
   businessRules:
     - "REFERENCE_BEHAVIOR: OpenAI standard TTS models expose 9 preset voices; gpt-4o-mini-tts exposes 13; Gemini and MiMo have their own per-model voice lists."
     - "REFERENCE_BEHAVIOR: Region and language names are rendered with Intl.DisplayNames, with raw codes as fallback."
-    - "REFERENCE_BEHAVIOR: A preview uses the selected provider, model, voice and a short input, and displays returned audio."
+    - "REFERENCE_BEHAVIOR: A preview uses the selected provider, model, voice and a short input, and displays returned audio. AIGate previews through the same synthesis path as /v1/audio/speech for every provider with a TTS route and an active saved connection; installed browser voices play locally."
     - "IMPLEMENTATION_ACCIDENT: The old UI passes an API key through its client example path; AIGate's dashboard preview reads an already-saved connection on the server."
-  state: { reads: ["catalog TTS models", "active connection for remote preview", "browser speechSynthesis voices for local preview"], writes: [], runtimeOnly: ["temporary audio object URL"] }
+    - "REFERENCE_BEHAVIOR: voice pickers for elevenlabs, inworld and minimax load the account's own voices; the language filter groups them. AIGate adds a text search, shows at most 200 matching rows, and copies the ready <provider>/<model>/<voice> model string."
+  state: { reads: ["catalog TTS models", "active connection for remote preview and account voices", "browser speechSynthesis voices for local preview"], writes: [], runtimeOnly: ["temporary audio object URL"] }
   dependencies: ["media.tts-voice-listing", "media.tts-lane"]
-  providerInteraction: "AIGate preview calls only an existing OpenAI-compatible speech endpoint for a validated model/voice; local browser voices use speechSynthesis."
-  fallback: { hasFallback: false, retry: null, timeout: "15 s", quota: null }
+  providerInteraction: "AIGate preview runs the provider's TTS request for a validated model/voice; local browser voices use speechSynthesis."
+  fallback: { hasFallback: false, retry: null, timeout: "20 s", quota: null }
   errorCases:
     - { code: INVALID_REQUEST, when: "model or voice does not belong to the selected provider", partial: false }
-    - { code: INVALID_REQUEST, when: "a remote preview has no active saved credential (dashboard code NO_ACTIVE_CONNECTION)", partial: false }
+    - { code: INVALID_REQUEST, when: "a remote preview or account voice list has no active saved credential (dashboard code NO_ACTIVE_CONNECTION)", partial: false }
     - { code: PROVIDER_UNAVAILABLE, when: "upstream refuses or returns oversized audio (dashboard code VOICE_PREVIEW_FAILED)", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "the account voice list cannot be fetched (dashboard code VOICES_FETCH_FAILED)", partial: false }
   sideEffects: ["Remote preview may consume provider credit"]
   persistence: []
-  performanceConcerns: ["one remote call per click, 15 s deadline, 1 MiB maximum audio, no automatic retries or cache"]
+  performanceConcerns: ["one remote call per click, 20 s deadline, 1 MiB maximum audio, no automatic retries or cache"]
   behavior: { streaming: false, cancellation: "browser abort and server disconnect", concurrency: "one preview per browser control" }
   edgeCases: ["Browser speechSynthesis may have no installed voices", "providers without an AIGate preview adapter list voices but disable playback"]
   evidence:
@@ -321,6 +352,137 @@
   newModule: media
   parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
+
+- id: media.tts-openrouter-audio-chunks
+  group: Media Providers
+  feature: Text To Speech
+  subFeature: OpenRouter TTS joins streamed base64 chunks and misreads a bare model as a voice
+  trigger: POST /v1/audio/speech with an openrouter model
+  input: "model openrouter/<vendor>/<model>[/<voice>], input"
+  output: "WAV audio assembled from the chat-completions SSE stream's delta.audio.data"
+  businessRules:
+    - "REFERENCE_BEHAVIOR: OpenRouter speech goes through /api/v1/chat/completions with modalities [text, audio], audio { voice, format: wav }, stream true, and the text as the user message; AIGate sends the same request."
+    - "SUSPECTED_BUG: the chunks' base64 strings are concatenated before decoding, and a model with no voice segment becomes the voice. AIGate decodes each chunk, joins the bytes (wrapping raw PCM16 as WAV when the bytes have no RIFF header), and matches the model against the catalog's openrouter TTS models."
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["media.tts-lane"]
+  providerInteraction: "POST https://openrouter.ai/api/v1/chat/completions (SSE)"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "the stream carries no audio data", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["AIGate caps the assembled audio at 16 MiB"]
+  behavior: { streaming: true, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: open-sse/handlers/ttsProviders/openrouter.js, line: 13, note: "lastIndexOf split; a two-segment model becomes the voice" }
+    - { file: open-sse/handlers/ttsProviders/openrouter.js, line: 34, note: "chat-completions audio request body" }
+    - { file: open-sse/handlers/ttsProviders/openrouter.js, line: 71, note: "chunks.join(\"\") of base64 strings" }
+  newModule: media
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Each streamed audio chunk is decoded on its own and the bytes are joined; openai/gpt-4o-mini-tts alone means that model with its default voice."
+    actual: "Base64 strings are joined before decoding, so any chunk ending in padding corrupts the rest; \"openai/gpt-4o-mini-tts\" becomes voice \"openai/gpt-4o-mini-tts\" on the default model."
+    impact: "Longer OpenRouter audio can come back truncated or noisy, and the documented model name without a voice fails upstream."
+
+- id: media.tts-public-voices-omit-minimax
+  group: Media Providers
+  feature: Text To Speech
+  subFeature: The public voice list omits MiniMax and names models without their model segment
+  trigger: GET /v1/audio/voices?provider=minimax
+  input: "?provider=<id>[&lang=]"
+  output: "400 for minimax; for others, model ids of the form <alias>/<voice>"
+  businessRules:
+    - "SUSPECTED_BUG: PROVIDER_API lists elevenlabs, deepgram, inworld, edge-tts and local-device but not minimax, whose dedicated voice route exists. AIGate lists every provider with a voice catalog, minimax and minimax-cn included."
+    - "REFERENCE_BEHAVIOR: each item carries a model string for /v1/audio/speech; AIGate writes <provider>/<model>/<voice> so the voice cannot be mistaken for a model."
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["media.tts-voice-listing"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "provider has no voice catalog", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: src/app/api/v1/audio/voices/route.js, line: 4, note: "PROVIDER_API map without minimax" }
+    - { file: src/app/api/v1/audio/voices/route.js, line: 56, note: "model: `${alias}/${v.id}`" }
+    - { file: src/app/api/media-providers/tts/minimax/voices/route.js, line: 65, note: "working minimax voice route" }
+  newModule: media
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG]
+  suspicion:
+    expected: "Every provider whose voices the dashboard can list is also listed on /v1/audio/voices."
+    actual: "minimax is missing from the public map, so clients get a 400 for it."
+    impact: "API clients cannot discover MiniMax voices although synthesis works."
+
+- id: media.tts-deepgram-voices-without-synthesis
+  group: Media Providers
+  feature: Text To Speech
+  subFeature: Deepgram voices are listed although Deepgram cannot synthesize speech
+  trigger: GET /api/media-providers/tts/deepgram/voices or /v1/audio/voices?provider=deepgram
+  input: "stored deepgram connection"
+  output: "Aura voice list from GET /v1/models"
+  businessRules:
+    - "SUSPECTED_BUG: deepgram declares only serviceKinds [stt] and an sttConfig, so /v1/audio/speech rejects it, yet its voices are listed and the dashboard offers them. AIGate lists no Deepgram TTS voices until a Deepgram TTS route exists."
+  state: { reads: ["providerConnections (first active deepgram row)"], writes: [], runtimeOnly: [] }
+  dependencies: ["media.tts-voice-listing"]
+  providerInteraction: "GET https://api.deepgram.com/v1/models"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: open-sse/providers/registry/deepgram.js, line: 31, note: "serviceKinds: [\"stt\"] only" }
+    - { file: src/app/api/media-providers/tts/deepgram/voices/route.js, line: 16, note: "voice list read from the deepgram connection" }
+    - { file: open-sse/handlers/ttsProviders/genericFormats.js, line: 19, note: "deepgram handler unreachable without a ttsConfig" }
+  newModule: media
+  parityStatus: implemented
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "Only providers that can synthesize speech list TTS voices."
+    actual: "Deepgram voices are listed while the speech lane has no Deepgram route."
+    impact: "A user picks a Deepgram voice and every request fails."
+
+- id: media.tts-unreachable-providers
+  group: Media Providers
+  feature: Text To Speech
+  subFeature: aws-polly has no synthesis handler; local-device synthesis only works on macOS
+  trigger: POST /v1/audio/speech with aws-polly or local-device on Windows/Linux
+  input: "model aws-polly/... or local-device/..."
+  output: "\"does not support TTS via this route\" for aws-polly; a failed say command elsewhere"
+  businessRules:
+    - "SUSPECTED_BUG: aws-polly declares ttsConfig.format aws-polly, which FORMAT_HANDLERS lacks, so it is listed but can never synthesize. AIGate does not offer aws-polly."
+    - "SUSPECTED_BUG: synthesizeMacOrWin always runs macOS say (and ffmpeg) although voices are also listed through Windows SAPI. AIGate plays installed voices in the browser and has no server-side local-device synthesis."
+  state: { reads: [], writes: [], runtimeOnly: [] }
+  dependencies: ["media.tts-lane"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "provider has no TTS route", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: []
+  evidence:
+    - { file: open-sse/providers/registry/aws-polly.js, line: 24, note: "format: \"aws-polly\"" }
+    - { file: open-sse/handlers/ttsProviders/genericFormats.js, line: 176, note: "FORMAT_HANDLERS without aws-polly" }
+    - { file: open-sse/handlers/ttsProviders/localDevice.js, line: 66, note: "synthesizeMacOrWin" }
+    - { file: open-sse/handlers/ttsProviders/localDevice.js, line: 72, note: "always runs say" }
+  newModule: media
+  parityStatus: implemented
+  labels: [SUSPECTED_BUG]
+  suspicion:
+    expected: "A listed TTS provider can synthesize on the platforms it lists voices for."
+    actual: "aws-polly never synthesizes; local-device synthesizes only on macOS."
+    impact: "Users see providers and voices that always fail."
 
 - id: media.stt-lane
   group: Media Providers
