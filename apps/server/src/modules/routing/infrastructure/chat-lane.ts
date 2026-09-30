@@ -32,8 +32,10 @@ import { modelFit, needsMedia, reorderByCapabilities, trimHistory, widen, type W
 import { applyTokenSaver, headroomInput } from "../domain/token-saver.js";
 import { collectPanel, judgeRequest, MAX_COMBO_DEPTH, memberFailover, panelRequest, type Combo } from "../domain/combo.js";
 import { CapacityPoolsRepository } from "./capacity-pools.repo.js";
+import { UsageRecorder } from "../../usage/infrastructure/usage-recorder.js";
 import { CombosRepository } from "./combos.repo.js";
 import { PxpipeService } from "./pxpipe.service.js";
+import { meter } from "./usage-meter.js";
 
 // The /v1 chat lane (docs/contracts/chat-lane.md): key gate, parse, resolve, adapter, stream.
 
@@ -177,6 +179,8 @@ interface Call {
   // A fusion panel or judge request: the combo lane changed it, so the client's raw body no longer describes it.
   readonly rewritten: boolean;
   readonly pxpipe: { enabled: boolean; minChars: number; timeoutMs: number };
+  // docs/contracts/usage.md: the client route and the AIGate key the gate accepted.
+  readonly usage: { readonly endpoint: string; readonly apiKeyId: string | null };
 }
 
 // What the lane does with a resolved target: answer the client, or (a fusion panel member) return the answer.
@@ -309,6 +313,7 @@ const OPENAI_RESPONSES_COMPACT: ClientProtocol = {
 @Injectable()
 export class ChatLane {
   private readonly logger = new Logger("ChatLane");
+  private readonly keyIds = new WeakMap<FastifyRequest, string>();
 
   constructor(
     private readonly settings: SettingsRepository,
@@ -322,6 +327,7 @@ export class ChatLane {
     private readonly combos: CombosRepository,
     private readonly capacity: CapacityPoolsRepository,
     private readonly pxpipe: PxpipeService,
+    private readonly usage: UsageRecorder,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
     @Inject(CHAT_LIMITS) private readonly limits: ChatLimits,
   ) {}
@@ -329,7 +335,7 @@ export class ChatLane {
   // onRequest hook: runs before the body is read, so an unauthenticated caller costs one lookup at most.
   async authorize(request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply | undefined> {
     const { requireApiKey } = await this.settings.get();
-    const failure = requireApiKey ? await this.checkKey(extractApiKey(request.headers)) : this.checkLocal(request);
+    const failure = requireApiKey ? await this.checkKey(extractApiKey(request.headers), request) : this.checkLocal(request);
     return failure ? this.fail(reply, failure) : undefined;
   }
 
@@ -374,7 +380,7 @@ export class ChatLane {
     const { requireApiKey } = await this.settings.get();
     if (isGeminiTtsRequest(route, request.body)) return this.geminiTts(request, reply, route, requireApiKey);
     // The chat path reads the key as every /v1 lane does (Authorization, then x-api-key).
-    const failure = requireApiKey ? await this.checkKey(extractApiKey(request.headers)) : undefined;
+    const failure = requireApiKey ? await this.checkKey(extractApiKey(request.headers), request) : undefined;
     if (failure) {
       this.fail(reply, failure);
       return;
@@ -738,6 +744,7 @@ export class ChatLane {
       const call: Call = {
         parsed, protocol, reply, requestId, signal: AbortSignal.any([client.signal, budget.signal]), rewritten: savedRequest !== parsed.request,
         pxpipe: { enabled: settings.tokenSaverEnabled && settings.pxpipeEnabled && !tokenSaverOptOut, minChars: settings.pxpipeMinChars, timeoutMs: settings.pxpipeTimeoutMs },
+        usage: { endpoint: request.routeOptions.url ?? request.url.split("?", 1)[0], apiKeyId: this.keyIds.get(request) ?? null },
       };
       await this.route(call, savedRequest, async (target, adapter, credential) => {
         if (!target.request.stream) {
@@ -873,7 +880,11 @@ export class ChatLane {
           },
         };
       }
-      const adapter = createAdapter(target.provider, transport);
+      const usageCall = {
+        requestId: call.requestId, provider: target.provider.id, model: splitThinkingSuffix(target.request.model).model,
+        connectionId: target.connection.id === "noauth" ? null : target.connection.id, ...call.usage,
+      };
+      const adapter = meter(createAdapter(target.provider, transport), usageCall, this.usage);
       try {
         const result = await this.withRefresh(target, (credential) => deliver(target, adapter, credential, call), () => !call.reply.sent && !call.signal.aborted);
         await this.connections.clearLock(target.connection.id, splitThinkingSuffix(target.request.model).model);
@@ -1019,9 +1030,12 @@ export class ChatLane {
     }
   }
 
-  private async checkKey(key: string | undefined): Promise<GatewayError | undefined> {
+  // The accepted key's id is kept for the request, so its usage is attributed to it.
+  private async checkKey(key: string | undefined, request?: FastifyRequest): Promise<GatewayError | undefined> {
     if (!key) return new GatewayError(401, "invalid_request_error", "missing_api_key", MISSING_KEY);
-    if (!(await this.keys.isValid(key))) {
+    const id = await this.keys.activeId(key);
+    if (id && request) this.keyIds.set(request, id);
+    if (!id) {
       return new GatewayError(401, "invalid_request_error", "invalid_api_key", "The API key is not valid or was disabled. Check it in AIGate: Gateway → Endpoint & Keys.");
     }
     return undefined;

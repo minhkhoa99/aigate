@@ -56,9 +56,14 @@ export class ApiKeysRepository {
 
   // apikey.validate-lookup: valid when an active row has this hash. Malformed keys never reach the database.
   async isValid(key: string): Promise<boolean> {
-    if (!isWellFormedKey(key)) return false;
+    return (await this.activeId(key)) !== undefined;
+  }
+
+  // The id of the active key, so usage can be attributed to it (docs/contracts/usage.md).
+  async activeId(key: string): Promise<string | undefined> {
+    if (!isWellFormedKey(key)) return undefined;
     const row = await this.database.db.select({ id: apiKeys.id }).from(apiKeys)
       .where(and(eq(apiKeys.keyHash, sha256(key)), eq(apiKeys.isActive, true))).get();
-    return row !== undefined;
+    return row?.id;
   }
 }

@@ -41,3 +41,14 @@
 @media(max-width:1100px) { .voice-filters { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:740px) { .voice-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:420px) { .voice-filters { grid-template-columns:1fr; } }
+/* SP24a usage charts (docs/contracts/usage.md "UI"): the dataviz reference categorical slots, validated on this app's surfaces (dark #14151b, light #fff). */
+:root { --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500; --series-5:#d55181; --series-other:#6b6d7a; }
+:root[data-theme="light"] { --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; --series-4:#eda100; --series-5:#e87ba4; --series-other:#9a9cab; }
+.usage-actions { flex-wrap:wrap; justify-content:flex-end; } .usage-actions .input { width:auto; }
+.usage-chart-wrap { position:relative; } .usage-chart { display:block; overflow:visible; } .usage-chart-wrap { min-height:180px; } .usage-charts { grid-template-columns:repeat(2,minmax(0,1fr)); } @media(max-width:1200px) { .usage-charts { grid-template-columns:1fr; } }
+.usage-grid { stroke:var(--line); stroke-width:1; } .usage-axis { fill:var(--subtle); font-size:9px; font-family:"JetBrains Mono",monospace; }
+.usage-line { fill:none; stroke:var(--series-1); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; } .usage-crosshair { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; } .usage-marker { fill:var(--series-1); stroke:var(--surface); stroke-width:2; }
+.usage-tooltip { position:absolute; top:4px; transform:translateX(-50%); pointer-events:none; min-width:150px; background:var(--surface-3); border:1px solid var(--line); border-radius:5px; padding:8px 10px; font-size:10px; box-shadow:var(--shadow); z-index:5; } .usage-tooltip strong { display:block; margin-bottom:5px; color:var(--text); }
+.usage-tooltip-row { display:flex; align-items:center; gap:6px; color:var(--muted); line-height:1.7; } .usage-tooltip-row b { margin-left:auto; color:var(--text); font-family:"JetBrains Mono",monospace; font-weight:600; } .usage-tooltip-row i, .usage-legend i { width:8px; height:8px; border-radius:2px; flex:none; }
+.usage-legend { list-style:none; display:flex; flex-wrap:wrap; gap:6px 16px; margin:10px 0 0; padding:0; font-size:10px; color:var(--muted); } .usage-legend li { display:flex; align-items:center; gap:6px; } .usage-legend b { color:var(--text); font-family:"JetBrains Mono",monospace; font-weight:600; }
+.pricing-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; } .pricing-heading { font-size:12px; margin:20px 0 8px; display:flex; gap:8px; align-items:center; }

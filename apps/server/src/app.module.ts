@@ -11,16 +11,18 @@ import { RoutingModule } from "./modules/routing/routing.module.js";
 import { IdentityModule } from "./modules/identity/identity.module.js";
 import { SettingsModule } from "./modules/settings/settings.module.js";
 import { TransportModule } from "./modules/transport/transport.module.js";
+import type { UsageConfig } from "./modules/usage/infrastructure/usage-recorder.js";
+import { UsageModule } from "./modules/usage/usage.module.js";
 import { SecretsModule, type SecretCipherPort } from "./secret-cipher.js";
 
 @Module({})
 export class AppModule {
-  static with(database: DatabaseHandle, cipher: SecretCipherPort, limits: ChatLimits, dataDir: string, transport?: HttpTransportPort): DynamicModule {
+  static with(database: DatabaseHandle, cipher: SecretCipherPort, limits: ChatLimits, dataDir: string, usage: UsageConfig, transport?: HttpTransportPort): DynamicModule {
     return {
       module: AppModule,
       imports: [
         DatabaseModule.with(database), SecretsModule.with(cipher), TransportModule.with(transport),
-        SettingsModule, IdentityModule, ApiKeysModule, CatalogModule, ConnectionsModule, RoutingModule.with(limits, dataDir),
+        SettingsModule, IdentityModule, ApiKeysModule, CatalogModule, ConnectionsModule, UsageModule.with(usage), RoutingModule.with(limits, dataDir),
       ],
       controllers: [HealthController],
     };

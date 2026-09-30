@@ -1256,6 +1256,7 @@
     - "Q8 streaming: finalizeStream runs AFTER the terminal bytes are enqueued — in flush() for normal ends, or inside transform() on the Responses terminal event (because Responses clients close right after it and flush never runs). The save runs concurrently with the final flush to the client"
     - "When the upstream sends no usage, it is estimated from the request body and emitted content length"
     - "Rows with zero input and zero output tokens are not written at all"
+    - "AIGate (SP24a, schema rule 11): a stream that errors, stalls, or loses its client is recorded as an aborted event with the usage seen so far, or an estimate when none arrived; recording goes through the buffered writer and never blocks the flush. docs/contracts/usage.md."
   state:
     reads: []
     writes: ["usageHistory / usageDaily (saveRequestUsage)", "requestDetails"]

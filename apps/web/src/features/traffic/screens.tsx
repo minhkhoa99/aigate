@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button, CopyField, Dot, Input, Metric, PageHeading, Panel, Pill, Table, Warning } from "../../shared/ui";
 
+export { Usage } from "./usage";
+
 const requestRows = [
   ["req_01J9A2", "14:02:41", "claude-3.5-sonnet", "Anthropic", "1,420", "$0.0042", "200"],
   ["req_01J9A1", "14:02:38", "gpt-4o", "OpenAI", "3,112", "$0.0124", "200"],
@@ -9,16 +11,6 @@ const requestRows = [
   ["req_01J99Z", "14:01:49", "gemini-2.5-pro", "Google Vertex", "2,190", "$0.0036", "200"],
   ["req_01J99Y", "14:00:57", "claude-3.7-sonnet", "Anthropic", "4,208", "$0.0161", "200"],
 ];
-const bars = [24,30,26,40,38,51,63,54,48,70,59,76,72,82,68,91,76,84,71,88,94,79,96,83];
-
-export function Usage() {
-  const [period, setPeriod] = useState("24 hours");
-  return <><PageHeading eyebrow="Traffic / Usage" title="Usage analytics" description="Monitor request volume, token consumption, and cost by provider." action={<Button onClick={() => setPeriod(period === "24 hours" ? "7 days" : "24 hours")}>{period} ⌄</Button>} />
-    <div className="grid grid-4"><Metric label="Total requests" value="1.48M" delta="↗ +24.3%" /><Metric label="Input tokens" value="604.2M" delta="↗ +10.1%" /><Metric label="Output tokens" value="238.4M" delta="↗ +7.2%" /><Metric label="Estimated cost" value="$142.85" delta="↘ -2.1%" /></div>
-    <Panel title="Requests over time" detail={`Bucketed usage · last ${period}`} className="section-gap"><div className="chart-bars" role="img" aria-label="Requests trend rises through the selected period">{bars.map((bar, i) => <span key={i} style={{ height: `${bar}%` }} />)}</div><div className="chart-axis"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>Now</span></div></Panel>
-    <div className="grid grid-2 section-gap"><Panel title="Cost by provider"><Table columns={["Provider", "Requests", "Cost"]} rows={[["Anthropic", "402K", "$63.20"],["OpenAI", "389K", "$48.10"],["Google Vertex", "321K", "$21.34"],["DeepSeek", "114K", "$10.21"]]} /></Panel><Panel title="Top models"><Table columns={["Model", "Tokens", "Share"]} rows={[["claude-3.5-sonnet", "204M", "24%"],["gpt-4o", "187M", "22%"],["gemini-2.5-pro", "146M", "17%"],["deepseek-r1", "103M", "12%"]].map((r) => [<code>{r[0]}</code>, <span className="mono">{r[1]}</span>, r[2]])} /></Panel></div>
-  </>;
-}
 
 export function Requests() {
   const [status, setStatus] = useState("All statuses");

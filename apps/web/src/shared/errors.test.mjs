@@ -40,3 +40,7 @@ test("voice codes name the provider's failure and the next step (docs/contracts/
   assert.match(toProblem(new ApiError(502, "VOICES_FETCH_FAILED", "x")).message, /voice list could not be loaded/);
   assert.equal(toProblem(new ApiError(400, "NO_ACTIVE_CONNECTION", "x", { message: "elevenlabs has no active connection." })).message, "elevenlabs has no active connection.");
 });
+
+test("a refused live usage stream says why and what to do", () => {
+  assert.match(toProblem(new ApiError(503, "USAGE_STREAM_BUSY", "")).message, /Close another tab, then reload/);
+});

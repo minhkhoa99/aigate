@@ -25,6 +25,7 @@
     - "latency.total = Date.now() - requestStartTime, computed once the outcome (success or error) is known; latency.ttft is only ever set by the streaming path (buildOnStreamComplete) — every non-streaming and forced-JSON error/success path hardcodes ttft: 0"
     - "status is 'success' (buildRequestDetail default) or explicitly 'error'; the error message is stored under response.error, not as a separate field"
     - "fallback attempts are NOT part of the usage row: a single request may try several accounts/providers before one succeeds, but only the account/provider that finally answered (or the account whose failure ended the loop) is passed into saveRequestUsage/saveRequestDetail — see edgeCases"
+    - "AIGate (SP24a, user decision 2026-09-30): one usage event per upstream call (success, error, or aborted stream) with the requestId that groups a request's attempts, so fallback attempts and error rates are visible; ttft is null, not 0, on paths that do not measure it; usage absent from the upstream is estimated (input from the request, output from emitted characters / 4) and flagged estimated. docs/contracts/usage.md."
   state:
     reads: []
     writes: ["usageHistory / usageDaily (via saveRequestUsage)", "requestDetails (via saveRequestDetail)"]
@@ -62,6 +63,7 @@
     - "Every call site invokes saveRequestUsage(...).catch(() => {}) without awaiting it — the promise is fired and its rejection swallowed, the caller moves on immediately"
     - "saveRequestUsage's own function body starts with `const db = await getAdapter();` — even the portion of the function that runs before the caller regains control is minimal; the DB work happens after a yield to the event loop"
     - "Because the write is unawaited and off the critical path, it is NOT synchronous with the response and does not sit on the hot path — the condition stated for labeling this IMPLEMENTATION_ACCIDENT does not hold here"
+    - "AIGate (schema rule 11): a bounded buffered writer replaces fire-and-forget writes: flush every 1 s or at 200 events in one transaction, at most 10 000 queued, oldest dropped when full, drops and write failures counted and shown on the Usage page, final flush on shutdown. Recording never blocks or fails the response."
   state:
     reads: []
     writes: ["usageHistory / usageDaily"]
@@ -96,6 +98,7 @@
     - "started=false decrements both counters (clamped to >= 0 via Math.max) and clears the timer — this is the normal 'request finished' signal, called from success, error, disconnect and stream-complete paths"
     - "If the timer fires before a matching started=false ever arrives (unhandled exception before onError/onDisconnect wiring, process anomaly), it force-resets the counter to 0 for that model/account and deletes itself — a watchdog against a permanently-stuck 'N active requests' badge, not a request-level timeout that cancels anything"
     - "The timer is a plain Node setTimeout, not unref'd, scoped per connectionId+modelKey so a second started=true for the same pair replaces (clearTimeout + reschedule) rather than stacking timers"
+    - "AIGate: kept (in-memory active counters per model and account with a 60 s watchdog), held by the UsageRecorder singleton."
   state:
     reads: []
     writes: []
@@ -132,6 +135,7 @@
     - "recentRing is a 50-item (RING_CAP) in-memory ring, lazily hydrated once per process from the last 50 usageHistory rows on first read (ensureRingInitialized), then appended to on every saveRequestUsage insert"
     - "recentRequests are deduped by `${model}|${provider}|${promptTokens}|${completionTokens}|${minuteTimestamp}` and rows with zero prompt AND zero completion tokens are dropped entirely, capped at 20 after dedup"
     - "errorProvider surfaces the last provider that errored, but only within a 10-second window of the error (Date.now() - lastErrorProvider.ts < 10000) — it self-clears by staleness, not by an explicit reset"
+    - "AIGate: a 50-event recent ring filled from recorded events (no content dedup and no zero-token filter, since every event is distinct and errors count); the stream payload carries the last 20."
   state:
     reads: ["usageHistory (cold-start hydration only)"]
     writes: []
@@ -170,6 +174,7 @@
     - "If found, no new row is written — at most the existing row's endpoint is backfilled if it was previously null"
     - "If not found, all three writes (history insert, usageDaily upsert via aggregateEntryToDay, _meta.totalRequestsLifetime increment) happen inside one db.transaction(), justified in-source by better-sqlite3 being synchronous so no other JS runs mid-transaction in the same process"
     - "pushToRing() and the debounced stats-event only fire when a new row was actually inserted (inserted === true)"
+    - "AIGate (schema rule 5): not reproduced; every event gets its own id and row."
   state:
     reads: ["usageHistory (dedup SELECT)", "usageDaily (current day row)", "_meta.totalRequestsLifetime"]
     writes: ["usageHistory", "usageDaily", "_meta.totalRequestsLifetime"]
@@ -210,6 +215,7 @@
     - "dateKey is computed by getLocalDateKey() using the server process's local timezone (new Date().getFullYear/Month/Date), not UTC"
     - "byApiKey buckets missing apiKey under the literal key 'local-no-key' rather than omitting the request from that breakdown"
     - "Each breakdown key embeds enough context to redisplay later without re-joining (rawModel, provider) via addToCounter's `meta` merge"
+    - "AIGate (schema rule 2): the day comes from AIGATE_USAGE_TIMEZONE (IANA, default the server zone at startup), named in every usage response; the rollup is a typed usage_daily table keyed by day, provider, model, connection, API key, and endpoint, and a request without a key has a null key (shown as 'No key') instead of 'local-no-key'. Daily rows are kept 400 days."
   state:
     reads: []
     writes: ["usageDaily row for today's dateKey"]
@@ -245,6 +251,7 @@
     - "period in {7d, 30d, 60d, all} sums pre-aggregated usageDaily rows instead (useDailySummary = true), then does a second pass over raw usageHistory (bounded to the same window) purely to overlay precise lastUsed timestamps onto each breakdown entry"
     - "Provider/connection/API-key display names are enriched via 3 parallel repo imports (connectionsRepo, apiKeysRepo, nodesRepo) at the top of the function, each independently wrapped in try/catch so one repo failing degrades to raw ids instead of failing the whole stats call"
     - "last10Minutes is always computed from live usageHistory regardless of period, as a fixed 10-bucket-per-minute series"
+    - "AIGate: summaries are SQL GROUP BY queries: hourly periods (today, 24h) read usage_events, longer periods (7d, 30d, 90d, custom up to 400 days) read usage_daily; names come from joins. Events are kept 90 days (AIGATE_USAGE_RETENTION_DAYS), pruned hourly."
   state:
     reads: ["usageDaily (period >= 7d)", "usageHistory (period in {today,24h}, plus the lastUsed overlay pass, plus last10Minutes)", "providerConnections", "apiKeys", "providerNodes"]
     writes: []
@@ -279,6 +286,7 @@
     - "today: 24 hourly buckets anchored at local midnight, scanning live usageHistory"
     - "24h: 24 hourly buckets trailing backward from now, scanning live usageHistory"
     - "7d/30d/60d: one bucket per day sourced from pre-aggregated usageDaily rows (loadDaysInRange), not raw history"
+    - "AIGate: today and 24h are hourly buckets from usage_events, 7d/30d/90d/custom daily buckets from usage_daily, each with tokens per provider and cost; an unknown period is 400 INVALID_REQUEST."
   state:
     reads: ["usageHistory (today/24h)", "usageDaily (7d/30d/60d)"]
     writes: []
@@ -314,6 +322,7 @@
     - "appendRequestLog() takes any arguments and does nothing — it is `export async function appendRequestLog() {}`, per an in-source comment: 'request log is now derived from usageHistory table on read'"
     - "Every one of its 5+ call sites (chatCore.js PENDING/FAILED lines, stream.js) invokes it as `appendRequestLog({...}).catch(() => {})` and never inspects the resolved value or branches on it — nothing depends on it having an effect"
     - "getRecentLogs(limit=200) instead reads the last N usageHistory rows directly and formats them for display, resolving connectionId -> account name via a fresh (uncached) connectionsRepo call every invocation — unlike getActiveRequests' 30s-TTL connectionMapCache"
+    - "AIGate: not ported; the no-op append and the alias route pair have no user. The recent ring on the usage stream covers the log view."
   state:
     reads: ["usageHistory", "providerConnections (uncached)"]
     writes: []
@@ -351,6 +360,7 @@
     - "All 7 pieces of live, in-memory usage state are guarded with `if (!global._x) global._x = ...` instead of being declared as module-scope `let`/`const`"
     - "The in-source comment states the reason directly: 'In-memory state shared across Next.js modules'"
     - "Next.js can evaluate a given source module more than once within the same server process (dev-mode HMR, and the route-handler module graph in general); module-scope state would silently re-initialize on each re-evaluation — a fresh EventEmitter with no subscribers, a reset pending-counter map — breaking the pending-request badge and dropping in-flight SSE listeners. Attaching to the single process-wide `global` object survives re-evaluation because it is not tied to any one module instance."
+    - "AIGate: the live state lives in the DI-managed UsageRecorder singleton."
   state:
     reads: []
     writes: []
@@ -385,6 +395,7 @@
     - "Subscribes to statsEmitter's 'update' event (full getUsageStats() recalculation) and 'pending' event (lightweight activeRequests+recentRequests+errorProvider refresh merged onto the last cached full stats)"
     - "Both events are debounced at the source: scheduleStatsEvent('update', 250) and scheduleStatsEvent('pending', 150-default) in usageRepo.js collapse bursts of writes into one emit per 150ms/250ms window"
     - "A 25000ms keepalive comment ping (`: ping\\n\\n`) is sent on an interval independent of the event-driven pushes, to hold the connection through idle periods"
+    - "AIGate: kept (payload on connect, debounced 250 ms push after each flush, 25 s keepalive ping), with at most 16 concurrent dashboard clients (503 beyond) and one shared summary per push instead of a recompute per client."
   state:
     reads: []
     writes: []
@@ -537,6 +548,7 @@
   businessRules:
     - "history/route.js calls `await getUsageStats()` with no period argument, which defaults to 'all' inside getUsageStats — an aggregate stats object identical in shape to what /api/usage/stats?period=all returns"
     - "The function that actually returns per-request rows with provider/model/date-range filtering — getUsageHistory(filter) — is exported from usageRepo.js and re-exported through both src/lib/db/index.js and src/lib/usageDb.js, but has zero callers anywhere in the checkout (verified: the only matches for 'getUsageHistory' are its own definition and the two re-export barrel lines)"
+    - "AIGate: not ported as named; GET /api/usage/summary is the aggregate, and per-request rows come with SP24b's request list."
   state:
     reads: ["usageDaily + usageHistory (via getUsageStats)"]
     writes: []
@@ -575,6 +587,7 @@
     - "calculateCost() looks up pricing via pricingRepo.getPricingForModel(provider, model) — user overrides (KV store) first, then open-sse/providers/pricing.js's built-in table — and delegates the actual arithmetic to calculateCostFromTokens() in open-sse so there is one source of truth for the formula"
     - "canonicalizeUsage() folds cached_tokens and cache_creation_input_tokens INTO prompt_tokens ahead of time (the cache-inclusive convention) — calculateCostFromTokens then subtracts them back out (nonCachedInput = inputTokens - cachedTokens - cacheCreationTokens) so cached tokens are billed at pricing.cached (falling back to pricing.input) instead of double-counting them at full input rate"
     - "Any failure (missing provider, missing model, missing pricing, thrown error) resolves to cost = 0, not an error — calculateCost wraps the whole lookup in try/catch and logs to console.error"
+    - "AIGate: the formula is carried over to AIGate's token convention (inputTokens excludes cache, outputTokens includes reasoning): input x in + cacheRead x cached + cacheWrite x cache_creation + (output - reasoning) x out + reasoning x (reasoning or out), so reasoning is billed once. A model without pricing records cost null and counts as unpriced (the UI says so) instead of $0."
   state:
     reads: ["pricing KV (via pricingRepo, 5s cache)"]
     writes: []
@@ -612,6 +625,7 @@
     - "updatePricing() does a per-provider read-modify-write inside one db.transaction() so concurrent PATCHes to different providers cannot clobber each other's KV rows"
     - "DELETE resets one model (provider+model given), one whole provider (provider only), or all pricing (neither) back to defaults by removing the corresponding KV override(s)"
     - "Every write (PATCH or DELETE) calls invalidate() to clear the 5000ms (CACHE_TTL_MS) in-process pricing cache so the next getPricing()/getPricingForModel() call re-reads from the KV store"
+    - "AIGate: GET/PATCH/DELETE /api/pricing kept with the same validation; overrides live in a typed pricing_overrides table; GET marks each price as default or override. /api/pricing/defaults is not added (unreachable in 9router). An override sets only the fields it names and is merged over the built-in price field by field; 9router's lookup returned the override entry whole, so a partial override left rates undefined and the cost NaN."
   state:
     reads: ["pricing KV"]
     writes: ["pricing KV"]

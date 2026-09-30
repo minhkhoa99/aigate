@@ -10,6 +10,8 @@ import { AppModule } from "./app.module.js";
 import { ChatLane, DEFAULT_REFRESH_RETRY_DELAY_MS, DEFAULT_STREAM_IDLE_TIMEOUT_MS } from "./modules/routing/infrastructure/chat-lane.js";
 import { SpeechLane } from "./modules/routing/infrastructure/speech-lane.js";
 import { registerV1Routes } from "./modules/routing/infrastructure/v1-routes.js";
+import { assertTimeZone } from "./modules/usage/domain/usage.js";
+import { DEFAULT_RETENTION_DAYS } from "./modules/usage/infrastructure/usage-recorder.js";
 import { AesGcmCipher, loadSecretKey } from "./secret-cipher.js";
 
 export { DATABASE } from "./database.provider.js";
@@ -37,13 +39,28 @@ export interface ServerOptions {
   refreshRetryDelayMs?: number;
   // The first wait before a custom provider's stream is retried (retryStreamErrors), 2 s; tests make it short.
   streamRetryDelayMs?: number;
+  // AIGATE_USAGE_TIMEZONE (IANA); the zone of this process when unset.
+  usageTimezone?: string;
+  // AIGATE_USAGE_RETENTION_DAYS, 1..3650.
+  usageRetentionDays?: number;
+  // Tests only: how often queued usage events are written (1 s).
+  usageFlushIntervalMs?: number;
 }
 
 export async function createServer({
   databaseFile, dataDir = dirname(databaseFile), webDist, secretKey, transport, streamIdleTimeoutMs = DEFAULT_STREAM_IDLE_TIMEOUT_MS, refreshRetryDelayMs = DEFAULT_REFRESH_RETRY_DELAY_MS, streamRetryDelayMs = STREAM_RETRY_DELAY_MS,
+  usageTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone, usageRetentionDays = DEFAULT_RETENTION_DAYS, usageFlushIntervalMs = 1_000,
 }: ServerOptions): Promise<NestFastifyApplication> {
   if (!Number.isInteger(streamIdleTimeoutMs) || streamIdleTimeoutMs < 1_000 || streamIdleTimeoutMs > 600_000) {
     throw new RangeError("AIGATE_STREAM_IDLE_TIMEOUT_MS must be an integer from 1000 to 600000");
+  }
+  if (!Number.isInteger(usageRetentionDays) || usageRetentionDays < 1 || usageRetentionDays > 3650) {
+    throw new RangeError("AIGATE_USAGE_RETENTION_DAYS must be an integer from 1 to 3650");
+  }
+  try {
+    assertTimeZone(usageTimezone);
+  } catch {
+    throw new RangeError(`AIGATE_USAGE_TIMEZONE "${usageTimezone}" is not an IANA time zone such as Asia/Ho_Chi_Minh`);
   }
   // Loaded before the database opens: a bad key stops startup before anything else happens.
   const cipher = new AesGcmCipher(loadSecretKey(secretKey, join(dirname(databaseFile), "secret.key")));
@@ -52,7 +69,7 @@ export async function createServer({
   try {
     // bodyParser:false drops the urlencoded parser Nest adds, so a cross-site HTML form cannot produce a
     // body these handlers accept; Fastify's own JSON parser (prototype-poisoning safe) stays.
-    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, dataDir, transport), new FastifyAdapter(), { bodyParser: false });
+    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, dataDir, { timezone: usageTimezone, retentionDays: usageRetentionDays, flushIntervalMs: usageFlushIntervalMs }, transport), new FastifyAdapter(), { bodyParser: false });
   } catch (error) {
     await database.close();
     throw error;

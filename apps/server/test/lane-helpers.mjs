@@ -60,8 +60,8 @@ export const errorOf = (res) => ({ status: res.statusCode, code: res.json().erro
 export const frames = (text) => text.split("\n\n").filter(Boolean).map((f) => (f === "data: [DONE]" ? "[DONE]" : JSON.parse(f.slice(6))));
 
 // Real sockets: inject cannot model a slow reader or a client that leaves.
-export async function listening(file, transport) {
-  const session = await ready(file, transport);
+export async function listening(file, transport, options = {}) {
+  const session = await ready(file, transport, options);
   await session.app.listen(0, "127.0.0.1");
   return { ...session, port: session.app.getHttpServer().address().port };
 }

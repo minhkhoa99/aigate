@@ -34,6 +34,8 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   // docs/contracts/speech.md: the provider refused or failed the account's voice list.
   VOICES_FETCH_FAILED: (body) => typeof body.message === "string" ? `${body.message} Check the connection's key, then retry.` : "The provider's voice list could not be loaded. Check the connection's key, then retry.",
   VOICE_PREVIEW_FAILED: (body) => typeof body.message === "string" ? body.message : "The provider could not generate a voice preview.",
+  // docs/contracts/usage.md.
+  USAGE_STREAM_BUSY: "Live usage updates are off: too many dashboard tabs are watching usage. Close another tab, then reload this page.",
   // docs/contracts/custom-providers.md.
   NODE_LIMIT: "You have reached the maximum of 100 custom providers. Delete one you no longer use.",
   PROXY_POOL_IN_USE: "This proxy pool is still assigned to a connection. Remove it from those connections first.",
