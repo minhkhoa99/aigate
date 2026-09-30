@@ -19,7 +19,7 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   ALREADY_SET_UP: "A dashboard password already exists. Sign in instead.",
   SETUP_REQUIRED: "Set a dashboard password first.",
   LIMIT_REACHED: "You have reached the maximum of 100 API keys. Revoke one you no longer use.",
-  NOT_FOUND: "That item no longer exists. The list was refreshed.",
+  NOT_FOUND: (body) => typeof body.message === "string" ? body.message : "That item no longer exists. The list was refreshed.",
   CONFLICT: (body) => typeof body.message === "string" ? body.message : "That resource already exists. Choose another name.",
   PROVIDER_UNAVAILABLE: (body) => typeof body.message === "string" ? body.message : "The relay provider could not complete this deployment. Try again.",
   // docs/contracts/connections.md. The server message gives the catalog reason.

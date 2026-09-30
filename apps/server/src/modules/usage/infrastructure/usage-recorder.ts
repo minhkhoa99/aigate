@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
 import { lt, sql, type AnyColumn } from "drizzle-orm";
-import { usageDaily, usageEvents, type DatabaseHandle, type UsageStatus } from "@aigate/database";
+import { usageDaily, usageEvents, usageRequests, type DatabaseHandle, type UsageStatus } from "@aigate/database";
 import { costOf, type TokenUsage } from "@aigate/engine";
 import { DATABASE } from "../../../database.provider.js";
 import { addDays, dayKey } from "../domain/usage.js";
@@ -62,14 +62,40 @@ export interface RecentEvent {
   latencyMs: number;
   ttftMs: number | null;
 }
+// SP24b: how a client request ended, recorded once when its handler finishes.
+export interface RequestOutcome {
+  readonly requestId: string;
+  readonly startedAt: number;
+  readonly endpoint: string;
+  readonly requestedModel: string | null;
+  readonly apiKeyId: string | null;
+  readonly stream: boolean;
+  readonly httpStatus: number;
+  readonly errorCode: string | null;
+  // The client closed the connection before the answer ended.
+  readonly clientGone: boolean;
+}
+interface RequestTally {
+  attempts: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number;
+  cost: number; priced: number; unpriced: number;
+  last?: { provider: string; model: string; connectionId: string | null; status: UsageStatus; errorCode: string | null; ttftMs: number | null };
+}
+
 export interface ActiveCount { provider: string; model: string; connectionId: string | null; count: number }
 export interface WriterState { queued: number; dropped: number; failed: number }
 
 type EventRow = typeof usageEvents.$inferInsert & { at: Date; cost: number | null };
+type RequestRow = typeof usageRequests.$inferInsert;
+// Requests in flight whose attempts are being tallied; the oldest is forgotten past this (a handler that never finished).
+const MAX_OPEN_REQUESTS = 10_000;
+// 22 request columns x 40 rows stays under SQLite's 999 bound variables.
+const REQUESTS_PER_INSERT = 40;
 interface DailyRow {
   day: string; provider: string; model: string; connectionId: string; apiKeyId: string; endpoint: string;
   requests: number; errors: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number; cost: number; unpriced: number;
 }
+
+const emptyTally = (): RequestTally => ({ attempts: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, cost: 0, priced: 0, unpriced: 0 });
 
 // ON CONFLICT: the stored counter plus the batch's.
 const add = (column: AnyColumn) => sql`${column} + excluded.${sql.identifier(column.name)}`;
@@ -78,6 +104,9 @@ const add = (column: AnyColumn) => sql`${column} + excluded.${sql.identifier(col
 export class UsageRecorder implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger("UsageRecorder");
   private readonly queue: EventRow[] = [];
+  private readonly requests: RequestRow[] = [];
+  private readonly open = new Map<string, RequestTally>();
+  private readonly keys = new WeakMap<object, string>();
   private dropped = 0;
   private failed = 0;
   private readonly ring: RecentEvent[] = [];
@@ -126,10 +155,36 @@ export class UsageRecorder implements OnModuleInit, OnModuleDestroy {
         inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, cost, estimated: outcome.estimated, latencyMs: outcome.latencyMs, ttftMs: outcome.ttftMs,
       });
       if (this.ring.length > RING) this.ring.shift();
+      this.tally(call, outcome, cost);
       if (this.queue.length >= FLUSH_AT) void this.flush();
     } catch (error) {
       this.dropped += 1;
       this.logger.error("usage event not recorded", error instanceof Error ? error.stack : String(error));
+    }
+  }
+
+  // The request row (docs/contracts/usage.md "Requests"): its attempts' totals and the last attempt. Never throws.
+  finish(outcome: RequestOutcome, at = Date.now()): void {
+    try {
+      const tally = this.open.get(outcome.requestId) ?? emptyTally();
+      this.open.delete(outcome.requestId);
+      const { last } = tally;
+      const status: UsageStatus = outcome.clientGone ? "aborted" : outcome.httpStatus >= 400 ? "error" : last?.status === "aborted" ? "aborted" : "success";
+      this.requests.push({
+        id: outcome.requestId, at: new Date(outcome.startedAt), endpoint: outcome.endpoint, requestedModel: outcome.requestedModel, apiKeyId: outcome.apiKeyId, stream: outcome.stream,
+        status, httpStatus: outcome.httpStatus, errorCode: status === "success" ? null : outcome.errorCode ?? last?.errorCode ?? (outcome.clientGone ? "CLIENT_CLOSED" : null),
+        attempts: tally.attempts, finalProvider: last?.provider ?? null, finalModel: last?.model ?? null, finalConnectionId: last?.connectionId ?? null,
+        inputTokens: tally.inputTokens, outputTokens: tally.outputTokens, cacheReadTokens: tally.cacheReadTokens, cacheWriteTokens: tally.cacheWriteTokens, reasoningTokens: tally.reasoningTokens,
+        cost: tally.priced > 0 ? tally.cost : null, unpriced: tally.unpriced, latencyMs: Math.max(0, at - outcome.startedAt), ttftMs: last?.ttftMs ?? null,
+      });
+      if (this.requests.length > MAX_QUEUE) {
+        this.requests.shift();
+        this.dropped += 1;
+      }
+      if (this.requests.length >= FLUSH_AT) void this.flush();
+    } catch (error) {
+      this.dropped += 1;
+      this.logger.error("request row not recorded", error instanceof Error ? error.stack : String(error));
     }
   }
 
@@ -170,7 +225,16 @@ export class UsageRecorder implements OnModuleInit, OnModuleDestroy {
   }
 
   writer(): WriterState {
-    return { queued: this.queue.length, dropped: this.dropped, failed: this.failed };
+    return { queued: this.queue.length + this.requests.length, dropped: this.dropped, failed: this.failed };
+  }
+
+  // The AIGate key the /v1 gate accepted for a request, so every lane can attribute its usage.
+  attribute(request: object, apiKeyId: string): void {
+    this.keys.set(request, apiKeyId);
+  }
+
+  keyOf(request: object): string | null {
+    return this.keys.get(request) ?? null;
   }
 
   onChange(listener: () => void): () => void {
@@ -187,20 +251,22 @@ export class UsageRecorder implements OnModuleInit, OnModuleDestroy {
   async prune(now = Date.now()): Promise<void> {
     this.lastPrune = now;
     await this.database.db.delete(usageEvents).where(lt(usageEvents.at, new Date(now - this.config.retentionDays * DAY_MS)));
+    await this.database.db.delete(usageRequests).where(lt(usageRequests.at, new Date(now - this.config.retentionDays * DAY_MS)));
     await this.database.db.delete(usageDaily).where(lt(usageDaily.day, addDays(dayKey(now, this.config.timezone), -DAILY_RETENTION_DAYS)));
   }
 
   private async drain(): Promise<void> {
     let wrote = false;
     // eslint-disable-next-line aigate/retry-through-helper -- each pass writes the next batch; a failed batch is counted, not retried.
-    while (this.queue.length > 0) {
+    while (this.queue.length > 0 || this.requests.length > 0) {
       const batch = this.queue.splice(0, WRITE_BATCH);
+      const requests = this.requests.splice(0, WRITE_BATCH);
       try {
-        await this.write(batch);
+        await this.write(batch, requests);
         wrote = true;
       } catch (error) {
         this.failed += 1;
-        this.logger.error(`usage batch of ${batch.length} not written`, error instanceof Error ? error.stack : String(error));
+        this.logger.error(`usage batch of ${batch.length} events and ${requests.length} requests not written`, error instanceof Error ? error.stack : String(error));
       }
     }
     if (Date.now() - this.lastPrune >= PRUNE_EVERY_MS) {
@@ -209,7 +275,7 @@ export class UsageRecorder implements OnModuleInit, OnModuleDestroy {
     if (wrote) this.changed();
   }
 
-  private async write(batch: readonly EventRow[]): Promise<void> {
+  private async write(batch: readonly EventRow[], requests: readonly RequestRow[]): Promise<void> {
     const daily = new Map<string, DailyRow>();
     for (const event of batch) {
       const day = dayKey(event.at.getTime(), this.config.timezone);
@@ -234,6 +300,9 @@ export class UsageRecorder implements OnModuleInit, OnModuleDestroy {
     const rows = [...daily.values()];
     await this.database.db.transaction(async (tx) => {
       for (let start = 0; start < batch.length; start += ROWS_PER_INSERT) await tx.insert(usageEvents).values(batch.slice(start, start + ROWS_PER_INSERT));
+      for (let start = 0; start < requests.length; start += REQUESTS_PER_INSERT) {
+        await tx.insert(usageRequests).values(requests.slice(start, start + REQUESTS_PER_INSERT)).onConflictDoNothing();
+      }
       for (let start = 0; start < rows.length; start += ROWS_PER_INSERT) {
         await tx.insert(usageDaily).values(rows.slice(start, start + ROWS_PER_INSERT)).onConflictDoUpdate({
           target: [usageDaily.day, usageDaily.provider, usageDaily.model, usageDaily.connectionId, usageDaily.apiKeyId, usageDaily.endpoint],
@@ -245,6 +314,31 @@ export class UsageRecorder implements OnModuleInit, OnModuleDestroy {
         });
       }
     });
+  }
+
+  private tally(call: UsageCall, outcome: UsageOutcome, cost: number | null): void {
+    let tally = this.open.get(call.requestId);
+    if (!tally) {
+      tally = emptyTally();
+      this.open.set(call.requestId, tally);
+      for (const oldest of this.open.keys()) {
+        if (this.open.size <= MAX_OPEN_REQUESTS) break;
+        this.open.delete(oldest);
+      }
+    }
+    const { usage } = outcome;
+    tally.attempts += 1;
+    tally.inputTokens += usage.inputTokens;
+    tally.outputTokens += usage.outputTokens;
+    tally.cacheReadTokens += usage.cacheReadTokens ?? 0;
+    tally.cacheWriteTokens += usage.cacheWriteTokens ?? 0;
+    tally.reasoningTokens += usage.reasoningTokens ?? 0;
+    if (cost === null) tally.unpriced += 1;
+    else {
+      tally.cost += cost;
+      tally.priced += 1;
+    }
+    tally.last = { provider: call.provider, model: call.model, connectionId: call.connectionId, status: outcome.status, errorCode: outcome.errorCode, ttftMs: outcome.ttftMs };
   }
 
   private changed(): void {

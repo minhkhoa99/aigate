@@ -1,6 +1,6 @@
-# Usage contract (M2 SP24a)
+# Usage contract (M2 SP24a, SP24b)
 
-Per-call usage recording, cost from pricing, summaries, the live stream, and the pricing editor. Matrix: `docs/discovery/feature-matrix/08-usage-quota.yaml` (`usage.*`, `pricing.*`) and `routing.usage-recording-timing`. Request detail is SP24b; vendor quota is SP24c.
+Per-call usage recording, cost from pricing, summaries, the live stream, the pricing editor (SP24a), and request detail with the media lanes (SP24b). Matrix: `docs/discovery/feature-matrix/08-usage-quota.yaml` (`usage.*`, `pricing.*`) and `routing.usage-recording-timing`. Vendor quota is SP24c.
 
 ## What is recorded
 
@@ -93,6 +93,48 @@ Errors:
 - 503 `USAGE_STREAM_BUSY`: 16 live streams are already open.
 
 All of these reach the dashboard through `apps/web/src/shared/errors.ts`.
+
+## Requests (SP24b)
+
+**What else is recorded.**
+- One **request row** per client request, on the chat routes and on `/v1/embeddings`, `/v1/images/generations`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/search`, `/v1/web/fetch`, and `/v1/videos/*`.
+- The media lanes also record a usage event per upstream call (TTS per connection tried). Tokens come from the upstream `usage` when it sends one, otherwise 0; cost is null unless an override prices the model.
+
+**Request row fields:**
+- `id` (the `x-request-id`), `at` (start), `endpoint`, `requestedModel` (as the client sent it: a combo name, a bare id, or `provider/model`), `apiKeyId`, `stream`.
+- `status`, one of:
+  - `success`: the client got a 2xx and the stream, if any, finished.
+  - `error`: the client got an error status.
+  - `aborted`: the client left, or the stream failed after it started.
+- `httpStatus`, `errorCode` (the lane's code, or the last attempt's).
+- `attempts` (the request's usage events), and `finalProvider`, `finalModel`, `finalConnectionId` from the last attempt.
+- The attempts' summed tokens, `cost` (null when no attempt was priced), `unpriced` (attempts without a price), `latencyMs`, `ttftMs` (the last attempt's).
+
+Nothing from a request or answer body is stored. Rows share the writer and the event retention.
+
+| Method | Path | Answer |
+|---|---|---|
+| GET | `/api/requests?cursor=&limit=&status=error&provider=&model=&endpoint=&fallback=1&from=&to=` | `{ items, nextCursor }`, newest first |
+| GET | `/api/requests/filters` | `{ providers: [{ id, name }], models: [{ provider, model }], endpoints }` |
+| GET | `/api/requests/:id` | `{ request, attempts }` |
+
+Paging and filters:
+- `limit` is 1–100 (default 50).
+- `cursor` is the opaque `nextCursor` of the previous page (`null` on the last page).
+- `status=error` matches error and aborted.
+- `fallback=1` keeps requests with more than one attempt.
+- `provider` and `model` match the final attempt.
+- `from` and `to` are epoch ms.
+- Items carry display names for the provider, the account, and the key.
+- `filters` reads `usage_daily` within the retention, at most 500 entries per list.
+
+Errors:
+- 400 `INVALID_REQUEST`: bad cursor, limit, time, or status.
+- 404 `NOT_FOUND`: an unknown or pruned request id.
+
+UI:
+- `/traffic/requests`: filters in the URL; a table of time, requested model, final provider, account, status and code, attempts, TTFT, latency, tokens, and cost; Load more by cursor, at most 500 rows on the page.
+- `/traffic/requests/detail?id=<id>`: metrics, the attempt timeline (provider, account, status, error, latency, tokens), and the metadata with a copyable request id.
 
 ## Deviations from 9router
 

@@ -1,10 +1,7 @@
 import { BadRequestException, Controller, Get, Header, Query, Res, ServiceUnavailableException } from "@nestjs/common";
 import type { FastifyReply } from "fastify";
-import { builtinRegistry, CATALOG, mediaService } from "@aigate/engine";
-import { ApiKeysRepository } from "../../apikeys/infrastructure/api-keys.repo.js";
-import { ConnectionsRepository } from "../../connections/infrastructure/connections.repo.js";
-import { ProviderNodesRepository } from "../../connections/infrastructure/provider-nodes.repo.js";
 import { addDays, csvField, InvalidPeriod, parsePeriod, startOfDay, type UsageRange } from "../domain/usage.js";
+import { DisplayNames } from "./display-names.js";
 import { UsageRecorder } from "./usage-recorder.js";
 import { MAX_EXPORT, UsageRepository, type Counters, type GroupRow } from "./usage.repo.js";
 
@@ -31,16 +28,14 @@ export class UsageController {
   constructor(
     private readonly usage: UsageRepository,
     private readonly recorder: UsageRecorder,
-    private readonly connections: ConnectionsRepository,
-    private readonly nodes: ProviderNodesRepository,
-    private readonly keys: ApiKeysRepository,
+    private readonly displayNames: DisplayNames,
   ) {}
 
   @Get("summary")
   @Header("Cache-Control", "no-store")
   async summary(@Query() query: Query) {
     const range = this.range(query);
-    const names = await this.names();
+    const names = await this.displayNames.load();
     const totals = await this.usage.totals(range);
     const byProvider = await this.usage.breakdown(range, "provider");
     const byModel = await this.usage.breakdown(range, "model");
@@ -84,7 +79,7 @@ export class UsageController {
   @Get("export.csv")
   async export(@Query() query: Query, @Res({ passthrough: true }) reply: FastifyReply): Promise<string> {
     const range = this.range(query);
-    const names = await this.names();
+    const names = await this.displayNames.load();
     const rows = await this.usage.breakdown(range, "model", MAX_EXPORT);
     const header = ["provider", "provider_name", "model", "requests", "errors", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens", "cost_usd", "unpriced"];
     const lines = rows.map((row) => [row.provider, names.provider(row.provider), row.model, row.requests, row.errors, row.inputTokens, row.outputTokens, row.cacheReadTokens,
@@ -126,17 +121,5 @@ export class UsageController {
       if (error instanceof InvalidPeriod) throw new BadRequestException({ code: "INVALID_REQUEST", message: error.message });
       throw error;
     }
-  }
-
-  // Display names; an id that no longer exists is shown as it is.
-  private async names() {
-    const nodes = new Map((await this.nodes.list()).map((node) => [node.id, node.name]));
-    const connections = new Map((await this.connections.list()).map((connection) => [connection.id, connection.name]));
-    const keys = new Map((await this.keys.list()).map((key) => [key.id, key.name]));
-    return {
-      provider: (id: string | null) => (id === null ? null : builtinRegistry.provider(id)?.name ?? mediaService(id)?.name ?? CATALOG.find((entry) => entry.id === id)?.name ?? nodes.get(id) ?? id),
-      connection: (id: string | null) => (id === null ? null : connections.get(id) ?? id),
-      key: (id: string | null) => (id === null ? null : keys.get(id) ?? id),
-    };
   }
 }

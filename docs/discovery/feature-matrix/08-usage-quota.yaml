@@ -435,6 +435,7 @@
     - "sanitizeHeaders() strips authorization/x-api-key/cookie/token/api-key headers from item.request.headers before it is ever written to disk"
     - "truncateField() replaces any request/providerRequest/providerResponse/response field larger than maxJsonSize (default 5KB) with a {_truncated, _originalSize, _preview} stub instead of storing it whole"
     - "beforeExit/SIGINT/SIGTERM/exit handlers force a final flush of any buffered-but-unflushed items so a graceful shutdown doesn't lose the tail of the buffer"
+    - "AIGate (SP24b, user decision 2026-09-30): request detail holds metadata and attempts only, never bodies, so it is always on instead of opt-in (the opt-in existed because bodies carry conversations). One usage_requests row per client request (requested model, endpoint, key, stream, final status, HTTP status, error code, attempts, final provider/model/connection, summed tokens and cost, latency, TTFT) goes through the SP24a buffered writer and shares the events' retention (AIGATE_USAGE_RETENTION_DAYS). Attempts are the request's usage_events rows. docs/contracts/usage.md 'Requests'."
   state:
     reads: ["settings.enableObservability / observabilityMaxRecords / observabilityBatchSize / observabilityFlushIntervalMs / observabilityMaxJsonSize (5s-cached)"]
     writes: ["requestDetails"]
@@ -483,6 +484,7 @@
     - "page must be >= 1 and pageSize must be 1-100, both validated with an explicit 400 before querying"
     - "Every returned detail has its request, providerRequest, providerResponse and response fields overwritten with {redacted: true} — the in-source comment states this is deliberate: those fields hold full user prompts, tool calls and provider responses, and any dashboard-authenticated user (or anyone, if requireLogin is disabled) could otherwise read every user's conversation history through this endpoint"
     - "Only metadata (model, tokens, latency, status, timestamps) survives redaction"
+    - "AIGate: no body is stored, so nothing needs redacting; GET /api/requests pages by an opaque (at, id) cursor with limit 1-100 (spec: no unbounded list) instead of page/pageSize, filtered by errors only, provider, model, endpoint, fallback (attempts > 1), and a time range; GET /api/requests/:id returns the request and its attempts, 404 NOT_FOUND."
   state:
     reads: ["requestDetails"]
     writes: []
@@ -517,6 +519,7 @@
     - "Sources DISTINCT provider from the requestDetails table, not usageHistory — the in-source comment explains this avoids parsing every row's full JSON blob (usageHistory rows can total hundreds of MB), which previously caused OOM"
     - "Display name resolution: providerNodes.name first, then getProviderByAlias/AI_PROVIDERS config name, else the raw provider id"
     - "This list is scoped to the request-details table specifically (it is the filter for that tab), so it naturally returns an empty array whenever requestDetails is empty — which is the default state, since observability is off by default (see usage.request-details-buffered-persistence)"
+    - "AIGate: GET /api/requests/filters returns the distinct providers, models, and endpoints of usage_daily within the event retention, at most 500 each, with display names."
   state:
     reads: ["requestDetails (DISTINCT provider column only)", "providerNodes"]
     writes: []

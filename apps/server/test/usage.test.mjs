@@ -158,6 +158,8 @@ test("streams: an aborted stream is recorded with an estimate; the live usage st
       assert.deepEqual([today.totals.requests, today.totals.errors, today.totals.outputTokens], [1, 1, 10]);
       const week = await summary(dash, "period=7d");
       assert.deepEqual([week.totals.requests, week.totals.errors], [1, 1], "the rollup counts an aborted call as an error too");
+      const aborted = (await dash({ url: "/api/requests" })).json().items[0];
+      assert.deepEqual([aborted.status, aborted.httpStatus, aborted.errorCode, aborted.stream, aborted.attempts], ["aborted", 499, "CLIENT_CLOSED", true, 1]);
       const recent = recorderOf(app).live().recent[0];
       assert.deepEqual([recent.status, recent.errorCode, recent.estimated, typeof recent.ttftMs], ["aborted", "CLIENT_CLOSED", true, "number"]);
 
@@ -169,4 +171,60 @@ test("streams: an aborted stream is recorded with an estimate; the live usage st
       for (const res of open) res.destroy();
       await app.close();
     }
+  }));
+
+test("requests: one row per client request, cursor pages, filters, detail with attempts, media lanes", () =>
+  withTempDb(async (file) => {
+    let chats = 0;
+    const upstream = { async send(request, ctx) {
+      const reply = (status, value) => ({ status, headers: { "content-type": "application/json" }, body: body(JSON.stringify(value), ctx) });
+      if (request.url.endsWith("/embeddings")) return reply(200, { object: "list", data: [], usage: { prompt_tokens: 8, total_tokens: 8 } });
+      if (request.url === "https://api.tavily.com/search") return reply(200, { results: [{ title: "T", url: "https://example.com", content: "c" }] });
+      chats += 1;
+      return chats === 2 ? reply(429, { error: { message: "Rate limit reached for gpt-4.1" } }) : reply(200, completion);
+    } };
+    const { app, dash, chat, key, call } = await ready(file, upstream, OPTIONS);
+    assert.equal((await chat(hello)).statusCode, 200);
+    await dash({ method: "POST", url: "/api/combos", body: { name: "pair", models: ["openai/gpt-4.1", "openai/gpt-4o"] } });
+    assert.equal((await chat({ ...hello, model: "pair" })).statusCode, 200);
+    assert.equal((await chat({ ...hello, model: "nope-model-x" })).statusCode, 404);
+    const v1 = (url, payload) => call({ method: "POST", url, body: payload, headers: { authorization: `Bearer ${key}` } });
+    assert.equal((await v1("/v1/embeddings", { model: "openai/text-embedding-3-small", input: "hi" })).statusCode, 200);
+    await dash({ method: "POST", url: "/api/connections", body: { provider: "tavily", apiKey: "tvly-test-key-123456" } });
+    assert.equal((await v1("/v1/search", { provider: "tavily", query: "kites" })).statusCode, 200);
+    await recorderOf(app).flush();
+
+    const first = (await dash({ url: "/api/requests?limit=2" })).json();
+    assert.equal(first.items.length, 2);
+    assert.ok(first.nextCursor);
+    const rest = (await dash({ url: `/api/requests?limit=100&cursor=${first.nextCursor}` })).json();
+    const all = [...first.items, ...rest.items];
+    assert.equal(rest.nextCursor, null);
+    assert.equal(new Set(all.map((item) => item.id)).size, 5, "every request once, none repeated across pages");
+    assert.deepEqual(all.map((item) => item.endpoint), ["/v1/search", "/v1/embeddings", "/v1/chat/completions", "/v1/chat/completions", "/v1/chat/completions"]);
+
+    const [search, embeddings, missing, combo, plain] = all;
+    assert.deepEqual([search.status, search.attempts, search.finalProvider, search.requestedModel, search.keyName], ["success", 1, "tavily", "tavily", "client"]);
+    assert.deepEqual([embeddings.inputTokens, embeddings.cost, embeddings.unpriced], [8, null, 1], "embedding tokens come from the upstream usage; no price is built in");
+    assert.deepEqual([missing.status, missing.httpStatus, missing.errorCode, missing.attempts, missing.requestedModel], ["error", 404, "model_not_found", 0, "nope-model-x"]);
+    assert.deepEqual([combo.status, combo.attempts, combo.requestedModel, combo.finalModel, combo.providerName], ["success", 2, "pair", "gpt-4o", "OpenAI"]);
+    assert.deepEqual([plain.attempts, plain.inputTokens, plain.outputTokens, plain.httpStatus, plain.stream], [1, 3, 2, 200, false]);
+
+    const errors = (await dash({ url: "/api/requests?status=error" })).json().items;
+    assert.deepEqual(errors.map((item) => item.id), [missing.id]);
+    assert.deepEqual((await dash({ url: "/api/requests?fallback=1" })).json().items.map((item) => item.id), [combo.id]);
+    assert.deepEqual((await dash({ url: "/api/requests?provider=tavily" })).json().items.map((item) => item.id), [search.id]);
+
+    const detail = (await dash({ url: `/api/requests/${combo.id}` })).json();
+    assert.deepEqual(detail.attempts.map((attempt) => [attempt.model, attempt.status, attempt.errorCode]), [["gpt-4.1", "error", "RATE_LIMIT"], ["gpt-4o", "success", null]]);
+    assert.equal(detail.request.id, combo.id);
+    const unknown = await dash({ url: "/api/requests/not-a-request" });
+    assert.deepEqual([unknown.statusCode, unknown.json().code], [404, "NOT_FOUND"]);
+    const badCursor = await dash({ url: "/api/requests?cursor=zzz" });
+    assert.deepEqual([badCursor.statusCode, badCursor.json().code], [400, "INVALID_REQUEST"]);
+    assert.equal((await dash({ url: "/api/requests?limit=101" })).statusCode, 400);
+
+    const filters = (await dash({ url: "/api/requests/filters" })).json();
+    assert.ok(filters.providers.some((provider) => provider.id === "openai" && provider.name === "OpenAI"));
+    assert.ok(filters.endpoints.includes("/v1/search"));
   }));

@@ -36,6 +36,6 @@ export const navigation = [
 export const extraRoutes = [
   "/gateway/routing/new",
   "/providers/new", "/providers/detail", "/providers/media/catalog", "/providers/media/provider", "/providers/media/video", "/providers/media/video/xai",
-  "/traffic/requests/request-123", "/integrations/cli-tools/codex", "/network/proxy-pools/deploy",
+  "/traffic/requests/detail", "/integrations/cli-tools/codex", "/network/proxy-pools/deploy",
   "/welcome", "/login", "/callback",
 ] as const;

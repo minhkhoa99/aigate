@@ -38,7 +38,7 @@ export function ScreenView({ path, developerMode, onDeveloperMode, state = "read
     case "/providers/media/video/xai": return <MediaProviders kind="video" providerId="xai" />;
     case "/traffic/usage": return <Usage />;
     case "/traffic/requests": return <Requests />;
-    case "/traffic/requests/request-123": return <RequestDetail />;
+    case "/traffic/requests/detail": return <RequestDetail requestId={new URLSearchParams(window.location.search).get("id") ?? ""} />;
     case "/traffic/console": return developerMode ? <Console /> : <><PageHeading eyebrow="Traffic" title="Developer mode required" description="Enable developer mode in Settings to inspect console events." /><StateBlock state="empty" action={<Link to="/settings/developer" className="button button-primary">Open developer settings</Link>} /></>;
     case "/network/proxy-pools": return <ProxyPools />;
     case "/network/proxy-pools/deploy": return <DeployWizard />;

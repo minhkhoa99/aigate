@@ -28,6 +28,32 @@ export const usageEvents = sqliteTable("usage_events", {
   ttftMs: integer("ttft_ms"),
 }, (t) => [index("usage_events_at").on(t.at), index("usage_events_request").on(t.requestId)]);
 
+// SP24b: one row per client request, metadata only (no body); its attempts are the usage_events rows with its id.
+export const usageRequests = sqliteTable("usage_requests", {
+  id: text("id").primaryKey(),
+  at: integer("at", { mode: "timestamp_ms" }).notNull(),
+  endpoint: text("endpoint").notNull(),
+  requestedModel: text("requested_model"),
+  apiKeyId: text("api_key_id"),
+  stream: integer("stream", { mode: "boolean" }).notNull().default(false),
+  status: text("status", { enum: USAGE_STATUSES }).notNull(),
+  httpStatus: integer("http_status").notNull(),
+  errorCode: text("error_code"),
+  attempts: integer("attempts").notNull(),
+  finalProvider: text("final_provider"),
+  finalModel: text("final_model"),
+  finalConnectionId: text("final_connection_id"),
+  inputTokens: integer("input_tokens").notNull(),
+  outputTokens: integer("output_tokens").notNull(),
+  cacheReadTokens: integer("cache_read_tokens").notNull(),
+  cacheWriteTokens: integer("cache_write_tokens").notNull(),
+  reasoningTokens: integer("reasoning_tokens").notNull(),
+  cost: real("cost"),
+  unpriced: integer("unpriced").notNull(),
+  latencyMs: integer("latency_ms").notNull(),
+  ttftMs: integer("ttft_ms"),
+}, (t) => [index("usage_requests_at").on(t.at, t.id), index("usage_requests_status_at").on(t.status, t.at)]);
+
 // The per-day rollup the long periods read. "" stands for no connection or no key, so the composite key matches on
 // upsert (SQLite treats NULLs as distinct). `day` is YYYY-MM-DD in AIGATE_USAGE_TIMEZONE (schema rule 2).
 export const usageDaily = sqliteTable("usage_daily", {

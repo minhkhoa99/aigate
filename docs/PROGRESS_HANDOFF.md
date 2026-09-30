@@ -50,8 +50,8 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M2 SP21 Token Saver | Done, UI wired | `docs/contracts/token-saver.md` |
 | M2 SP22 media lanes | Done, UI wired | `docs/discovery/feature-matrix/09-media-providers.yaml` |
 | M2 SP23 media catalog, TTS lane, voice lists and browser | Done, UI wired, browser smoke (no real provider key); uncommitted | `docs/contracts/speech.md`, `docs/contracts/catalog-providers.md` |
-| M2 SP24a usage recording, pricing, summaries, live stream, Usage page | Done, UI wired, browser smoke; uncommitted | `docs/contracts/usage.md` |
-| M2 SP24b request detail (metadata + attempts), media-lane usage, Requests page | Not started | — |
+| M2 SP24a usage recording, pricing, summaries, live stream, Usage page | Done, UI wired, browser smoke, committed `d45e04b` | `docs/contracts/usage.md` |
+| M2 SP24b request detail (metadata + attempts), media-lane usage, Requests page | Done, UI wired, browser smoke; uncommitted | `docs/contracts/usage.md` "Requests" |
 | M2 SP24c vendor quota (21 handlers), Quota page | Not started | — |
 
 ## Completed and verified
@@ -820,3 +820,11 @@ Checks and status:
 - **Found during smoke.** `@fastify/static` with `wildcard: false` serves only the asset names present at startup, so a web rebuild needs a server restart (not changed; production builds restart anyway).
 - **Graph.** `graphify update .` (2982 nodes, 7122 edges) and `build_project_map.py`.
 - **Next.** Commit SP24a when the user asks, then SP24b (request detail with attempts grouped by `requestId`, media-lane usage, the Requests page).
+
+**M2 SP24b is complete (request detail, media-lane usage, Requests page).** Plan `plans/plan_2026-09-30_SP24b.md` (5 decisions approved 2026-09-30); contract `docs/contracts/usage.md` "Requests"; matrix notes on `usage.request-details-buffered-persistence`, `usage.request-details-api-redaction`, `usage.providers-distinct-api`. Uncommitted.
+- **Database.** Migration `0023_usage_requests.sql`: `usage_requests`, one row per client request, metadata only (requested model, endpoint, key, stream, status, HTTP status, error code, attempts, final provider/model/connection, summed tokens and cost, unpriced count, latency, TTFT), indexed by (at, id) and (status, at); pruned with the events.
+- **Server.** `UsageRecorder` tallies each request's attempts in memory (10 000 open at most) and `finish()` queues the row, written in the same transaction as the events. The key the gate accepted moved to the recorder (`attribute`/`keyOf`) so every lane attributes usage. `ChatLane.serve` and all seven media handlers (embeddings, images, transcription, search, fetch, video create and poll) write a request row; the media sends go through `meteredSend` (bounded read, usage block tokens, errors recorded); search/fetch meter each connection tried. `SpeechLane` records each TTS connection tried and its request row (the dashboard preview has no attribution and is not recorded). A client that left is recorded as HTTP 499. `RequestsController`: `GET /api/requests` (cursor pages of up to 100, filters), `/api/requests/filters` (from `usage_daily`, 500 max), `/api/requests/:id` (404 `NOT_FOUND`). `DisplayNames` is shared with the usage summary.
+- **Web.** `features/traffic/requests.tsx`: `/traffic/requests` (filters in the URL, Load more by cursor to 500 rows) and `/traffic/requests/detail?id=` (a query parameter, as `/providers/detail`: a `$param` route made every typed `Link` in the app require params). `errors.ts` passes the server message through for `NOT_FOUND`.
+- **Checks.** Engine 190/190, database 6/6, server 152 pass / 3 skipped (`test/usage.test.mjs` 6 cases, new: request rows for plain, combo fallback (2 attempts, RATE_LIMIT then success), a 404 before any upstream call, embeddings tokens from the upstream usage, search per connection, cursor paging without repeats, the four filters, detail, 404, bad cursor, limit, filter lists; the aborted stream's row is 499 CLIENT_CLOSED), web 19/19; lint, build, `git diff --check`, `pnpm discovery validate` (356) pass. 4 mutations caught (client-gone status, attempt count, cursor tiebreak, fallback filter). Browser smoke on the production build with the local fake upstream: list with a 2-attempt combo and a 404, fallback and error filters, the detail timeline (Attempt 1 RATE_LIMIT, Attempt 2 success with TTFT and cost), the NOT_FOUND page.
+- **Graph.** `graphify update .` and `build_project_map.py`.
+- **Next.** Commit SP24b when the user asks, then SP24c (vendor quota: 21 handlers, Quota page).

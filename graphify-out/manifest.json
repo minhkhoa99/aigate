@@ -160,8 +160,8 @@
     "hash": "93dbedf1999c65e8082f57804a5ed370"
   },
   "E:\\AIgate\\apps\\server\\src\\modules\\routing\\infrastructure\\chat-lane.ts": {
-    "mtime": 1790761687.0370767,
-    "hash": "5aacf312bdb7a6fb7cb08dd56b75fe4e"
+    "mtime": 1790763943.8983912,
+    "hash": "629c25df953b796d5054c08df7ecef5f"
   },
   "E:\\AIgate\\apps\\server\\src\\modules\\routing\\infrastructure\\combos.controller.ts": {
     "mtime": 1790669545.9017642,
@@ -184,12 +184,12 @@
     "hash": "13c2051fdd49ce6ffa3ad28f99c07e60"
   },
   "E:\\AIgate\\apps\\server\\src\\modules\\routing\\infrastructure\\speech-lane.ts": {
-    "mtime": 1790759262.8292701,
-    "hash": "ee059483f7b00409414214948f27f4f6"
+    "mtime": 1790763996.7555478,
+    "hash": "35200d085b57cf4dbe5c61d6349c1fa2"
   },
   "E:\\AIgate\\apps\\server\\src\\modules\\routing\\infrastructure\\usage-meter.ts": {
-    "mtime": 1790761955.5132678,
-    "hash": "cf20c9c613c266cbd41de198164f6e38"
+    "mtime": 1790763811.2387822,
+    "hash": "9c99b551b041816e8027cac70641917f"
   },
   "E:\\AIgate\\apps\\server\\src\\modules\\routing\\infrastructure\\v1-routes.ts": {
     "mtime": 1790758844.381558,
@@ -240,8 +240,8 @@
     "hash": "cd71b8b8d57dbb986dd1efc9b3d42f06"
   },
   "E:\\AIgate\\apps\\server\\src\\modules\\usage\\usage.module.ts": {
-    "mtime": 1790761560.146404,
-    "hash": "8bf7b94b89244b25b5daf748e1453ff3"
+    "mtime": 1790764121.7851782,
+    "hash": "67cec3484e8fb9b72a84ed0ed0aa3ba3"
   },
   "E:\\AIgate\\apps\\server\\src\\modules\\usage\\domain\\pricing.ts": {
     "mtime": 1790761232.7687478,
@@ -251,6 +251,10 @@
     "mtime": 1790761201.2878911,
     "hash": "00b39ce6971982c44c40c4d977158a33"
   },
+  "E:\\AIgate\\apps\\server\\src\\modules\\usage\\infrastructure\\display-names.ts": {
+    "mtime": 1790764027.2374735,
+    "hash": "9b0c1f6d2546036c8f9e86ada1c9ed14"
+  },
   "E:\\AIgate\\apps\\server\\src\\modules\\usage\\infrastructure\\pricing.controller.ts": {
     "mtime": 1790761544.6334364,
     "hash": "125d4d5822cd21984a332f4c416cf411"
@@ -259,13 +263,21 @@
     "mtime": 1790761232.8299944,
     "hash": "fbe1f137b5767d799c52397cd1c50418"
   },
+  "E:\\AIgate\\apps\\server\\src\\modules\\usage\\infrastructure\\requests.controller.ts": {
+    "mtime": 1790764146.805226,
+    "hash": "4383ecb4dd65d2f7df5fb56e41db33c3"
+  },
+  "E:\\AIgate\\apps\\server\\src\\modules\\usage\\infrastructure\\requests.repo.ts": {
+    "mtime": 1790764097.2774427,
+    "hash": "9a6f91b793ed714c3c88b5a9277eadd2"
+  },
   "E:\\AIgate\\apps\\server\\src\\modules\\usage\\infrastructure\\usage-recorder.ts": {
-    "mtime": 1790761372.431857,
-    "hash": "ad31f093bf56d51814025ae12117f1c7"
+    "mtime": 1790763811.2397864,
+    "hash": "56a703926201aafbdffd1ebb333b9b05"
   },
   "E:\\AIgate\\apps\\server\\src\\modules\\usage\\infrastructure\\usage.controller.ts": {
-    "mtime": 1790761519.6974516,
-    "hash": "15d2e73b9b2280a3b39328e9e0209fd7"
+    "mtime": 1790764059.9775758,
+    "hash": "68ca7f60d0e8fed7981aa8e5c441d9e5"
   },
   "E:\\AIgate\\apps\\server\\src\\modules\\usage\\infrastructure\\usage.repo.ts": {
     "mtime": 1790761447.5344653,
@@ -400,8 +412,8 @@
     "hash": "f9b641aeb605664413a4885ef2f87dc1"
   },
   "E:\\AIgate\\apps\\server\\test\\usage.test.mjs": {
-    "mtime": 1790762066.8032854,
-    "hash": "53fcf2e7de6805bdb5b383939e5eff39"
+    "mtime": 1790764218.5800512,
+    "hash": "84dea0b30d44e6133e0c1d323c781f2d"
   },
   "E:\\AIgate\\apps\\server\\test\\vertex-lane.test.mjs": {
     "mtime": 1790433983.4333978,
@@ -420,12 +432,12 @@
     "hash": "ca0d22070a9ffbdd347e5d27d3f04037"
   },
   "E:\\AIgate\\apps\\web\\src\\app\\navigation.ts": {
-    "mtime": 1790304403.783569,
-    "hash": "56301e6c68288eabaedccc669b763140"
+    "mtime": 1790764398.310307,
+    "hash": "bf727fa0e4d3e53720df42748d6d823a"
   },
   "E:\\AIgate\\apps\\web\\src\\app\\screens.tsx": {
-    "mtime": 1790304403.789567,
-    "hash": "0a59c813222934f8e19423170ba9c6a0"
+    "mtime": 1790764398.310307,
+    "hash": "8d9792f410c40b5e46a82019d7c119e9"
   },
   "E:\\AIgate\\apps\\web\\src\\app\\shell.tsx": {
     "mtime": 1790670075.9916475,
@@ -528,20 +540,24 @@
     "hash": "b502ed8f6753c46c07e63c3af1a4b94a"
   },
   "E:\\AIgate\\apps\\web\\src\\features\\traffic\\api.ts": {
-    "mtime": 1790762443.0800214,
-    "hash": "8bcaf41a5d532dfd03cbde6f74c5a1a5"
+    "mtime": 1790764299.6727307,
+    "hash": "de6e306840965d40f692b530528f937a"
   },
   "E:\\AIgate\\apps\\web\\src\\features\\traffic\\charts.tsx": {
-    "mtime": 1790762455.9877875,
-    "hash": "f50a23516ece86d7ca069fd0ceddc867"
+    "mtime": 1790763281.1816032,
+    "hash": "5a76d55b9592e97ed003cccd80d9f0e1"
   },
   "E:\\AIgate\\apps\\web\\src\\features\\traffic\\pricing-modal.tsx": {
     "mtime": 1790762687.0640397,
     "hash": "1bdf9b34d0f44f5562deca5b1622d124"
   },
+  "E:\\AIgate\\apps\\web\\src\\features\\traffic\\requests.tsx": {
+    "mtime": 1790764414.1578612,
+    "hash": "25f0e21753abbbd93a3a47b262580007"
+  },
   "E:\\AIgate\\apps\\web\\src\\features\\traffic\\screens.tsx": {
-    "mtime": 1790762443.07902,
-    "hash": "219f5ad13760134718db60ae43eda1f3"
+    "mtime": 1790764446.066156,
+    "hash": "b1b094fba660f9219d46755513d017cb"
   },
   "E:\\AIgate\\apps\\web\\src\\features\\traffic\\usage-format.test.mjs": {
     "mtime": 1790762235.2957604,
@@ -552,20 +568,20 @@
     "hash": "9d2bca19e5dbf1918e444b43695cc890"
   },
   "E:\\AIgate\\apps\\web\\src\\features\\traffic\\usage.tsx": {
-    "mtime": 1790762614.4718182,
-    "hash": "40fa09dfc8e14fc7bd5cdd8d0b01d573"
+    "mtime": 1790763281.182607,
+    "hash": "c7612b3a8441f8b867bbe3ab14e6671f"
   },
   "E:\\AIgate\\apps\\web\\src\\shared\\api.ts": {
     "mtime": 1790753503.7500932,
     "hash": "286731817e55b99915dbc512865a155a"
   },
   "E:\\AIgate\\apps\\web\\src\\shared\\errors.test.mjs": {
-    "mtime": 1790762522.6837635,
-    "hash": "77a5de3a764d8b94fb2ef120c1f4aab4"
+    "mtime": 1790764473.7562315,
+    "hash": "8ac5859e8e348241809c333a785a6a11"
   },
   "E:\\AIgate\\apps\\web\\src\\shared\\errors.ts": {
-    "mtime": 1790762443.07902,
-    "hash": "dd1aaac5e216ca4557ff42de3f3d754b"
+    "mtime": 1790764473.7552361,
+    "hash": "dd442ddb577cdf8c2318dbe31bbc9975"
   },
   "E:\\AIgate\\apps\\web\\src\\shared\\toast.tsx": {
     "mtime": 1790245061.8207188,
@@ -679,6 +695,10 @@
     "mtime": 1790760948.991055,
     "hash": "58b92d4d4387736b7d679ebc891125e6"
   },
+  "E:\\AIgate\\packages\\database\\drizzle\\0023_usage_requests.sql": {
+    "mtime": 1790763639.0303438,
+    "hash": "5b801bc4037c16e688262778fbb5144d"
+  },
   "E:\\AIgate\\packages\\database\\spike\\conformance.mjs": {
     "mtime": 1790328869.1393242,
     "hash": "332fdf50029bb84f30073b9e6d8da993"
@@ -696,8 +716,8 @@
     "hash": "7f7ebe264d73de0609eb6c6f88a03002"
   },
   "E:\\AIgate\\packages\\database\\src\\index.ts": {
-    "mtime": 1790760947.0330076,
-    "hash": "85707c52a9f3b173284eb11de3b17e28"
+    "mtime": 1790763636.8571434,
+    "hash": "5d177651a3182044ca1d4bbba2d58956"
   },
   "E:\\AIgate\\packages\\database\\src\\schema\\apikeys.ts": {
     "mtime": 1790332582.5071466,
@@ -728,12 +748,12 @@
     "hash": "52ba676ee1d38b1221f566aa5fbe636b"
   },
   "E:\\AIgate\\packages\\database\\src\\schema\\usage.ts": {
-    "mtime": 1790760947.0049393,
-    "hash": "c4622fa04eaad52dc68d978815855c5c"
+    "mtime": 1790763636.8571434,
+    "hash": "a97f740d10953f176c0d8bee6c0fc6e3"
   },
   "E:\\AIgate\\packages\\database\\test\\conformance.test.mjs": {
-    "mtime": 1790760975.0213907,
-    "hash": "489af6eb2e6187633d3b84952f6a9ac1"
+    "mtime": 1790763636.8626897,
+    "hash": "423a82a18a3dc4e502c129b4f8433147"
   },
   "E:\\AIgate\\packages\\database\\test\\fixture\\schema.ts": {
     "mtime": 1790328098.6740665,
@@ -1180,8 +1200,8 @@
     "hash": "4d090f5fa7e890f878973a96545e8f07"
   },
   "E:\\AIgate\\CLAUDE.md": {
-    "mtime": 1790762819.6955628,
-    "hash": "2916f8bd38c3a92a65e562e0d4208929"
+    "mtime": 1790764605.153182,
+    "hash": "6a277bc74202566e7b9ee7193a1ebb0e"
   },
   "E:\\AIgate\\pnpm-workspace.yaml": {
     "mtime": 1790328185.2460623,
@@ -1200,11 +1220,11 @@
     "hash": "6da1d64604d3e3c1a13b0bcb9f7da2fc"
   },
   "E:\\AIgate\\docs\\PROGRESS_HANDOFF.md": {
-    "mtime": 1790762090.4187913,
-    "hash": "d7d0242f7e6f4856912b7fae36579599"
+    "mtime": 1790763593.7075944,
+    "hash": "c42f8779c3d6facc0ec666986a8e5c11"
   },
   "E:\\AIgate\\docs\\PROJECT_MAP.md": {
-    "mtime": 1790759943.6197581,
+    "mtime": 1790762919.2032223,
     "hash": "fd8792dd69dbf9db6c4fefd129957bf0"
   },
   "E:\\AIgate\\docs\\contracts\\capacity-adapter.md": {
@@ -1340,12 +1360,12 @@
     "hash": "799f3f6b0d2b87891f7df23faf0a61aa"
   },
   "E:\\AIgate\\docs\\contracts\\usage.md": {
-    "mtime": 1790760804.4478717,
-    "hash": "892d143a810a76bee44372723b9d1ac2"
+    "mtime": 1790764414.1588607,
+    "hash": "94131d26e65151e68d5f8207549c6fdd"
   },
   "E:\\AIgate\\docs\\design\\API_UI_MAP.md": {
-    "mtime": 1790762819.6915083,
-    "hash": "9373ccd7eb9b890ca0ba630710c666a6"
+    "mtime": 1790764605.1521828,
+    "hash": "4fc69502426c6bb77bfe2e9d68041883"
   },
   "E:\\AIgate\\docs\\design\\DESIGN.md": {
     "mtime": 1790066455.8348658,
@@ -1508,8 +1528,8 @@
     "hash": "af75cf3ef7009d5474a69f6db6a991b0"
   },
   "E:\\AIgate\\docs\\discovery\\feature-matrix\\08-usage-quota.yaml": {
-    "mtime": 1790760918.3755476,
-    "hash": "520fc7a5b10ccb05aeeb3cfd3cd42b77"
+    "mtime": 1790763593.7065992,
+    "hash": "e3b79fdb53cf9184feff53c460e0b2dd"
   },
   "E:\\AIgate\\docs\\discovery\\feature-matrix\\09-media-providers.yaml": {
     "mtime": 1790759310.975472,
@@ -1586,6 +1606,10 @@
   "E:\\AIgate\\plans\\plan_2026-09-30_SP24a.md": {
     "mtime": 1790760604.629676,
     "hash": "dc90a05923ab0688c432fbba551083c7"
+  },
+  "E:\\AIgate\\plans\\plan_2026-09-30_SP24b.md": {
+    "mtime": 1790763507.8142536,
+    "hash": "2665f310a5fd25703d5b8a887cc6382e"
   },
   "E:\\AIgate\\docs\\design\\stitch-export\\shot\\authflow-modals.png": {
     "mtime": 1790069653.9838612,

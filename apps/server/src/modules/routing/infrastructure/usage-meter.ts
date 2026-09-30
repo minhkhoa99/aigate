@@ -1,4 +1,4 @@
-import { EngineError, UnsupportedFeatureError, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type StreamChunk, type TokenUsage } from "@aigate/engine";
+import { EngineError, readBoundedText, UnsupportedFeatureError, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type ExecCtx, type HttpRequest, type HttpResponse, type HttpTransportPort, type StreamChunk, type TokenUsage } from "@aigate/engine";
 import { estimateTokens } from "../../usage/domain/usage.js";
 import type { UsageCall, UsageRecorder } from "../../usage/infrastructure/usage-recorder.js";
 
@@ -85,4 +85,40 @@ export function meter(adapter: AIProviderPort, call: UsageCall, recorder: UsageR
       }
     },
   };
+}
+
+// SP24b media lanes: the usage block an OpenAI-style answer carries (embeddings, some image APIs), else nothing.
+export function usageOfBody(text: string): TokenUsage {
+  try {
+    const root: unknown = JSON.parse(text);
+    const usage = typeof root === "object" && root !== null && "usage" in root ? root.usage : undefined;
+    if (typeof usage !== "object" || usage === null) return NONE;
+    const count = (key: string): number => {
+      const value: unknown = key in usage ? Reflect.get(usage, key) : undefined;
+      return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+    };
+    return { inputTokens: count("prompt_tokens") || count("input_tokens"), outputTokens: count("completion_tokens") || count("output_tokens") };
+  } catch {
+    return NONE;
+  }
+}
+
+const MAX_MEDIA_TEXT = 16 * 1024 * 1024;
+
+// One media call: sent, read (bounded), and recorded as a usage event whatever its outcome.
+export async function meteredSend(transport: HttpTransportPort, recorder: UsageRecorder, call: UsageCall, http: HttpRequest, ctx: ExecCtx): Promise<{ response: HttpResponse; text: string }> {
+  const started = Date.now();
+  const end = recorder.begin(call);
+  try {
+    const response = await transport.send(http, ctx);
+    const text = await readBoundedText(response.body, MAX_MEDIA_TEXT);
+    const ok = response.status >= 200 && response.status < 300;
+    recorder.record(call, { status: ok ? "success" : "error", errorCode: ok ? null : `HTTP_${response.status}`, usage: ok ? usageOfBody(text) : NONE, estimated: false, latencyMs: Date.now() - started, ttftMs: null });
+    return { response, text };
+  } catch (error) {
+    recorder.record(call, { status: "error", errorCode: abortCode(ctx.signal) ?? codeOf(error), usage: NONE, estimated: false, latencyMs: Date.now() - started, ttftMs: null });
+    throw error;
+  } finally {
+    end();
+  }
 }

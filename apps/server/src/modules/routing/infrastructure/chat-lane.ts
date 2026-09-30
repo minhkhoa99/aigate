@@ -13,7 +13,7 @@ import {
   parseAnthropicMessagesRequest, parseGeminiGenerateRequest, parseGeminiPath, parseOpenAIChatRequest, parseOpenAIResponsesRequest,
   responsesClientGetsObject, responsesRequestFor, ResponsesStreamEncoder, toAnthropicMessage, toGeminiResponse, toOpenAIChatCompletion, toOpenAIError,
   splitThinkingSuffix, toResponsesObject, UnsupportedFeatureError, withClaudeCodePrompt, withConnection, withThinking, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Capability, type Credential,
-  type ExecCtx, type GeminiRoute, type HttpTransportPort, type OpenAIError, type ProviderDescriptor, type ProxyConfig, type StreamChunk,
+  type ExecCtx, type GeminiRoute, type HttpRequest, type HttpTransportPort, type OpenAIError, type ProviderDescriptor, type ProxyConfig, type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
 import type { Settings } from "../../settings/domain/settings.js";
@@ -32,10 +32,10 @@ import { modelFit, needsMedia, reorderByCapabilities, trimHistory, widen, type W
 import { applyTokenSaver, headroomInput } from "../domain/token-saver.js";
 import { collectPanel, judgeRequest, MAX_COMBO_DEPTH, memberFailover, panelRequest, type Combo } from "../domain/combo.js";
 import { CapacityPoolsRepository } from "./capacity-pools.repo.js";
-import { UsageRecorder } from "../../usage/infrastructure/usage-recorder.js";
+import { UsageRecorder, type UsageCall } from "../../usage/infrastructure/usage-recorder.js";
 import { CombosRepository } from "./combos.repo.js";
 import { PxpipeService } from "./pxpipe.service.js";
-import { meter } from "./usage-meter.js";
+import { meter, meteredSend } from "./usage-meter.js";
 
 // The /v1 chat lane (docs/contracts/chat-lane.md): key gate, parse, resolve, adapter, stream.
 
@@ -95,6 +95,7 @@ export function errorOf(error: unknown): OpenAIError {
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+const modelOf = (body: unknown): string | null => (isObject(body) && typeof body.model === "string" ? body.model : null);
 
 // The body stays opaque for forwarding. Only the small model field is read, before any binary file part.
 function multipartField(body: Uint8Array, name: string): string | undefined {
@@ -313,7 +314,6 @@ const OPENAI_RESPONSES_COMPACT: ClientProtocol = {
 @Injectable()
 export class ChatLane {
   private readonly logger = new Logger("ChatLane");
-  private readonly keyIds = new WeakMap<FastifyRequest, string>();
 
   constructor(
     private readonly settings: SettingsRepository,
@@ -396,6 +396,8 @@ export class ChatLane {
   // SP22: OpenAI-compatible embedding providers share the chat connection, proxy, and credential lifecycle.
   async embeddings(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     const requestId = randomUUID();
+    const startedAt = Date.now();
+    let errorCode: string | null = null;
     const client = new AbortController();
     reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
     const budget = deadline(REQUEST_BUDGET_MS, `The request did not finish within ${REQUEST_BUDGET_MS / 1000} s`);
@@ -430,10 +432,8 @@ export class ChatLane {
           : { model: geminiModel, content: { parts: [{ text: body.input }] }, ...dimensions };
       } else throw new GatewayError(400, "invalid_request_error", "embedding_provider_unsupported", `${target.provider.name} has no supported embeddings endpoint.`);
       const headers = { ...target.provider.headers, "content-type": "application/json", [target.provider.auth.header]: target.provider.auth.scheme === "raw" ? target.credential.apiKey : `Bearer ${target.credential.apiKey}` };
-      const upstream = await this.transport.send({ method: "POST", url: endpoint, headers, body: JSON.stringify(payload), timeoutMs: REQUEST_BUDGET_MS }, {
-        signal, requestId, proxy: target.proxy,
-      });
-      const text = await readBoundedText(upstream.body, 16 * 1024 * 1024);
+      const { response: upstream, text } = await meteredSend(this.transport, this.usage, this.mediaCall(request, requestId, target),
+        { method: "POST", url: endpoint, headers, body: JSON.stringify(payload), timeoutMs: REQUEST_BUDGET_MS }, { signal, requestId, proxy: target.proxy });
       if (upstream.status >= 200 && upstream.status < 300 && target.provider.protocol === "gemini") {
         const result: unknown = JSON.parse(text);
         const rows = isObject(result) && Array.isArray(result.embeddings) ? result.embeddings.filter(isObject)
@@ -449,15 +449,19 @@ export class ChatLane {
       if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
       this.logUnexpected(error, requestId);
       const { status, body } = errorOf(error);
+      errorCode = body.error.code;
       reply.code(status).header("cache-control", "no-store").send(body);
     } finally {
       budget.clear();
+      this.finishRequest(request, reply, { requestId, startedAt, requestedModel: this.requestedOf(request), stream: false, errorCode, clientGone: client.signal.aborted });
     }
   }
 
   // SP22: OpenAI-compatible image generation, with the same bounded connection lifecycle as embeddings.
   async imageGeneration(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     const requestId = randomUUID();
+    const startedAt = Date.now();
+    let errorCode: string | null = null;
     const client = new AbortController();
     reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
     const budget = deadline(REQUEST_BUDGET_MS, `The request did not finish within ${REQUEST_BUDGET_MS / 1000} s`);
@@ -480,18 +484,18 @@ export class ChatLane {
       const upstreamBody: Record<string, unknown> = { model: descriptor?.upstreamModelId ?? target.request.model, prompt: body.prompt };
       for (const key of ["n", "size", "quality", "style", "response_format"] as const) if (body[key] !== undefined) upstreamBody[key] = body[key];
       const headers = { ...target.provider.headers, "content-type": "application/json", [target.provider.auth.header]: target.provider.auth.scheme === "raw" ? target.credential.apiKey : `Bearer ${target.credential.apiKey}` };
-      const upstream = await this.transport.send({ method: "POST", url: endpoint, headers, body: JSON.stringify(upstreamBody), timeoutMs: REQUEST_BUDGET_MS }, {
-        signal, requestId, proxy: target.proxy,
-      });
-      const text = await readBoundedText(upstream.body, 16 * 1024 * 1024);
+      const { response: upstream, text } = await meteredSend(this.transport, this.usage, this.mediaCall(request, requestId, target),
+        { method: "POST", url: endpoint, headers, body: JSON.stringify(upstreamBody), timeoutMs: REQUEST_BUDGET_MS }, { signal, requestId, proxy: target.proxy });
       reply.code(upstream.status).header("cache-control", "no-store").header("content-type", upstream.headers["content-type"] ?? "application/json").send(text);
     } catch (error) {
       if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
       this.logUnexpected(error, requestId);
       const { status, body } = errorOf(error);
+      errorCode = body.error.code;
       reply.code(status).header("cache-control", "no-store").send(body);
     } finally {
       budget.clear();
+      this.finishRequest(request, reply, { requestId, startedAt, requestedModel: this.requestedOf(request), stream: false, errorCode, clientGone: client.signal.aborted });
     }
   }
 
@@ -505,6 +509,8 @@ export class ChatLane {
     const model = multipartField(body, "model");
     if (!model || !multipartField(body, "file")) return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_transcription_request", "Transcription requires model and file multipart fields."));
     const requestId = randomUUID();
+    const startedAt = Date.now();
+    let errorCode: string | null = null;
     const client = new AbortController();
     reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
     const budget = deadline(REQUEST_BUDGET_MS, `The request did not finish within ${REQUEST_BUDGET_MS / 1000} s`);
@@ -516,17 +522,17 @@ export class ChatLane {
       const endpoint = target.provider.chatUrl.replace(/\/chat\/completions(?:\?.*)?$/, "/audio/transcriptions");
       if (endpoint === target.provider.chatUrl) throw new GatewayError(400, "invalid_request_error", "stt_provider_unsupported", `${target.provider.name} has no configured transcription endpoint.`);
       const headers = { ...target.provider.headers, "content-type": contentType, [target.provider.auth.header]: target.provider.auth.scheme === "raw" ? target.credential.apiKey : `Bearer ${target.credential.apiKey}` };
-      const upstream = await this.transport.send({ method: "POST", url: endpoint, headers, body, timeoutMs: REQUEST_BUDGET_MS }, {
-        signal: AbortSignal.any([client.signal, budget.signal]), requestId, proxy: target.proxy,
-      });
-      const text = await readBoundedText(upstream.body, 16 * 1024 * 1024);
+      const { response: upstream, text } = await meteredSend(this.transport, this.usage, this.mediaCall(request, requestId, target),
+        { method: "POST", url: endpoint, headers, body, timeoutMs: REQUEST_BUDGET_MS }, { signal: AbortSignal.any([client.signal, budget.signal]), requestId, proxy: target.proxy });
       reply.code(upstream.status).header("cache-control", "no-store").header("content-type", upstream.headers["content-type"] ?? "application/json").send(text);
     } catch (error) {
       if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
       this.logUnexpected(error, requestId);
       const { status, body: response } = errorOf(error);
+      errorCode = response.error.code;
       reply.code(status).header("cache-control", "no-store").send(response);
     } finally {
+      this.finishRequest(request, reply, { requestId, startedAt, requestedModel: this.requestedOf(request), stream: false, errorCode, clientGone: client.signal.aborted });
       budget.clear();
     }
   }
@@ -543,6 +549,8 @@ export class ChatLane {
     const maxResults = typeof body.max_results === "number" && Number.isInteger(body.max_results) ? body.max_results : 5;
     if (maxResults < 1 || maxResults > 20) return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_search_request", "max_results must be an integer from 1 to 20."));
     const requestId = randomUUID();
+    const startedAt = Date.now();
+    let errorCode: string | null = null;
     const started = Date.now();
     const client = new AbortController();
     reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
@@ -566,12 +574,12 @@ export class ChatLane {
       else if (service.search.format === "tavily") payload = { query, max_results: maxResults, topic: type === "news" ? "news" : "general" };
       else if (service.search.format === "exa") payload = { query, numResults: maxResults, type: "auto", text: true, highlights: true, ...(type === "news" ? { category: "news" } : {}) };
       else payload = { query, max_results: maxResults };
-      const { status, raw } = await this.mediaResponse(service.id, `websearch:${service.id}`, requestId, signal, (target) => {
+      const { status, raw } = await this.mediaResponse(service.id, `websearch:${service.id}`, requestId, signal, { ...this.usageOf(request), model: "search" }, (target) => {
         const key = target.credential.apiKey;
         const auth: Record<string, string> = service.authHeader === "authorization" ? { authorization: `Bearer ${key}` } : { [service.authHeader]: key };
         const searchUrl = service.search!.format === "searchapi" ? url.replace("__key__", encodeURIComponent(key)) : url;
-        return this.transport.send({ method: ["brave", "searchapi", "youcom", "xquik"].includes(service.search!.format) ? "GET" : "POST", url: searchUrl,
-          headers: { accept: "application/json", ...auth, ...(payload ? { "content-type": "application/json" } : {}) }, ...(payload ? { body: JSON.stringify(payload) } : {}), timeoutMs: 15_000 }, { signal, requestId, proxy: target.proxy });
+        return { method: ["brave", "searchapi", "youcom", "xquik"].includes(service.search!.format) ? "GET" : "POST", url: searchUrl,
+          headers: { accept: "application/json", ...auth, ...(payload ? { "content-type": "application/json" } : {}) }, ...(payload ? { body: JSON.stringify(payload) } : {}), timeoutMs: 15_000 };
       });
       if (status < 200 || status >= 300) return void reply.code(status).header("cache-control", "no-store").send(raw);
       const parsed: unknown = JSON.parse(raw);
@@ -601,8 +609,10 @@ export class ChatLane {
       if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
       this.logUnexpected(error, requestId);
       const { status, body: response } = errorOf(error);
+      errorCode = response.error.code;
       reply.code(status).header("cache-control", "no-store").send(response);
-    } finally { budget.clear(); }
+    } finally {
+      this.finishRequest(request, reply, { requestId, startedAt, requestedModel: this.requestedOf(request), stream: false, errorCode, clientGone: client.signal.aborted }); budget.clear(); }
   }
 
   // SP22: the requested page is checked before a remote extraction provider is asked to fetch it.
@@ -614,6 +624,8 @@ export class ChatLane {
     const maxCharacters = typeof body.max_characters === "number" && Number.isInteger(body.max_characters) ? body.max_characters : 100_000;
     if (maxCharacters < 1 || maxCharacters > 200_000) return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_fetch_request", "max_characters must be an integer from 1 to 200000."));
     const requestId = randomUUID();
+    const startedAt = Date.now();
+    let errorCode: string | null = null;
     const started = Date.now();
     const client = new AbortController();
     reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
@@ -627,10 +639,10 @@ export class ChatLane {
         : service.fetch.format === "tavily" ? { urls: [url], extract_depth: "basic" }
         : service.fetch.format === "exa" ? { ids: [url], text: true }
         : { url, format };
-      const { status, raw } = await this.mediaResponse(service.id, `webfetch:${service.id}`, requestId, signal, (target) => {
+      const { status, raw } = await this.mediaResponse(service.id, `webfetch:${service.id}`, requestId, signal, { ...this.usageOf(request), model: "fetch" }, (target) => {
         const key = target.credential.apiKey;
         const auth: Record<string, string> = service.authHeader === "authorization" ? { authorization: `Bearer ${key}` } : { [service.authHeader]: key };
-        return this.transport.send({ method: "POST", url: service.fetch!.url, headers: { "content-type": "application/json", ...auth }, body: JSON.stringify(payload), timeoutMs: 30_000 }, { signal, requestId, proxy: target.proxy });
+        return { method: "POST", url: service.fetch!.url, headers: { "content-type": "application/json", ...auth }, body: JSON.stringify(payload), timeoutMs: 30_000 };
       });
       if (status < 200 || status >= 300) return void reply.code(status).header("cache-control", "no-store").send(raw);
       const parsed: unknown = service.fetch.format === "jina" ? raw : JSON.parse(raw);
@@ -643,8 +655,10 @@ export class ChatLane {
       if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
       this.logUnexpected(error, requestId);
       const { status, body: response } = errorOf(error);
+      errorCode = response.error.code;
       reply.code(status).header("cache-control", "no-store").send(response);
-    } finally { budget.clear(); }
+    } finally {
+      this.finishRequest(request, reply, { requestId, startedAt, requestedModel: this.requestedOf(request), stream: false, errorCode, clientGone: client.signal.aborted }); budget.clear(); }
   }
 
   // SP22: xAI's asynchronous video jobs. Other catalog video entries lack a usable video endpoint (matrix records that bug).
@@ -656,6 +670,8 @@ export class ChatLane {
       return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_video_request", "Video generation requires a JSON body with a model."));
     }
     const requestId = randomUUID();
+    const startedAt = Date.now();
+    let errorCode: string | null = null;
     const client = new AbortController();
     reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
     const budget = deadline(120_000, "The video upstream did not respond within 120 s");
@@ -669,17 +685,20 @@ export class ChatLane {
         ...target.provider.headers, "content-type": "application/json", [target.provider.auth.header]: target.provider.auth.scheme === "raw" ? target.credential.apiKey : `Bearer ${target.credential.apiKey}`,
         ...(typeof request.headers["idempotency-key"] === "string" ? { "idempotency-key": request.headers["idempotency-key"] } : {}),
       };
-      const upstream = await this.transport.send({ method: "POST", url: target.provider.chatUrl.replace(/\/chat\/completions(?:\?.*)?$/, `/videos/${action}`), headers,
-        body: JSON.stringify({ ...body, model: target.request.model }), timeoutMs: 120_000 }, { signal, requestId, proxy: target.proxy });
-      const text = await readBoundedText(upstream.body, 16 * 1024 * 1024);
+      const { response: upstream, text } = await meteredSend(this.transport, this.usage, this.mediaCall(request, requestId, target), {
+        method: "POST", url: target.provider.chatUrl.replace(/\/chat\/completions(?:\?.*)?$/, `/videos/${action}`), headers,
+        body: JSON.stringify({ ...body, model: target.request.model }), timeoutMs: 120_000,
+      }, { signal, requestId, proxy: target.proxy });
       reply.code(upstream.status).header("cache-control", "no-store").header("content-type", upstream.headers["content-type"] ?? "application/json")
         .header("x-aigate-connection-id", target.connection.id).send(text);
     } catch (error) {
       if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
       this.logUnexpected(error, requestId);
       const { status, body: response } = errorOf(error);
+      errorCode = response.error.code;
       reply.code(status).header("cache-control", "no-store").send(response);
     } finally {
+      this.finishRequest(request, reply, { requestId, startedAt, requestedModel: this.requestedOf(request), stream: false, errorCode, clientGone: client.signal.aborted });
       budget.clear();
     }
   }
@@ -688,6 +707,8 @@ export class ChatLane {
     const id = request.params.id;
     if (!/^[A-Za-z0-9_-]{1,200}$/.test(id)) return void this.fail(reply, new GatewayError(400, "invalid_request_error", "invalid_video_id", "Invalid video request id."));
     const requestId = randomUUID();
+    const startedAt = Date.now();
+    let errorCode: string | null = null;
     const client = new AbortController();
     reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
     const budget = deadline(120_000, "The video upstream did not respond within 120 s");
@@ -712,14 +733,20 @@ export class ChatLane {
       if (client.signal.aborted) { reply.hijack(); reply.raw.destroy(); return; }
       this.logUnexpected(error, requestId);
       const { status, body } = errorOf(error);
+      errorCode = body.error.code;
       reply.code(status).header("cache-control", "no-store").send(body);
     } finally {
       budget.clear();
+      this.finishRequest(request, reply, { requestId, startedAt, requestedModel: this.requestedOf(request), stream: false, errorCode, clientGone: client.signal.aborted });
     }
   }
 
   private async serve(request: FastifyRequest, reply: FastifyReply, protocol: ClientProtocol): Promise<void> {
     const requestId = randomUUID();
+    const startedAt = Date.now();
+    let requestedModel = modelOf(request.body);
+    let stream = false;
+    let errorCode: string | null = null;
     const client = new AbortController();
     reply.raw.once("close", () => {
       if (!reply.raw.writableFinished) client.abort(new ClientGone());
@@ -733,6 +760,8 @@ export class ChatLane {
       }
       const accept = request.headers.accept;
       const parsed = protocol.parse(request.body, typeof accept === "string" ? accept : undefined);
+      requestedModel = parsed.request.model;
+      stream = parsed.request.stream === true;
       const settings = await this.settings.get();
       const tokenHeader = request.headers["x-aigate-token-saver"];
       const tokenSaverOptOut = typeof tokenHeader === "string" && tokenHeader.toLowerCase() === "off";
@@ -744,7 +773,7 @@ export class ChatLane {
       const call: Call = {
         parsed, protocol, reply, requestId, signal: AbortSignal.any([client.signal, budget.signal]), rewritten: savedRequest !== parsed.request,
         pxpipe: { enabled: settings.tokenSaverEnabled && settings.pxpipeEnabled && !tokenSaverOptOut, minChars: settings.pxpipeMinChars, timeoutMs: settings.pxpipeTimeoutMs },
-        usage: { endpoint: request.routeOptions.url ?? request.url.split("?", 1)[0], apiKeyId: this.keyIds.get(request) ?? null },
+        usage: this.usageOf(request),
       };
       await this.route(call, savedRequest, async (target, adapter, credential) => {
         if (!target.request.stream) {
@@ -763,10 +792,12 @@ export class ChatLane {
       }
       this.logUnexpected(error, requestId);
       const { status, body } = errorOf(error);
+      errorCode = body.error.code;
       if (error instanceof GatewayError && error.retryAfter) reply.header("retry-after", Math.max(1, Math.ceil(error.retryAfter / 1000)));
       reply.code(status).header("cache-control", "no-store").send(body);
     } finally {
       budget.clear();
+      this.finishRequest(request, reply, { requestId, startedAt, requestedModel, stream, errorCode, clientGone: client.signal.aborted });
     }
   }
 
@@ -880,11 +911,7 @@ export class ChatLane {
           },
         };
       }
-      const usageCall = {
-        requestId: call.requestId, provider: target.provider.id, model: splitThinkingSuffix(target.request.model).model,
-        connectionId: target.connection.id === "noauth" ? null : target.connection.id, ...call.usage,
-      };
-      const adapter = meter(createAdapter(target.provider, transport), usageCall, this.usage);
+      const adapter = meter(createAdapter(target.provider, transport), { ...this.callOf(call.requestId, target), ...call.usage }, this.usage);
       try {
         const result = await this.withRefresh(target, (credential) => deliver(target, adapter, credential, call), () => !call.reply.sent && !call.signal.aborted);
         await this.connections.clearLock(target.connection.id, splitThinkingSuffix(target.request.model).model);
@@ -1034,7 +1061,7 @@ export class ChatLane {
   private async checkKey(key: string | undefined, request?: FastifyRequest): Promise<GatewayError | undefined> {
     if (!key) return new GatewayError(401, "invalid_request_error", "missing_api_key", MISSING_KEY);
     const id = await this.keys.activeId(key);
-    if (id && request) this.keyIds.set(request, id);
+    if (id && request) this.usage.attribute(request, id);
     if (!id) {
       return new GatewayError(401, "invalid_request_error", "invalid_api_key", "The API key is not valid or was disabled. Check it in AIGate: Gateway → Endpoint & Keys.");
     }
@@ -1122,8 +1149,8 @@ export class ChatLane {
 
   // Search and fetch share their normal account rotation, but lock only the lane-specific key.
   private async mediaResponse(
-    serviceId: string, lockKey: string, requestId: string, signal: AbortSignal,
-    send: (target: { credential: StoredCredential; proxy?: ProxyConfig }) => ReturnType<HttpTransportPort["send"]>,
+    serviceId: string, lockKey: string, requestId: string, signal: AbortSignal, usage: { endpoint: string; apiKeyId: string | null; model: string },
+    build: (target: { credential: StoredCredential; proxy?: ProxyConfig }) => HttpRequest,
   ): Promise<{ status: number; raw: string }> {
     const service = mediaService(serviceId)!;
     const credentialProviderId = service.credentialProviderId ?? service.id;
@@ -1132,8 +1159,8 @@ export class ChatLane {
     for (;;) {
       const target = await this.mediaCredential(serviceId, lockKey, excluded);
       try {
-        const response = await send(target);
-        const raw = await readBoundedText(response.body, 16 * 1024 * 1024);
+        const call: UsageCall = { requestId, provider: service.id, connectionId: target.credential.id, ...usage };
+        const { response, text: raw } = await meteredSend(this.transport, this.usage, call, build(target), { signal, requestId, proxy: target.proxy });
         const cooldown = mediaCooldown(response.status);
         if (!cooldown || (await this.connections.activeCount(credentialProviderId)) < 2) {
           if (response.status >= 200 && response.status < 300) await this.connections.clearLock(target.credential.id, lockKey);
@@ -1148,6 +1175,32 @@ export class ChatLane {
         excluded.add(target.credential.id);
       }
     }
+  }
+
+  // SP24b (docs/contracts/usage.md "Requests"): the route and key a request is attributed to.
+  private usageOf(request: FastifyRequest): { endpoint: string; apiKeyId: string | null } {
+    return { endpoint: request.routeOptions.url ?? request.url.split("?", 1)[0], apiKeyId: this.usage.keyOf(request) };
+  }
+
+  private callOf(requestId: string, target: Target): Omit<UsageCall, "endpoint" | "apiKeyId"> {
+    return { requestId, provider: target.provider.id, model: splitThinkingSuffix(target.request.model).model, connectionId: target.connection.id === "noauth" ? null : target.connection.id };
+  }
+
+  private mediaCall(request: FastifyRequest, requestId: string, target: Target): UsageCall {
+    return { ...this.callOf(requestId, target), ...this.usageOf(request) };
+  }
+
+  // The model the client named: the JSON model field, a search or fetch provider, or the multipart model.
+  private requestedOf(request: FastifyRequest): string | null {
+    const body = request.body;
+    if (Buffer.isBuffer(body)) return multipartField(body, "model") ?? null;
+    if (!isObject(body)) return null;
+    return typeof body.model === "string" ? body.model : typeof body.provider === "string" ? body.provider : null;
+  }
+
+  // One request row when a handler ends; a client that left is recorded as 499, as proxies log it.
+  private finishRequest(request: FastifyRequest, reply: FastifyReply, row: { requestId: string; startedAt: number; requestedModel: string | null; stream: boolean; errorCode: string | null; clientGone: boolean }): void {
+    this.usage.finish({ ...row, ...this.usageOf(request), httpStatus: row.clientGone ? 499 : reply.raw.statusCode });
   }
 
   private modelNotFound(ref: string): GatewayError {

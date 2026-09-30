@@ -44,3 +44,8 @@ test("voice codes name the provider's failure and the next step (docs/contracts/
 test("a refused live usage stream says why and what to do", () => {
   assert.match(toProblem(new ApiError(503, "USAGE_STREAM_BUSY", "")).message, /Close another tab, then reload/);
 });
+
+test("a missing request says why it is gone (docs/contracts/usage.md)", () => {
+  assert.equal(toProblem(new ApiError(404, "NOT_FOUND", "x", { message: "No request with this id: it was never recorded or is past the usage retention." })).message,
+    "No request with this id: it was never recorded or is past the usage retention.");
+});

@@ -15,6 +15,7 @@ import { HTTP_TRANSPORT } from "../../transport/transport.token.js";
 import { ProxyPoolsRepository } from "../../transport/infrastructure/proxy-pools.repo.js";
 import { MAX_COMBO_DEPTH, memberFailover } from "../domain/combo.js";
 import { CHAT_LIMITS, ClientGone, deadline, errorOf, exhausted, fallbackCooldown, GatewayError, mediaCooldown, REQUEST_BUDGET_MS, type ChatLimits } from "./chat-lane.js";
+import { UsageRecorder } from "../../usage/infrastructure/usage-recorder.js";
 import { CombosRepository } from "./combos.repo.js";
 
 // docs/contracts/speech.md: POST /v1/audio/speech, GET /v1/audio/voices, and the synthesis the dashboard preview shares.
@@ -35,6 +36,8 @@ export interface SpeechSpec {
   readonly language?: string;
   readonly style?: string;
   readonly options: Readonly<Record<string, unknown>>;
+  // SP24b: the route and key usage is attributed to; the dashboard preview sends none and is not recorded.
+  readonly attribution?: { readonly endpoint: string; readonly apiKeyId: string | null };
 }
 
 // Streamed bytes as the upstream sent them, or decoded audio already in memory.
@@ -107,10 +110,14 @@ export class SpeechLane {
     private readonly pools: ProxyPoolsRepository,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
     @Inject(CHAT_LIMITS) private readonly limits: ChatLimits,
+    private readonly usage: UsageRecorder,
   ) {}
 
   async speech(request: SpeechRequest, reply: FastifyReply): Promise<void> {
     const requestId = randomUUID();
+    const startedAt = Date.now();
+    const attribution = { endpoint: request.routeOptions.url ?? request.url.split("?", 1)[0], apiKeyId: this.usage.keyOf(request) };
+    let errorCode: string | null = null;
     const client = new AbortController();
     reply.raw.once("close", () => { if (!reply.raw.writableFinished) client.abort(new ClientGone()); });
     const budget = deadline(REQUEST_BUDGET_MS, `The request did not finish within ${REQUEST_BUDGET_MS / 1000} s`);
@@ -119,7 +126,7 @@ export class SpeechLane {
       if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
         throw new GatewayError(415, "invalid_request_error", "unsupported_media_type", "Send the body as JSON with Content-Type: application/json.");
       }
-      const audio = await this.synthesize(parseSpeech(request.body), signal, requestId);
+      const audio = await this.synthesize({ ...parseSpeech(request.body), attribution }, signal, requestId);
       const asJson = request.query.response_format === "json";
       if (asJson || audio.kind === "bytes") {
         const bytes = audio.kind === "bytes" ? audio.bytes : await readAudio(audio.body, MAX_AUDIO_BYTES);
@@ -138,14 +145,18 @@ export class SpeechLane {
     } catch (error) {
       if (client.signal.aborted || reply.sent) { reply.hijack(); reply.raw.destroy(); return; }
       this.logUnexpected(error, requestId);
+      const { status, body } = errorOf(error);
+      errorCode = body.error.code;
       if (error instanceof UpstreamReply) {
         return void reply.code(error.status).header("cache-control", "no-store").header("content-type", error.contentType).send(error.raw);
       }
-      const { status, body } = errorOf(error);
       if (error instanceof GatewayError && error.retryAfter) reply.header("retry-after", Math.max(1, Math.ceil(error.retryAfter / 1000)));
       reply.code(status).header("cache-control", "no-store").send(body);
     } finally {
       budget.clear();
+      const clientGone = client.signal.aborted;
+      const requestedModel = typeof request.body === "object" && request.body !== null && "model" in request.body && typeof request.body.model === "string" ? request.body.model : null;
+      this.usage.finish({ requestId, startedAt, ...attribution, requestedModel, stream: false, httpStatus: clientGone ? 499 : reply.raw.statusCode, errorCode, clientGone });
     }
   }
 
@@ -282,6 +293,15 @@ export class SpeechLane {
         excluded.add(stored.id);
         return true;
       };
+      // docs/contracts/usage.md "Requests": each connection tried is a usage event (no token count for audio).
+      const started = Date.now();
+      let recorded = false;
+      const recordAttempt = (status: "success" | "error", code: string | null) => {
+        if (recorded || !spec.attribution) return;
+        recorded = true;
+        this.usage.record({ requestId, provider: route.provider, model: target.model, connectionId: stored.id, ...spec.attribution },
+          { status, errorCode: code, usage: { inputTokens: 0, outputTokens: 0 }, estimated: false, latencyMs: Date.now() - started, ttftMs: null });
+      };
       try {
         const proxy = await this.pools.resolve(stored.proxyPoolId);
         const send = (apiKey: string) => this.transport.send(ttsRequest(route, provider, apiKey, call, REQUEST_BUDGET_MS), { signal, requestId, proxy });
@@ -295,13 +315,16 @@ export class SpeechLane {
         }
         if (response.status < 200 || response.status >= 300) {
           const raw = await readBoundedText(response.body, MAX_ERROR_BYTES).catch(() => "");
+          recordAttempt("error", `HTTP_${response.status}`);
           if (await nextAccount(mediaCooldown(response.status))) continue;
           throw new UpstreamReply(response.status, raw, response.headers["content-type"] ?? "application/json");
         }
         const audio = await this.decode(route, response, spec.options);
+        recordAttempt("success", null);
         await this.connections.clearLock(stored.id, lockKey);
         return audio;
       } catch (error) {
+        recordAttempt("error", error instanceof GatewayError ? error.code : error instanceof EngineError ? error.code : "UNKNOWN");
         if (error instanceof GatewayError || !(await nextAccount(fallbackCooldown(error)))) throw error;
       }
     }

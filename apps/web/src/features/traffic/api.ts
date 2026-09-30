@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../../shared/api";
 import { toProblem, type Problem } from "../../shared/errors";
 
@@ -104,3 +104,36 @@ export function usePricingEdits() {
   });
   return { save, reset };
 }
+
+// docs/contracts/usage.md "Requests".
+export type UsageStatus = "success" | "error" | "aborted";
+export interface RequestRow {
+  id: string; at: number; endpoint: string; requestedModel: string | null; apiKeyId: string | null; keyName: string | null; stream: boolean;
+  status: UsageStatus; httpStatus: number; errorCode: string | null; attempts: number;
+  finalProvider: string | null; providerName: string | null; finalModel: string | null; finalConnectionId: string | null; connectionName: string | null;
+  inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number;
+  cost: number | null; unpriced: number; latencyMs: number; ttftMs: number | null;
+}
+export interface Attempt {
+  id: string; at: number; provider: string; providerName: string | null; model: string; connectionId: string | null; connectionName: string | null;
+  status: UsageStatus; errorCode: string | null; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number;
+  estimated: boolean; cost: number | null; latencyMs: number; ttftMs: number | null;
+}
+export interface RequestFilters { status?: string; provider?: string; model?: string; endpoint?: string; fallback?: string }
+
+export const REQUEST_PAGE = 100;
+// A page holds at most five pages of rows; the filters narrow the rest.
+export const MAX_REQUEST_ROWS = 500;
+export const requestParams = (filters: RequestFilters, cursor?: string): string =>
+  new URLSearchParams(Object.entries({ ...filters, limit: String(REQUEST_PAGE), ...(cursor ? { cursor } : {}) }).filter((entry): entry is [string, string] => Boolean(entry[1]))).toString();
+
+export const useRequests = (filters: RequestFilters) => useInfiniteQuery({
+  queryKey: ["usage", "requests", filters],
+  queryFn: ({ pageParam }) => api<{ items: RequestRow[]; nextCursor: string | null }>(`/api/requests?${requestParams(filters, pageParam)}`),
+  initialPageParam: "",
+  getNextPageParam: (page, pages) => (page.nextCursor && pages.length * REQUEST_PAGE < MAX_REQUEST_ROWS ? page.nextCursor : undefined),
+});
+export const useRequestFilters = () =>
+  useQuery({ queryKey: ["usage", "request-filters"], queryFn: () => api<{ providers: { id: string; name: string }[]; models: { provider: string; model: string }[]; endpoints: string[] }>("/api/requests/filters") });
+export const useRequestDetail = (id: string) =>
+  useQuery({ queryKey: ["usage", "request", id], queryFn: () => api<{ request: RequestRow; attempts: Attempt[] }>(`/api/requests/${encodeURIComponent(id)}`), enabled: Boolean(id) });
