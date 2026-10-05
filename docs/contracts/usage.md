@@ -2,6 +2,20 @@
 
 Per-call usage recording, cost from pricing, summaries, the live stream, the pricing editor (SP24a), and request detail with the media lanes (SP24b). Matrix: `docs/discovery/feature-matrix/08-usage-quota.yaml` (`usage.*`, `pricing.*`) and `routing.usage-recording-timing`. Vendor quota is SP24c.
 
+## Vendor quota (SP24c)
+
+`QuotaService` reads each active saved connection through the provider's quota or balance endpoint. It uses `TokenRefresher`, the connection's proxy pool, and `HTTP_TRANSPORT`; credentials never go to the browser. Reads have a 15-second deadline, a 1 MiB response cap, at most four concurrent provider calls, a 60-second in-memory cache (100 entries), and in-flight request deduplication. Errors are returned inline per account so one provider outage does not fail the page. Manual refresh bypasses cached values; scheduled polling runs every 60 seconds while the page is open.
+
+| Method | Path | Answer |
+|---|---|---|
+| GET | `/api/quotas` | Active connection quota rows: `{ connectionId, provider, name, plan, quotas: [{ name, used, total, remaining, resetAt, unlimited }], message, fetchedAt, cached }[]` |
+| POST | `/api/quotas/refresh` | Force refresh all active connections; same answer as GET |
+| POST | `/api/quotas/:id/refresh` | Force refresh one active connection; `NOT_FOUND` when missing or disabled |
+
+Provider handlers use vendor-reported windows for Claude, GitHub Copilot, Codex, Gemini CLI, Antigravity, Kiro, OpenCode Go/Zen, GLM/Z.ai (international and China), MiniMax (international and China), DeepSeek balance, Groq rate-limit headers, Kimi, CodeBuddy (international and China), Vercel AI Gateway credits, Ollama Cloud, Grok CLI, and CommandCode. Providers without a quota API return an account-level message; the dashboard does not synthesize quota values. Antigravity uses only its vendor quota response here; the 9router request-strike cache is not part of AIGate's quota dashboard.
+
+The page reports healthy/near/exhausted counts and each account's vendor windows, reset time, and cache status. Refresh errors use the standard API problem toast. Inactive connections are omitted from listing and rejected by per-connection refresh.
+
 ## What is recorded
 
 One **usage event** per upstream call the chat lane makes, on `/v1/chat/completions`, `/v1/messages`, `/v1/responses` (and its aliases), and `/v1beta/models/*` generate. Every combo member and every fusion panel or judge call is its own event. Fields:

@@ -36,6 +36,12 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   VOICE_PREVIEW_FAILED: (body) => typeof body.message === "string" ? body.message : "The provider could not generate a voice preview.",
   // docs/contracts/usage.md.
   USAGE_STREAM_BUSY: "Live usage updates are off: too many dashboard tabs are watching usage. Close another tab, then reload this page.",
+  LOG_STREAM_BUSY: "Live console updates are off: all eight log streams are in use. Close another dashboard tab and reload this page.",
+  TUNNEL_SECURITY_REQUIRED: (body) => typeof body.message === "string" ? body.message : "Secure dashboard login and API keys before enabling a public tunnel.",
+  TUNNEL_ROUTE_CONFLICT: (body) => typeof body.message === "string" ? body.message : "Another Tailscale Funnel route is active. Review it before enabling AIGate.",
+  TUNNEL_NOT_INSTALLED: "Install and sign in to Tailscale on the AIGate host before enabling Funnel.",
+  TUNNEL_START_FAILED: "Tailscale Funnel could not start. Check the Tailscale daemon and tailnet Funnel policy.",
+  TUNNEL_STOP_FAILED: "Tailscale Funnel could not be disabled. Check the Tailscale daemon and retry.",
   // docs/contracts/custom-providers.md.
   NODE_LIMIT: "You have reached the maximum of 100 custom providers. Delete one you no longer use.",
   PROXY_POOL_IN_USE: "This proxy pool is still assigned to a connection. Remove it from those connections first.",

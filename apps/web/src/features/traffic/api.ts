@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError } from "../../shared/api";
+import { api, apiVoid, ApiError } from "../../shared/api";
 import { toProblem, type Problem } from "../../shared/errors";
 
 // docs/contracts/usage.md "Dashboard API".
@@ -47,6 +47,30 @@ export const periodParams = ({ period, from, to }: PeriodQuery): string =>
 
 const summaryKey = ["usage", "summary"] as const;
 const chartKey = ["usage", "chart"] as const;
+
+export interface ConsoleEvent { id: string; at: string; level: "INFO" | "WARN" | "ERROR"; message: string }
+const consoleKey = ["tooling", "logs"] as const;
+export function useConsoleLogs(enabled = true) {
+  const client = useQueryClient();
+  const query = useQuery({ queryKey: consoleKey, queryFn: () => api<ConsoleEvent[]>("/api/tooling/logs") });
+  const [connected, setConnected] = useState(false);
+  const [stopped, setStopped] = useState(false);
+  useEffect(() => {
+    if (!enabled) { setConnected(false); return; }
+    setStopped(false);
+    const source = new EventSource("/api/tooling/logs/stream");
+    source.onopen = () => setConnected(true);
+    source.onerror = () => { setConnected(false); if (source.readyState === EventSource.CLOSED) setStopped(true); };
+    source.onmessage = (event: MessageEvent<string>) => {
+      const row: ConsoleEvent = JSON.parse(event.data);
+      client.setQueryData<ConsoleEvent[]>(consoleKey, (previous = []) => [...previous.filter((item) => item.id !== row.id), row].slice(-200));
+    };
+    source.addEventListener("clear", () => client.setQueryData<ConsoleEvent[]>(consoleKey, []));
+    return () => { source.close(); setConnected(false); };
+  }, [client, enabled]);
+  const clear = async () => { await apiVoid("/api/tooling/logs", "DELETE"); client.setQueryData<ConsoleEvent[]>(consoleKey, []); };
+  return { query, connected, stopped, clear };
+}
 
 export const useUsageSummary = (query: PeriodQuery, enabled = true) =>
   useQuery({ queryKey: [...summaryKey, query], queryFn: () => api<UsageSummary>(`/api/usage/summary?${periodParams(query)}`), enabled, placeholderData: (previous) => previous });

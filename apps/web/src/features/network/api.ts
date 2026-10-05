@@ -32,3 +32,18 @@ export const useUpdateProxyRotation = () => {
     onSettled: () => client.invalidateQueries({ queryKey: rotationKey }),
   });
 };
+
+export interface TunnelStatus { installed: boolean; enabled: boolean; running: boolean; publicUrl: string | null; routeConflict?: boolean; accessReady: boolean; blockedReason: string | null }
+export const useTunnelStatus = () => useQuery({ queryKey: ["tooling", "tunnel"], queryFn: () => api<TunnelStatus>("/api/tooling/tunnel"), refetchInterval: 5_000 });
+function useTunnelAction(action: "enable" | "disable") {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: () => api<TunnelStatus | { success: boolean; enabled: boolean }>(`/api/tooling/tunnel/${action}`, { method: "POST" }),
+    onSuccess: () => { void client.invalidateQueries({ queryKey: ["tooling", "tunnel"] }); } });
+}
+export const useEnableTunnel = () => useTunnelAction("enable");
+export const useDisableTunnel = () => useTunnelAction("disable");
+export interface MitmStatus { listener: { configuredPort: number; available: boolean; running: boolean }; certificate: { path: string; present: boolean; keyPresent: boolean }; targets: { host: string; enabled: boolean; blockedReason: string | null }[] }
+export interface MitmPreview { previewId: string; action: "generate" | "install" | "remove" | "start" | "stop"; certificatePath: string; keyPath: string; changes: string[]; expiresAt: string }
+export const useMitmStatus = () => useQuery({ queryKey: ["tooling", "mitm"], queryFn: () => api<MitmStatus>("/api/tooling/mitm") });
+export const useMitmPreview = () => useMutation({ mutationFn: (action: MitmPreview["action"]) => api<MitmPreview>("/api/tooling/mitm/preview", { method: "POST", body: { action } }) });
+export function useApplyMitmPreview() { const client = useQueryClient(); return useMutation({ mutationFn: (previewId: string) => api<MitmStatus>("/api/tooling/mitm/apply", { method: "POST", body: { previewId } }), onSuccess: () => { void client.invalidateQueries({ queryKey: ["tooling", "mitm"] }); } }); }

@@ -36,6 +36,6 @@ export const navigation = [
 export const extraRoutes = [
   "/gateway/routing/new",
   "/providers/new", "/providers/detail", "/providers/media/catalog", "/providers/media/provider", "/providers/media/video", "/providers/media/video/xai",
-  "/traffic/requests/detail", "/integrations/cli-tools/codex", "/network/proxy-pools/deploy",
+  "/traffic/requests/detail", "/integrations/cli-tools/codex", "/integrations/cli-tools/claude", "/integrations/cli-tools/opencode", "/integrations/cli-tools/cline", "/integrations/cli-tools/droid", "/integrations/cli-tools/copilot", "/integrations/cli-tools/crush", "/integrations/cli-tools/pi", "/integrations/cli-tools/smelt", "/integrations/cli-tools/codewhale", "/integrations/cli-tools/forge", "/integrations/cli-tools/kilo", "/integrations/cli-tools/openclaw", "/integrations/cli-tools/deepseek-tui", "/integrations/cli-tools/hermes", "/integrations/cli-tools/jcode", "/integrations/cli-tools/omp", "/integrations/cli-tools/grok-build", "/network/proxy-pools/deploy",
   "/welcome", "/login", "/callback",
 ] as const;

@@ -20,5 +20,6 @@ import { IdentityRepository } from "./infrastructure/identity.repo.js";
     // Deny by default: every route needs a session unless it is marked @Public().
     { provide: APP_GUARD, useClass: DashboardAuthGuard },
   ],
+  exports: [IdentityRepository],
 })
 export class IdentityModule {}

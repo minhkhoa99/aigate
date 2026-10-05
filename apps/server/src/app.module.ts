@@ -13,6 +13,7 @@ import { SettingsModule } from "./modules/settings/settings.module.js";
 import { TransportModule } from "./modules/transport/transport.module.js";
 import type { UsageConfig } from "./modules/usage/infrastructure/usage-recorder.js";
 import { UsageModule } from "./modules/usage/usage.module.js";
+import { toolingModule } from "./modules/tooling/tooling.module.js";
 import { SecretsModule, type SecretCipherPort } from "./secret-cipher.js";
 
 @Module({})
@@ -22,7 +23,7 @@ export class AppModule {
       module: AppModule,
       imports: [
         DatabaseModule.with(database), SecretsModule.with(cipher), TransportModule.with(transport),
-        SettingsModule, IdentityModule, ApiKeysModule, CatalogModule, ConnectionsModule, UsageModule.with(usage), RoutingModule.with(limits, dataDir),
+        SettingsModule, IdentityModule, ApiKeysModule, CatalogModule, ConnectionsModule, UsageModule.with(usage), toolingModule(dataDir), RoutingModule.with(limits, dataDir),
       ],
       controllers: [HealthController],
     };

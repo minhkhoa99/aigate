@@ -3,6 +3,8 @@ import { ApiKeysModule } from "../apikeys/apikeys.module.js";
 import { ConnectionsModule } from "../connections/connections.module.js";
 import { DisplayNames } from "./infrastructure/display-names.js";
 import { PricingController } from "./infrastructure/pricing.controller.js";
+import { QuotaController } from "./infrastructure/quota.controller.js";
+import { QuotaService } from "./infrastructure/quota.service.js";
 import { RequestsController } from "./infrastructure/requests.controller.js";
 import { RequestsRepository } from "./infrastructure/requests.repo.js";
 import { PricingRepository } from "./infrastructure/pricing.repo.js";
@@ -18,8 +20,8 @@ export class UsageModule {
     return {
       module: UsageModule,
       imports: [ConnectionsModule, ApiKeysModule],
-      controllers: [UsageController, PricingController, RequestsController],
-      providers: [PricingRepository, UsageRecorder, UsageRepository, RequestsRepository, DisplayNames, { provide: USAGE_CONFIG, useValue: config }],
+      controllers: [UsageController, PricingController, RequestsController, QuotaController],
+      providers: [PricingRepository, UsageRecorder, UsageRepository, RequestsRepository, QuotaService, DisplayNames, { provide: USAGE_CONFIG, useValue: config }],
       exports: [UsageRecorder],
     };
   }

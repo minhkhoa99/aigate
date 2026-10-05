@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { Button, Input, PageHeading, Panel, Pill, Warning } from "../../shared/ui";
+import { Button, PageHeading, Panel, Pill, StateBlock, Warning } from "../../shared/ui";
+import { useToast } from "../../shared/toast";
+import { toProblem } from "../../shared/errors";
+import { useConsoleLogs } from "./api";
 
 export { Usage } from "./usage";
 export { RequestDetail, Requests } from "./requests";
@@ -7,9 +10,15 @@ export { RequestDetail, Requests } from "./requests";
 
 export function Console() {
   const [level, setLevel] = useState("All levels");
-  return <><PageHeading eyebrow="Traffic / Developer" title="Console log" description="Live gateway diagnostics with bounded history and sanitized fields." action={<div className="row"><Pill tone="healthy">Streaming</Pill><Button>Pause</Button><Button>Clear view</Button></div>} />
-    <Warning>Developer mode is on. Logs may include model names and request IDs, but never credentials or prompt bodies.</Warning>
-    <Panel title="Events" className="section-gap panel-flush"><div className="table-toolbar"><select className="input" value={level} onChange={(e) => setLevel(e.target.value)} aria-label="Filter log level"><option>All levels</option><option>Warnings</option><option>Errors</option></select><Input placeholder="Filter messages" /></div><div className="console-lines" role="log" aria-live="polite">
-      {["14:02:41.392  INFO   response completed req_01J9A2 · 200 · 1,420 tokens", "14:02:38.211  INFO   connection selected openai-primary · gpt-4o", "14:01:56.032  WARN   provider quota near limit deepseek-primary", "14:01:49.441  INFO   SSE stream started · gemini-2.5-pro", "14:00:57.120  INFO   usage snapshot persisted req_01J99Y"].filter((x) => level === "All levels" || (level === "Warnings" ? x.includes("WARN") : x.includes("ERROR"))).map((line) => <div key={line}>{line}</div>)}
-    </div></Panel></>;
+  const [filter, setFilter] = useState("");
+  const [paused, setPaused] = useState(false);
+  const { query, connected, stopped, clear } = useConsoleLogs(!paused);
+  const toast = useToast();
+  const rows = (query.data ?? []).filter((row) => (level === "All levels" || (level === "Warnings" ? row.level === "WARN" : row.level === "ERROR")) && row.message.toLowerCase().includes(filter.toLowerCase()));
+  return <><PageHeading eyebrow="Traffic / Developer" title="Console log" description="Recent request diagnostics with bounded history and sanitized metadata." action={<div className="row"><Pill tone={connected ? "healthy" : "muted"}>{paused ? "Paused" : stopped ? "Stopped" : connected ? "Live" : "Connecting"}</Pill><Button onClick={() => setPaused(!paused)}>{paused ? "Resume" : "Pause"}</Button><Button onClick={() => void clear().catch((error) => toast({ tone: "error", ...toProblem(error) }))}>Clear log</Button></div>} />
+    <Warning>Only request metadata is recorded here. Prompt and response bodies, credentials, and provider keys are never included.</Warning>
+    <Panel title="Events" className="section-gap panel-flush"><div className="table-toolbar"><select className="input" value={level} onChange={(e) => setLevel(e.target.value)} aria-label="Filter log level"><option>All levels</option><option>Warnings</option><option>Errors</option></select><input className="input" placeholder="Filter messages" value={filter} onChange={(event) => setFilter(event.target.value)} /></div>
+      {query.isPending ? <StateBlock state="loading" /> : query.isError ? <StateBlock state="error" code={toProblem(query.error).code} action={<Button onClick={() => void query.refetch()}>Retry</Button>} />
+        : <div className="console-lines" role="log" aria-live="polite">{rows.map((row) => <div key={row.id}><time>{new Date(row.at).toLocaleTimeString()}</time> <strong>{row.level}</strong> {row.message}</div>)}{rows.length === 0 && <p className="muted">No request events yet. Send a request through AIGate to see it here.</p>}</div>}
+    </Panel></>;
 }

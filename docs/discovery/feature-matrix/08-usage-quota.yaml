@@ -52,6 +52,76 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
+- id: quota.aigate-vendor-fetch-and-cache
+  group: Quota Tracker
+  feature: Vendor quota reads
+  subFeature: Bounded server reads for active saved connections
+  trigger: GET /api/quotas, explicit refresh, or the quota page's 60-second poll
+  input: "Connection id, stored provider credential and metadata, optional proxy pool"
+  output: "Per-account plan, vendor windows or balance rows, reset timestamps, and a transient message when unavailable"
+  businessRules:
+    - "Quota reads use TokenRefresher, the connection proxy, and HTTP_TRANSPORT; the key and OAuth data stay server-side"
+    - "Each read has a 15-second deadline and 1 MiB body limit; listing uses four fixed workers, an in-flight map, and a 60-second cache capped at 100 accounts"
+    - "Only active connections are listed; one vendor failure produces a per-account message without failing other rows"
+    - "Provider windows keep vendor units and reset time; balances and credits are represented as available amounts when no fixed quota is published"
+    - "Providers without a quota endpoint return a message; no usage is inferred from AIGate request totals"
+  state:
+    reads: ["provider_connections", sealed credential, proxy pool]
+    writes: []
+    runtimeOnly: ["QuotaService 60-second cache", "in-flight quota requests"]
+  dependencies: ["connections.secret-storage", "transport.proxy-resolution"]
+  providerInteraction: "Read-only vendor quota, balance, or rate-limit endpoints over HTTP_TRANSPORT"
+  fallback: { hasFallback: false, retry: null, timeout: "15000ms per vendor call", quota: "60-second cache; at most four concurrent vendor reads" }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "a vendor rejects or cannot serve its quota request", partial: true }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["100 active connection maximum; four concurrent reads; response bodies capped at 1 MiB"]
+  behavior: { streaming: false, cancellation: "15-second transport deadline", concurrency: "Four fixed workers; concurrent reads for one connection share a promise" }
+  edgeCases:
+    - "Force refresh bypasses cached values but still shares an already-running read for that connection"
+    - "Credential refresh or a single provider's quota endpoint can fail without hiding other accounts"
+    - "Single refresh returns NOT_FOUND for a missing or disabled connection"
+  evidence:
+    - { file: open-sse/services/usage.js, line: 28, note: "USAGE_HANDLERS vendor quota dispatch table" }
+    - { file: open-sse/services/usage/google.js, line: 20, note: "Gemini CLI and Antigravity vendor quota reads" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
+
+- id: quota.dashboard-refresh-and-account-visibility
+  group: Quota Tracker
+  feature: Quota UI
+  subFeature: Active account quota rows, refresh, and visible error state
+  trigger: User opens /providers/quota or selects Refresh quotas
+  input: "Quota response rows for active saved connections"
+  output: "Healthy, near-limit, and exhausted counts; vendor quota rows and reset times; per-account error messages"
+  businessRules:
+    - "The page polls GET /api/quotas every 60000ms and POSTs /api/quotas/refresh for a user refresh"
+    - "A missing or disabled connection's individual refresh is NOT_FOUND; a vendor error appears on that account while other accounts remain visible"
+    - "Quota numbers come from vendors; unsupported endpoints show a message and never placeholder values"
+    - "The dashboard presents percentages for finite quota windows and labels unlimited rows separately"
+  state:
+    reads: ["GET /api/quotas"]
+    writes: []
+    runtimeOnly: ["TanStack Query quota cache"]
+  dependencies: [quota.aigate-vendor-fetch-and-cache]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: "Retry the list query or refresh all", timeout: null, quota: "60000ms polling" }
+  errorCases:
+    - { code: PROVIDER_UNAVAILABLE, when: "quota vendor cannot serve the account", partial: true }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: false, cancellation: "Query cancellation on unmount", concurrency: null }
+  edgeCases: ["A single account refresh reports NOT_FOUND when the connection was removed or disabled"]
+  evidence:
+    - { file: "src/app/(dashboard)/dashboard/quota/page.js", line: 8, note: "quota dashboard entry page" }
+    - { file: "src/app/(dashboard)/dashboard/usage/components/ProviderLimits/index.js", line: 449, note: "quota refresh and account rows" }
+  newModule: usage
+  parityStatus: traced
+  labels: [REFERENCE_BEHAVIOR]
+
 - id: usage.write-not-synchronous
   group: Usage
   feature: Per-request usage capture

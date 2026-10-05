@@ -1,0 +1,3 @@
+import { BadRequestException, Body, Controller, Get, Post } from "@nestjs/common";
+import { JcodeSettingsService } from "./jcode-settings.service.js";
+@Controller("api/tooling/cli-tools/jcode") export class JcodeSettingsController { constructor(private readonly settings: JcodeSettingsService) {} @Get() status() { return this.settings.status(); } @Post("preview") preview(@Body() body: unknown) { return this.settings.preview(body); } @Post("apply") apply(@Body() body: unknown) { if (typeof body !== "object" || body === null || !("previewId" in body) || typeof body.previewId !== "string") throw new BadRequestException({ code: "INVALID_REQUEST", message: "previewId is required" }); return this.settings.apply(body.previewId); } }

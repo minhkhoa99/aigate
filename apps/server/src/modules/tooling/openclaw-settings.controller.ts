@@ -1,0 +1,3 @@
+import { BadRequestException, Body, Controller, Get, Post } from "@nestjs/common";
+import { OpenClawSettingsService } from "./openclaw-settings.service.js";
+@Controller("api/tooling/cli-tools/openclaw") export class OpenClawSettingsController { constructor(private readonly openclaw: OpenClawSettingsService) {} @Get() status() { return this.openclaw.status(); } @Post("preview") preview(@Body() body: unknown) { return this.openclaw.preview(body); } @Post("apply") apply(@Body() body: unknown) { if (typeof body !== "object" || body === null || !("previewId" in body) || typeof body.previewId !== "string") throw new BadRequestException({ code: "INVALID_REQUEST", message: "previewId is required" }); return this.openclaw.apply(body.previewId); } }

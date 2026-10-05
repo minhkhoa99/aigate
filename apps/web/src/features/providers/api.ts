@@ -83,6 +83,14 @@ const TEST_TIMEOUT_MS = 25_000;
 const connectionsKey = ["connections"] as const;
 
 export const useConnections = () => useQuery({ queryKey: connectionsKey, queryFn: () => api<Connection[]>("/api/connections") });
+export interface QuotaLine { name: string; used: number; total: number; remaining: number | null; resetAt: string | null; unlimited: boolean }
+export interface ConnectionQuota { connectionId: string; provider: string; name: string; plan: string | null; quotas: QuotaLine[]; message: string | null; fetchedAt: number; cached: boolean }
+const quotasKey = ["quotas"] as const;
+export const useQuotas = () => useQuery({ queryKey: quotasKey, queryFn: () => api<ConnectionQuota[]>("/api/quotas"), refetchInterval: 60_000 });
+export const useRefreshQuotas = () => {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: () => api<ConnectionQuota[]>("/api/quotas/refresh", { method: "POST" }), onSuccess: (quotas) => client.setQueryData(quotasKey, quotas) });
+};
 // The catalog is built into the server, so it only changes with an AIGate upgrade.
 export const useProviders = () => useQuery({ queryKey: ["providers"], queryFn: () => api<ProviderSummary[]>("/api/providers"), staleTime: Infinity });
 export const useProvider = (id: string, enabled = true) =>
