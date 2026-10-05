@@ -22,6 +22,31 @@ export interface Settings {
 
 export type SettingsPatch = Partial<Settings>;
 
+export const MAX_SETTINGS_DOCUMENT_BYTES = 64 * 1024;
+export interface SettingsDocument { format: "aigate-settings"; version: 1; settings: SettingsPatch }
+
+// Service URLs can carry query tokens; portable settings never include them.
+export function settingsDocument(settings: Settings): SettingsDocument {
+  const transferable: SettingsPatch = { ...settings };
+  delete transferable.headroomUrl;
+  return { format: "aigate-settings", version: 1, settings: transferable };
+}
+
+export function parseSettingsDocument(body: unknown): PatchResult {
+  const invalid = (message: string): PatchResult => ({ ok: false, message, keys: [] });
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return invalid("Import must be an aigate-settings JSON document.");
+  if (Object.keys(body).length !== 3 || !Object.hasOwn(body, "settings") || Reflect.get(body, "format") !== "aigate-settings" || Reflect.get(body, "version") !== 1) {
+    return invalid("Settings document must contain only format (aigate-settings), version (1), and settings.");
+  }
+  const result = parseSettingsPatch(Reflect.get(body, "settings"));
+  if (!result.ok) return result;
+  if (Object.hasOwn(result.patch, "headroomUrl")) return invalid("Service URLs are not transferable. Configure Headroom in Token Saver.");
+  if (Object.keys(result.patch).length === 0) return invalid("Settings document must contain at least one transferable setting.");
+  // Only fixed-count primitive settings reach serialization; nested invalid input cannot overflow its stack.
+  if (new TextEncoder().encode(JSON.stringify(body)).byteLength > MAX_SETTINGS_DOCUMENT_BYTES) return invalid("Settings document must be at most 64 KiB.");
+  return result;
+}
+
 export type PatchResult =
   | { ok: true; patch: SettingsPatch }
   | { ok: false; message: string; keys: string[] };

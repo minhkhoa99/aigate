@@ -950,6 +950,43 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
+- id: settings.portable-config-general
+  group: Settings
+  feature: General settings integration
+  subFeature: SP27 runtime information and reviewed portable settings transfer
+  trigger: Settings General exports or reviews/applies an import; Developer downloads runtime metadata
+  input: "Version 1 aigate-settings document, <=64 KiB, typed transferable settings; apply includes the current reviewed fingerprint"
+  output: "Runtime metadata, secret-free settings download, before/after diff, and merged settings or precise validation/conflict error"
+  businessRules:
+    - "REFERENCE_BEHAVIOR: preserve settings export/import intent from settings.database-export-import and current editable-key validation; AIGate design 10.9.18 requires redacted export and import confirmation."
+    - "REFERENCE_BEHAVIOR: AIGate exports only typed transferable settings, excluding headroomUrl (a service URL may contain query tokens), every credential table, and environment secrets; the format is aigate-settings version 1."
+    - "REFERENCE_BEHAVIOR: validate format, version, envelope keys, size, nonempty editable keys and existing value bounds before preview or write; omitted keys are preserved and import needs a type-to-confirm UI."
+    - "REFERENCE_BEHAVIOR: a fingerprint plus conditional SQL update refuses changes made since preview; existing write-through settings apply on the next request."
+    - "REFERENCE_BEHAVIOR: successful runtime/export/preview/apply responses are HTTP 200 with no-store; preview/apply do not create resources. All transfer routes use the dashboard guard."
+    - "REFERENCE_BEHAVIOR: General/Developer expose actual runtime retention and downloads, with browser-local theme/developer preferences and explicit restart requirements; unsupported preview controls are removed."
+    - "REFERENCE_BEHAVIOR: General runtime labels and long data paths wrap at narrow widths so actual running values remain readable without horizontal table scrolling."
+    - "IMPLEMENTATION_ACCIDENT: full database wipe/repopulation and credential-bundle export are not the portable settings contract; no new backup service, preview cache or filesystem staging is needed."
+  state: { reads: [settings, runtime configuration, UsageRecorder writer state], writes: [provided typed settings keys only], runtimeOnly: [browser theme and developer mode] }
+  dependencies: [settings.defaults-and-merge, settings.patch-protected-keys]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: "existing dashboard 10s deadline", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "invalid document, size, envelope, fingerprint syntax or setting values", partial: false }
+    - { code: INVALID_REQUEST, when: "reviewed settings changed: HTTP 409 SETTINGS_CHANGED requires a fresh preview; nothing is overwritten", partial: false }
+    - { code: AUTH_ERROR, when: "dashboard guard refuses an unauthenticated runtime/export/preview/apply request with HTTP 401 UNAUTHENTICATED", partial: false }
+    - { code: INTERNAL_ERROR, when: "database or runtime read fails; the dashboard shows a precise failure", partial: false }
+  sideEffects: ["Reviewed import merges provided settings atomically; no other tables change"]
+  persistence: [existing single settings row]
+  performanceConcerns: ["Fixed setting count, one bounded file, constant-size SQL reads/conditional write, no network fan-out or growing history scan"]
+  behavior: { streaming: false, cancellation: null, concurrency: "conditional SQL match refuses stale imports even when PATCH races apply" }
+  edgeCases: ["Unknown fields and service URLs are rejected rather than silently removed", "listener metadata is null before listen", "missing imported settings preserve the current values"]
+  evidence:
+    - { file: src/app/api/settings/database/route.js, line: 19, note: "reference export entry point; AIGate's settings-only deviation follows design 10.9.18" }
+    - { file: src/lib/db/index.js, line: 102, note: "reference full database restore; portable import intentionally does not wipe unrelated tables" }
+  newModule: settings
+  parityStatus: verified
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
+
 - id: settings.database-export-import
   group: Settings
   feature: Settings

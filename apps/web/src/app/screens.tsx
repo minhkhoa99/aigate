@@ -9,8 +9,9 @@ import { Callback, Login, Onboarding, SettingsAuth, SettingsDeveloper, SettingsG
 import { Button, PageHeading, Panel, StateBlock } from "../shared/ui";
 import { Link } from "@tanstack/react-router";
 
-export function ScreenView({ path, developerMode, onDeveloperMode, state = "ready" }: {
+export function ScreenView({ path, developerMode, onDeveloperMode, theme, onTheme, state = "ready" }: {
   path: string; developerMode: boolean; onDeveloperMode: (enabled: boolean) => void;
+  theme: string; onTheme: (theme: string) => void;
   state?: "ready" | "loading" | "empty" | "error";
 }) {
   if (state !== "ready") return <><PageHeading eyebrow="UI state preview" title={path === "/" ? "Overview" : path.split("/").filter(Boolean).at(-1)?.replaceAll("-", " ") ?? "Screen"}
@@ -65,7 +66,7 @@ export function ScreenView({ path, developerMode, onDeveloperMode, state = "read
     case "/integrations/cli-tools/openclaw": return <OpenClawToolDetail />;
     case "/integrations/skills": return <Skills />;
     case "/integrations/mcp": return <Mcp />;
-    case "/settings/general": return <SettingsGeneral />;
+    case "/settings/general": return <SettingsGeneral theme={theme} onTheme={onTheme} />;
     case "/settings/auth": return <SettingsAuth />;
     case "/settings/developer": return <SettingsDeveloper enabled={developerMode} onChange={onDeveloperMode} />;
     case "/login": return <Login />;

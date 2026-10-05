@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { Button, Metric, PageHeading, Panel, Pill, StateBlock, Table, Warning } from "../../shared/ui";
 import { toProblem } from "../../shared/errors";
 import { CostChart, Legend, TokenChart, type Series } from "./charts";
-import { periodParams, useLiveUsage, useUsageChart, useUsageSummary, type PeriodQuery } from "./api";
+import { useLiveUsage } from "../../shared/live-usage";
+import { periodParams, useUsageChart, useUsageSummary, type PeriodQuery } from "./api";
 import { PricingModal } from "./pricing-modal";
 import { assignSlots, chartSeries, errorRate, formatCost, formatTokens, OTHER } from "./usage-format";
 
@@ -27,7 +28,7 @@ export function Usage() {
   const ready = query.period !== "custom" || Boolean(query.from && query.to);
   const summary = useUsageSummary(query, ready);
   const chart = useUsageChart(query, ready);
-  const { live, connected, stopped } = useLiveUsage();
+  const { live, connected, stopped, reconnect } = useLiveUsage();
 
   const apply = (next: PeriodQuery) => {
     setQuery(next);
@@ -43,7 +44,7 @@ export function Usage() {
   const legendTotals = { ...providerTotals, [OTHER]: Object.entries(providerTotals).filter(([provider]) => !named.includes(provider)).reduce((sum, [, tokens]) => sum + tokens, 0) };
 
   const totals = summary.data?.totals;
-  const writer = live?.writer ?? summary.data?.writer;
+  const writer = connected ? live?.writer ?? summary.data?.writer : summary.data?.writer;
   const failure = summary.error ?? chart.error;
   const zone = summary.data?.timezone ?? chart.data?.timezone;
 
@@ -94,11 +95,12 @@ export function Usage() {
 
     <div className="grid grid-2 section-gap">
       <Panel title="Running now" action={<Pill tone={connected ? "healthy" : stopped ? "danger" : "warning"}>{connected ? "Live" : stopped ? "Stopped" : "Reconnecting"}</Pill>}>
-        {stopped ? <p className="text-danger">{stopped.message}</p> : live && live.active.length > 0 ? <div className="stack">{live.active.map((entry) => <div className="list-row" key={`${entry.provider}/${entry.model}/${entry.connectionId ?? ""}`}>
+        {stopped ? <><p className="text-danger"><code>{stopped.code}</code> · {stopped.message}</p><Button onClick={reconnect}>Reconnect</Button></> : !connected ? <p className="muted">Live counts unavailable while reconnecting.</p> : live && live.active.length > 0 ? <div className="stack">{live.active.map((entry) => <div className="list-row" key={`${entry.provider}/${entry.model}/${entry.connectionId ?? ""}`}>
           <div><strong>{names.get(entry.provider) ?? entry.provider} · {entry.model}</strong><small>{entry.connectionId ? `connection ${entry.connectionId.slice(0, 8)}` : "no saved connection"}</small></div><Pill tone="info">{entry.count} active</Pill></div>)}</div>
           : <p className="muted">No call in flight.</p>}
       </Panel>
       <Panel title="Recent calls" detail="The last 20 upstream calls, newest first." className="panel-flush">
+        {!connected && live && <p className="muted">Showing the last received calls.</p>}
         <Table columns={["Time", "Model", "Status", "Tokens", "Latency", "Cost"]} empty="No call since the server started."
           rows={(live?.recent ?? []).map((event) => [new Date(event.at).toLocaleTimeString(), <span><small className="muted">{names.get(event.provider) ?? event.provider}</small> <code>{event.model}</code></span>,
             <Pill tone={STATUS_TONE[event.status]}>{event.status}{event.errorCode ? ` · ${event.errorCode}` : ""}</Pill>,

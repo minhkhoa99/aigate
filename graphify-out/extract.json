@@ -1,6 +1,16 @@
 {
   "nodes": [
     {
+      "id": "sp_sp26", "label": "SP26 — live Overview integration", "file_type": "document",
+      "source_file": "docs/contracts/overview.md", "source_location": "SP26 contract", "source_url": null,
+      "captured_at": "2026-10-05", "author": null, "contributor": null
+    },
+    {
+      "id": "sp_sp27", "label": "SP27 — General runtime and portable settings", "file_type": "document",
+      "source_file": "docs/contracts/settings.md", "source_location": "SP27 / M3 U2", "source_url": null,
+      "captured_at": "2026-10-05", "author": null, "contributor": null
+    },
+    {
       "id": "doc_aigate_design_spec",
       "label": "AIGate Design Spec (2026-09-22)",
       "file_type": "document",
@@ -10619,6 +10629,30 @@
     }
   ],
   "edges": [
+    {
+      "source": "sp_u8", "target": "sp_sp26", "relation": "conceptually_related_to", "confidence": "EXTRACTED",
+      "confidence_score": 1, "source_file": "docs/contracts/overview.md", "source_location": "SP26 / M3 U8", "weight": 1
+    },
+    {
+      "source": "sp_u8", "target": "ctx_usage", "relation": "conceptually_related_to", "confidence": "EXTRACTED",
+      "confidence_score": 1, "source_file": "docs/contracts/overview.md", "source_location": "Summary and usage stream", "weight": 1
+    },
+    {
+      "source": "sp_u8", "target": "ctx_connections", "relation": "conceptually_related_to", "confidence": "EXTRACTED",
+      "confidence_score": 1, "source_file": "docs/contracts/overview.md", "source_location": "Enabled-account attention", "weight": 1
+    },
+    {
+      "source": "sp_u2", "target": "sp_sp27", "relation": "conceptually_related_to", "confidence": "EXTRACTED",
+      "confidence_score": 1, "source_file": "docs/contracts/settings.md", "source_location": "SP27 / M3 U2", "weight": 1
+    },
+    {
+      "source": "sp_sp27", "target": "ctx_settings", "relation": "implements", "confidence": "EXTRACTED",
+      "confidence_score": 1, "source_file": "docs/contracts/settings.md", "source_location": "Portable settings routes", "weight": 1
+    },
+    {
+      "source": "sp_sp26", "target": "ctx_usage", "relation": "implements", "confidence": "EXTRACTED",
+      "confidence_score": 1, "source_file": "docs/contracts/overview.md", "source_location": "Summary and usage stream", "weight": 1
+    },
     {
       "source": "doc_aigate_design_spec",
       "target": "concept_behavioral_source_of_truth",

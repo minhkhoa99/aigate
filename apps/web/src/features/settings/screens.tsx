@@ -1,24 +1,19 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Button, CopyField, Field, Input, PageHeading, Panel, Pill, SecretField, Tabs, Warning } from "../../shared/ui";
+import { Button, CopyField, Field, Input, PageHeading, Panel, SecretField, StateBlock, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { isApiError } from "../../shared/api";
 import { toProblem, type Problem } from "../../shared/errors";
-import { useAuthStatus, useChangePassword, useLogin, useLogout, usePatchSettings, useSettings, useSetup } from "./api";
+import { downloadSettingsFile, useAuthStatus, useChangePassword, useLogin, useLogout, usePatchSettings, useRuntimeInfo, useSettings, useSetup } from "./api";
 import { OAUTH_CHANNEL, type CallbackData } from "../providers/sign-in";
 
 const MIN_PASSWORD = 8;
 const MAX_PASSWORD = 256;
+export { SettingsGeneral } from "./general";
 
 function formValue(event: FormEvent<HTMLFormElement>, name: string): string {
   const value = new FormData(event.currentTarget).get(name);
   return typeof value === "string" ? value : "";
-}
-
-export function SettingsGeneral() {
-  return <><PageHeading eyebrow="Settings / General" title="General settings" description="Defaults for gateway operation and dashboard presentation." action={<Button variant="primary">Save changes</Button>} />
-    <div className="split"><Panel title="Gateway"><div className="stack"><Field label="Instance name"><Input defaultValue="Local instance" /></Field><Field label="Preferred language"><select className="input"><option>English</option><option>Tiếng Việt</option></select></Field><Field label="Default model"><Input defaultValue="claude-3.5-sonnet" /></Field></div></Panel><Panel title="Runtime"><div className="list-row"><div><strong>Start at login</strong><small>Open the dashboard after starting AIGate.</small></div><input type="checkbox" defaultChecked aria-label="Start at login" /></div><div className="list-row"><div><strong>Enable observability</strong><small>Persist sanitized request details.</small></div><input type="checkbox" aria-label="Enable observability" /></div></Panel></div>
-  </>;
 }
 
 export function SettingsAuth() {
@@ -63,10 +58,27 @@ export function SettingsAuth() {
 }
 
 export function SettingsDeveloper({ enabled, onChange }: { enabled: boolean; onChange: (enabled: boolean) => void }) {
+  const runtime = useRuntimeInfo();
+  const showToast = useToast();
+  const [downloading, setDownloading] = useState(false);
+  const download = async () => {
+    setDownloading(true);
+    try { await downloadSettingsFile("runtime"); }
+    catch (error) { showToast({ tone: "error", ...toProblem(error) }); }
+    finally { setDownloading(false); }
+  };
   return <><PageHeading eyebrow="Settings / Developer" title="Developer settings" description="Diagnostics and advanced inspection for this local instance." />
     <Warning>Developer tools may expose request identifiers and provider metadata. Sensitive values remain masked.</Warning>
     <Panel title="Developer mode" detail="Enables Console and advanced diagnostics in the navigation." className="section-gap"><div className="list-row"><div><strong>Enable developer mode</strong><small>Show Console and detailed transport diagnostics.</small></div><input type="checkbox" checked={enabled} onChange={(e) => onChange(e.target.checked)} aria-label="Enable developer mode" /></div></Panel>
-    <Panel title="Diagnostics" className="section-gap"><div className="list-row"><div><strong>Trace retention</strong><small>Local sanitized diagnostics only.</small></div><Pill tone="info">7 days</Pill></div><Button>Download diagnostics</Button></Panel>
+    <Panel title="Diagnostics" className="section-gap">
+      {runtime.error ? <Warning tone="danger"><code>{toProblem(runtime.error).code}</code> · {toProblem(runtime.error).message}<Button onClick={() => { void runtime.refetch(); }}>Retry</Button></Warning>
+        : !runtime.data ? <StateBlock state="loading" /> : <>
+          <div className="list-row"><div><strong>Usage retention</strong><small>Metadata only, no request or response bodies. Change AIGATE_USAGE_RETENTION_DAYS and restart.</small></div><span>{runtime.data.usageRetentionDays} days</span></div>
+          <p className="muted">Daily totals: {runtime.data.dailyRetentionDays} days. Console uses a bounded in-memory ring since startup.</p>
+          <p className="muted">Usage writer: {runtime.data.writer.queued} queued · {runtime.data.writer.dropped} dropped · {runtime.data.writer.failed} failed batches.</p>
+        </>}
+      <Button onClick={() => { void download(); }} disabled={downloading}>Download runtime info</Button><p className="muted">Includes runtime configuration and counters; no credentials or request bodies.</p>
+    </Panel>
   </>;
 }
 

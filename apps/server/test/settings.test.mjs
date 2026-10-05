@@ -1,6 +1,9 @@
 // Contract: docs/contracts/settings.md
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { eq } from "drizzle-orm";
+import { settings } from "@aigate/database";
+import { DATABASE } from "../dist/database.provider.js";
 import { boot, setUp, withTempDb } from "./helpers.mjs";
 
 async function signedIn(file, run) {
@@ -69,3 +72,70 @@ test("PATCH rejects unknown, secret, and wrongly typed keys without changing any
     }
     assert.equal((await request("GET")).json().requireApiKey, true, "nothing changed");
   })));
+
+test("portable settings: safe export, preview, validation, merge and atomic stale-import refusal", () =>
+  withTempDb(async (file) => {
+    const { app, call } = await boot(file, { usageTimezone: "UTC", usageRetentionDays: 31 });
+    try {
+      assert.equal((await call({ url: "/api/settings/export" })).statusCode, 401);
+      assert.equal((await call({ url: "/api/settings/runtime" })).statusCode, 401);
+      for (const url of ["/api/settings/import/preview", "/api/settings/import"]) {
+        assert.equal((await call({ method: "POST", url, body: {} })).statusCode, 401);
+      }
+      const cookie = await setUp(call);
+      const dash = (request) => call({ ...request, cookie });
+      await dash({ method: "PATCH", url: "/api/settings", body: { headroomUrl: "https://helper.example/compress?token=do-not-export" } });
+      const exported = await dash({ url: "/api/settings/export" });
+      const document = exported.json();
+      assert.equal(exported.headers["cache-control"], "no-store");
+      assert.match(exported.headers["content-disposition"], /aigate-settings.json/);
+      assert.deepEqual([document.format, document.version], ["aigate-settings", 1]);
+      assert.deepEqual(Object.keys(document.settings).sort(), [
+        "requireLogin", "requireApiKey", "fallbackStrategy", "comboStickyLimit", "tokenSaverEnabled", "rtkEnabled",
+        "headroomEnabled", "headroomCompressUserMessages", "headroomTimeoutMs", "cavemanEnabled", "cavemanLevel",
+        "ponytailEnabled", "ponytailLevel", "pxpipeEnabled", "pxpipeMinChars", "pxpipeTimeoutMs",
+      ].sort(), "only the 16 transferable keys are exported");
+      assert.ok(!exported.body.includes("headroomUrl") && !exported.body.includes("do-not-export"));
+      const runtime = (await dash({ url: "/api/settings/runtime" })).json();
+      assert.deepEqual([runtime.usageTimezone, runtime.usageRetentionDays, runtime.dailyRetentionDays, runtime.port], ["UTC", 31, 400, null]);
+      assert.ok(!JSON.stringify(runtime).includes("do-not-export"));
+
+      const partial = { format: "aigate-settings", version: 1, settings: { comboStickyLimit: 8 } };
+      const previewResponse = await dash({ method: "POST", url: "/api/settings/import/preview", body: partial });
+      assert.equal(previewResponse.statusCode, 200, previewResponse.body);
+      assert.equal(previewResponse.headers["cache-control"], "no-store");
+      const preview = previewResponse.json();
+      assert.deepEqual(preview.changes, [{ key: "comboStickyLimit", before: 1, after: 8 }]);
+      assert.equal((await dash({ url: "/api/settings" })).json().comboStickyLimit, 1, "preview does not write");
+      const imported = await dash({ method: "POST", url: "/api/settings/import", body: { document: partial, expectedVersion: preview.version } });
+      assert.equal(imported.statusCode, 200, imported.body);
+      assert.equal(imported.headers["cache-control"], "no-store");
+      assert.equal(imported.json().comboStickyLimit, 8);
+      assert.equal(imported.json().headroomUrl, "https://helper.example/compress?token=do-not-export", "omitted service URL stays on the target");
+      const stale = await dash({ method: "POST", url: "/api/settings/import", body: { document: partial, expectedVersion: preview.version } });
+      assert.deepEqual([stale.statusCode, stale.json().code], [409, "SETTINGS_CHANGED"]);
+
+      for (const invalid of [
+        { ...partial, version: 2 }, { ...partial, format: "9router" }, { ...partial, extra: true },
+        { ...partial, settings: {} }, { ...partial, settings: { password: "x" } },
+        { ...partial, settings: { headroomUrl: "https://helper.example" } },
+        { ...partial, settings: { comboStickyLimit: 0 } }, { ...partial, padding: "x".repeat(65_536) },
+      ]) {
+        const answer = await dash({ method: "POST", url: "/api/settings/import/preview", body: invalid });
+        assert.deepEqual([answer.statusCode, answer.json().code], [400, "INVALID_REQUEST"]);
+      }
+      assert.equal((await dash({ url: "/api/settings" })).json().comboStickyLimit, 8, "invalid documents change nothing");
+      for (const body of [null, [], {}, { document: partial, expectedVersion: "bad-version" },
+        { document: partial, expectedVersion: preview.version, extra: true }]) {
+        const answer = await dash({ method: "POST", url: "/api/settings/import", body });
+        assert.deepEqual([answer.statusCode, answer.json().code], [400, "INVALID_REQUEST"]);
+      }
+
+      const reviewed = (await dash({ method: "POST", url: "/api/settings/import/preview", body: partial })).json();
+      // Simulate a write after the cached version was reviewed; SQL must guard even if the cache is stale.
+      await app.get(DATABASE).db.update(settings).set({ comboStickyLimit: 9 }).where(eq(settings.id, 1));
+      const raced = await dash({ method: "POST", url: "/api/settings/import", body: { document: partial, expectedVersion: reviewed.version } });
+      assert.deepEqual([raced.statusCode, raced.json().code], [409, "SETTINGS_CHANGED"]);
+      assert.equal((await dash({ url: "/api/settings" })).json().comboStickyLimit, 9);
+    } finally { await app.close(); }
+  }));

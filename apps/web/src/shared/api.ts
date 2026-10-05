@@ -20,6 +20,24 @@ export class ApiError extends Error {
   }
 }
 
+function requestFailure(error: unknown, timeoutMs = REQUEST_TIMEOUT_MS): ApiError {
+  if (error instanceof ApiError) return error;
+  if (error instanceof DOMException && error.name === "TimeoutError") {
+    return new ApiError(0, "TIMEOUT", `AIGate did not answer within ${timeoutMs / 1000} seconds.`, { timeoutSeconds: timeoutMs / 1000 });
+  }
+  return new ApiError(0, "NETWORK_ERROR", "Could not reach AIGate.");
+}
+
+async function checkedResponse(response: Response): Promise<Response> {
+  if (response.ok) return response;
+  const payload: unknown = await response.json().catch(() => ({}));
+  const record = typeof payload === "object" && payload !== null ? Object.fromEntries(Object.entries(payload)) : {};
+  const code = typeof record.code === "string" ? record.code : `HTTP_${response.status}`;
+  const message = typeof record.message === "string" ? record.message : response.statusText || "Request failed";
+  if (code === "UNAUTHENTICATED" && typeof window !== "undefined") window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
+  throw new ApiError(response.status, code, message, record);
+}
+
 async function send(path: string, method: string, body: unknown, timeoutMs = REQUEST_TIMEOUT_MS, signal?: AbortSignal): Promise<Response> {
   let response: Response;
   try {
@@ -30,19 +48,25 @@ async function send(path: string, method: string, body: unknown, timeoutMs = REQ
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.any([signal ?? AbortSignal.timeout(timeoutMs), AbortSignal.timeout(timeoutMs)]),
     });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "TimeoutError") {
-      throw new ApiError(0, "TIMEOUT", `AIGate did not answer within ${timeoutMs / 1000} seconds.`, { timeoutSeconds: timeoutMs / 1000 });
+  } catch (error) { throw requestFailure(error, timeoutMs); }
+  return checkedResponse(response);
+}
+
+// The deadline covers the handshake only; the usage reader owns heartbeat/body cancellation.
+export async function apiStream(path: string, signal: AbortSignal): Promise<Response> {
+  const deadline = new AbortController();
+  const timer = setTimeout(() => deadline.abort(new DOMException("Stream handshake timed out", "TimeoutError")), REQUEST_TIMEOUT_MS);
+  try {
+    // eslint-disable-next-line aigate/fetch-timeout -- clearable 10s handshake deadline above; caller bounds streamed body separately.
+    const response = await fetch(path, { credentials: "same-origin", headers: { accept: "text/event-stream" }, signal: AbortSignal.any([signal, deadline.signal]) });
+    await checkedResponse(response);
+    if (!response.body || !/^text\/event-stream(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "")) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new ApiError(response.status, "BAD_RESPONSE", "AIGate did not return a live usage stream.");
     }
-    throw new ApiError(0, "NETWORK_ERROR", "Could not reach AIGate.");
-  }
-  if (response.ok) return response;
-  const payload: unknown = await response.json().catch(() => ({}));
-  const record = typeof payload === "object" && payload !== null ? Object.fromEntries(Object.entries(payload)) : {};
-  const code = typeof record.code === "string" ? record.code : `HTTP_${response.status}`;
-  const message = typeof record.message === "string" ? record.message : response.statusText || "Request failed";
-  if (code === "UNAUTHENTICATED" && typeof window !== "undefined") window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
-  throw new ApiError(response.status, code, message, record);
+    return response;
+  } catch (error) { deadline.abort(); throw requestFailure(error); }
+  finally { clearTimeout(timer); }
 }
 
 // timeoutMs: only for calls the server itself bounds longer, such as a connection test.

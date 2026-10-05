@@ -924,6 +924,41 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
+- id: usage.overview-summary
+  group: Usage
+  feature: Gateway overview
+  subFeature: SP26 aggregate overview and existing live usage stream
+  trigger: Dashboard Overview at /
+  input: "GET /api/overview/summary; existing GET /api/usage/stream"
+  output: "24h client request metrics, prior 24h, hourly sparklines, last-hour provider health, enabled account attention, writer state"
+  businessRules:
+    - "REFERENCE_BEHAVIOR: preserve usage, active-call and recent-attempt visibility from usage.stats-query-dual-path and usage.sse-live-stream; no credentials or request bodies reach Overview."
+    - "REFERENCE_BEHAVIOR: AIGate design section 10.9.1 adds one summary request plus the existing usage SSE to replace Overview fixtures; requests count client rows, cost/tokens include their attempts, and failed fallback attempts affect provider health. docs/contracts/overview.md defines the contract."
+    - "REFERENCE_BEHAVIOR: AIGate windows are rolling half-open 24h intervals; SQL aggregates history into 48 buckets, 200 provider rows and 100 attention alerts, with explicit list truncation. Zero traffic and zero comparison baseline are explicit."
+    - "REFERENCE_BEHAVIOR: enabled-account attention includes live locks, failed credential tests, OAuth expiry within three days and fresh cached quota at 10 percent remaining or exhausted; unknown quota and unobserved provider health are not fabricated."
+    - "REFERENCE_BEHAVIOR: SP26 completion consumes the same SSE endpoint with native fetch to preserve actual HTTP errors: only server USAGE_STREAM_BUSY is a tab-limit refusal, UNAUTHENTICATED ends the session, and EOF is USAGE_STREAM_DISCONNECTED. Do not guess status from EventSource.CLOSED."
+    - "REFERENCE_BEHAVIOR: handshake 10s, heartbeat 60s, line buffer 1 MiB, three consecutive failed connections, fixed 1s/2s reconnect delays and manual Reconnect; unmount/restart cancels requests, readers and timers. Malformed snapshots stop with BAD_RESPONSE."
+    - "REFERENCE_BEHAVIOR: disconnect makes active counts unknown and recent rows explicitly last-received; one trailing refresh preserves writes arriving inside the five-second summary throttle."
+    - "REFERENCE_BEHAVIOR: server shutdown closes the existing live replies and releases their listeners/timers before waiting for HTTP sockets; Overview endpoint and core status counts remain visible at mobile widths."
+    - "IMPLEMENTATION_ACCIDENT: do not port reference whole-history JavaScript scans or a new SSE singleton; reuse SQL aggregation, UsageRecorder and QuotaService's bounded cache with no vendor calls on Overview."
+  state: { reads: [usage_requests, usage_events, provider_connections, account_locks, QuotaService cache], writes: [], runtimeOnly: [existing UsageRecorder live ring and SSE] }
+  dependencies: [usage.stats-query-dual-path, usage.sse-live-stream]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: "dashboard API timeout 10s", quota: "cache only; no vendor requests" }
+  errorCases:
+    - { code: INTERNAL_ERROR, when: "summary database read fails; dashboard shows HTTP failure with Retry", partial: false }
+  sideEffects: []
+  persistence: [existing usage and connection tables only]
+  performanceConcerns: ["Aggregate indexed 48h/1h windows in SQL; bounded result rows, fixed query fan-out, no N+1 vendor reads"]
+  behavior: { streaming: true, cancellation: "fetch/read cancellation and timer cleanup on unmount or manual reconnect", concurrency: "existing 16-client server limit; one connection and bounded timers per view" }
+  edgeCases: ["restart empties the recent-attempt ring but keeps historical summary", "unpriced attempts make cost partial", "disabled/deleted accounts and expired caches/locks do not alert"]
+  evidence:
+    - { file: src/lib/db/repos/usageRepo.js, line: 346, note: "reference usage stats; AIGate Overview is specified separately in design section 10.9.1" }
+    - { file: src/app/api/usage/stats/route.js, line: 8, note: "reference dashboard stats entry; no reference Overview endpoint is claimed" }
+  newModule: usage
+  parityStatus: verified
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
+
 - id: quota.auto-ping-window-warming
   group: Quota Tracker
   feature: Quota UI

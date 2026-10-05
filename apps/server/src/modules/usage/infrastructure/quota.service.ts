@@ -216,6 +216,11 @@ export class QuotaService {
     return view?.isActive ? this.one(view, true) : undefined;
   }
 
+  // Overview consumes only fresh successful readings; opening it never starts vendor traffic.
+  cached(now: number): QuotaView[] {
+    return [...this.cache.values()].filter((entry) => entry.expiresAt > now).map((entry) => entry.value);
+  }
+
   private async one(connection: ConnectionView, force: boolean): Promise<QuotaView> {
     const now = Date.now(); const hit = this.cache.get(connection.id);
     if (!force && hit && hit.expiresAt > now) return { ...hit.value, cached: true };

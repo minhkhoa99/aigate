@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { settings, type DatabaseHandle } from "@aigate/database";
 import { DATABASE } from "../../../database.provider.js";
 import type { Settings, SettingsPatch } from "../domain/settings.js";
@@ -13,6 +14,10 @@ const columns = {
   ponytailLevel: settings.ponytailLevel, pxpipeEnabled: settings.pxpipeEnabled, pxpipeMinChars: settings.pxpipeMinChars,
   pxpipeTimeoutMs: settings.pxpipeTimeoutMs,
 };
+
+export class SettingsChangedError extends Error {}
+export const settingsVersion = (value: Settings): string => createHash("sha256")
+  .update(JSON.stringify(Object.keys(columns).map((key) => [key, Reflect.get(value, key)]))).digest("hex");
 
 // Read on the request hot path, so the row is cached and replaced on every write.
 // ponytail: assumes this process is the only writer; other tools must change settings through the API.
@@ -30,11 +35,17 @@ export class SettingsRepository {
     return this.current;
   }
 
-  async update(patch: SettingsPatch): Promise<Settings> {
-    await this.get();
+  async update(patch: SettingsPatch, expectedVersion?: string): Promise<Settings> {
+    const current = await this.get();
+    if (expectedVersion !== undefined && settingsVersion(current) !== expectedVersion) throw new SettingsChangedError("Settings changed since preview. Preview the document again.");
     if (Object.keys(patch).length === 0) return this.get();
-    const [row] = await this.database.db.update(settings).set(patch).where(eq(settings.id, ROW_ID)).returning(columns);
-    if (!row) throw new Error("settings row disappeared during update");
+    const unchanged = expectedVersion === undefined ? [] : Object.entries(columns).map(([key, column]) => eq(column, Reflect.get(current, key)));
+    const [row] = await this.database.db.update(settings).set(patch).where(and(eq(settings.id, ROW_ID), ...unchanged)).returning(columns);
+    if (!row) {
+      this.current = undefined;
+      if (expectedVersion !== undefined) throw new SettingsChangedError("Settings changed since preview. Preview the document again.");
+      throw new Error("settings row disappeared during update");
+    }
     this.current = Promise.resolve(row);
     return row;
   }

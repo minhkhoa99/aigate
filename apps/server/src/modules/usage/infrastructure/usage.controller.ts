@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Header, Query, Res, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Header, Query, Res, ServiceUnavailableException, type OnModuleDestroy } from "@nestjs/common";
 import type { FastifyReply } from "fastify";
 import { addDays, csvField, InvalidPeriod, parsePeriod, startOfDay, type UsageRange } from "../domain/usage.js";
 import { DisplayNames } from "./display-names.js";
@@ -22,14 +22,18 @@ const counters = (row: Counters): Counters => ({
 interface Bucket { start: number; day?: string; requests: number; cost: number; tokens: Record<string, number> }
 
 @Controller("api/usage")
-export class UsageController {
-  private streams = 0;
+export class UsageController implements OnModuleDestroy {
+  private readonly streams = new Set<FastifyReply["raw"]>();
 
   constructor(
     private readonly usage: UsageRepository,
     private readonly recorder: UsageRecorder,
     private readonly displayNames: DisplayNames,
   ) {}
+
+  onModuleDestroy(): void {
+    for (const raw of this.streams) raw.destroy();
+  }
 
   @Get("summary")
   @Header("Cache-Control", "no-store")
@@ -92,10 +96,10 @@ export class UsageController {
   // usage.sse-live-stream: the live counts on connect, then after changes (debounced), with a keepalive comment.
   @Get("stream")
   stream(@Res() reply: FastifyReply): void {
-    if (this.streams >= MAX_STREAMS) throw new ServiceUnavailableException({ code: "USAGE_STREAM_BUSY", message: `${MAX_STREAMS} live usage views are already open. Close another dashboard tab and reload.` });
-    this.streams += 1;
+    if (this.streams.size >= MAX_STREAMS) throw new ServiceUnavailableException({ code: "USAGE_STREAM_BUSY", message: `${MAX_STREAMS} live usage views are already open. Close another dashboard tab and reload.` });
     reply.hijack();
     const raw = reply.raw;
+    this.streams.add(raw);
     raw.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache", "x-accel-buffering": "no" });
     let pending: NodeJS.Timeout | undefined;
     const write = (text: string) => {
@@ -106,7 +110,7 @@ export class UsageController {
     const off = this.recorder.onChange(() => { pending ??= setTimeout(() => { pending = undefined; send(); }, PUSH_DEBOUNCE_MS); });
     const ping = setInterval(() => write(": ping\n\n"), PING_MS);
     raw.once("close", () => {
-      this.streams -= 1;
+      this.streams.delete(raw);
       off();
       clearInterval(ping);
       clearTimeout(pending);

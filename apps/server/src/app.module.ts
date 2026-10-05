@@ -1,4 +1,5 @@
 import { Module, type DynamicModule } from "@nestjs/common";
+import { resolve } from "node:path";
 import type { DatabaseHandle } from "@aigate/database";
 import type { HttpTransportPort } from "@aigate/engine";
 import { DatabaseModule } from "./database.provider.js";
@@ -10,6 +11,7 @@ import type { ChatLimits } from "./modules/routing/infrastructure/chat-lane.js";
 import { RoutingModule } from "./modules/routing/routing.module.js";
 import { IdentityModule } from "./modules/identity/identity.module.js";
 import { SettingsModule } from "./modules/settings/settings.module.js";
+import { RUNTIME_CONFIG, RuntimeController } from "./modules/settings/infrastructure/runtime.controller.js";
 import { TransportModule } from "./modules/transport/transport.module.js";
 import type { UsageConfig } from "./modules/usage/infrastructure/usage-recorder.js";
 import { UsageModule } from "./modules/usage/usage.module.js";
@@ -25,7 +27,8 @@ export class AppModule {
         DatabaseModule.with(database), SecretsModule.with(cipher), TransportModule.with(transport),
         SettingsModule, IdentityModule, ApiKeysModule, CatalogModule, ConnectionsModule, UsageModule.with(usage), toolingModule(dataDir), RoutingModule.with(limits, dataDir),
       ],
-      controllers: [HealthController],
+      controllers: [HealthController, RuntimeController],
+      providers: [{ provide: RUNTIME_CONFIG, useValue: { dataDir: resolve(dataDir), streamIdleTimeoutMs: limits.streamIdleTimeoutMs } }],
     };
   }
 }

@@ -42,7 +42,7 @@ export function Shell() {
   const uiState = uiStateParam === "loading" || uiStateParam === "empty" || uiStateParam === "error" ? uiStateParam : "ready";
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("aigate-theme", theme); }, [theme]);
   const standalone = path === "/welcome" || path === "/login" || path === "/callback";
-  if (standalone) return <ScreenView path={path} developerMode={developerMode} onDeveloperMode={setDeveloperMode} />;
+  if (standalone) return <ScreenView path={path} developerMode={developerMode} onDeveloperMode={setDeveloperMode} theme={theme} onTheme={setTheme} />;
   // Console pages need a session (docs/contracts/identity-apikeys.md); the server enforces it, this only routes.
   if (auth.isPending) return <div className="standalone"><div className="auth-card"><StateBlock state="loading" /></div></div>;
   if (auth.isError) return <div className="standalone"><div className="auth-card"><StateBlock state="error" code={toProblem(auth.error).code}
@@ -59,12 +59,12 @@ export function Shell() {
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`} aria-label="Main navigation">
       <div className="brand"><div className="brand-mark">⌘</div><div className="brand-copy"><strong>AIGate</strong><small>LOCAL GATEWAY</small></div>
         <button className="sidebar-toggle" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setCollapsed(!collapsed)}>{collapsed ? "›" : "‹"}</button></div>
-      <div className="workspace"><Dot tone="info" /><div><strong>Local instance</strong><small>UI preview</small></div><span>⌄</span></div>
+      <div className="workspace"><Dot tone="info" /><div><strong>AIGate instance</strong><small>Dashboard</small></div><span>⌄</span></div>
       <nav className="sidebar-nav">{visibleGroups.map((group) => <div className="nav-group" key={group.group}>
         <div className="nav-group-label">{group.group}</div>{group.items.map((item) => <Link key={item.href} to={item.href} onClick={() => setMobileOpen(false)}
           aria-current={path === item.href ? "page" : undefined} className={`nav-link ${path === item.href ? "selected" : ""}`} title={item.label}>
           <span className="nav-icon" aria-hidden="true">{item.icon}</span><span className="nav-text">{item.label}</span></Link>)}</div>)}</nav>
-      <div className="sidebar-foot"><div className="system-line"><Dot tone="info" /> <span>System status</span><strong>PREVIEW</strong></div><small>Demo data · backend pending</small></div>
+      <div className="sidebar-foot"><div className="system-line"><Dot tone="info" /> <span>Session</span><strong>SIGNED IN</strong></div><small>Overview shows live gateway data</small></div>
     </aside>
     <div className="app-main">
       <header className="topbar"><div className="breadcrumb"><button className="mobile-menu" aria-label="Open menu" onClick={() => setMobileOpen(true)}>☰</button>
@@ -73,7 +73,7 @@ export function Shell() {
           <span className="latency"><Dot tone="info" /> RT --</span><button className="icon-button" aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? "☼" : "◐"}</button>
           <button className="icon-button" aria-label="Notifications">♧</button><span className="user-chip"><span>AL</span> admin@local</span></div>
       </header>
-      <main id="main-content" className="content"><ScreenView path={path} state={uiState} developerMode={developerMode} onDeveloperMode={(value) => {
+      <main id="main-content" className="content"><ScreenView path={path} state={uiState} theme={theme} onTheme={setTheme} developerMode={developerMode} onDeveloperMode={(value) => {
         setDeveloperMode(value); localStorage.setItem("aigate-developer", String(value));
       }} /></main>
     </div>

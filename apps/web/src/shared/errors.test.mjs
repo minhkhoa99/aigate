@@ -18,6 +18,7 @@ test("server codes use the details the contract returns", () => {
   assert.match(toProblem(new ApiError(401, "UNAUTHENTICATED", "x")).message, /session ended/);
   assert.match(toProblem(new ApiError(409, "LIMIT_REACHED", "x")).message, /100 API keys/);
   assert.match(toProblem(new ApiError(404, "NOT_FOUND", "x")).message, /refreshed/);
+  assert.match(toProblem(new ApiError(409, "SETTINGS_CHANGED", "x")).message, /Preview the document again/);
 });
 
 test("validation messages pass through and unknown failures stay honest", () => {
@@ -43,6 +44,9 @@ test("voice codes name the provider's failure and the next step (docs/contracts/
 
 test("a refused live usage stream says why and what to do", () => {
   assert.match(toProblem(new ApiError(503, "USAGE_STREAM_BUSY", "")).message, /Close another tab, then reload/);
+  assert.match(toProblem(new ApiError(0, "USAGE_STREAM_DISCONNECTED", "")).message, /Reconnect/);
+  assert.match(toProblem(new ApiError(401, "UNAUTHENTICATED", "")).message, /session ended/);
+  assert.match(toProblem(new ApiError(502, "HTTP_502", "")).message, /HTTP 502/);
 });
 
 test("a missing request says why it is gone (docs/contracts/usage.md)", () => {

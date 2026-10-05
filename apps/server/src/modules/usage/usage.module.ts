@@ -2,6 +2,8 @@ import { Global, Module, type DynamicModule } from "@nestjs/common";
 import { ApiKeysModule } from "../apikeys/apikeys.module.js";
 import { ConnectionsModule } from "../connections/connections.module.js";
 import { DisplayNames } from "./infrastructure/display-names.js";
+import { OverviewController } from "./infrastructure/overview.controller.js";
+import { OverviewRepository } from "./infrastructure/overview.repo.js";
 import { PricingController } from "./infrastructure/pricing.controller.js";
 import { QuotaController } from "./infrastructure/quota.controller.js";
 import { QuotaService } from "./infrastructure/quota.service.js";
@@ -20,8 +22,8 @@ export class UsageModule {
     return {
       module: UsageModule,
       imports: [ConnectionsModule, ApiKeysModule],
-      controllers: [UsageController, PricingController, RequestsController, QuotaController],
-      providers: [PricingRepository, UsageRecorder, UsageRepository, RequestsRepository, QuotaService, DisplayNames, { provide: USAGE_CONFIG, useValue: config }],
+      controllers: [UsageController, PricingController, RequestsController, QuotaController, OverviewController],
+      providers: [PricingRepository, UsageRecorder, UsageRepository, RequestsRepository, QuotaService, DisplayNames, OverviewRepository, { provide: USAGE_CONFIG, useValue: config }],
       exports: [UsageRecorder],
     };
   }

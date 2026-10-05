@@ -95,7 +95,15 @@ Stream:
 - On connect, and at most every 250 ms after a flush, it sends `data: { active, recent, writer, flushedAt }`. `active` lists the live counts; `recent` is the last 20 events.
 - A `: ping` comment is sent every 25 s.
 - At most 16 clients at once.
+- Server shutdown destroys live replies; their close handlers release listeners,
+  ping/debounce timers and stream slots before HTTP shutdown waits for sockets.
 - The dashboard refetches the summary and chart after a push, at most every 5 s.
+- Since SP26 completion, Overview and Usage share a native fetch reader for this
+  same endpoint: actual HTTP error codes, 10s handshake/60s heartbeat deadlines,
+  1 MiB line cap, bounded reconnect with a Reconnect action, and disconnect cleanup.
+  EOF is the web code `USAGE_STREAM_DISCONNECTED`; only the real server 503 means
+  `USAGE_STREAM_BUSY`. Active counts are unknown while disconnected. A trailing
+  timer preserves updates that arrive inside the five-second throttle window.
 
 Pricing PATCH:
 - Every field must be one of the five names, with a finite value ≥ 0.

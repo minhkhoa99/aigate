@@ -55,3 +55,8 @@
 .requests-filters { flex-wrap:wrap; } .requests-filters .input, .requests-filters .input:first-child { flex:0 0 auto; width:auto; min-width:150px; } .requests-check { gap:6px; color:var(--muted); font-size:11px; } .requests-more { padding:12px 14px; border-top:1px solid var(--line); display:flex; justify-content:center; }
 
 .tool-card-link { display:block; }
+.overview-status { flex-wrap:wrap; }
+.overview-status>.row:last-child { display:flex; }
+.overview-status .copy-wrap { display:flex; min-width:0; max-width:100%; }
+.overview-status .target-label { display:inline; }
+.settings-runtime td { white-space:normal; overflow-wrap:anywhere; }

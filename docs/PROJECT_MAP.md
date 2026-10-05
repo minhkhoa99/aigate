@@ -33,13 +33,13 @@ Nguồn: `docs/superpowers/specs/2026-09-22-aigate-design.md` (spec — thắng 
 |---|---|---|---|---|---|
 | U0 | U0 — Design system (tokens, Radix primitives, light/dark theme, standard states, a11y baseline) | — | — | — | — |
 | U1 | U1 — Shell (router tree, query client, layout, 7-group sidebar, SSE client, error boundary, i18n) | — | U0 | — | — |
-| U2 | U2 — Auth + Onboarding + Settings | onboarding, login, callback, settings_general, settings_auth, settings_developer | U1 | settings, identity, settings, identity | SP5, SP6 |
+| U2 | U2 — Auth + Onboarding + Settings | onboarding, login, callback, settings_general, settings_auth, settings_developer | U1 | settings, identity, settings, identity | SP27, SP5, SP6 |
 | U3 | U3 — Endpoint & Keys | endpoint_keys | U1 | apikeys, apikeys | SP6 |
 | U4 | U4 — Providers + AuthFlow + Connections (heaviest SP) | llm_providers, connections, provider_detail, authflow | U1 | connections, connections | SP11, SP16, SP17 |
 | U5 | U5 — Media Providers | media_providers | U4, U1 | — | SP23 |
 | U6 | U6 — Routing & Fallback + Simulator | routing_fallback, token_saver? | U1 | routing, routing | SP19, SP20 |
 | U7 | U7 — Usage + Quota + Requests | usage, quota, requests, request_detail | U1 | usage, usage | SP24 |
-| U8 | U8 — Overview | overview | U3, U4, U5, U6, U7, U1 | — | — |
+| U8 | U8 — Overview | overview | U3, U4, U5, U6, U7, U1 | usage, connections | SP26 |
 | U9 | U9 — Network: Proxy Pools + Tunnel + MITM | proxy_pools, tunnel, mitm, deploy_wizard | U1 | transport, transport | SP18 |
 | U10 | U10 — Integrations: CLI Tools + Skills + MCP | cli_tools, skills, mcp, cli_tool_detail | U1 | tooling, tooling | SP25 |
 | U11 | U11 — Console + dev mode | console | U1 | — | — |
@@ -98,10 +98,10 @@ Nguồn: `docs/superpowers/specs/2026-09-22-aigate-design.md` (spec — thắng 
 | `identity` | login, JWT cookie, password, OIDC, SAML, Local Mode. | SP6, SP6 | onboarding, settings_auth, login, callback | — |
 | `media` | 9 media kinds, voice list. | SP23, SP23 | media_providers | — |
 | `routing` | The core context: 8 lanes, CIP, combo, capacity adapter, token saver. | SP12, SP20, SP22, SP7, SP9, SP10, SP14, SP15, SP17, SP19, SP21, SP12, SP19, SP20 | routing_fallback, token_saver | ai_provider |
-| `settings` | settings + guard against mass-assignment. | SP5, SP5 | settings_general, settings_developer | — |
+| `settings` | settings + guard against mass-assignment. | SP27, SP5, SP5 | settings_general, settings_developer | — |
 | `tooling` | CLI tools writer, skills, console log, tunnel, MITM control, MCP. | SP25, SP25 | console, tunnel, mitm, mcp, cli_tools, cli_tool_detail, skills | — |
 | `transport` | proxy pool, relay deploy, outbound proxy, MITM bypass DNS. | SP8, SP18, SP8, SP18 | proxy_pools, mitm, deploy_wizard | http_transport |
-| `usage` | history/daily, quota tracker, request detail, live SSE. | SP24, SP24 | overview, quota, usage, requests, request_detail | clock, event_bus |
+| `usage` | history/daily, quota tracker, request detail, live SSE. | SP26, SP24, SP24 | overview, quota, usage, requests, request_detail | clock, event_bus |
 
 ## 5 · Lỗi / khoảng trống đã biết
 

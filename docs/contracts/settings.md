@@ -61,3 +61,57 @@ Server tests call these routes through Fastify inject. They cover:
 - `400` with no change for an unknown key, a secret name, a wrong type, and a non-object body
 - `403` for a non-loopback client
 - `Cache-Control: no-store`
+
+## SP27 / M3 U2 — General, runtime and portable settings
+
+The numbered M2 roadmap ends at SP25; this slice follows SP26 Overview and
+wires General according to design §10.9.18. It is a portable settings transfer,
+not a database backup. Its v1 export contains 16 transferable keys. Connections,
+passwords, sessions, keys, proxy credentials,
+usage, combos and environment variables never enter the document. Service URLs
+(`headroomUrl`) are also excluded because their query strings may carry secrets.
+
+All routes below require the dashboard session and use `Cache-Control: no-store`.
+Successful responses are HTTP 200, including preview/apply: neither creates a
+new resource.
+
+| Method | Path | Behavior |
+|---|---|---|
+| GET | `/api/settings/runtime` | Actual listener address/port (null before listen), data directory, Node version, SQLite driver, uptime, stream idle timeout, usage timezone/retention, daily retention, and writer counters. No environment dump or credentials. |
+| GET | `/api/settings/export` | Download `aigate-settings.json`: `{ format: "aigate-settings", version: 1, settings: { ... } }`, containing only transferable typed settings, excluding service URLs. |
+| POST | `/api/settings/import/preview` | Validate the document; return `{ version, changes: [{ key, before, after }], settings }`. `version` is an opaque SHA-256 fingerprint of current settings. No writes. |
+| POST | `/api/settings/import` | `{ document, expectedVersion }`: revalidate, compare the reviewed version, and atomically merge the document's provided keys. Return the full current settings. Missing keys are preserved. |
+
+Documents are at most 64 KiB, have exactly the three envelope keys above, and
+contain at least one transferable setting. Unknown keys, secrets, service URLs,
+wrong field types and unsupported versions/formats are 400
+`INVALID_REQUEST`; no setting changes. Values reuse `parseSettingsPatch` bounds.
+Import uses a conditional SQL update matching every current setting, so a PATCH
+racing a reviewed import results in 409 `SETTINGS_CHANGED`, with no overwrite.
+No preview cache, disk staging, migration or new dependency is needed. Applied
+settings take effect on the next request through the existing write-through cache.
+
+`/settings/general` shows runtime information with loading/error/Retry and
+download, links to the existing controls for auth/routing/Token Saver/proxy pools,
+and export/import actions. A bounded local file read submits the document for
+preview; a table shows each real before/after value, and a type-to-confirm IMPORT
+dialog precedes Apply. Failures re-read settings; stale previews require a new
+preview. Export is available before importing so a user can keep the prior values.
+No fake Save, instance-name/default-model, startup or observability controls remain.
+The runtime table wraps long startup labels and data-directory paths so running
+values remain readable on narrow screens without horizontal table scrolling.
+
+Theme uses the shell's existing local state/localStorage and applies immediately
+in this browser. `/settings/developer` keeps its browser-local developer-mode
+toggle, shows actual usage retention/writer status, and downloads the same runtime
+metadata instead of a fake seven-day diagnostic archive. Retention, port and data
+directory are startup settings; the UI identifies their environment variables
+and restart requirement. Full i18n, automatic updates, OS startup registration
+and complete installation backup remain separate features.
+
+`SETTINGS_CHANGED` reaches `shared/errors.ts` with a precise re-preview instruction;
+other errors reuse the existing validation, session and transport mappings.
+Runnable check: the settings transfer case in `apps/server/test/settings.test.mjs`.
+It covers route auth/status/no-store, export redaction, preview-only behavior,
+validation, merge and stale-import refusal. The shared web error check covers
+the actionable `SETTINGS_CHANGED` message.

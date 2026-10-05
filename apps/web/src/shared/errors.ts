@@ -21,6 +21,7 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   LIMIT_REACHED: "You have reached the maximum of 100 API keys. Revoke one you no longer use.",
   NOT_FOUND: (body) => typeof body.message === "string" ? body.message : "That item no longer exists. The list was refreshed.",
   CONFLICT: (body) => typeof body.message === "string" ? body.message : "That resource already exists. Choose another name.",
+  SETTINGS_CHANGED: "Settings changed since your import preview. Preview the document again before applying it.",
   PROVIDER_UNAVAILABLE: (body) => typeof body.message === "string" ? body.message : "The relay provider could not complete this deployment. Try again.",
   // docs/contracts/connections.md. The server message gives the catalog reason.
   PROVIDER_NOT_SUPPORTED: (body) => typeof body.message === "string" ? body.message : "This provider cannot be connected yet.",
@@ -36,6 +37,7 @@ const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => stri
   VOICE_PREVIEW_FAILED: (body) => typeof body.message === "string" ? body.message : "The provider could not generate a voice preview.",
   // docs/contracts/usage.md.
   USAGE_STREAM_BUSY: "Live usage updates are off: too many dashboard tabs are watching usage. Close another tab, then reload this page.",
+  USAGE_STREAM_DISCONNECTED: "The live usage connection closed. Reconnect to resume live updates; the last received rows are historical.",
   LOG_STREAM_BUSY: "Live console updates are off: all eight log streams are in use. Close another dashboard tab and reload this page.",
   TUNNEL_SECURITY_REQUIRED: (body) => typeof body.message === "string" ? body.message : "Secure dashboard login and API keys before enabling a public tunnel.",
   TUNNEL_ROUTE_CONFLICT: (body) => typeof body.message === "string" ? body.message : "Another Tailscale Funnel route is active. Review it before enabling AIGate.",
