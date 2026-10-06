@@ -1,64 +1,29 @@
 import { ApiError } from "./api.ts";
+import { translate, type Language, type MessageKey, type Params } from "./i18n.ts";
 
-// One table from error code to what the user should read and do (docs/design/API_UI_MAP.md,
-// "Error handling"). Server codes come from docs/contracts/*.md; transport codes from shared/api.ts.
 export type Problem = { code: string; message: string };
+// Only app-owned advice is translated. Raw provider/validation detail remains verbatim.
+const PASSTHROUGH = new Set(["NOT_FOUND", "CONFLICT", "PROVIDER_UNAVAILABLE", "PROVIDER_NOT_SUPPORTED", "ALREADY_CONNECTED",
+  "NO_ACTIVE_CONNECTION", "VOICE_PREVIEW_FAILED", "TUNNEL_SECURITY_REQUIRED", "TUNNEL_ROUTE_CONFLICT"]);
 
-const MESSAGES: Record<string, string | ((body: Record<string, unknown>) => string | undefined)> = {
-  NETWORK_ERROR: "Could not reach AIGate. Check that the server is running, then try again.",
-  TIMEOUT: (body) => `AIGate did not answer within ${typeof body.timeoutSeconds === "number" ? body.timeoutSeconds : 10} seconds. Try again.`,
-  BAD_RESPONSE: "AIGate returned a response the dashboard could not read. Refresh the page.",
-  UNAUTHENTICATED: "Your session ended. Sign in again.",
-  INVALID_CREDENTIALS: (body) => typeof body.remainingBeforeLock === "number"
-    ? `The password did not match. ${body.remainingBeforeLock} attempt(s) left before a temporary lock.`
-    : "The password did not match.",
-  RATE_LIMITED: (body) => typeof body.retryAfter === "number"
-    ? `Too many failed attempts. Try again in ${body.retryAfter}s.`
-    : "Too many failed attempts. Wait a moment and try again.",
-  NOT_LOCAL: "Set the first password on the machine running AIGate, or start AIGate with AIGATE_INITIAL_PASSWORD.",
-  ALREADY_SET_UP: "A dashboard password already exists. Sign in instead.",
-  SETUP_REQUIRED: "Set a dashboard password first.",
-  LIMIT_REACHED: "You have reached the maximum of 100 API keys. Revoke one you no longer use.",
-  NOT_FOUND: (body) => typeof body.message === "string" ? body.message : "That item no longer exists. The list was refreshed.",
-  CONFLICT: (body) => typeof body.message === "string" ? body.message : "That resource already exists. Choose another name.",
-  SETTINGS_CHANGED: "Settings changed since your import preview. Preview the document again before applying it.",
-  PROVIDER_UNAVAILABLE: (body) => typeof body.message === "string" ? body.message : "The relay provider could not complete this deployment. Try again.",
-  // docs/contracts/connections.md. The server message gives the catalog reason.
-  PROVIDER_NOT_SUPPORTED: (body) => typeof body.message === "string" ? body.message : "This provider cannot be connected yet.",
-  ALREADY_CONNECTED: (body) => typeof body.message === "string" ? body.message : "This provider is already connected. Use Replace key on its row instead.",
-  // docs/contracts/oauth.md: the provider refused the sign-in; its own words follow.
-  OAUTH_FAILED: (body) => typeof body.message === "string" ? `The sign-in failed: ${body.message}` : "The sign-in failed. Try again.",
-  CREDENTIAL_UNREADABLE: "The saved key can no longer be decrypted, because the secret key file changed. Use Replace key to enter it again.",
-  // docs/contracts/custom-models.md: 9router's words, the upstream status only (kept by user decision).
-  MODELS_FETCH_FAILED: (body) => typeof body.message === "string" ? `${body.message}. Test the connection to see why.` : "Failed to fetch models. Test the connection to see why.",
-  NO_ACTIVE_CONNECTION: (body) => typeof body.message === "string" ? body.message : "Add or enable a provider connection to hear this voice.",
-  // docs/contracts/speech.md: the provider refused or failed the account's voice list.
-  VOICES_FETCH_FAILED: (body) => typeof body.message === "string" ? `${body.message} Check the connection's key, then retry.` : "The provider's voice list could not be loaded. Check the connection's key, then retry.",
-  VOICE_PREVIEW_FAILED: (body) => typeof body.message === "string" ? body.message : "The provider could not generate a voice preview.",
-  // docs/contracts/usage.md.
-  USAGE_STREAM_BUSY: "Live usage updates are off: too many dashboard tabs are watching usage. Close another tab, then reload this page.",
-  USAGE_STREAM_DISCONNECTED: "The live usage connection closed. Reconnect to resume live updates; the last received rows are historical.",
-  LOG_STREAM_BUSY: "Live console updates are off: all eight log streams are in use. Close another dashboard tab and reload this page.",
-  TUNNEL_SECURITY_REQUIRED: (body) => typeof body.message === "string" ? body.message : "Secure dashboard login and API keys before enabling a public tunnel.",
-  TUNNEL_ROUTE_CONFLICT: (body) => typeof body.message === "string" ? body.message : "Another Tailscale Funnel route is active. Review it before enabling AIGate.",
-  TUNNEL_NOT_INSTALLED: "Install and sign in to Tailscale on the AIGate host before enabling Funnel.",
-  TUNNEL_START_FAILED: "Tailscale Funnel could not start. Check the Tailscale daemon and tailnet Funnel policy.",
-  TUNNEL_STOP_FAILED: "Tailscale Funnel could not be disabled. Check the Tailscale daemon and retry.",
-  // docs/contracts/custom-providers.md.
-  NODE_LIMIT: "You have reached the maximum of 100 custom providers. Delete one you no longer use.",
-  PROXY_POOL_IN_USE: "This proxy pool is still assigned to a connection. Remove it from those connections first.",
-  // docs/contracts/combos.md.
-  COMBO_EXISTS: "A combo with this name already exists. Choose another name, or edit that combo.",
-  COMBO_LIMIT: "You have reached the maximum of 200 combos. Delete one you no longer use.",
-};
-
-export function toProblem(error: unknown): Problem {
-  if (!(error instanceof ApiError)) return { code: "UNEXPECTED", message: "Something went wrong in the dashboard. Refresh the page." };
-  const entry = MESSAGES[error.code];
-  const message = typeof entry === "function" ? entry(error.body) : entry;
-  if (message) return { code: error.code, message };
-  // Validation messages from the server name the exact field, so they are shown as they are.
-  if (error.code === "INVALID_REQUEST") return { code: error.code, message: error.message };
-  if (error.status >= 500) return { code: error.code, message: `AIGate hit an unexpected error (HTTP ${error.status}). Try again; if it keeps happening, check the server log.` };
-  return { code: error.code, message: error.message || `Request failed (HTTP ${error.status}).` };
+export function toProblem(error: unknown, language: Language = "en"): Problem {
+  const t = (key: MessageKey, params?: Params) => translate(language, key, params);
+  if (!(error instanceof ApiError)) return { code: "UNEXPECTED", message: t("errors.UNEXPECTED") };
+  const { code, body } = error;
+  const detail = typeof body.message === "string" ? body.message : undefined;
+  if (detail && PASSTHROUGH.has(code)) return { code, message: detail };
+  if (code === "INVALID_REQUEST") return { code, message: error.message };
+  if (detail !== undefined && code === "OAUTH_FAILED") return { code, message: t("errors.OAUTH_DETAIL", { message: detail }) };
+  if (detail !== undefined && code === "MODELS_FETCH_FAILED") return { code, message: t("errors.MODELS_DETAIL", { message: detail }) };
+  if (detail !== undefined && code === "VOICES_FETCH_FAILED") return { code, message: t("errors.VOICES_DETAIL", { message: detail }) };
+  const n = (value: number) => language === "en" ? String(value) : new Intl.NumberFormat("vi-VN").format(value);
+  if (code === "TIMEOUT") return { code, message: t("errors.TIMEOUT", { seconds: n(typeof body.timeoutSeconds === "number" ? body.timeoutSeconds : 10) }) };
+  if (code === "INVALID_CREDENTIALS" && typeof body.remainingBeforeLock === "number") return { code, message: t("errors.INVALID_CREDENTIALS_COUNT", { count: n(body.remainingBeforeLock) }) };
+  if (code === "RATE_LIMITED" && typeof body.retryAfter === "number") return { code, message: t("errors.RATE_LIMITED_TIME", { seconds: n(body.retryAfter) }) };
+  // Pure lookup guards own keys; unknown codes and empty raw detail retain the original HTTP fallback.
+  const key = `errors.${code}` as MessageKey;
+  const owned = detail === "" && PASSTHROUGH.has(code) ? key : t(key);
+  if (owned !== key) return { code, message: owned };
+  if (error.status >= 500) return { code, message: t("errors.HTTP_SERVER", { status: error.status }) };
+  return { code, message: error.message || t("errors.HTTP_FAILURE", { status: error.status }) };
 }

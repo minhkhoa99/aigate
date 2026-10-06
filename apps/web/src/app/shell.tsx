@@ -30,7 +30,7 @@ export function Shell() {
   // Logout in another tab, a password change, or the 24 h expiry: tell the user, then re-check status.
   useEffect(() => {
     const onSessionEnded = () => {
-      showToast({ tone: "error", ...toProblem(new ApiError(401, "UNAUTHENTICATED", "")) });
+      showToast({ tone: "error", error: new ApiError(401, "UNAUTHENTICATED", "") });
       void queryClient.invalidateQueries({ queryKey: authStatusKey });
     };
     window.addEventListener(SESSION_ENDED_EVENT, onSessionEnded);

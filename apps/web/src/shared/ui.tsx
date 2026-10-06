@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { useLocale } from "./locale";
 
 export type Tone = "healthy" | "warning" | "danger" | "muted" | "info";
 
@@ -42,17 +43,18 @@ export function Metric({ label, value, delta, tone = "healthy", bars }: {
     </div></div>;
 }
 
-export function Table({ columns, rows, empty = "No records yet" }: {
+export function Table({ columns, rows, empty }: {
   columns: string[]; rows: ReactNode[][]; empty?: string;
 }) {
+  const { t } = useLocale();
   return <div className="table-wrap"><table><thead><tr>{columns.map((c) => <th key={c}>{c}</th>)}</tr></thead>
     <tbody>{rows.length ? rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>) :
-      <tr><td colSpan={columns.length} className="table-empty">{empty}</td></tr>}</tbody></table></div>;
+      <tr><td colSpan={columns.length} className="table-empty">{empty ?? t("common.noRecords")}</td></tr>}</tbody></table></div>;
 }
 
-export function Tabs({ items, active, onChange }: { items: string[]; active: string; onChange: (item: string) => void }) {
+export function Tabs({ items, active, onChange, getLabel }: { items: string[]; active: string; onChange: (item: string) => void; getLabel?: (item: string) => string }) {
   return <div className="tabs" role="tablist">{items.map((item) => <button key={item} role="tab" aria-selected={active === item}
-    className={active === item ? "active" : ""} onClick={() => onChange(item)}>{item}</button>)}</div>;
+    className={active === item ? "active" : ""} onClick={() => onChange(item)}>{getLabel?.(item) ?? item}</button>)}</div>;
 }
 
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
@@ -68,24 +70,27 @@ export function Input({ placeholder, type = "text", defaultValue, disabled, name
 }
 
 export function CopyField({ label, value }: { label?: string; value: string }) {
+  const { t } = useLocale();
   const [copied, setCopied] = useState(false);
   return <div className="copy-wrap">{label && <span className="field-label">{label}</span>}
-    <div className="copy-field"><code>{value}</code><button aria-label={`Copy ${label ?? "value"}`} onClick={async () => {
+    <div className="copy-field"><code>{value}</code><button aria-label={t("common.copyLabel", { label: label ?? t("common.value") })} onClick={async () => {
       await navigator.clipboard.writeText(value); setCopied(true); window.setTimeout(() => setCopied(false), 2000);
-    }}>{copied ? "Copied" : "Copy"}</button></div></div>;
+    }}>{t(copied ? "common.copied" : "common.copy")}</button></div></div>;
 }
 
 export function SecretField({ label }: { label: string }) {
+  const { t } = useLocale();
   return <div className="copy-wrap"><span className="field-label">{label}</span><div className="secret-field">
-    <Pill tone="healthy">Configured</Pill><Button variant="ghost">Replace</Button></div></div>;
+    <Pill tone="healthy">{t("common.configured")}</Pill><Button variant="ghost">{t("common.replace")}</Button></div></div>;
 }
 
 export function StateBlock({ state, code, action }: {
   state: "loading" | "empty" | "error"; code?: string; action?: ReactNode;
 }) {
-  if (state === "loading") return <div className="state-block" aria-label="Loading content"><div className="skeleton wide" /><div className="skeleton" /><div className="skeleton short" /></div>;
-  if (state === "empty") return <div className="state-block"><strong>No data to display</strong><p>Connect a provider or change the current filters to see results.</p>{action}</div>;
-  return <div className="state-block error"><code>{code ?? "ERR_DATA_UNAVAILABLE"}</code><strong>Could not load this section</strong><p>Check the gateway connection and try again.</p>{action ?? <Button>Retry</Button>}</div>;
+  const { t } = useLocale();
+  if (state === "loading") return <div className="state-block" aria-label={t("common.loading")}><div className="skeleton wide" /><div className="skeleton" /><div className="skeleton short" /></div>;
+  if (state === "empty") return <div className="state-block"><strong>{t("common.empty")}</strong><p>{t("common.emptyHint")}</p>{action}</div>;
+  return <div className="state-block error"><code>{code ?? "ERR_DATA_UNAVAILABLE"}</code><strong>{t("common.loadFailed")}</strong><p>{t("common.loadHint")}</p>{action ?? <Button>{t("common.retry")}</Button>}</div>;
 }
 
 export function Warning({ children, tone = "warning" }: { children: ReactNode; tone?: "warning" | "danger" }) {
@@ -102,10 +107,11 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 }
 
 export function ConfirmDialog({ name, detail, onClose, onConfirm }: { name: string; detail?: ReactNode; onClose: () => void; onConfirm: () => void }) {
+  const { t } = useLocale();
   const [typed, setTyped] = useState("");
-  return <Modal title="Confirm removal" onClose={onClose}>
-    {detail && <p>{detail}</p>}<p>Type <code>{name}</code> to confirm this action.</p>
-    <input className="input confirm-input" aria-label={`Type ${name} to confirm`} placeholder={name} value={typed} onChange={(e) => setTyped(e.target.value)} />
-    <div className="modal-actions"><Button onClick={onClose}>Cancel</Button><Button variant="danger" disabled={typed !== name} onClick={onConfirm}>Remove {name}</Button></div>
+  return <Modal title={t("common.confirmRemoval")} onClose={onClose}>
+    {detail && <p>{detail}</p>}<p>{t("common.confirmInstruction", { name })}</p>
+    <input className="input confirm-input" aria-label={t("common.confirmAria", { name })} placeholder={name} value={typed} onChange={(e) => setTyped(e.target.value)} />
+    <div className="modal-actions"><Button onClick={onClose}>{t("common.cancel")}</Button><Button variant="danger" disabled={typed !== name} onClick={onConfirm}>{t("common.remove", { name })}</Button></div>
   </Modal>;
 }
