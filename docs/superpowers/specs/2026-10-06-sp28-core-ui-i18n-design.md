@@ -1,7 +1,8 @@
 # SP28 — core dashboard localization (EN/VI)
 
-Status: conversational design approved on 2026-10-06; this written spec awaits
-user review. No product implementation or implementation plan is approved yet.
+Status: conversational design and this written spec approved on 2026-10-06.
+Implementation plan awaits user review and execution-method selection; no
+product implementation is approved yet.
 
 ## Intent and baseline
 
@@ -197,6 +198,7 @@ or an implementation plan. After written-spec approval, use the
 `superpowers:writing-plans` workflow to prepare the implementation plan. Present
 that plan and agree its execution method before editing product code.
 
-The current session can write workspace files but `.git` is read-only. Keep
-the spec intact if its checkpoint commit is refused; do not bypass that
-restriction, reset existing work or claim the commit succeeded.
+The managed permission profile declares `.git` read-only, but the normal spec
+checkpoint succeeded at `7d37a91` without an override. Use only normal scoped
+git operations and report actual results. Keep files intact if a later write
+is refused; never bypass restrictions, reset user work or claim false success.
