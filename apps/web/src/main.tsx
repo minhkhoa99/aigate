@@ -5,6 +5,7 @@ import { createRootRoute, createRoute, createRouter, RouterProvider } from "@tan
 import { navigation, extraRoutes } from "./app/navigation";
 import { Shell } from "./app/shell";
 import { ToastProvider } from "./shared/toast";
+import { LocaleProvider } from "./shared/locale";
 import { ApiError } from "./shared/api";
 import "./styles.css";
 
@@ -16,6 +17,6 @@ declare module "@tanstack/react-router" { interface Register { router: typeof ro
 // Client errors (4xx) will not succeed on retry; only transient failures get one more attempt.
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 1 } } });
 
-createRoot(document.getElementById("root")!).render(<React.StrictMode><QueryClientProvider client={queryClient}><ToastProvider>
+createRoot(document.getElementById("root")!).render(<React.StrictMode><LocaleProvider><QueryClientProvider client={queryClient}><ToastProvider>
   <RouterProvider router={router} />
-</ToastProvider></QueryClientProvider></React.StrictMode>);
+</ToastProvider></QueryClientProvider></LocaleProvider></React.StrictMode>);

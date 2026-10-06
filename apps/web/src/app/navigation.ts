@@ -1,35 +1,35 @@
 export const navigation = [
-  { group: "Overview", items: [{ label: "Overview", href: "/", icon: "▣" }] },
-  { group: "Gateway", items: [
-    { label: "Endpoint & Keys", href: "/gateway/endpoint", icon: "◇" },
-    { label: "Routing & Fallback", href: "/gateway/routing", icon: "↬" },
-    { label: "Token Saver", href: "/gateway/token-saver", icon: "◈" },
+  { group: "Overview", groupKey: "nav.overview", items: [{ label: "Overview", labelKey: "nav.overview", href: "/", icon: "▣" }] },
+  { group: "Gateway", groupKey: "nav.gateway", items: [
+    { label: "Endpoint & Keys", labelKey: "nav.endpoint", href: "/gateway/endpoint", icon: "◇" },
+    { label: "Routing & Fallback", labelKey: "nav.routing", href: "/gateway/routing", icon: "↬" },
+    { label: "Token Saver", labelKey: "nav.tokenSaver", href: "/gateway/token-saver", icon: "◈" },
   ] },
-  { group: "Providers", items: [
-    { label: "LLM Providers", href: "/providers", icon: "▤" },
-    { label: "Media Providers", href: "/providers/media", icon: "▧" },
-    { label: "Connections", href: "/providers/connections", icon: "⌁" },
-    { label: "Quota", href: "/providers/quota", icon: "◔" },
+  { group: "Providers", groupKey: "nav.providers", items: [
+    { label: "LLM Providers", labelKey: "nav.llm", href: "/providers", icon: "▤" },
+    { label: "Media Providers", labelKey: "nav.media", href: "/providers/media", icon: "▧" },
+    { label: "Connections", labelKey: "nav.connections", href: "/providers/connections", icon: "⌁" },
+    { label: "Quota", labelKey: "nav.quota", href: "/providers/quota", icon: "◔" },
   ] },
-  { group: "Traffic", items: [
-    { label: "Usage", href: "/traffic/usage", icon: "▥" },
-    { label: "Requests", href: "/traffic/requests", icon: "≡" },
-    { label: "Console", href: "/traffic/console", icon: "▢", devOnly: true },
+  { group: "Traffic", groupKey: "nav.traffic", items: [
+    { label: "Usage", labelKey: "nav.usage", href: "/traffic/usage", icon: "▥" },
+    { label: "Requests", labelKey: "nav.requests", href: "/traffic/requests", icon: "≡" },
+    { label: "Console", labelKey: "nav.console", href: "/traffic/console", icon: "▢", devOnly: true },
   ] },
-  { group: "Network", items: [
-    { label: "Proxy Pools", href: "/network/proxy-pools", icon: "⇄" },
-    { label: "Tunnel", href: "/network/tunnel", icon: "◉" },
-    { label: "MITM", href: "/network/mitm", icon: "⬡" },
+  { group: "Network", groupKey: "nav.network", items: [
+    { label: "Proxy Pools", labelKey: "nav.proxy", href: "/network/proxy-pools", icon: "⇄" },
+    { label: "Tunnel", labelKey: "nav.tunnel", href: "/network/tunnel", icon: "◉" },
+    { label: "MITM", labelKey: "nav.mitm", href: "/network/mitm", icon: "⬡" },
   ] },
-  { group: "Integrations", items: [
-    { label: "CLI Tools", href: "/integrations/cli-tools", icon: "▦" },
-    { label: "Skills", href: "/integrations/skills", icon: "✧" },
-    { label: "MCP", href: "/integrations/mcp", icon: "⌘" },
+  { group: "Integrations", groupKey: "nav.integrations", items: [
+    { label: "CLI Tools", labelKey: "nav.cli", href: "/integrations/cli-tools", icon: "▦" },
+    { label: "Skills", labelKey: "nav.skills", href: "/integrations/skills", icon: "✧" },
+    { label: "MCP", labelKey: "nav.mcp", href: "/integrations/mcp", icon: "⌘" },
   ] },
-  { group: "Settings", items: [
-    { label: "General", href: "/settings/general", icon: "⚙" },
-    { label: "Auth & Access", href: "/settings/auth", icon: "♧" },
-    { label: "Developer", href: "/settings/developer", icon: "⌥" },
+  { group: "Settings", groupKey: "nav.settings", items: [
+    { label: "General", labelKey: "nav.general", href: "/settings/general", icon: "⚙" },
+    { label: "Auth & Access", labelKey: "nav.auth", href: "/settings/auth", icon: "♧" },
+    { label: "Developer", labelKey: "nav.developer", href: "/settings/developer", icon: "⌥" },
   ] },
 ] as const;
 

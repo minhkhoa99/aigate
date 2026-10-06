@@ -950,6 +950,37 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
+- id: settings.browser-locale-core
+  group: Settings
+  feature: Core dashboard localization
+  subFeature: SP28 browser-local EN/VI for shell, Auth, Settings, Overview and shared copy
+  trigger: General language selection or initial browser preference load
+  input: "en or vi; browser localStorage aigate-language"
+  output: "Localized owned text, html lang and Intl display; unchanged server contracts"
+  businessRules:
+    - "REFERENCE_BEHAVIOR: persist a supported display-language choice; English default/fallback; AIGate scopes this slice to en/vi in browser storage."
+    - "REFERENCE_BEHAVIOR: root React locale state renders shell/Auth/Settings/Overview/shared owned copy; preserve routes, query keys, raw diagnostic messages, identifiers and literal IMPORT."
+    - "REFERENCE_BEHAVIOR: catalogs have identical keys/placeholders; interpolation is literal and own-property only; missing text uses English, denied storage keeps in-memory selection usable."
+    - "REFERENCE_BEHAVIOR: native Intl uses en-US/vi-VN, retains USD, precision and usage timezone; no refetch/SSE restart/form reset/toast lifetime extension on selection."
+    - "IMPLEMENTATION_ACCIDENT: the reference Next cookie POST /api/locale and its framework/many-language machinery are not required for the approved two-language browser-only slice."
+  state: { reads: [browser preference, static catalogs, existing query data], writes: [browser preference, html lang], runtimeOnly: [React locale state] }
+  dependencies: [settings.portable-config-general]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "unsupported saved preference falls back to English without a server request", partial: false }
+  sideEffects: ["Browser presentation preference only; no gateway mutation"]
+  persistence: [localStorage aigate-language only]
+  performanceConcerns: ["Two bundled catalogs, fixed formatters, no network fan-out/cache/queue/DOM scanning"]
+  behavior: { streaming: false, cancellation: null, concurrency: "Locale does not enter query keys or SSE lifecycle dependencies" }
+  edgeCases: ["Storage access denied", "Existing error/toast during selection", "Raw diagnostics and IMPORT remain literal"]
+  evidence:
+    - { file: src/app/api/locale/route.js, line: 8, note: "supported language check; reference persistence is a Next cookie, not AIGate's browser contract" }
+    - { file: src/i18n/config.js, line: 38, note: "English default; AIGate's scope and invariants are in docs/contracts/i18n.md" }
+  newModule: settings
+  parityStatus: contracted
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
+
 - id: settings.portable-config-general
   group: Settings
   feature: General settings integration

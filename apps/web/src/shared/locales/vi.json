@@ -1,0 +1,22 @@
+{
+  "common.retry": "Thử lại",
+  "common.refresh": "Làm mới",
+  "common.cancel": "Hủy",
+  "common.loading": "Đang tải nội dung",
+  "settings.language": "Ngôn ngữ",
+  "settings.languageHint": "Áp dụng ngay trong trình duyệt này; không nằm trong file xuất cấu hình server.",
+  "settings.languageScope": "Các màn hình chính hỗ trợ tiếng Anh và tiếng Việt. Trang tính năng khác và chẩn đoán từ server có thể vẫn dùng tiếng Anh. Tự khởi động cùng hệ điều hành là tính năng riêng.",
+  "nav.overview": "Tổng quan", "nav.gateway": "Gateway", "nav.endpoint": "Endpoint & khóa",
+  "nav.routing": "Định tuyến & dự phòng", "nav.tokenSaver": "Token Saver", "nav.providers": "Nhà cung cấp",
+  "nav.llm": "Nhà cung cấp LLM", "nav.media": "Nhà cung cấp media", "nav.connections": "Kết nối", "nav.quota": "Hạn mức",
+  "nav.traffic": "Lưu lượng", "nav.usage": "Mức sử dụng", "nav.requests": "Yêu cầu", "nav.console": "Console",
+  "nav.network": "Mạng", "nav.proxy": "Nhóm proxy", "nav.tunnel": "Tunnel", "nav.mitm": "MITM",
+  "nav.integrations": "Tích hợp", "nav.cli": "Công cụ CLI", "nav.skills": "Skills", "nav.mcp": "MCP",
+  "nav.settings": "Cài đặt", "nav.general": "Chung", "nav.auth": "Xác thực & truy cập", "nav.developer": "Nhà phát triển",
+  "nav.createCombo": "Tạo combo", "nav.editCombo": "Sửa combo", "nav.mediaDetail": "Nhà cung cấp media",
+  "nav.providerDetail": "Chi tiết nhà cung cấp", "nav.requestDetail": "Chi tiết yêu cầu", "nav.cliDetail": "Chi tiết công cụ CLI",
+  "shell.openMenu": "Mở menu", "shell.closeMenu": "Đóng menu", "shell.navigation": "Điều hướng chính",
+  "shell.expand": "Mở rộng thanh bên", "shell.collapse": "Thu gọn thanh bên", "shell.localGateway": "GATEWAY CỤC BỘ",
+  "shell.instance": "Phiên bản AIGate", "shell.dashboard": "Bảng điều khiển", "shell.session": "Phiên đăng nhập", "shell.signedIn": "ĐÃ ĐĂNG NHẬP",
+  "shell.liveHint": "Tổng quan hiển thị dữ liệu gateway trực tiếp", "shell.search": "Tìm trang", "shell.theme": "Đổi giao diện", "shell.notifications": "Thông báo"
+}

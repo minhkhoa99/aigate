@@ -1,0 +1,22 @@
+{
+  "common.retry": "Retry",
+  "common.refresh": "Refresh",
+  "common.cancel": "Cancel",
+  "common.loading": "Loading content",
+  "settings.language": "Language",
+  "settings.languageHint": "Applies immediately in this browser; not included in server settings exports.",
+  "settings.languageScope": "Core screens support English and Vietnamese. Other feature pages and server diagnostics may remain in English. Operating-system startup integration is a separate feature.",
+  "nav.overview": "Overview", "nav.gateway": "Gateway", "nav.endpoint": "Endpoint & Keys",
+  "nav.routing": "Routing & Fallback", "nav.tokenSaver": "Token Saver", "nav.providers": "Providers",
+  "nav.llm": "LLM Providers", "nav.media": "Media Providers", "nav.connections": "Connections", "nav.quota": "Quota",
+  "nav.traffic": "Traffic", "nav.usage": "Usage", "nav.requests": "Requests", "nav.console": "Console",
+  "nav.network": "Network", "nav.proxy": "Proxy Pools", "nav.tunnel": "Tunnel", "nav.mitm": "MITM",
+  "nav.integrations": "Integrations", "nav.cli": "CLI Tools", "nav.skills": "Skills", "nav.mcp": "MCP",
+  "nav.settings": "Settings", "nav.general": "General", "nav.auth": "Auth & Access", "nav.developer": "Developer",
+  "nav.createCombo": "Create combo", "nav.editCombo": "Edit combo", "nav.mediaDetail": "Media Provider",
+  "nav.providerDetail": "Provider Detail", "nav.requestDetail": "Request Detail", "nav.cliDetail": "CLI Tool Detail",
+  "shell.openMenu": "Open menu", "shell.closeMenu": "Close menu", "shell.navigation": "Main navigation",
+  "shell.expand": "Expand sidebar", "shell.collapse": "Collapse sidebar", "shell.localGateway": "LOCAL GATEWAY",
+  "shell.instance": "AIGate instance", "shell.dashboard": "Dashboard", "shell.session": "Session", "shell.signedIn": "SIGNED IN",
+  "shell.liveHint": "Overview shows live gateway data", "shell.search": "Search pages", "shell.theme": "Toggle theme", "shell.notifications": "Notifications"
+}

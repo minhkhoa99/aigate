@@ -1,6 +1,8 @@
 import { useState, type ChangeEvent } from "react";
 import { Link } from "@tanstack/react-router";
 import { ApiError } from "../../shared/api";
+import { useLocale } from "../../shared/locale";
+import { normalizeLanguage } from "../../shared/i18n";
 import { toProblem, type Problem } from "../../shared/errors";
 import { Button, CopyField, Field, Modal, PageHeading, Panel, StateBlock, Table, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
@@ -9,6 +11,7 @@ import { downloadSettingsFile, useRuntimeInfo, useSettingsImport, type SettingsP
 const MAX_FILE_BYTES = 64 * 1024;
 
 export function SettingsGeneral({ theme, onTheme }: { theme: string; onTheme: (theme: string) => void }) {
+  const { language, setLanguage, t } = useLocale();
   const runtime = useRuntimeInfo();
   const imports = useSettingsImport();
   const showToast = useToast();
@@ -72,7 +75,8 @@ export function SettingsGeneral({ theme, onTheme }: { theme: string; onTheme: (t
         </div>}
     </Panel><Panel title="Presentation and controls">
       <div className="stack"><Field label="Theme" hint="Applies immediately in this browser; not included in server settings exports."><select className="input" value={theme} onChange={(event) => onTheme(event.target.value)}><option value="dark">Dark</option><option value="light">Light</option></select></Field>
-        <p className="muted">The dashboard currently uses English. Additional languages and operating-system startup integration are separate features.</p>
+        <Field label={t("settings.language")} hint={t("settings.languageHint")}><select className="input" value={language} onChange={event => setLanguage(normalizeLanguage(event.target.value))}><option value="en">English</option><option value="vi">Tiếng Việt</option></select></Field>
+        <p className="muted">{t("settings.languageScope")}</p>
         <Link to="/settings/auth" className="button">Auth and API access →</Link><Link to="/gateway/routing" className="button">Routing and fallback →</Link>
         <Link to="/gateway/token-saver" className="button">Token Saver →</Link><Link to="/network/proxy-pools" className="button">Outbound proxy pools →</Link>
       </div>
