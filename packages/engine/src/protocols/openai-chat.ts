@@ -130,7 +130,8 @@ function userPart(entry: unknown, param: string): ContentPart {
       onlyKeys(part, ["type", "text", "cache_control"], param);
       return textPart(part, param);
     case "image_url": {
-      onlyKeys(part, ["type", "image_url"], param);
+      onlyKeys(part, ["type", "image_url", "cache_control"], param);
+      if (present(part.cache_control)) cacheMark(part.cache_control, `${param}.cache_control`);
       const image = object(part.image_url, `${param}.image_url`);
       onlyKeys(image, ["url", "detail"], `${param}.image_url`);
       const source = mediaSource(string(image.url, `${param}.image_url.url`), `${param}.image_url.url`);
@@ -140,14 +141,16 @@ function userPart(entry: unknown, param: string): ContentPart {
       return { type: "image", source, detail };
     }
     case "input_audio": {
-      onlyKeys(part, ["type", "input_audio"], param);
+      onlyKeys(part, ["type", "input_audio", "cache_control"], param);
+      if (present(part.cache_control)) cacheMark(part.cache_control, `${param}.cache_control`);
       const audio = object(part.input_audio, `${param}.input_audio`);
       const mediaType = AUDIO_MEDIA_TYPES.get(string(audio.format, `${param}.input_audio.format`));
       if (mediaType === undefined) throw invalid(`${param}.input_audio.format`, "must be wav or mp3");
       return { type: "audio", source: { kind: "base64", mediaType, data: string(audio.data, `${param}.input_audio.data`) } };
     }
     case "file": {
-      onlyKeys(part, ["type", "file"], param);
+      onlyKeys(part, ["type", "file", "cache_control"], param);
+      if (present(part.cache_control)) cacheMark(part.cache_control, `${param}.cache_control`);
       const file = object(part.file, `${param}.file`);
       if (present(file.file_id)) throw unsupported("a file_id reference (send file_data instead)");
       const source = mediaSource(string(file.file_data, `${param}.file.file_data`), `${param}.file.file_data`);
@@ -164,11 +167,16 @@ function toolCalls(value: unknown, param: string): ContentPart[] {
     const at = `${param}[${i}]`;
     const call = object(entry, at);
     if (call.type !== "function") throw unknownType(call.type, at, "tool calls");
-    onlyKeys(call, ["id", "type", "function"], at);
+    onlyKeys(call, ["id", "type", "function", "cache_control", "index"], at);
+    if (present(call.cache_control)) cacheMark(call.cache_control, `${at}.cache_control`);
+    if (present(call.index) && (typeof call.index !== "number" || !Number.isInteger(call.index))) throw invalid(`${at}.index`, "must be an integer");
     const fn = object(call.function, `${at}.function`);
     const id = string(call.id, `${at}.id`);
     if (id === "") throw invalid(`${at}.id`, "must not be empty");
-    return { type: "tool_call", id, name: string(fn.name, `${at}.function.name`), arguments: string(fn.arguments, `${at}.function.arguments`) };
+    const rawArgs = fn.arguments;
+    const args = typeof rawArgs === "string" ? rawArgs : isRecord(rawArgs) || Array.isArray(rawArgs) ? JSON.stringify(rawArgs) : undefined;
+    if (args === undefined) throw invalid(`${at}.function.arguments`, "must be a string");
+    return { type: "tool_call", id, name: string(fn.name, `${at}.function.name`), arguments: args };
   });
 }
 
@@ -181,7 +189,7 @@ function toMessages(value: unknown): { system: ContentPart[]; systemMarked: bool
   for (let i = 0; i < raw.length; i++) {
     const param = `messages[${i}]`;
     const message = object(raw[i], param);
-    if (present(message.name)) throw unsupported("the message name field");
+    if (message.role !== "tool" && present(message.name)) throw unsupported("the message name field");
     switch (message.role) {
       case "system":
       case "developer":
@@ -201,11 +209,30 @@ function toMessages(value: unknown): { system: ContentPart[]; systemMarked: bool
         break;
       }
       case "assistant": {
-        onlyKeys(message, ["role", "content", "tool_calls", "refusal", "name", "audio", "function_call", "cache_control"], param);
+        onlyKeys(message, ["role", "content", "tool_calls", "refusal", "name", "audio", "function_call", "cache_control", "reasoning_content", "reasoning", "reasoning_details", "encrypted_content", "thinking", "logprobs", "annotations", "id", "index"], param);
         if (present(message.refusal)) throw unsupported("an assistant refusal");
         if (present(message.audio)) throw unsupported("assistant audio");
         if (present(message.function_call)) throw unsupported("the legacy function_call field (use tool_calls)");
+        const thinking: ContentPart[] = [];
+        if (present(message.reasoning_content)) {
+          const rc = string(message.reasoning_content, `${param}.reasoning_content`);
+          if (rc) {
+            const sig = present(message.encrypted_content) ? string(message.encrypted_content, `${param}.encrypted_content`) : undefined;
+            thinking.push({ type: "thinking", text: rc, ...(sig ? { signature: sig } : {}) });
+          } else if (present(message.encrypted_content)) {
+            string(message.encrypted_content, `${param}.encrypted_content`);
+          }
+        } else if (present(message.encrypted_content)) {
+          string(message.encrypted_content, `${param}.encrypted_content`);
+        }
+        if (present(message.reasoning) && typeof message.reasoning === "string" && message.reasoning) {
+          thinking.push({ type: "thinking", text: message.reasoning });
+        } else if (present(message.thinking) && typeof message.thinking === "string" && message.thinking) {
+          thinking.push({ type: "thinking", text: message.thinking });
+        }
+        // reasoning_details is accepted for compatibility and ignored — its text is already in reasoning_content when present.
         const parts = [
+          ...thinking,
           ...(present(message.content) ? textParts(message.content, `${param}.content`, "assistant") : []),
           ...(present(message.tool_calls) ? toolCalls(message.tool_calls, `${param}.tool_calls`) : []),
         ];
@@ -214,8 +241,9 @@ function toMessages(value: unknown): { system: ContentPart[]; systemMarked: bool
         break;
       }
       case "tool": {
-        onlyKeys(message, ["role", "content", "tool_call_id", "cache_control"], param);
+        onlyKeys(message, ["role", "content", "tool_call_id", "cache_control", "name"], param);
         const toolCallId = string(message.tool_call_id, `${param}.tool_call_id`);
+        if (present(message.name)) string(message.name, `${param}.name`);
         const content = textParts(message.content, `${param}.content`, "tool");
         messages.push({ role: "tool", content: [{ type: "tool_result", toolCallId, content }], ...messageMark(message, param) });
         break;
@@ -238,9 +266,11 @@ function toTools(value: unknown): ToolDefinition[] {
     const param = `tools[${i}]`;
     const tool = object(entry, param);
     if (tool.type !== "function") throw unknownType(tool.type, param, "tools");
-    onlyKeys(tool, ["type", "function"], param);
+    onlyKeys(tool, ["type", "function", "cache_control"], param);
+    if (present(tool.cache_control)) cacheMark(tool.cache_control, `${param}.cache_control`);
     const fn = object(tool.function, `${param}.function`);
-    onlyKeys(fn, ["name", "description", "parameters", "strict"], `${param}.function`);
+    onlyKeys(fn, ["name", "description", "parameters", "strict", "cache_control"], `${param}.function`);
+    if (present(fn.cache_control)) cacheMark(fn.cache_control, `${param}.function.cache_control`);
     const description = present(fn.description) ? string(fn.description, `${param}.function.description`) : undefined;
     const strict = optionalBoolean(fn.strict, `${param}.function.strict`);
     return {
