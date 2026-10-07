@@ -6,6 +6,7 @@ export type MessageKey = keyof typeof en;
 export type Params = Readonly<Record<string, string | number>>;
 export type Message = { key: MessageKey; params?: Params };
 export const LANGUAGE_KEY = "aigate-language";
+export function isMessageKey(key: string): key is MessageKey { return Object.hasOwn(en, key); }
 export const normalizeLanguage = (value: unknown): Language => value === "vi" ? "vi" : "en";
 export function readLanguage(read: () => string | null): Language {
   try { return normalizeLanguage(read()); } catch { return "en"; }

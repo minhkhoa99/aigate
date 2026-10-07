@@ -106,7 +106,7 @@ in this browser. `/settings/developer` keeps its browser-local developer-mode
 toggle, shows actual usage retention/writer status, and downloads the same runtime
 metadata instead of a fake seven-day diagnostic archive. Retention, port and data
 directory are startup settings; the UI identifies their environment variables
-and restart requirement. Full i18n, automatic updates, OS startup registration
+and restart requirement. Whole-dashboard i18n, automatic updates, OS startup registration
 and complete installation backup remain separate features.
 
 `SETTINGS_CHANGED` reaches `shared/errors.ts` with a precise re-preview instruction;
@@ -115,3 +115,13 @@ Runnable check: the settings transfer case in `apps/server/test/settings.test.mj
 It covers route auth/status/no-store, export redaction, preview-only behavior,
 validation, merge and stale-import refusal. The shared web error check covers
 the actionable `SETTINGS_CHANGED` message.
+
+## SP28 browser presentation
+
+General adds EN/VI selection under browser-local `aigate-language`; Auth,
+General and Developer resolve owned labels/notices/errors at render time.
+See `i18n.md`. Human counts/durations use native Intl; port, Node/driver/path,
+environment names, settings keys and raw before/after values remain literal.
+The language preference is not a server setting or settings export key.
+The 64 KiB limit, original import document/fingerprint and exact `IMPORT`
+confirmation guards are unchanged. OIDC/SAML remain existing visual previews.

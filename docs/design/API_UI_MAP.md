@@ -57,6 +57,7 @@ If an SP adds no HTTP API (for example `packages/engine`), write "no UI" in its 
 | `customHeaders`, `retryStreamErrors` on `POST`/`PATCH /api/provider-nodes` (2026-09-28) | same | `/providers/new` create and edit form: Custom headers rows (name, password-type value, Remove, + Add header up to 20; a saved header shows `Unchanged (••••1234)` and keeps its value when left empty) and the Retry stream errors checkbox (off by default); the custom provider detail page lists the header names and the retry state | `useCreateNode` / `useUpdateNode` (`headerPayload` in `node-rules.ts`) | Wired: every refusal (a reserved name such as authorization, a bad name or value, a duplicate, more than 20, a new header without a value) is an `INVALID_REQUEST` toast with the server's message |
 | `DELETE /api/provider-nodes/:id` | same | Custom provider card → Delete (type-to-confirm; says the connection and key go too) | `useDeleteNode` | Wired: refreshes custom providers and connections |
 | `GET /health` | — | none (probe) | — | No UI |
+| No HTTP API: browser presentation (SP28) | `contracts/i18n.md` | Shell/navigation; `/login`, `/welcome`, `/callback`; `/settings/general`, `/settings/auth`, `/settings/developer`; `/` and shared owned defaults | `shared/locale.tsx`, `shared/i18n.ts`; General EN/VI selector | Implemented; native checks pass, browser acceptance pending. Browser-only `aigate-language`, no server/export setting; raw diagnostics/IDs stay literal; other feature copy stays English |
 
 ## Waiting for backend
 
@@ -64,7 +65,7 @@ Each screen keeps its fixture data until the SP in the second column lands. When
 
 | Screen (route → component) | Backend SP | Notes |
 |---|---|---|
-| General language, OS startup, automatic updates and full installation backup | Future M3 slices | SP27 wires runtime, theme and portable typed settings; these broader capabilities are not represented as working controls |
+| Whole-dashboard language coverage, OS startup, automatic updates and full installation backup | Future M3 slices | SP28 implements browser EN/VI for the core screens above; other page copy and these broader capabilities remain out of scope |
 | `/settings/auth` OIDC and SAML tabs | M2 (OIDC/SAML) | Visual only |
 | OAuth on `Connections` (AuthFlow modal) | SP16 | SP11 has API-key connections only |
 | Multi-account, priority, strategies on `Connections` | SP17 | SP11 has one API-key account per provider |

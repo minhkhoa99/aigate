@@ -6,11 +6,11 @@ import { readLiveUsage, type LiveUsage } from "./usage-stream";
 export type { WriterState } from "./usage-stream";
 
 // Overview and Usage consume the same bounded stream; no feature imports another feature.
-export function useLiveUsage(): { live: LiveUsage | null; connected: boolean; stopped: Problem | null; reconnect: () => void } {
+export function useLiveUsage(): { live: LiveUsage | null; connected: boolean; failure: { error: unknown } | null; stopped: Problem | null; reconnect: () => void } {
   const client = useQueryClient();
   const [live, setLive] = useState<LiveUsage | null>(null);
   const [connected, setConnected] = useState(false);
-  const [stopped, setStopped] = useState<Problem | null>(null);
+  const [failure, setFailure] = useState<{ error: unknown } | null>(null);
   const lastRefetch = useRef(0);
   const [restart, setRestart] = useState(0);
   useEffect(() => {
@@ -18,7 +18,7 @@ export function useLiveUsage(): { live: LiveUsage | null; connected: boolean; st
     let retry: ReturnType<typeof setTimeout> | undefined;
     let refresh: ReturnType<typeof setTimeout> | undefined;
     let failures = 0;
-    setConnected(false); setStopped(null);
+    setConnected(false); setFailure(null);
     const receive = (next: LiveUsage) => {
       if (controller.signal.aborted) return;
       failures = 0;
@@ -41,11 +41,11 @@ export function useLiveUsage(): { live: LiveUsage | null; connected: boolean; st
         const retryable = error instanceof ApiError && error.code !== "USAGE_STREAM_BUSY" &&
           (error.status >= 500 || (error.status === 0 && ["NETWORK_ERROR", "TIMEOUT", "USAGE_STREAM_DISCONNECTED"].includes(error.code)));
         if (retryable && failures < 3) retry = setTimeout(() => { void connect(); }, failures * 1_000);
-        else setStopped(toProblem(error));
+        else setFailure({ error });
       }
     };
     void connect();
     return () => { controller.abort(); clearTimeout(retry); clearTimeout(refresh); };
   }, [client, restart]);
-  return { live, connected, stopped, reconnect: () => setRestart((value) => value + 1) };
+  return { live, connected, failure, stopped: failure ? toProblem(failure.error) : null, reconnect: () => setRestart((value) => value + 1) };
 }

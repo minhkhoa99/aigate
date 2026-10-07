@@ -967,8 +967,7 @@
   dependencies: [settings.portable-config-general]
   providerInteraction: null
   fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
-  errorCases:
-    - { code: INVALID_REQUEST, when: "unsupported saved preference falls back to English without a server request", partial: false }
+  errorCases: [] # Unsupported preference is a silent local fallback, not an API error.
   sideEffects: ["Browser presentation preference only; no gateway mutation"]
   persistence: [localStorage aigate-language only]
   performanceConcerns: ["Two bundled catalogs, fixed formatters, no network fan-out/cache/queue/DOM scanning"]
@@ -978,7 +977,7 @@
     - { file: src/app/api/locale/route.js, line: 8, note: "supported language check; reference persistence is a Next cookie, not AIGate's browser contract" }
     - { file: src/i18n/config.js, line: 38, note: "English default; AIGate's scope and invariants are in docs/contracts/i18n.md" }
   newModule: settings
-  parityStatus: contracted
+  parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
 
 - id: settings.portable-config-general

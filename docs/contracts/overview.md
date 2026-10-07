@@ -82,3 +82,15 @@ dependency, provider polling or extra cache is needed.
 Runnable contract check: `node --test apps/server/test/overview.test.mjs` after
 the server build. It also checks shutdown with an open live stream.
 Web stream check: `node --test apps/web/src/shared/usage-stream.test.mjs`.
+
+## SP28 presentation
+
+Overview resolves owned copy and number/time display with the selected EN/VI
+locale. USD, the summary's timezone, metric/bar math and health tones stay
+unchanged. Provider/account names, model IDs, error codes and attention.message
+are displayed verbatim. `useLiveUsage` stores one tagged raw failure, exposing
+its existing English `stopped` field for Usage and a source `failure` for
+Overview's render-time translation. Locale is absent from its effect dependencies,
+query keys and request bodies. No summary/server/stream-reader behavior changed.
+Native rendering and reader checks pass; live locale-switch lifecycle and visual
+acceptance still require the planned isolated browser checks.

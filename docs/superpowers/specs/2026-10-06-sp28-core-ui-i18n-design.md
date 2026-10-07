@@ -1,8 +1,8 @@
 # SP28 — core dashboard localization (EN/VI)
 
-Status: conversational design and this written spec approved on 2026-10-06.
-Implementation plan awaits user review and execution-method selection; no
-product implementation is approved yet.
+Status: design/spec/plan approved on 2026-10-06; user selected native execution
+and targeted tests. Core implementation and native checks are present; browser
+acceptance remains unverified. See the latest `docs/PROGRESS_HANDOFF.md` entry.
 
 ## Intent and baseline
 
