@@ -780,8 +780,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/features/overview/screens.tsx": {
-    "mtime": 1791258867.2632456,
-    "seen": 1791271882.287767,
+    "mtime": 1791392732.4135864,
+    "seen": 1791395389.645004,
     "ast_hash": "499bb2c8db2d382e4deedbff690564ce",
     "semantic_hash": ""
   },
@@ -876,8 +876,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/features/settings/screens.tsx": {
-    "mtime": 1791258693.383496,
-    "seen": 1791271882.2917962,
+    "mtime": 1791392732.4145865,
+    "seen": 1791395389.6469958,
     "ast_hash": "fe0d9eba9be4fc61809e3747c8b69481",
     "semantic_hash": ""
   },
@@ -948,8 +948,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/shared/errors.ts": {
-    "mtime": 1791272179.968545,
-    "seen": 1791272244.0810146,
+    "mtime": 1791392732.415586,
+    "seen": 1791395389.6495173,
     "ast_hash": "e7420a6b505c435e06a92b52b8efa945",
     "semantic_hash": ""
   },
@@ -1578,9 +1578,9 @@
     "semantic_hash": ""
   },
   "packages/engine/src/protocols/openai-chat.ts": {
-    "mtime": 1790515779.6895921,
-    "seen": 1790785226.0182607,
-    "ast_hash": "decf60dce615bc033448c2c0a357b6e7",
+    "mtime": 1791392682.485213,
+    "seen": 1791395389.6673167,
+    "ast_hash": "55853bcabab178caeecdaa70cf5365c1",
     "semantic_hash": ""
   },
   "packages/engine/src/protocols/openai-responses.ts": {
@@ -2088,9 +2088,9 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1791271852.8150163,
-    "seen": 1791271882.3356242,
-    "ast_hash": "5b659bfa138c7088a8edf6ee67f18c32",
+    "mtime": 1791395328.1045537,
+    "seen": 1791395389.6849153,
+    "ast_hash": "b0a0bd493ebfea4e7b5da0e7a3a53538",
     "semantic_hash": ""
   },
   "apps/web/CLAUDE.md": {
@@ -2106,14 +2106,14 @@
     "semantic_hash": ""
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1791272222.672777,
-    "seen": 1791272244.1259222,
-    "ast_hash": "0677bc8a54cbcf22258eb4091f28ba5b",
+    "mtime": 1791395328.1080792,
+    "seen": 1791395389.6855323,
+    "ast_hash": "7115e23019c95c92a8882d389989a09f",
     "semantic_hash": ""
   },
   "docs/PROJECT_MAP.md": {
-    "mtime": 1791271897.3713002,
-    "seen": 1791272244.1259222,
+    "mtime": 1791272302.3569586,
+    "seen": 1791395389.6855323,
     "ast_hash": "5cab4112e6edae1f745b1685160b1731",
     "semantic_hash": ""
   },
@@ -2298,8 +2298,8 @@
     "semantic_hash": ""
   },
   "docs/contracts/settings.md": {
-    "mtime": 1791271849.7356324,
-    "seen": 1791271882.3452964,
+    "mtime": 1791392732.4227242,
+    "seen": 1791395389.693317,
     "ast_hash": "6825d85907a3dde5223d53250abde989",
     "semantic_hash": ""
   },
@@ -2334,9 +2334,9 @@
     "semantic_hash": ""
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1791271851.8198597,
-    "seen": 1791271882.3473158,
-    "ast_hash": "4df98a65db82f62809b13605ce33b86f",
+    "mtime": 1791395328.1035423,
+    "seen": 1791395389.6947868,
+    "ast_hash": "387db6295d4b6baf50144cc237390495",
     "semantic_hash": ""
   },
   "docs/design/DESIGN.md": {
@@ -2538,9 +2538,9 @@
     "semantic_hash": ""
   },
   "docs/discovery/feature-matrix/01-endpoint-apikey-settings.yaml": {
-    "mtime": 1791271739.155748,
-    "seen": 1791271882.3534436,
-    "ast_hash": "60a4f60aa8d04643c23e236312c50c7d",
+    "mtime": 1791395328.1055536,
+    "seen": 1791395389.7015214,
+    "ast_hash": "2243f436f143da8e0835fdb0f818ac22",
     "semantic_hash": ""
   },
   "docs/discovery/feature-matrix/02-providers-auth.yaml": {
@@ -3156,21 +3156,21 @@
     "semantic_hash": ""
   },
   "apps/web/src/features/settings/general.tsx": {
-    "mtime": 1791258692.6467836,
-    "seen": 1791271882.2917962,
+    "mtime": 1791392732.4145865,
+    "seen": 1791395389.6469958,
     "ast_hash": "124800113cfdc15ddbf449785ed93309",
     "semantic_hash": ""
   },
   "apps/web/src/shared/live-usage.ts": {
-    "mtime": 1791258768.3704093,
-    "seen": 1791271882.2938094,
+    "mtime": 1791392732.4171808,
+    "seen": 1791395389.6495173,
     "ast_hash": "164106a05d588bd35bbd5cb6da1773a2",
     "semantic_hash": ""
   },
   "docs/contracts/overview.md": {
-    "mtime": 1791271850.8404098,
-    "seen": 1791271882.3376567,
-    "ast_hash": "c6ecadfbf1f6e27d6e390d0c6372d10c",
+    "mtime": 1791395328.1035423,
+    "seen": 1791395389.6884375,
+    "ast_hash": "cab8ff2a5cbc620c73d2b810ed53d94d",
     "semantic_hash": ""
   },
   "docs/contracts/tooling.md": {
@@ -3192,14 +3192,14 @@
     "semantic_hash": ""
   },
   "apps/web/src/shared/i18n.test.mjs": {
-    "mtime": 1791272152.7706635,
-    "seen": 1791272244.0810146,
+    "mtime": 1791392732.415586,
+    "seen": 1791395389.6495173,
     "ast_hash": "5467eaffdb4d63e770c12c931adc818b",
     "semantic_hash": ""
   },
   "apps/web/src/shared/i18n.ts": {
-    "mtime": 1791271737.4277744,
-    "seen": 1791271882.2938094,
+    "mtime": 1791392732.4171808,
+    "seen": 1791395389.6495173,
     "ast_hash": "b11fb609764be1323a9db302445c68aa",
     "semantic_hash": ""
   },
@@ -3210,33 +3210,33 @@
     "semantic_hash": ""
   },
   "apps/web/src/shared/locales/en.json": {
-    "mtime": 1791272177.5624192,
-    "seen": 1791272244.0820255,
+    "mtime": 1791392732.4181952,
+    "seen": 1791395389.650514,
     "ast_hash": "4bdce4420f69de8148f2a1018379f904",
     "semantic_hash": ""
   },
   "apps/web/src/shared/locales/vi.json": {
-    "mtime": 1791272178.966638,
-    "seen": 1791272244.0820255,
+    "mtime": 1791392732.4187093,
+    "seen": 1791395389.650514,
     "ast_hash": "6f839494e19f7d608baf23f8cd9b7a4b",
     "semantic_hash": ""
   },
   "docs/contracts/i18n.md": {
-    "mtime": 1791272180.9602206,
-    "seen": 1791272244.1279871,
-    "ast_hash": "65f02c5d8ef684608a30baa27a9f509b",
+    "mtime": 1791395328.101844,
+    "seen": 1791395389.6874115,
+    "ast_hash": "5045ed0e17a6ea61199437ce1a8f3313",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-10-06-sp28-core-ui-i18n.md": {
-    "mtime": 1791272031.893015,
-    "seen": 1791272244.15199,
-    "ast_hash": "cfaf91a32e811fcdcdd555d289779f21",
+    "mtime": 1791395328.1055536,
+    "seen": 1791395389.7068708,
+    "ast_hash": "95478c5c852ecf506e2feea3b29672a6",
     "semantic_hash": ""
   },
   "docs/superpowers/specs/2026-10-06-sp28-core-ui-i18n-design.md": {
-    "mtime": 1791272030.6764739,
-    "seen": 1791272244.1535091,
-    "ast_hash": "394c60df68fd259db226e228a8bc7201",
+    "mtime": 1791395328.1055536,
+    "seen": 1791395389.7085657,
+    "ast_hash": "5d15c18d9426681da17ae3b1df0050cf",
     "semantic_hash": ""
   }
 }

@@ -92,5 +92,7 @@ are displayed verbatim. `useLiveUsage` stores one tagged raw failure, exposing
 its existing English `stopped` field for Usage and a source `failure` for
 Overview's render-time translation. Locale is absent from its effect dependencies,
 query keys and request bodies. No summary/server/stream-reader behavior changed.
-Native rendering and reader checks pass; live locale-switch lifecycle and visual
-acceptance still require the planned isolated browser checks.
+Native rendering/reader checks and the isolated 2026-10-08 browser checks pass.
+Mounted switching preserves summary/SSE activity, stopped errors, last-received
+rows and manual reconnect; raw alerts and USD/timezone/health tones remain intact.
+The handoff distinguishes actual server/live rows from injected error/alert branches.

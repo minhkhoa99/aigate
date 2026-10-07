@@ -1,8 +1,9 @@
 # SP28 — core dashboard localization (EN/VI)
 
 Status: design/spec/plan approved on 2026-10-06; user selected native execution
-and targeted tests. Core implementation and native checks are present; browser
-acceptance remains unverified. See the latest `docs/PROGRESS_HANDOFF.md` entry.
+and targeted tests, then authorized completing browser acceptance/checkpoint.
+Core implementation, targeted checks and isolated browser acceptance pass
+(2026-10-08). See the latest `docs/PROGRESS_HANDOFF.md` entry.
 
 ## Intent and baseline
 
