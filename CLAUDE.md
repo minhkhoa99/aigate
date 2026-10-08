@@ -26,6 +26,16 @@ Read `docs/PROGRESS_HANDOFF.md` before resuming work. M-1 discovery is complete 
 
 ## Verify (PowerShell)
 
+SP29 / M3 U6 implements the existing Routing Simulator tab and session-guarded
+`POST /api/routing/simulate`. See `docs/contracts/routing-simulator.md`: shared
+pure model/account choices, metadata-only projections/rotation peeks, bounded
+conditional tree, OpenAI Chat input only, no vendor/refresh/decryption/usage/
+rotation execution. New tab copy uses existing EN/VI; other Routing previews
+remain labeled. Native code is committed with build/lint gates passing, but
+targeted tests/browser acceptance are unrun pending authorization and the fresh
+review attempt hit the service usage limit. Do not mark SP29 verified or redo
+its completed code; resume from the latest handoff/plan ledger.
+
 ```powershell
 pnpm install --frozen-lockfile
 git clone --filter=blob:none https://github.com/decolua/9router.git .reference/9router

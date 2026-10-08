@@ -12,9 +12,9 @@
     "semantic_hash": ""
   },
   "apps/server/package.json": {
-    "mtime": 1791209833.1768453,
-    "seen": 1791210435.0303254,
-    "ast_hash": "1b45a8256303cf82f9c4fd82f96970be",
+    "mtime": 1791432089.3221126,
+    "seen": 1791447523.8297727,
+    "ast_hash": "42197dcba3cc4aa40417d37c1c80b12e",
     "semantic_hash": ""
   },
   "apps/server/src/app.module.ts": {
@@ -126,9 +126,9 @@
     "semantic_hash": ""
   },
   "apps/server/src/modules/connections/infrastructure/connections.repo.ts": {
-    "mtime": 1790783098.510833,
-    "seen": 1790785226.0182607,
-    "ast_hash": "0c0e5ccf334efff381e4183bb84d8118",
+    "mtime": 1791431663.3154795,
+    "seen": 1791447523.8327894,
+    "ast_hash": "202e330f0b8632ce9332b4ba59ba86cc",
     "semantic_hash": ""
   },
   "apps/server/src/modules/connections/infrastructure/oauth.controller.ts": {
@@ -144,9 +144,9 @@
     "semantic_hash": ""
   },
   "apps/server/src/modules/connections/infrastructure/provider-nodes.repo.ts": {
-    "mtime": 1790599976.4855156,
-    "seen": 1790785226.0182607,
-    "ast_hash": "ceee7d2bbfe78db93ef1c5d6040c8a9d",
+    "mtime": 1791431663.316484,
+    "seen": 1791447523.8327894,
+    "ast_hash": "21b1294f4de0bcee04ad7f4cdb90eebf",
     "semantic_hash": ""
   },
   "apps/server/src/modules/connections/infrastructure/token-refresher.ts": {
@@ -258,15 +258,15 @@
     "semantic_hash": ""
   },
   "apps/server/src/modules/routing/infrastructure/capacity-pools.repo.ts": {
-    "mtime": 1790783098.5128322,
-    "seen": 1790785226.0182607,
-    "ast_hash": "93dbedf1999c65e8082f57804a5ed370",
+    "mtime": 1791431663.3174837,
+    "seen": 1791447523.8357904,
+    "ast_hash": "3fb782eb1a636afccb5708952b0ea1a6",
     "semantic_hash": ""
   },
   "apps/server/src/modules/routing/infrastructure/chat-lane.ts": {
-    "mtime": 1790783098.513833,
-    "seen": 1790785226.0182607,
-    "ast_hash": "629c25df953b796d5054c08df7ecef5f",
+    "mtime": 1791431663.3184836,
+    "seen": 1791447523.8357904,
+    "ast_hash": "57b7418039b24a0a5d14d0182f7a45de",
     "semantic_hash": ""
   },
   "apps/server/src/modules/routing/infrastructure/combos.controller.ts": {
@@ -276,9 +276,9 @@
     "semantic_hash": ""
   },
   "apps/server/src/modules/routing/infrastructure/combos.repo.ts": {
-    "mtime": 1790687601.4544327,
-    "seen": 1790785226.0182607,
-    "ast_hash": "a7427a6e9b4299056ce870f4e072f420",
+    "mtime": 1791431663.316484,
+    "seen": 1791447523.8357904,
+    "ast_hash": "4c44572c1d7f99851bb03f55affc5b01",
     "semantic_hash": ""
   },
   "apps/server/src/modules/routing/infrastructure/model-test.controller.ts": {
@@ -324,9 +324,9 @@
     "semantic_hash": ""
   },
   "apps/server/src/modules/routing/routing.module.ts": {
-    "mtime": 1790783098.5158336,
-    "seen": 1790785226.0182607,
-    "ast_hash": "54baba489eb47b1fe29491213140f9e2",
+    "mtime": 1791432089.027541,
+    "seen": 1791447523.8377924,
+    "ast_hash": "a82a504ca69fec2f07381520fc124442",
     "semantic_hash": ""
   },
   "apps/server/src/modules/settings/domain/settings.ts": {
@@ -480,9 +480,9 @@
     "semantic_hash": ""
   },
   "apps/server/src/server.ts": {
-    "mtime": 1790783098.521835,
-    "seen": 1790785226.0182607,
-    "ast_hash": "8362f7530c33323a1e1c82dee06fab03",
+    "mtime": 1791432089.027541,
+    "seen": 1791447523.8473687,
+    "ast_hash": "b6880b326b2faa43adbbfa62a9b69285",
     "semantic_hash": ""
   },
   "apps/server/test/anthropic-lane.test.mjs": {
@@ -714,9 +714,9 @@
     "semantic_hash": ""
   },
   "apps/web/package.json": {
-    "mtime": 1791257862.5850155,
-    "seen": 1791271882.2862206,
-    "ast_hash": "e35e04e833b618fdd6e65308d3c0cfa0",
+    "mtime": 1791432414.683536,
+    "seen": 1791447523.8528907,
+    "ast_hash": "8b3c553188478d0d7d8d4ab65be821f0",
     "semantic_hash": ""
   },
   "apps/web/src/app/navigation.ts": {
@@ -738,9 +738,9 @@
     "semantic_hash": ""
   },
   "apps/web/src/features/gateway/api.ts": {
-    "mtime": 1790783098.5288343,
-    "seen": 1790785226.0182607,
-    "ast_hash": "88a83b2c8abb58b758f1f3b96c30c7d1",
+    "mtime": 1791432354.7494946,
+    "seen": 1791447523.853891,
+    "ast_hash": "7d833919666917318c857290230a8f68",
     "semantic_hash": ""
   },
   "apps/web/src/features/gateway/capacity-pools.tsx": {
@@ -756,9 +756,9 @@
     "semantic_hash": ""
   },
   "apps/web/src/features/gateway/screens.tsx": {
-    "mtime": 1790783098.5288343,
-    "seen": 1790785226.0182607,
-    "ast_hash": "141d79c6ff18c7304c4c26a52a49772b",
+    "mtime": 1791432354.7494946,
+    "seen": 1791447523.853891,
+    "ast_hash": "d80be2104d654a32f7702c75244f9161",
     "semantic_hash": ""
   },
   "apps/web/src/features/integrations/screens.tsx": {
@@ -942,9 +942,9 @@
     "semantic_hash": ""
   },
   "apps/web/src/shared/errors.test.mjs": {
-    "mtime": 1791210757.3197255,
-    "seen": 1791210836.36391,
-    "ast_hash": "76724176480a9350fa2535f2daa7f0fa",
+    "mtime": 1791432288.1166158,
+    "seen": 1791447523.8588903,
+    "ast_hash": "1ad7d66b46027c461eda8cc0db0710f4",
     "semantic_hash": ""
   },
   "apps/web/src/shared/errors.ts": {
@@ -1812,9 +1812,9 @@
     "semantic_hash": ""
   },
   "tools/discovery/src/paths.ts": {
-    "mtime": 1790948302.3996377,
-    "seen": 1791192963.9941635,
-    "ast_hash": "c7e2a8e85aebc68c6438c7d94aef0565",
+    "mtime": 1791431663.3184836,
+    "seen": 1791447523.8814816,
+    "ast_hash": "e83f114f8fafc963ddc5b1bc97bd1a59",
     "semantic_hash": ""
   },
   "tools/discovery/src/schema.ts": {
@@ -1824,9 +1824,9 @@
     "semantic_hash": ""
   },
   "tools/discovery/src/validate.ts": {
-    "mtime": 1790251646.3115568,
-    "seen": 1790785226.0182607,
-    "ast_hash": "2d1a05540d4e4c686060fe959cfd97fa",
+    "mtime": 1791431663.3194847,
+    "seen": 1791447523.8824825,
+    "ast_hash": "6d4d1b140b3ec0fc6a69de15c60971c3",
     "semantic_hash": ""
   },
   "tools/discovery/test/capabilities.test.ts": {
@@ -1854,9 +1854,9 @@
     "semantic_hash": ""
   },
   "tools/discovery/test/paths.test.ts": {
-    "mtime": 1790251646.3145802,
-    "seen": 1790785226.0182607,
-    "ast_hash": "90a58288dea976956b39aa9a42ca0748",
+    "mtime": 1791431588.4303477,
+    "seen": 1791447523.8824825,
+    "ast_hash": "53a51f15cb23322f5aaaebd6611f955a",
     "semantic_hash": ""
   },
   "tools/discovery/test/schema.test.ts": {
@@ -1866,9 +1866,9 @@
     "semantic_hash": ""
   },
   "tools/discovery/test/validate.test.ts": {
-    "mtime": 1790251646.315582,
-    "seen": 1790785226.0182607,
-    "ast_hash": "7947f4de054bd32d60e466ebecc21a5d",
+    "mtime": 1791431588.4303477,
+    "seen": 1791447523.8824825,
+    "ast_hash": "fd8909d4414d4dcf1ef8a512cf13dcf1",
     "semantic_hash": ""
   },
   "tools/discovery/tsconfig.json": {
@@ -2088,9 +2088,9 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1791395328.1045537,
-    "seen": 1791395389.6849153,
-    "ast_hash": "b0a0bd493ebfea4e7b5da0e7a3a53538",
+    "mtime": 1791447743.0355403,
+    "seen": 1791447792.2646677,
+    "ast_hash": "85b0e2551faf77f370dd60626a0d502d",
     "semantic_hash": ""
   },
   "apps/web/CLAUDE.md": {
@@ -2106,21 +2106,21 @@
     "semantic_hash": ""
   },
   "docs/PROGRESS_HANDOFF.md": {
-    "mtime": 1791395328.1080792,
-    "seen": 1791395389.6855323,
-    "ast_hash": "7115e23019c95c92a8882d389989a09f",
+    "mtime": 1791447743.0365405,
+    "seen": 1791447792.2646677,
+    "ast_hash": "41da1f78689e6c060d2dd91db5c2a3a5",
     "semantic_hash": ""
   },
   "docs/PROJECT_MAP.md": {
-    "mtime": 1791272302.3569586,
-    "seen": 1791395389.6855323,
+    "mtime": 1791447602.730783,
+    "seen": 1791447792.2646677,
     "ast_hash": "5cab4112e6edae1f745b1685160b1731",
     "semantic_hash": ""
   },
   "docs/capabilities.md": {
-    "mtime": 1790613028.848914,
-    "seen": 1790785226.0182607,
-    "ast_hash": "6da1d64604d3e3c1a13b0bcb9f7da2fc",
+    "mtime": 1791447746.9357631,
+    "seen": 1791447792.2646677,
+    "ast_hash": "015898deb9f7c1bf8c34e21052d764d3",
     "semantic_hash": ""
   },
   "docs/contracts/capacity-adapter.md": {
@@ -2334,9 +2334,9 @@
     "semantic_hash": ""
   },
   "docs/design/API_UI_MAP.md": {
-    "mtime": 1791395328.1035423,
-    "seen": 1791395389.6947868,
-    "ast_hash": "387db6295d4b6baf50144cc237390495",
+    "mtime": 1791447743.033542,
+    "seen": 1791447792.270699,
+    "ast_hash": "bde550af4b402aee57993b76921c79a2",
     "semantic_hash": ""
   },
   "docs/design/DESIGN.md": {
@@ -2562,9 +2562,9 @@
     "semantic_hash": ""
   },
   "docs/discovery/feature-matrix/05-request-routing-fallback.yaml": {
-    "mtime": 1790783098.5428326,
-    "seen": 1790785226.0182607,
-    "ast_hash": "2a844b79f8dbc95436809ea70208c986",
+    "mtime": 1791447743.033542,
+    "seen": 1791447792.2766976,
+    "ast_hash": "ef12ffc3527411275893c221f642253c",
     "semantic_hash": ""
   },
   "docs/discovery/feature-matrix/06-combo-capacity-adapter.yaml": {
@@ -3210,15 +3210,15 @@
     "semantic_hash": ""
   },
   "apps/web/src/shared/locales/en.json": {
-    "mtime": 1791392732.4181952,
-    "seen": 1791395389.650514,
-    "ast_hash": "4bdce4420f69de8148f2a1018379f904",
+    "mtime": 1791432414.043384,
+    "seen": 1791447523.8588903,
+    "ast_hash": "3231861cec95f3486b32946fc86750bb",
     "semantic_hash": ""
   },
   "apps/web/src/shared/locales/vi.json": {
-    "mtime": 1791392732.4187093,
-    "seen": 1791395389.650514,
-    "ast_hash": "6f839494e19f7d608baf23f8cd9b7a4b",
+    "mtime": 1791432414.3538072,
+    "seen": 1791447523.8588903,
+    "ast_hash": "42c07c9b974427206ae4b6d44da2615b",
     "semantic_hash": ""
   },
   "docs/contracts/i18n.md": {
@@ -3237,6 +3237,90 @@
     "mtime": 1791395328.1055536,
     "seen": 1791395389.7085657,
     "ast_hash": "5d15c18d9426681da17ae3b1df0050cf",
+    "semantic_hash": ""
+  },
+  "apps/server/src/modules/connections/domain/account-selection.ts": {
+    "mtime": 1791431663.3144808,
+    "seen": 1791447523.831788,
+    "ast_hash": "03b03874488e247438cb66e5ac8ac2ca",
+    "semantic_hash": ""
+  },
+  "apps/server/src/modules/routing/domain/model-resolution.ts": {
+    "mtime": 1791431663.3144808,
+    "seen": 1791447523.8357904,
+    "ast_hash": "a07f4a57ae46f370258b00216a78a844",
+    "semantic_hash": ""
+  },
+  "apps/server/src/modules/routing/domain/routing-simulator.ts": {
+    "mtime": 1791431991.3338206,
+    "seen": 1791447523.8357904,
+    "ast_hash": "3a0baa613e7576b6fd923228f4373600",
+    "semantic_hash": ""
+  },
+  "apps/server/src/modules/routing/infrastructure/routing-simulator.controller.ts": {
+    "mtime": 1791432089.0265422,
+    "seen": 1791447523.8367925,
+    "ast_hash": "aafdb4c116e60751abe4259714ac2179",
+    "semantic_hash": ""
+  },
+  "apps/server/src/modules/routing/infrastructure/routing-simulator.ts": {
+    "mtime": 1791431991.3348203,
+    "seen": 1791447523.8367925,
+    "ast_hash": "2722c432c52d503e6cdfe67066b9ccd7",
+    "semantic_hash": ""
+  },
+  "apps/server/test/routing-decisions.test.mjs": {
+    "mtime": 1791431588.4293382,
+    "seen": 1791447523.8518925,
+    "ast_hash": "e6a8a552f48fc44d94cec496d2998e45",
+    "semantic_hash": ""
+  },
+  "apps/server/test/routing-simulator-planner.test.mjs": {
+    "mtime": 1791431991.3348203,
+    "seen": 1791447523.8518925,
+    "ast_hash": "44ac83aa5a1138c1faeed67465125d49",
+    "semantic_hash": ""
+  },
+  "apps/server/test/routing-simulator.test.mjs": {
+    "mtime": 1791432089.0265422,
+    "seen": 1791447523.8518925,
+    "ast_hash": "d053e0954399b15862ac889816cbbad5",
+    "semantic_hash": ""
+  },
+  "apps/web/src/features/gateway/routing-simulator.tsx": {
+    "mtime": 1791432414.3708267,
+    "seen": 1791447523.853891,
+    "ast_hash": "fecb8d11730a4d5356c1382da62f66b0",
+    "semantic_hash": ""
+  },
+  "apps/web/src/features/gateway/simulation-result.test.mjs": {
+    "mtime": 1791432288.1151068,
+    "seen": 1791447523.853891,
+    "ast_hash": "be3bf5c2445287dfdb04cebb7fb4258a",
+    "semantic_hash": ""
+  },
+  "apps/web/src/features/gateway/simulation-result.ts": {
+    "mtime": 1791432288.1166158,
+    "seen": 1791447523.853891,
+    "ast_hash": "b6c2f4d4ec934b1cc47608fa2de08a49",
+    "semantic_hash": ""
+  },
+  "docs/contracts/routing-simulator.md": {
+    "mtime": 1791447743.032543,
+    "seen": 1791447792.2696984,
+    "ast_hash": "7b201b645123c42a7357c3688a393cd0",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-10-08-sp29-routing-simulator.md": {
+    "mtime": 1791447743.034537,
+    "seen": 1791447792.2792075,
+    "ast_hash": "5e684a44ec11465a1f802d8caea666d6",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-10-08-sp29-routing-simulator-design.md": {
+    "mtime": 1791447743.034537,
+    "seen": 1791447792.2802067,
+    "ast_hash": "14f388724397a04940e01a064f0ec761",
     "semantic_hash": ""
   }
 }

@@ -1,9 +1,10 @@
 # SP29 — read-only routing simulator
 
 Status: conversational scope and written spec approved on 2026-10-08.
-Implementation plan: `../plans/2026-10-08-sp29-routing-simulator.md`, awaiting
-user review and execution-method selection. No product implementation or
-test execution is authorized by this planning checkpoint.
+Implementation plan: `../plans/2026-10-08-sp29-routing-simulator.md`; user chose
+Native. Server/web implementation is committed, acceptance is not complete.
+Targeted/browser checks await explicit authorization; the fresh reviewer
+attempt was blocked by the service usage limit. See PROGRESS_HANDOFF.md.
 
 ## Intent and baseline
 

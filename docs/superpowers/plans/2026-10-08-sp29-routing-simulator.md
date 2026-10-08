@@ -16,9 +16,11 @@ TanStack Query, static EN/VI catalogs, Node test runner and discovery Vitest.
 
 **Spec:** `docs/superpowers/specs/2026-10-08-sp29-routing-simulator-design.md`
 
-Status: written spec approved on 2026-10-08. This plan awaits user review and
-execution-method selection. No product code/test/browser execution in the
-planning checkpoint. Baseline: clean `feat/m1-discovery` at `c87c0c8`.
+Status: spec/plan approved on 2026-10-08; user selected Native. Tasks 1–4 are
+implemented and committed; Task 5 acceptance is still open. Targeted/browser
+authorization is pending; one fresh review attempt failed on service usage
+limit. Checklists below retain planned steps, not claims of executed tests.
+Planning baseline: clean `feat/m1-discovery` at `c87c0c8`; execution base `1a79f15`.
 
 ## Global Constraints
 
@@ -669,4 +671,5 @@ planner and wire types consistent, followed by one fresh whole-range review.
 **Subagent-driven** remains available if chosen, at higher per-task context
 cost. User must review this plan, choose the method and explicitly authorize
 SP29 targeted tests/browser acceptance before those steps run. Do not reuse
-SP28's method/test authorization as approval of this new plan.
+SP28's method/test authorization as approval of this new plan. Method is now
+Native; only test/browser authorization and final review/acceptance remain open.

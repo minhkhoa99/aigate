@@ -497,7 +497,20 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Rules:**
   - normalizeCapEntry accepts two shapes: the legacy bare array [{model, enabled}] (treated as enabled:true, roundRobin:false, models mapped from entry.model||entry), or the current object shape {enabled, roundRobin, models}; anything else (undefined, wrong type) normalizes to fully disabled with an empty pool
   - Object-shape `enabled` defaults to true unless explicitly `false` (entry.enabled !== false) — an object with no 'enabled' key at all is treated as enabled
-  - getCapacityAdapterConfig upgrades an enabled-but-empty-models pool to models:[DEFAULT_FALLBACK_MODEL] ('oc/mimo-v2.5-free') so turning the toggle on is never a silent no-op
+  - getCapacityAdapterConfig upgrades an enabled-but-empty-models pool to models:[DEFAULT_FALLBACK_MODEL] ('oc/mimo-v2.6-flash-free'; a stored 'oc/mimo-v2.5-free' is rewritten to it on read) so turning the toggle on is never a silent no-op (defaults: capacity.default-pools-free-model)
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### Vision and audio pools ship enabled and empty, so they route to a hard-coded free public model
+
+- **id:** `capacity.default-pools-free-model` · **module:** `routing`
+- **Trigger:** A fresh install receives an image or audio request for a model (or combo) without that capability
+- **Input:** Default settings.capacityAdapter
+- **Output:** The request is answered by oc/mimo-v2.6-flash-free (OpenCode's keyless public endpoint), with the requested model as the last fallback
+- **Rules:**
+  - settingsRepo defaults vision and audioInput to { enabled: true, models: [] }; pdf and videoInput default to disabled
+  - getCapacityAdapterConfig turns an enabled empty pool into [DEFAULT_FALLBACK_MODEL], and the dashboard shows the same default
+- **Streaming:** yes
+- **AIGate required behavior:** No pool routes anywhere until the user turns it on with at least one model they chose
 
 ### Flattened deduped adapter pool across all 4 capabilities, and active-strategy resolution
 
@@ -508,6 +521,17 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Rules:**
   - getCapacityAdapterModels iterates CAPABILITY_KEYS in the fixed order [vision, pdf, audioInput, videoInput], including a capability's models only if that capability's pool is enabled; a model already seen from an earlier capability in that fixed order is skipped, so a model listed under both 'vision' and 'pdf' pools appears once, at its 'vision' position
   - getActiveAdapterStrategy scans the request's required HARD capabilities in whatever order detectRequiredCapabilities happened to add them to the Set, and returns the strategy ('round-robin' if enabled+roundRobin, else 'fallback') of the FIRST capability whose pool is both enabled and non-empty — it does not consider every required capability's strategy, only the first eligible one, defaulting to 'fallback' if none qualify
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### Round-robin state for a single-model adapter run is keyed by the client's model string
+
+- **id:** `capacity.solo-rotation-keyed-by-model` · **module:** `routing`
+- **Trigger:** A single-model request is widened by a round-robin capacity pool
+- **Input:** The requested model string (client input)
+- **Output:** An entry in the in-memory combo rotation Map named after the requested model
+- **Rules:**
+  - handleComboChat is called with comboName = the requested model, so every distinct model string a client sends with media adds a rotation entry that is never removed
+- **AIGate required behavior:** The rotation belongs to the pool: one state per capability, bounded by the four capabilities
 
 ### stripHistoryForContext — the exact token-budget formula, what is always kept, and what is dropped first
 
@@ -523,6 +547,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - If nothing was actually dropped (head.length === older.length, meaning `older` already had <=6 messages), the ORIGINAL body object is returned unchanged, not a copy
   - Only messages/input/contents array shapes are recognized (checked in that order); a body using none of them is returned unmodified
 
+### History trimming cuts between a tool call and its results
+
+- **id:** `capacity.strip-orphans-tool-calls` · **module:** `routing`
+- **Trigger:** A capacity-adapter pool model is called with a history of more than six turns before the current one that uses tools
+- **Input:** The request messages; the pool model's context window
+- **Output:** A trimmed message list that can pair tool results with no call, or a call with no results
+- **Rules:**
+  - tail starts after the last assistant/model message, so a trailing run of tool results is kept while the assistant turn that called the tools may be dropped with the middle
+  - head is a prefix of the older turns cut at a fixed count (and popped from its end), so it can end with an assistant tool call whose results were dropped
+- **Errors:** `INVALID_REQUEST` (the trimmed history is rejected upstream as malformed)
+- **AIGate required behavior:** Trimming keeps every tool result with the assistant turn that called it; the kept tail starts at the current user turn
+
 ### withCapacityAdapterStripping — per-call wrapper that strips history only for models actually drawn from the adapter pool
 
 - **id:** `capacity.wrap-stripping-per-model` · **module:** `routing`
@@ -533,6 +569,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Returns the original handleSingleModel completely UNCHANGED (not even wrapped) when adapterModels is empty — a pure passthrough when there is no adapter pool in play for this request
   - For a non-empty pool, the wrapper strips history via stripHistoryForContext only when modelStr is a member of adapterSet — the client's originally-requested model (or any other non-pool combo member) never has its history stripped by this wrapper, only the adapter-added fallback candidates do
   - contextWindow for the strip budget is looked up fresh per call via getCapabilitiesForModel(provider, model) for that specific modelStr, so each adapter-pool model can be trimmed to a different budget
+
+### Status of the all-members-failed answer comes from the first failure, its message from the last
+
+- **id:** `combo.aggregate-status-first-failure` · **module:** `routing`
+- **Trigger:** Every member of a fallback or round-robin combo fails with a fallback-eligible error
+- **Input:** The members' failing responses in attempt order
+- **Output:** One error Response: status = the FIRST failing member's status (variable named lastStatus), message = the LAST member's error text
+- **Rules:**
+  - lastStatus is assigned only `if (!lastStatus)`, so it keeps the first failure; lastError is overwritten on every failure
+  - A thrown member error sets lastStatus to 500 only when no status was recorded before
+- **Errors:** `PROVIDER_UNAVAILABLE` (every member failed; the status and message may describe different members)
+- **AIGate required behavior:** The aggregate error describes one member: the last failure's status and message together, as the variable name lastStatus says
 
 ### /api/combos CRUD routes — name validation, a duplicate pre-check race, and reuse outside the chat lane
 
@@ -642,6 +690,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - The read-modify-write of the Map entry is synchronous (no await inside getRotatedModels), so two requests for the same combo processed back-to-back on Node's single event-loop thread cannot interleave mid-update — each call completes atomically relative to the others
 - **Streaming:** yes
 
+### A combo member that names another combo is routed as that combo, with no depth or cycle bound
+
+- **id:** `combo.nested-member-recursion` · **module:** `routing`
+- **Trigger:** A combo member string without "/" that matches another combo's name (or the combo itself)
+- **Input:** Member string, combos table
+- **Output:** The nested combo's result, dispatched with its own strategy
+- **Rules:**
+  - Each member goes through handleSingleModelChat; when getModelInfo finds no provider for it, the member is looked up as a combo and dispatched with its own strategy (fallback, round-robin, or fusion)
+  - The dashboard aggregates nested combo capabilities, so nesting is a supported configuration
+  - Nothing tracks the combos already on the path: a combo that lists itself, or A -> B -> A, recurses until the process runs out of stack or requests
+- **Streaming:** yes
+- **Errors:** `INTERNAL_ERROR` (a cyclic combo exhausts the stack)
+- **AIGate required behavior:** Nested combos keep working, but a self-reference or cycle stops with a client-visible error
+
 ### reorderByCapabilities — 3-tier stable sort of combo/pool members by capability fit
 
 - **id:** `combo.reorder-by-capabilities-tiers` · **module:** `routing`
@@ -691,6 +753,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - models is stored as a JSON TEXT column; parseJson(row.models, []) defaults to an empty array on parse failure or a null/missing cell, so a corrupted models value degrades to 'no members' rather than throwing on read
   - kind is stored and returned by every read path but is not consumed anywhere in the combo dispatch/fallback/fusion logic traced in this file — it is metadata with no traced runtime effect on request routing
   - updateCombo runs inside a single db.transaction: it re-reads the current row, merges the incoming `data` on top of it (untouched fields survive a partial PUT body), and writes the merged result — two concurrent PUTs to the same id serialize at the DB transaction boundary rather than lost-update racing in application code
+
+### Per-combo strategy, judge, and fusion tuning live in settings.comboStrategies keyed by combo name
+
+- **id:** `combo.strategy-keyed-by-name` · **module:** `routing`
+- **Trigger:** The combos page changes a combo's strategy or judge; a combo is renamed through PUT /api/combos/[id]
+- **Input:** Combo name; patch { fallbackStrategy, judgeModel }
+- **Output:** settings.comboStrategies updated; the combo row is unchanged
+- **Rules:**
+  - handleSetComboStrategy writes settings.comboStrategies[comboName]; a fallback strategy deletes the entry
+  - Renaming a combo does not move its entry: the renamed combo silently reverts to the global strategy, and the old name's entry is orphaned until a combo with that name exists again
+  - fusionTuning (minPanel, stragglerGraceMs, panelHardTimeoutMs) is read from the same entry but no dashboard control writes it
+- **AIGate required behavior:** A combo keeps its strategy, judge, and tuning across a rename
 
 ### flattenToolHistory converts tool_use/tool_result/tool_calls turns to prose before panel calls
 
@@ -1021,17 +1095,88 @@ Every item below is a capability AIGate must have. Derived from tracing
   - maxDuration = 300 is set on the route module itself (Next.js route segment config) specifically to allow up to 5 minutes for large audio file processing — this is route-level config, not something sttCore or the handler enforces itself
 - **Errors:** `INVALID_REQUEST` (missing model or file, or invalid model format), `PROVIDER_UNAVAILABLE` (all credentialed accounts rate-limited/locked)
 
+### Browser voice catalog, filters, and audible preview
+
+- **id:** `media.tts-dashboard-browser` · **module:** `media`
+- **Trigger:** Dashboard Media Providers TTS tab opens or a user selects a voice to preview
+- **Input:** Provider and model selection; preview voice id from the listed catalog
+- **Output:** Voice rows with language, region, gender and a playable sample when the provider has a supported preview path
+- **Rules:**
+  - REFERENCE_BEHAVIOR: OpenAI standard TTS models expose 9 preset voices; gpt-4o-mini-tts exposes 13; Gemini and MiMo have their own per-model voice lists.
+  - REFERENCE_BEHAVIOR: Region and language names are rendered with Intl.DisplayNames, with raw codes as fallback.
+  - REFERENCE_BEHAVIOR: A preview uses the selected provider, model, voice and a short input, and displays returned audio. AIGate previews through the same synthesis path as /v1/audio/speech for every provider with a TTS route and an active saved connection; installed browser voices play locally.
+  - IMPLEMENTATION_ACCIDENT: The old UI passes an API key through its client example path; AIGate's dashboard preview reads an already-saved connection on the server.
+  - REFERENCE_BEHAVIOR: voice pickers for elevenlabs, inworld and minimax load the account's own voices; the language filter groups them. AIGate adds a text search, shows at most 200 matching rows, and copies the ready <provider>/<model>/<voice> model string.
+- **Errors:** `INVALID_REQUEST` (model or voice does not belong to the selected provider), `INVALID_REQUEST` (a remote preview or account voice list has no active saved credential (dashboard code NO_ACTIVE_CONNECTION)), `PROVIDER_UNAVAILABLE` (upstream refuses or returns oversized audio (dashboard code VOICE_PREVIEW_FAILED)), `PROVIDER_UNAVAILABLE` (the account voice list cannot be fetched (dashboard code VOICES_FETCH_FAILED))
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### Deepgram voices are listed although Deepgram cannot synthesize speech
+
+- **id:** `media.tts-deepgram-voices-without-synthesis` · **module:** `media`
+- **Trigger:** GET /api/media-providers/tts/deepgram/voices or /v1/audio/voices?provider=deepgram
+- **Input:** stored deepgram connection
+- **Output:** Aura voice list from GET /v1/models
+- **Rules:**
+  - SUSPECTED_BUG: deepgram declares only serviceKinds [stt] and an sttConfig, so /v1/audio/speech rejects it, yet its voices are listed and the dashboard offers them. AIGate lists no Deepgram TTS voices until a Deepgram TTS route exists.
+- **AIGate required behavior:** Only providers that can synthesize speech list TTS voices.
+
 ### POST /v1/audio/speech — combo expansion + account-selection loop + ttsCore provider dispatch
 
 - **id:** `media.tts-lane` · **module:** `media`
 - **Trigger:** POST /v1/audio/speech
-- **Input:** { model, input: string, language?, style? }, ?response_format=mp3|json
+- **Input:** { model, input: string, voice?, language?, style?, speed?, instructions?, response_format? }, ?response_format=mp3|json
 - **Output:** Raw audio bytes (default) or { audio: base64, format } JSON
 - **Rules:**
-  - model may name a combo, not just a provider/model pair: getComboModels(modelStr) expands it and the request is dispatched through handleComboChat (open-sse/services/combo.js) across the combo's member models before the single-provider account-selection loop ever runs — the same combo-expansion module the chat lane uses, reused here rather than duplicated
-  - handleTtsCore first tries a special-case adapter (getTtsAdapter — google-tts, edge-tts, local-device, elevenlabs, openai, openrouter, gemini, xiaomi-mimo); providers without one instead go through synthesizeViaConfig, a generic config-driven path keyed off the registry's ttsConfig (hyperbolic, deepgram, nvidia, huggingface, inworld, cartesia, playht, coqui, tortoise, qwen, ...) — two independent implementation strategies for the same endpoint, chosen per-provider
-  - response_format=json wraps the synthesized audio as base64 in a JSON body instead of returning it as a binary response — both code paths funnel through the same createTtsResponse formatter regardless of which adapter/config path produced the audio
-- **Errors:** `INVALID_REQUEST` (missing model or input), `INVALID_REQUEST` (provider has neither a special-case adapter nor synthesizeViaConfig support)
+  - REFERENCE_BEHAVIOR: model may name a combo, not just a provider/model pair: getComboModels(modelStr) expands it and the request is dispatched through handleComboChat (open-sse/services/combo.js) across the combo's member models before the single-provider account-selection loop ever runs — the same combo-expansion module the chat lane uses. AIGate: fallback and round-robin combos run their members in order with the chat lane's member-failover rules and nesting bound; a fusion combo is rejected (400 combo_strategy_unsupported) because a panel of audio answers cannot be judged.
+  - REFERENCE_BEHAVIOR: handleTtsCore first tries a special-case adapter (google-tts, edge-tts, local-device, elevenlabs, openai, openrouter, gemini, xiaomi-mimo, selfhosted-tts); providers without one go through synthesizeViaConfig keyed off the registry's ttsConfig.format. AIGate serves one request/decoder per upstream format: openai speech (per-connection base URL), openrouter chat-completions audio stream, xiaomi-mimo chat-completions audio (text in the assistant message, language/style hints in a user message), nvidia {input:{text},voice,model}, gemini generateContent AUDIO (PCM wrapped as WAV), minimax/minimax-cn t2a_v2 (hex audio, base_resp status), elevenlabs text-to-speech/{voice} (xi-api-key), inworld (Basic, audioContent base64), fish-audio (model header, reference_id voice).
+  - REFERENCE_BEHAVIOR: the model string carries the voice: <provider>/<model>/<voice>, the model matched against the provider's known TTS models (longest prefix wins, _base.js parseModelVoice); a string that names no known model is a voice for the default model. AIGate additionally accepts the OpenAI voice field, which wins over the voice in the model string.
+  - REFERENCE_BEHAVIOR: the gemini adapter prefixes "Say: " or "Say in <language>: " unless the text already contains ": "; MiMo adds "Speak in <language>." and the style as a user message.
+  - REFERENCE_BEHAVIOR: response_format=json (query) wraps the synthesized audio as base64 in { audio, format }; otherwise raw bytes. AIGate names mp3 audio/mpeg instead of 9router's non-standard audio/mp3.
+  - REFERENCE_BEHAVIOR: credentialed providers run the per-request account rotation (getProviderCredentials / markAccountUnavailable). AIGate locks tts:<model> on the chosen connection with the media cooldowns and moves to the next connection.
+  - AIGate addition (user decision 2026-09-30): the TTS account loop has no token refresh in 9router (only markAccountUnavailable). AIGate refreshes a connection that holds an OAuth refresh token once after a 401/403 and resends, as the chat lane does (oauth.refresh-lifecycle); API-key connections skip it. No TTS provider signs in with OAuth in AIGate yet (xiaomi-mimo's catalog lists oauth, but its sign-in is not ported), so this applies once one does.
+  - IMPLEMENTATION_ACCIDENT: every adapter buffers the whole audio as base64 before responding. AIGate streams binary passthrough upstreams with backpressure and buffers only the formats that must be decoded, up to 16 MiB.
+  - SUSPECTED_BUG: the connection test of a media-only provider (validate/route.js probeMediaProvider) POSTs {input,text,prompt:"ping"} to the ttsConfig synthesis URL and calls anything but 401/403 valid, so a test can bill a synthesis, and a 404/5xx/network answer passes. AIGate (user plan 2026-09-30) tests elevenlabs and inworld with a GET of their voice list and fish-audio with a GET of its model list: 401/403 invalid, 2xx active, anything else unreachable.
+  - Deferred by user decision (2026-09-30): edge-tts and google-tts (scraped Bing/Google Translate tokens), selfhosted-tts, and server-side local-device (the dashboard plays installed browser voices instead). cartesia, playht, coqui and tortoise stay hidden as in 9router.
+- **Streaming:** yes
+- **Errors:** `INVALID_REQUEST` (missing model or input (AIGate also rejects input over 10000 characters)), `INVALID_REQUEST` (provider has neither a special-case adapter nor synthesizeViaConfig support), `PROVIDER_UNAVAILABLE` (upstream answers without audio, with a MiniMax base_resp error, or with audio over the decode bound)
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### OpenRouter TTS joins streamed base64 chunks and misreads a bare model as a voice
+
+- **id:** `media.tts-openrouter-audio-chunks` · **module:** `media`
+- **Trigger:** POST /v1/audio/speech with an openrouter model
+- **Input:** model openrouter/<vendor>/<model>[/<voice>], input
+- **Output:** WAV audio assembled from the chat-completions SSE stream's delta.audio.data
+- **Rules:**
+  - REFERENCE_BEHAVIOR: OpenRouter speech goes through /api/v1/chat/completions with modalities [text, audio], audio { voice, format: wav }, stream true, and the text as the user message; AIGate sends the same request.
+  - SUSPECTED_BUG: the chunks' base64 strings are concatenated before decoding, and a model with no voice segment becomes the voice. AIGate decodes each chunk, joins the bytes (wrapping raw PCM16 as WAV when the bytes have no RIFF header), and matches the model against the catalog's openrouter TTS models.
+- **Streaming:** yes
+- **Errors:** `PROVIDER_UNAVAILABLE` (the stream carries no audio data)
+- **AIGate required behavior:** Each streamed audio chunk is decoded on its own and the bytes are joined; openai/gpt-4o-mini-tts alone means that model with its default voice.
+
+### The public voice list omits MiniMax and names models without their model segment
+
+- **id:** `media.tts-public-voices-omit-minimax` · **module:** `media`
+- **Trigger:** GET /v1/audio/voices?provider=minimax
+- **Input:** ?provider=<id>[&lang=]
+- **Output:** 400 for minimax; for others, model ids of the form <alias>/<voice>
+- **Rules:**
+  - SUSPECTED_BUG: PROVIDER_API lists elevenlabs, deepgram, inworld, edge-tts and local-device but not minimax, whose dedicated voice route exists. AIGate lists every provider with a voice catalog, minimax and minimax-cn included.
+  - REFERENCE_BEHAVIOR: each item carries a model string for /v1/audio/speech; AIGate writes <provider>/<model>/<voice> so the voice cannot be mistaken for a model.
+- **Errors:** `INVALID_REQUEST` (provider has no voice catalog)
+- **AIGate required behavior:** Every provider whose voices the dashboard can list is also listed on /v1/audio/voices.
+
+### aws-polly has no synthesis handler; local-device synthesis only works on macOS
+
+- **id:** `media.tts-unreachable-providers` · **module:** `media`
+- **Trigger:** POST /v1/audio/speech with aws-polly or local-device on Windows/Linux
+- **Input:** model aws-polly/... or local-device/...
+- **Output:** "does not support TTS via this route" for aws-polly; a failed say command elsewhere
+- **Rules:**
+  - SUSPECTED_BUG: aws-polly declares ttsConfig.format aws-polly, which FORMAT_HANDLERS lacks, so it is listed but can never synthesize. AIGate does not offer aws-polly.
+  - SUSPECTED_BUG: synthesizeMacOrWin always runs macOS say (and ffmpeg) although voices are also listed through Windows SAPI. AIGate plays installed voices in the browser and has no server-side local-device synthesis.
+- **Errors:** `INVALID_REQUEST` (provider has no TTS route)
+- **AIGate required behavior:** A listed TTS provider can synthesize on the platforms it lists voices for.
 
 ### Voice listing — one generic credential-free route plus four dedicated per-provider routes that require a stored connection
 
@@ -1040,10 +1185,13 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Input:** GET /api/media-providers/tts/voices?provider=edge-tts|local-device|elevenlabs&apiKey=... ; GET /api/media-providers/tts/{deepgram|elevenlabs|inworld|minimax}/voices
 - **Output:** { voices, languages, byLang } (generic route) or { languages, byLang } (dedicated routes)
 - **Rules:**
-  - The generic /api/media-providers/tts/voices route dispatches through VOICE_FETCHERS[provider] (re-exported from ttsCore.js) and needs no stored connection for edge-tts/local-device; for elevenlabs it instead reads apiKey from the query string, not from a stored providerConnections row — the only voice route that accepts a credential as a request parameter rather than looking one up
-  - The four dedicated routes (deepgram, elevenlabs, inworld, minimax) all read the FIRST active connection for that exact provider id via getProviderConnections({ provider, isActive: true }) and 400 with "No <Provider> connection found" if none exists — no account rotation, no mutex, and no fallback to a second connection of the same provider if the first one's key is invalid
-  - GET /v1/audio/voices (the OpenAI-style public listing) proxies to a hardcoded PROVIDER_API map covering elevenlabs/deepgram/inworld/edge-tts/local-device but omits minimax — minimax's own dedicated voices route exists and works when called directly, but is not reachable through the public /v1/audio/voices listing endpoint
-- **Errors:** `INVALID_REQUEST` (generic route's provider query param has no matching VOICE_FETCHERS entry), `AUTH_ERROR` (dedicated route's provider has no active stored connection), `PROVIDER_UNAVAILABLE` (the upstream voices/models call itself fails (non-ok response))
+  - IMPLEMENTATION_ACCIDENT: The generic /api/media-providers/tts/voices route dispatches through VOICE_FETCHERS[provider] and needs no stored connection for edge-tts/local-device; for elevenlabs it instead reads apiKey from the query string, not from a stored providerConnections row. AIGate never takes a credential as a query parameter: GET /api/providers/:id/voices reads the saved connection on the server.
+  - REFERENCE_BEHAVIOR: The dedicated routes (elevenlabs, inworld, minimax, minimax-cn) read the FIRST active connection for that provider and fail with "No <Provider> connection found" when none exists — no rotation for a read-only listing. AIGate keeps this (dashboard code NO_ACTIVE_CONNECTION) and maps each list to { id, name, locale, gender }: elevenlabs voice_id/name/labels.language/labels.gender, inworld voiceId/displayName/languages[0]/gender, minimax system/cloned/generated/music groups (cloned and generated names suffixed with their group).
+  - REFERENCE_BEHAVIOR: elevenlabs voice lists are cached (24 h per key in 9router). AIGate caches each connection's list for 10 minutes, at most 64 lists, keyed by connection and key so a replaced key is fetched again; failures are not cached.
+  - REFERENCE_BEHAVIOR: GET /v1/audio/voices returns an OpenAI-style { object: "list", data: [{ id, name, lang, gender, model }] } whose model field is ready for /v1/audio/speech. AIGate's model is the full <provider>/<model>/<voice>, it covers every provider with a voice catalog (preset or live), honors ?lang=, and requires the same API key as the rest of /v1 (user decision 2026-09-30; 9router's route is unauthenticated and sends Access-Control-Allow-Origin: *).
+  - Preset catalogs (openai 9 or 13 voices by model, openrouter the same, gemini 30 with gender, xiaomi-mimo 9) come from open-sse/config/ttsModels.js and gemini.js PREBUILT_VOICES.
+- **Errors:** `INVALID_REQUEST` (generic route's provider query param has no matching VOICE_FETCHERS entry (AIGate: a provider or model without TTS)), `AUTH_ERROR` (dedicated route's provider has no active stored connection), `PROVIDER_UNAVAILABLE` (the upstream voices/models call itself fails (non-ok response; dashboard code VOICES_FETCH_FAILED))
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
 ### POST /v1/videos/{generations,edits,extensions} + GET /v1/videos/[id] — async job proxy, xAI-only in practice
 
@@ -2566,6 +2714,19 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Errors:** `INVALID_REQUEST` (orgDomain or denoToken missing), `INVALID_REQUEST` (app creation returns 409 (name already exists)), `PROVIDER_UNAVAILABLE` (app creation (non-409) or deploy-revision call fails), `TIMEOUT` (poll loop exhausts 30 attempts (60s) without reaching a terminal status — this path orphans the Deno app (no rollback)), `INTERNAL_ERROR` (revision status resolves to anything other than 'succeeded' via a genuine terminal status or an early loop break — this path DOES roll back)
 - **AIGate required behavior:** Given that this route already rolls back on 2 of its 3 failure paths (deploy-call failure, bad-final-status), the timeout path should follow the same pattern — either DELETE before throwing, or set a sentinel status and let it fall through to the existing `if (status !== "succeeded")` rollback block, instead of throwing straight past it
 
+### OpenCode Free uses persisted fixed/round-robin/random pool selection on real chat traffic
+
+- **id:** `proxypool.keyless-opencode-runtime` · **module:** `transport`
+- **Trigger:** A `/v1` request for `opencode/<model>`
+- **Input:** OpenCode catalog model, configured provider_proxy_strategies row, and up to 100 active proxy pools
+- **Output:** A no-auth upstream request routed through the selected pool, or the ordinary environment/direct route when no pool applies
+- **Rules:**
+  - OpenCode sends the public protocol markers plus a valid generated session/request id; it never stores a user token or provider connection
+  - Muse Spark uses Responses, Union Alpha uses Messages, and remaining chat models use Chat Completions; upstream streaming is collected for a non-streaming caller
+  - The required bash/glob/grep/read fingerprint is canonicalized and completed without an unbounded tool list
+- **Streaming:** yes
+- **Errors:** `PROVIDER_UNAVAILABLE` (OpenCode stream or endpoint fails)
+
 ### pickProxyPoolId() rotation for free/noAuth providers, keyed by settings.providerStrategies
 
 - **id:** `proxypool.rotate-for-noauth` · **module:** `transport`
@@ -2633,13 +2794,13 @@ Every item below is a capability AIGate must have. Derived from tracing
 ### MITM_BYPASS_HOSTS — manual DNS resolution + raw-socket TLS to dodge local DNS/hosts poisoning
 
 - **id:** `transport.mitm-dns-bypass` · **module:** `transport`
-- **Trigger:** proxyAwareFetch() called with a target URL whose hostname matches (via substring `includes`) one of MITM_BYPASS_HOSTS
+- **Trigger:** proxy-aware transport receives a request for one of the exact MITM_BYPASS_HOSTS
 - **Input:** target hostname
 - **Output:** A Response obtained either through the configured proxy (dispatcher) or, if no proxy, through a manually-constructed HTTPS request to the real (Google-DNS-resolved) IP
 - **Rules:**
-  - MITM_BYPASS_HOSTS = cloudcode-pa.googleapis.com, daily-cloudcode-pa.googleapis.com, api.individual.githubcopilot.com, q.us-east-1.amazonaws.com, codewhisperer.us-east-1.amazonaws.com, api2.cursor.sh — exactly the upstream API hosts used by 9router's own antigravity/cloudcode, GitHub Copilot, kiro/codewhisperer, and cursor executors
+  - The bypass host set is cloudcode-pa.googleapis.com, daily-cloudcode-pa.googleapis.com, api.individual.githubcopilot.com, runtime.us-east-1.kiro.dev, q.us-east-1.amazonaws.com, codewhisperer.us-east-1.amazonaws.com, api2.cursor.sh — the IDE upstream hosts also rewritten by the local MITM
   - These are the same hostnames src/mitm/ rewrites in the OS hosts file / local DNS (per src/shared/constants/mitmToolHosts.js) to intercept IDE traffic for its own capture feature. When 9router's own outbound executor calls hit the SAME hostnames on a machine where the MITM feature is active, the OS-level resolution would route them into the local MITM interceptor instead of the real provider — this bypass exists so the router's own provider traffic is unaffected by whatever DNS/hosts state the MITM capture feature has put the machine in
-  - DNS resolution uses a dedicated Node dns.Resolver pinned to Google's public servers (8.8.8.8, 8.8.4.4), not the system resolver, specifically to avoid the poisoned /etc/hosts or local resolver
+  - DNS resolution uses a dedicated Node dns.Resolver pinned to Google's public servers (8.8.8.8, 8.8.4.4), not the system resolver, specifically to avoid the poisoned /etc/hosts or local resolver; the five-minute IPv4 cache is bounded by the fixed host allow-list
   - TLS is still fully established and validated: the resolved real IP is used only for the raw TCP connect; the TLS `servername` (SNI) and the Host header are set to the ORIGINAL hostname, not the IP — confirmed empirically (see file header) that https.request() wraps the raw net.Socket in a genuine TLS session keyed to `servername`, and a mismatched servername causes a handshake failure. So certificate-hostname validation is preserved against the real target host; this bypass only sidesteps the DNS/hosts layer, not TLS trust
 - **Errors:** `PROVIDER_UNAVAILABLE` (DNS resolve fails, or the raw-socket HTTPS request errors)
 
@@ -2682,6 +2843,21 @@ Every item below is a capability AIGate must have. Derived from tracing
 
 ## Quota Tracker
 
+### Bounded server reads for active saved connections
+
+- **id:** `quota.aigate-vendor-fetch-and-cache` · **module:** `usage`
+- **Trigger:** GET /api/quotas, explicit refresh, or the quota page's 60-second poll
+- **Input:** Connection id, stored provider credential and metadata, optional proxy pool
+- **Output:** Per-account plan, vendor windows or balance rows, reset timestamps, and a transient message when unavailable
+- **Rules:**
+  - Quota reads use TokenRefresher, the connection proxy, and HTTP_TRANSPORT; the key and OAuth data stay server-side
+  - Each read has a 15-second deadline and 1 MiB body limit; listing uses four fixed workers, an in-flight map, and a 60-second cache capped at 100 accounts
+  - Only active connections are listed; one vendor failure produces a per-account message without failing other rows
+  - Provider windows keep vendor units and reset time; balances and credits are represented as available amounts when no fixed quota is published
+  - Providers without a quota endpoint return a message; no usage is inferred from AIGate request totals
+- **Errors:** `PROVIDER_UNAVAILABLE` (a vendor rejects or cannot serve its quota request)
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
 ### Antigravity's locally-counted/inferred quota — RAM cache plus a strike-based trust override
 
 - **id:** `quota.antigravity-local-cache-strike-breaker` · **module:** `usage`
@@ -2720,6 +2896,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - A 409 no_credit response is returned distinctly from other 4xx/5xx failures when the vendor reports zero credits available
   - The dashboard confirms via a modal showing the remaining credit count, then re-fetches the connection's quota (fetchQuota) after a successful reset so the UI reflects the freshly-reset window immediately
 - **Errors:** `QUOTA_EXHAUSTED` (vendor responds with noCredit (no reset credits available)), `PROVIDER_UNAVAILABLE` (the consume call returns an unexpected non-4xx-non-2xx response)
+
+### Active account quota rows, refresh, and visible error state
+
+- **id:** `quota.dashboard-refresh-and-account-visibility` · **module:** `usage`
+- **Trigger:** User opens /providers/quota or selects Refresh quotas
+- **Input:** Quota response rows for active saved connections
+- **Output:** Healthy, near-limit, and exhausted counts; vendor quota rows and reset times; per-account error messages
+- **Rules:**
+  - The page polls GET /api/quotas every 60000ms and POSTs /api/quotas/refresh for a user refresh
+  - A missing or disabled connection's individual refresh is NOT_FOUND; a vendor error appears on that account while other accounts remain visible
+  - Quota numbers come from vendors; unsupported endpoints show a message and never placeholder values
+  - The dashboard presents percentages for finite quota windows and labels unlimited rows separately
+- **Errors:** `PROVIDER_UNAVAILABLE` (quota vendor cannot serve the account)
 
 ### The /dashboard/quota page — auto-refresh cadence, per-provider throttling, client cache, visibility settings
 
@@ -3246,6 +3435,19 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Errors:** `PROVIDER_UNAVAILABLE` (the SSE body has no data line (502 Invalid SSE response for non-streaming request))
 - **AIGate required behavior:** A non-streaming client receives the model answer: text, reasoning, tool calls, usage, and the finish reason
 
+### Read-only explanation of a chat routing decision
+
+- **id:** `routing.simulator-dry-run` · **module:** `routing`
+- **Trigger:** Explicit dashboard Simulator Run
+- **Input:** OpenAI Chat JSON envelope <=65536 bytes, nesting <=32, optional tokenSaverOptOut
+- **Output:** 200 metadata-only parent-linked tree; candidate, blocked, conditional or inconclusive
+- **Rules:**
+  - AIGATE_EXTENSION: inspect local metadata with shared pure routing decisions; never call a vendor, refresh/decrypt a credential, write usage/locks or advance rotations
+  - AIGATE_EXTENSION: at most 512 nodes, 32 inspected providers and existing three-combo depth; source overflow is inconclusive, not a confident refusal
+  - AIGATE_EXTENSION: hypothetical fallback/fusion branches are conditional; candidate is neither credential/provider health nor a reserved next request
+  - AIGATE_EXTENSION: OpenAI Chat input only; local Token Saver stages only; Headroom/PXPIPE/provider preparation remain unchecked
+- **Errors:** `INVALID_REQUEST` (malformed/oversized/non-JSON envelope or unsupported parser input), `AUTH_ERROR` (dashboard guard refuses the session), `TIMEOUT` (local inspection deadline expires)
+
 ### Deciding the client's wire format
 
 - **id:** `routing.source-format-detection` · **module:** `routing`
@@ -3347,6 +3549,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Q8 streaming: finalizeStream runs AFTER the terminal bytes are enqueued — in flush() for normal ends, or inside transform() on the Responses terminal event (because Responses clients close right after it and flush never runs). The save runs concurrently with the final flush to the client
   - When the upstream sends no usage, it is estimated from the request body and emitted content length
   - Rows with zero input and zero output tokens are not written at all
+  - AIGate (SP24a, schema rule 11): a stream that errors, stalls, or loses its client is recorded as an aborted event with the usage seen so far, or an estimate when none arrived; recording goes through the buffered writer and never blocks the flush. docs/contracts/usage.md.
 - **Streaming:** yes
 - **Errors:** `PROVIDER_UNAVAILABLE` (stream errors or is cancelled before its terminal event — flush never runs, usage is never recorded)
 - **AIGate required behavior:** Tokens the provider billed are recorded even when the stream ends abnormally or the client leaves
@@ -3494,6 +3697,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - dashboardGuard.js's isAuthenticated() treats the caller as authenticated if EITHER the auth_token cookie verifies (hasValidToken → verifyDashboardAuthToken) OR settings.requireLogin === false — the JWT check and the requireLogin bypass are two independent ways to pass the same gate
   - logout is unconditional and itself unauthenticated (no session check gates calling it) — it always clears auth_token plus the three OIDC PKCE/state cookies regardless of whether an OIDC flow was ever started, but does not clear saml_state
 
+### SP28 browser-local EN/VI for shell, Auth, Settings, Overview and shared copy
+
+- **id:** `settings.browser-locale-core` · **module:** `settings`
+- **Trigger:** General language selection or initial browser preference load
+- **Input:** en or vi; browser localStorage aigate-language
+- **Output:** Localized owned text, html lang and Intl display; unchanged server contracts
+- **Rules:**
+  - REFERENCE_BEHAVIOR: persist a supported display-language choice; English default/fallback; AIGate scopes this slice to en/vi in browser storage.
+  - REFERENCE_BEHAVIOR: root React locale state renders shell/Auth/Settings/Overview/shared owned copy; preserve routes, query keys, raw diagnostic messages, identifiers and literal IMPORT.
+  - REFERENCE_BEHAVIOR: catalogs have identical keys/placeholders; interpolation is literal and own-property only; missing text uses English, denied storage keeps in-memory selection usable.
+  - REFERENCE_BEHAVIOR: native Intl uses en-US/vi-VN, retains USD, precision and usage timezone; no refetch/SSE restart/form reset/toast lifetime extension on selection.
+  - IMPLEMENTATION_ACCIDENT: the reference Next cookie POST /api/locale and its framework/many-language machinery are not required for the approved two-language browser-only slice.
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
 ### Combo rotation state invalidated when combo strategy settings change
 
 - **id:** `settings.combo-rotation-reset` · **module:** `settings`
@@ -3582,6 +3799,24 @@ Every item below is a capability AIGate must have. Derived from tracing
   - PROTECTED_SETTING_KEYS = ['password', 'mitmSudoEncrypted'] — both are deleted from the incoming body before the password-change block, oidcClientSecret handling, or updateSettings(body) ever see them
   - This is a mass-assignment guard (the code comment cites CWE-915): without it, a client could set body.password directly to an attacker-chosen bcrypt hash (or arbitrary string) and bypass the bcrypt.compare(currentPassword) check entirely, since that check only runs inside the body.newPassword branch — a raw password field would flow straight into updateSettings unauthenticated by any current-password check
   - mitmSudoEncrypted (the encrypted sudo password used for MITM proxy host-file elevation) is protected the same way — direct overwrite would let a client plant attacker-controlled ciphertext that the MITM subsystem later decrypts and uses for privileged local operations
+
+### SP27 runtime information and reviewed portable settings transfer
+
+- **id:** `settings.portable-config-general` · **module:** `settings`
+- **Trigger:** Settings General exports or reviews/applies an import; Developer downloads runtime metadata
+- **Input:** Version 1 aigate-settings document, <=64 KiB, typed transferable settings; apply includes the current reviewed fingerprint
+- **Output:** Runtime metadata, secret-free settings download, before/after diff, and merged settings or precise validation/conflict error
+- **Rules:**
+  - REFERENCE_BEHAVIOR: preserve settings export/import intent from settings.database-export-import and current editable-key validation; AIGate design 10.9.18 requires redacted export and import confirmation.
+  - REFERENCE_BEHAVIOR: AIGate exports only typed transferable settings, excluding headroomUrl (a service URL may contain query tokens), every credential table, and environment secrets; the format is aigate-settings version 1.
+  - REFERENCE_BEHAVIOR: validate format, version, envelope keys, size, nonempty editable keys and existing value bounds before preview or write; omitted keys are preserved and import needs a type-to-confirm UI.
+  - REFERENCE_BEHAVIOR: a fingerprint plus conditional SQL update refuses changes made since preview; existing write-through settings apply on the next request.
+  - REFERENCE_BEHAVIOR: successful runtime/export/preview/apply responses are HTTP 200 with no-store; preview/apply do not create resources. All transfer routes use the dashboard guard.
+  - REFERENCE_BEHAVIOR: General/Developer expose actual runtime retention and downloads, with browser-local theme/developer preferences and explicit restart requirements; unsupported preview controls are removed.
+  - REFERENCE_BEHAVIOR: General runtime labels and long data paths wrap at narrow widths so actual running values remain readable without horizontal table scrolling.
+  - IMPLEMENTATION_ACCIDENT: full database wipe/repopulation and credential-bundle export are not the portable settings contract; no new backup service, preview cache or filesystem staging is needed.
+- **Errors:** `INVALID_REQUEST` (invalid document, size, envelope, fingerprint syntax or setting values), `INVALID_REQUEST` (reviewed settings changed: HTTP 409 SETTINGS_CHANGED requires a fresh preview; nothing is overwritten), `AUTH_ERROR` (dashboard guard refuses an unauthenticated runtime/export/preview/apply request with HTTP 401 UNAUTHENTICATED), `INTERNAL_ERROR` (database or runtime read fails; the dashboard shows a precise failure)
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
 ### POST /api/settings/proxy-test — verify an outbound proxy URL works before saving it
 
@@ -4429,6 +4664,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - calculateCost() looks up pricing via pricingRepo.getPricingForModel(provider, model) — user overrides (KV store) first, then open-sse/providers/pricing.js's built-in table — and delegates the actual arithmetic to calculateCostFromTokens() in open-sse so there is one source of truth for the formula
   - canonicalizeUsage() folds cached_tokens and cache_creation_input_tokens INTO prompt_tokens ahead of time (the cache-inclusive convention) — calculateCostFromTokens then subtracts them back out (nonCachedInput = inputTokens - cachedTokens - cacheCreationTokens) so cached tokens are billed at pricing.cached (falling back to pricing.input) instead of double-counting them at full input rate
   - Any failure (missing provider, missing model, missing pricing, thrown error) resolves to cost = 0, not an error — calculateCost wraps the whole lookup in try/catch and logs to console.error
+  - AIGate: the formula is carried over to AIGate's token convention (inputTokens excludes cache, outputTokens includes reasoning): input x in + cacheRead x cached + cacheWrite x cache_creation + (output - reasoning) x out + reasoning x (reasoning or out), so reasoning is billed once. A model without pricing records cost null and counts as unpriced (the UI says so) instead of $0.
 
 ### /api/pricing — GET merged pricing, PATCH validated overrides, DELETE reset-to-default
 
@@ -4442,6 +4678,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - updatePricing() does a per-provider read-modify-write inside one db.transaction() so concurrent PATCHes to different providers cannot clobber each other's KV rows
   - DELETE resets one model (provider+model given), one whole provider (provider only), or all pricing (neither) back to defaults by removing the corresponding KV override(s)
   - Every write (PATCH or DELETE) calls invalidate() to clear the 5000ms (CACHE_TTL_MS) in-process pricing cache so the next getPricing()/getPricingForModel() call re-reads from the KV store
+  - AIGate: GET/PATCH/DELETE /api/pricing kept with the same validation; overrides live in a typed pricing_overrides table; GET marks each price as default or override. /api/pricing/defaults is not added (unreachable in 9router). An override sets only the fields it names and is merged over the built-in price field by field; 9router's lookup returned the override entry whole, so a partial override left rates undefined and the cost NaN.
 - **Errors:** `INVALID_REQUEST` (PATCH body has an unknown pricing field or a negative/non-numeric value)
 - **AIGate required behavior:** GET /api/pricing/defaults returns the built-in default pricing table over HTTP, matching the route's own doc comment
 
@@ -4455,6 +4692,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - recentRing is a 50-item (RING_CAP) in-memory ring, lazily hydrated once per process from the last 50 usageHistory rows on first read (ensureRingInitialized), then appended to on every saveRequestUsage insert
   - recentRequests are deduped by `${model}|${provider}|${promptTokens}|${completionTokens}|${minuteTimestamp}` and rows with zero prompt AND zero completion tokens are dropped entirely, capped at 20 after dedup
   - errorProvider surfaces the last provider that errored, but only within a 10-second window of the error (Date.now() - lastErrorProvider.ts < 10000) — it self-clears by staleness, not by an explicit reset
+  - AIGate: a 50-event recent ring filled from recorded events (no content dedup and no zero-token filter, since every event is distinct and errors count); the stream payload carries the last 20.
 
 ### getChartData — time-bucketed tokens+cost series
 
@@ -4466,6 +4704,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - today: 24 hourly buckets anchored at local midnight, scanning live usageHistory
   - 24h: 24 hourly buckets trailing backward from now, scanning live usageHistory
   - 7d/30d/60d: one bucket per day sourced from pre-aggregated usageDaily rows (loadDaysInRange), not raw history
+  - AIGate: today and 24h are hourly buckets from usage_events, 7d/30d/90d/custom daily buckets from usage_daily, each with tokens per provider and cost; an unknown period is 400 INVALID_REQUEST.
 - **Errors:** `INVALID_REQUEST` (period is not one of the VALID_PERIODS set at the route layer)
 
 ### aggregateEntryToDay — per-day rollup by provider/model/account/apiKey/endpoint
@@ -4478,6 +4717,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - dateKey is computed by getLocalDateKey() using the server process's local timezone (new Date().getFullYear/Month/Date), not UTC
   - byApiKey buckets missing apiKey under the literal key 'local-no-key' rather than omitting the request from that breakdown
   - Each breakdown key embeds enough context to redisplay later without re-joining (rawModel, provider) via addToCounter's `meta` merge
+  - AIGate (schema rule 2): the day comes from AIGATE_USAGE_TIMEZONE (IANA, default the server zone at startup), named in every usage response; the rollup is a typed usage_daily table keyed by day, provider, model, connection, API key, and endpoint, and a request without a key has a null key (shown as 'No key') instead of 'local-no-key'. Daily rows are kept 400 days.
 
 ### Why live counters live on global.* instead of module-scope state
 
@@ -4489,6 +4729,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - All 7 pieces of live, in-memory usage state are guarded with `if (!global._x) global._x = ...` instead of being declared as module-scope `let`/`const`
   - The in-source comment states the reason directly: 'In-memory state shared across Next.js modules'
   - Next.js can evaluate a given source module more than once within the same server process (dev-mode HMR, and the route-handler module graph in general); module-scope state would silently re-initialize on each re-evaluation — a fresh EventEmitter with no subscribers, a reset pending-counter map — breaking the pending-request badge and dropping in-flight SSE listeners. Attaching to the single process-wide `global` object survives re-evaluation because it is not tied to any one module instance.
+  - AIGate: the live state lives in the DI-managed UsageRecorder singleton.
 - **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
 ### /api/usage/history is not a history-rows endpoint — it returns the same aggregate shape as /api/usage/stats
@@ -4500,6 +4741,7 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Rules:**
   - history/route.js calls `await getUsageStats()` with no period argument, which defaults to 'all' inside getUsageStats — an aggregate stats object identical in shape to what /api/usage/stats?period=all returns
   - The function that actually returns per-request rows with provider/model/date-range filtering — getUsageHistory(filter) — is exported from usageRepo.js and re-exported through both src/lib/db/index.js and src/lib/usageDb.js, but has zero callers anywhere in the checkout (verified: the only matches for 'getUsageHistory' are its own definition and the two re-export barrel lines)
+  - AIGate: not ported as named; GET /api/usage/summary is the aggregate, and per-request rows come with SP24b's request list.
 - **AIGate required behavior:** A route named /api/usage/history returns per-request usage history rows — the sibling getUsageHistory(filter) function (provider/model/date-range filterable) appears purpose-built to back exactly this route
 
 ### saveRequestUsage — dedup check, single-transaction 3-way write
@@ -4513,8 +4755,29 @@ Every item below is a capability AIGate must have. Derived from tracing
   - If found, no new row is written — at most the existing row's endpoint is backfilled if it was previously null
   - If not found, all three writes (history insert, usageDaily upsert via aggregateEntryToDay, _meta.totalRequestsLifetime increment) happen inside one db.transaction(), justified in-source by better-sqlite3 being synchronous so no other JS runs mid-transaction in the same process
   - pushToRing() and the debounced stats-event only fire when a new row was actually inserted (inserted === true)
+  - AIGate (schema rule 5): not reproduced; every event gets its own id and row.
 - **Errors:** `INTERNAL_ERROR` (the transaction throws (e.g. adapter failure))
 - **AIGate required behavior:** Every completed request that calls saveRequestUsage produces its own usageHistory row
+
+### SP26 aggregate overview and existing live usage stream
+
+- **id:** `usage.overview-summary` · **module:** `usage`
+- **Trigger:** Dashboard Overview at /
+- **Input:** GET /api/overview/summary; existing GET /api/usage/stream
+- **Output:** 24h client request metrics, prior 24h, hourly sparklines, last-hour provider health, enabled account attention, writer state
+- **Rules:**
+  - REFERENCE_BEHAVIOR: preserve usage, active-call and recent-attempt visibility from usage.stats-query-dual-path and usage.sse-live-stream; no credentials or request bodies reach Overview.
+  - REFERENCE_BEHAVIOR: AIGate design section 10.9.1 adds one summary request plus the existing usage SSE to replace Overview fixtures; requests count client rows, cost/tokens include their attempts, and failed fallback attempts affect provider health. docs/contracts/overview.md defines the contract.
+  - REFERENCE_BEHAVIOR: AIGate windows are rolling half-open 24h intervals; SQL aggregates history into 48 buckets, 200 provider rows and 100 attention alerts, with explicit list truncation. Zero traffic and zero comparison baseline are explicit.
+  - REFERENCE_BEHAVIOR: enabled-account attention includes live locks, failed credential tests, OAuth expiry within three days and fresh cached quota at 10 percent remaining or exhausted; unknown quota and unobserved provider health are not fabricated.
+  - REFERENCE_BEHAVIOR: SP26 completion consumes the same SSE endpoint with native fetch to preserve actual HTTP errors: only server USAGE_STREAM_BUSY is a tab-limit refusal, UNAUTHENTICATED ends the session, and EOF is USAGE_STREAM_DISCONNECTED. Do not guess status from EventSource.CLOSED.
+  - REFERENCE_BEHAVIOR: handshake 10s, heartbeat 60s, line buffer 1 MiB, three consecutive failed connections, fixed 1s/2s reconnect delays and manual Reconnect; unmount/restart cancels requests, readers and timers. Malformed snapshots stop with BAD_RESPONSE.
+  - REFERENCE_BEHAVIOR: disconnect makes active counts unknown and recent rows explicitly last-received; one trailing refresh preserves writes arriving inside the five-second summary throttle.
+  - REFERENCE_BEHAVIOR: server shutdown closes the existing live replies and releases their listeners/timers before waiting for HTTP sockets; Overview endpoint and core status counts remain visible at mobile widths.
+  - IMPLEMENTATION_ACCIDENT: do not port reference whole-history JavaScript scans or a new SSE singleton; reuse SQL aggregation, UsageRecorder and QuotaService's bounded cache with no vendor calls on Overview.
+- **Streaming:** yes
+- **Errors:** `INTERNAL_ERROR` (summary database read fails; dashboard shows HTTP failure with Retry)
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
 ### trackPendingRequest and the PENDING_TIMEOUT_MS watchdog
 
@@ -4527,6 +4790,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - started=false decrements both counters (clamped to >= 0 via Math.max) and clears the timer — this is the normal 'request finished' signal, called from success, error, disconnect and stream-complete paths
   - If the timer fires before a matching started=false ever arrives (unhandled exception before onError/onDisconnect wiring, process anomaly), it force-resets the counter to 0 for that model/account and deletes itself — a watchdog against a permanently-stuck 'N active requests' badge, not a request-level timeout that cancels anything
   - The timer is a plain Node setTimeout, not unref'd, scoped per connectionId+modelKey so a second started=true for the same pair replaces (clearTimeout + reschedule) rather than stacking timers
+  - AIGate: kept (in-memory active counters per model and account with a 60 s watchdog), held by the UsageRecorder singleton.
 
 ### GET /api/usage/providers — distinct-provider filter list for the request-details tab
 
@@ -4538,6 +4802,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Sources DISTINCT provider from the requestDetails table, not usageHistory — the in-source comment explains this avoids parsing every row's full JSON blob (usageHistory rows can total hundreds of MB), which previously caused OOM
   - Display name resolution: providerNodes.name first, then getProviderByAlias/AI_PROVIDERS config name, else the raw provider id
   - This list is scoped to the request-details table specifically (it is the filter for that tab), so it naturally returns an empty array whenever requestDetails is empty — which is the default state, since observability is off by default (see usage.request-details-buffered-persistence)
+  - AIGate: GET /api/requests/filters returns the distinct providers, models, and endpoints of usage_daily within the event retention, at most 500 each, with display names.
 
 ### appendRequestLog is an empty no-op; the log view is derived read-side from usageHistory
 
@@ -4549,6 +4814,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - appendRequestLog() takes any arguments and does nothing — it is `export async function appendRequestLog() {}`, per an in-source comment: 'request log is now derived from usageHistory table on read'
   - Every one of its 5+ call sites (chatCore.js PENDING/FAILED lines, stream.js) invokes it as `appendRequestLog({...}).catch(() => {})` and never inspects the resolved value or branches on it — nothing depends on it having an effect
   - getRecentLogs(limit=200) instead reads the last N usageHistory rows directly and formats them for display, resolving connectionId -> account name via a fresh (uncached) connectionsRepo call every invocation — unlike getActiveRequests' 30s-TTL connectionMapCache
+  - AIGate: not ported; the no-op append and the alias route pair have no user. The recent ring on the usage stream covers the log view.
 
 ### GET /api/usage/request-details — pagination plus mandatory content redaction
 
@@ -4560,6 +4826,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - page must be >= 1 and pageSize must be 1-100, both validated with an explicit 400 before querying
   - Every returned detail has its request, providerRequest, providerResponse and response fields overwritten with {redacted: true} — the in-source comment states this is deliberate: those fields hold full user prompts, tool calls and provider responses, and any dashboard-authenticated user (or anyone, if requireLogin is disabled) could otherwise read every user's conversation history through this endpoint
   - Only metadata (model, tokens, latency, status, timestamps) survives redaction
+  - AIGate: no body is stored, so nothing needs redacting; GET /api/requests pages by an opaque (at, id) cursor with limit 1-100 (spec: no unbounded list) instead of page/pageSize, filtered by errors only, provider, model, endpoint, fallback (attempts > 1), and a time range; GET /api/requests/:id returns the request and its attempts, 404 NOT_FOUND.
 - **Errors:** `INVALID_REQUEST` (page < 1 or pageSize outside 1-100)
 
 ### requestDetailsRepo — disabled by default, buffered batch writes, capped and sanitized
@@ -4576,6 +4843,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - sanitizeHeaders() strips authorization/x-api-key/cookie/token/api-key headers from item.request.headers before it is ever written to disk
   - truncateField() replaces any request/providerRequest/providerResponse/response field larger than maxJsonSize (default 5KB) with a {_truncated, _originalSize, _preview} stub instead of storing it whole
   - beforeExit/SIGINT/SIGTERM/exit handlers force a final flush of any buffered-but-unflushed items so a graceful shutdown doesn't lose the tail of the buffer
+  - AIGate (SP24b, user decision 2026-09-30): request detail holds metadata and attempts only, never bodies, so it is always on instead of opt-in (the opt-in existed because bodies carry conversations). One usage_requests row per client request (requested model, endpoint, key, stream, final status, HTTP status, error code, attempts, final provider/model/connection, summed tokens and cost, latency, TTFT) goes through the SP24a buffered writer and shares the events' retention (AIGATE_USAGE_RETENTION_DAYS). Attempts are the request's usage_events rows. docs/contracts/usage.md 'Requests'.
 - **Errors:** `INTERNAL_ERROR` (flushToDatabase's transaction throws)
 
 ### Every field recorded for one request, in the order it becomes known
@@ -4593,6 +4861,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - latency.total = Date.now() - requestStartTime, computed once the outcome (success or error) is known; latency.ttft is only ever set by the streaming path (buildOnStreamComplete) — every non-streaming and forced-JSON error/success path hardcodes ttft: 0
   - status is 'success' (buildRequestDetail default) or explicitly 'error'; the error message is stored under response.error, not as a separate field
   - fallback attempts are NOT part of the usage row: a single request may try several accounts/providers before one succeeds, but only the account/provider that finally answered (or the account whose failure ended the loop) is passed into saveRequestUsage/saveRequestDetail — see edgeCases
+  - AIGate (SP24a, user decision 2026-09-30): one usage event per upstream call (success, error, or aborted stream) with the requestId that groups a request's attempts, so fallback attempts and error rates are visible; ttft is null, not 0, on paths that do not measure it; usage absent from the upstream is estimated (input from the request, output from emitted characters / 4) and flagged estimated. docs/contracts/usage.md.
 - **Streaming:** yes
 
 ### GET /api/usage/stream — SSE push of usage stats
@@ -4606,6 +4875,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Subscribes to statsEmitter's 'update' event (full getUsageStats() recalculation) and 'pending' event (lightweight activeRequests+recentRequests+errorProvider refresh merged onto the last cached full stats)
   - Both events are debounced at the source: scheduleStatsEvent('update', 250) and scheduleStatsEvent('pending', 150-default) in usageRepo.js collapse bursts of writes into one emit per 150ms/250ms window
   - A 25000ms keepalive comment ping (`: ping\n\n`) is sent on an interval independent of the event-driven pushes, to hold the connection through idle periods
+  - AIGate: kept (payload on connect, debounced 250 ms push after each flush, 25 s keepalive ping), with at most 16 concurrent dashboard clients (503 beyond) and one shared summary per push instead of a recompute per client.
 - **Streaming:** yes
 
 ### getUsageStats — live-history path vs pre-aggregated usageDaily path
@@ -4619,6 +4889,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - period in {7d, 30d, 60d, all} sums pre-aggregated usageDaily rows instead (useDailySummary = true), then does a second pass over raw usageHistory (bounded to the same window) purely to overlay precise lastUsed timestamps onto each breakdown entry
   - Provider/connection/API-key display names are enriched via 3 parallel repo imports (connectionsRepo, apiKeysRepo, nodesRepo) at the top of the function, each independently wrapped in try/catch so one repo failing degrades to raw ids instead of failing the whole stats call
   - last10Minutes is always computed from live usageHistory regardless of period, as a fixed 10-bucket-per-minute series
+  - AIGate: summaries are SQL GROUP BY queries: hourly periods (today, 24h) read usage_events, longer periods (7d, 30d, 90d, custom up to 400 days) read usage_daily; names come from joins. Events are kept 90 days (AIGATE_USAGE_RETENTION_DAYS), pruned hourly.
 
 ### Whether the usage write blocks the HTTP response
 
@@ -4630,6 +4901,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Every call site invokes saveRequestUsage(...).catch(() => {}) without awaiting it — the promise is fired and its rejection swallowed, the caller moves on immediately
   - saveRequestUsage's own function body starts with `const db = await getAdapter();` — even the portion of the function that runs before the caller regains control is minimal; the DB work happens after a yield to the event loop
   - Because the write is unawaited and off the critical path, it is NOT synchronous with the response and does not sit on the hot path — the condition stated for labeling this IMPLEMENTATION_ACCIDENT does not hold here
+  - AIGate (schema rule 11): a bounded buffered writer replaces fire-and-forget writes: flush every 1 s or at 200 events in one transaction, at most 10 000 queued, oldest dropped when full, drops and write failures counted and shown on the Usage page, final flush on shutdown. Recording never blocks or fails the response.
 - **Streaming:** yes
 
 ## Suspected bugs — do NOT reproduce
@@ -4686,11 +4958,21 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `routing.model-thinking-suffix` | A literal catalog model id ending in parentheses remains addressable unless its suffix is a known thinking override | The reference removes every trailing parenthesized value before lookup, including an unknown value | A future provider model named like foo(beta) can resolve as foo or fail instead of reaching its literal id |
 | `provider.trae-solo` | A SOLO event stream should contain a terminal done event before its response is reported successful. | The reference resolves on stream EOF even if no done event arrived and returns the collected thought text as success. | A truncated upstream stream can be mistaken for a complete answer; preserve behavior and track separately. |
 | `provider.kiro-eventstream` | A returned social OAuth state should be compared with the state associated with the exchanged authorization code. | The reference Kiro social exchange has no state parameter and does not compare the state returned from authorize. | A callback state mismatch is not detected; preserve the observed contract and track CSRF binding separately. |
+| `combo.aggregate-status-first-failure` | The aggregate error describes one member: the last failure's status and message together, as the variable name lastStatus says | Status of the first failure, message of the last | Clients branch on a status that does not match the message (for example retrying a 429 whose text says the model does not exist) |
+| `combo.nested-member-recursion` | Nested combos keep working, but a self-reference or cycle stops with a client-visible error | Unbounded recursion | One request with a misconfigured combo can exhaust the server |
+| `combo.strategy-keyed-by-name` | A combo keeps its strategy, judge, and tuning across a rename | The settings entry stays under the old name; the renamed combo falls back to the global strategy | A renamed fusion combo quietly becomes a fallback combo |
+| `capacity.default-pools-free-model` | No pool routes anywhere until the user turns it on with at least one model they chose | Out of the box, image and audio requests a model cannot take go to OpenCode's free public endpoint first | Client content leaves for a service the user never configured; in AIGate that model is not in the catalog either, so its capabilities are unknown |
+| `capacity.strip-orphans-tool-calls` | Trimming keeps every tool result with the assistant turn that called it; the kept tail starts at the current user turn | The kept history can hold a tool result without its call, or a call without its results | The trimmed request is rejected upstream, so the pool model fails and the chain moves on or errors |
+| `capacity.solo-rotation-keyed-by-model` | The rotation belongs to the pool: one state per capability, bounded by the four capabilities | One state per requested model string, unbounded | Client input grows server memory; the same pool rotates differently per requested model |
 | `tokensaver.pxpipe-master-optout-bug` | x-9router-token-saver: off disables every token-saver stage, including PXPIPE, for that request | PXPIPE runs whenever settings.pxpipeEnabled is true, regardless of the per-request opt-out header — only RTK, headroom, caveman and ponytail honor it | A client that opts out to keep its exact payload intact (e.g. to preserve verbatim tool output for debugging, or because it distrusts lossy image conversion) can still have its request body silently rewritten into PNG image blocks by PXPIPE, changing token accounting and provider-visible content the client explicitly asked to avoid |
 | `usage.history-write-dedup-transaction` | Every completed request that calls saveRequestUsage produces its own usageHistory row | A request whose ISO-millisecond timestamp, provider, model, connectionId, apiKey, promptTokens and completionTokens all match the most recently matching prior row is treated as a duplicate: no new row is inserted, no usageDaily counts are added, no lifetime counter increment happens — only the endpoint column may be backfilled | Genuinely distinct requests that happen to land in the same millisecond with identical provider/model/account/token counts (e.g. rapid retries, fixed-size embeddings calls) are silently undercounted in usageHistory, usageDaily aggregates, byModel/byAccount stats and the lifetime request counter |
 | `usage.history-route-returns-aggregate-not-rows` | A route named /api/usage/history returns per-request usage history rows — the sibling getUsageHistory(filter) function (provider/model/date-range filterable) appears purpose-built to back exactly this route | It calls getUsageStats() with no period, returning the same aggregated shape as /api/usage/stats?period=all; getUsageHistory() is never invoked by any route or other code in the checkout | AIGate would misdesign a 'usage history' endpoint contract by assuming per-row data if this were ported literally; the working, filter-capable raw-row query exists in source but is unreachable from the API surface |
 | `pricing.crud-api` | GET /api/pricing/defaults returns the built-in default pricing table over HTTP, matching the route's own doc comment | GET_DEFAULTS is not a Next.js-recognized route export name (only GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS are dispatched) and no app/api/pricing/defaults/route.js file exists, so the function is dead code reachable only via direct import — which is exactly how the dashboard actually consumes it (PricingModal.js imports getDefaultPricing() from open-sse directly) | Any external client relying on the documented '/api/pricing/defaults' HTTP contract gets a 404, not the default pricing table; the feature works today only because the one consumer bypasses the API entirely |
 | `media.kind-endpoint-map-mismatch` | MEDIA_PROVIDER_KINDS and models/info's KIND_ENDPOINT should agree, and both should name a route that actually exists, for every kind. | imageToText's MEDIA_PROVIDER_KINDS path (/v1/images/understanding) names a route that was never built; webFetch's KIND_ENDPOINT path (/v1/fetch) is missing the /web/ segment the real route uses. | The dashboard's live "Try it" widget for any imageToText-kind provider/model 404s instead of exercising the real /v1/chat/completions vision path; any external client trusting GET /v1/models/info's endpoint field for a webFetch-kind model builds a request against a path 9router never routes. |
+| `media.tts-openrouter-audio-chunks` | Each streamed audio chunk is decoded on its own and the bytes are joined; openai/gpt-4o-mini-tts alone means that model with its default voice. | Base64 strings are joined before decoding, so any chunk ending in padding corrupts the rest; "openai/gpt-4o-mini-tts" becomes voice "openai/gpt-4o-mini-tts" on the default model. | Longer OpenRouter audio can come back truncated or noisy, and the documented model name without a voice fails upstream. |
+| `media.tts-public-voices-omit-minimax` | Every provider whose voices the dashboard can list is also listed on /v1/audio/voices. | minimax is missing from the public map, so clients get a 400 for it. | API clients cannot discover MiniMax voices although synthesis works. |
+| `media.tts-deepgram-voices-without-synthesis` | Only providers that can synthesize speech list TTS voices. | Deepgram voices are listed while the speech lane has no Deepgram route. | A user picks a Deepgram voice and every request fails. |
+| `media.tts-unreachable-providers` | A listed TTS provider can synthesize on the platforms it lists voices for. | aws-polly never synthesizes; local-device synthesizes only on macOS. | Users see providers and voices that always fail. |
 | `media.video-lane` | A model the catalog lists with kind:"video" should be reachable through the video-generation lane (or should not be listed as kind:video at all). | runwayml's gen4_turbo/gen3a_turbo are cataloged as kind:"video" (visible via GET /v1/models) but runwayml's serviceKinds/videoConfig never enable the video lane for that provider, so a request against either model 400s. | A client that trusts the catalog's per-model kind field to pick a video model can select runwayml's video models and get a hard 400 on every attempt; the same models are also invisible on the dashboard's video provider grid since that grid gates on serviceKinds, not the models[] kind field, so there is no UI path to notice the gap either. |
 | `transport.strict-proxy-fallback` | A proxy pool with strictProxy enabled should cause real model-traffic requests through that pool to fail (not silently go direct) when the proxy is unreachable, matching what the dashboard toggle promises and what the other three call sites (antigravityQuota, usage, codex-reset-credits) already do with the same field | chatCore.js — the handler behind every /v1 chat/completions request — builds its proxyOptions without a strictProxy key at all, so proxyAwareFetch's `proxyOptions?.strictProxy === true` check is always false for the main request path regardless of the pool's configured value | An operator who enables strictProxy specifically to guarantee traffic never leaves without the configured proxy (e.g. to hide the server's real egress IP from upstream providers) gets no such guarantee for actual chat requests — a dead proxy silently falls back to a direct connection from the box's own IP, with only a console.warn as a trace, defeating the stated purpose of the toggle on the one path that matters most |
 | `proxypool.crud-get-update-delete` | PUT /api/proxy-pools/[id] should accept the same four proxy types the create route and the deploy routes produce (http, vercel, cloudflare, deno), so editing/resaving an existing Deno-relay pool preserves its type | The PUT handler's validTypes array only lists http/vercel/cloudflare; any PUT body that includes a 'type' field on a deno pool is coerced to 'http' | A Deno relay pool edited through the dashboard (e.g. renaming it, or toggling isActive, if the edit form resubmits the current type) gets silently reclassified as a plain HTTP proxy; resolveConnectionProxyConfig() then routes it through the undici ProxyAgent path instead of the vercelRelayUrl header-relay path, and every subsequent request through that pool breaks because the Deno relay function only understands x-relay-target/x-relay-path headers, not being dialed as an HTTP_PROXY |

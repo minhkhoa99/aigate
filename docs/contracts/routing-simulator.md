@@ -1,6 +1,7 @@
 # Routing simulator (SP29 / M3 U6)
 
-Status: contracted; implementation/acceptance in progress. Spec:
+Status: implemented, UI wired; targeted/browser acceptance and independent
+review pending. Build/lint are not runtime acceptance. Spec:
 `docs/superpowers/specs/2026-10-08-sp29-routing-simulator-design.md`.
 This is an AIGate extension, not reference simulator parity.
 
@@ -69,9 +70,10 @@ interruptible. No SQL/usage/lock/rotation writes or secrets decrypted.
 Existing `/gateway/routing` Simulator tab: native ephemeral JSON draft,
 opt-out, one explicit Run, localized EN/VI explanation/disclosures and precise
 loading/error/Retry/stale/truncated framing. No polling/SSE/retry/locale rerun.
-Mutation gcTime 0, no draft URL/storage/download/query cache; pending input
+Mutation gcTime 0, no draft URL/storage/download/query cache; task-owned cache
+and GC timers are removed after observer teardown on tab departure. Pending input
 exists only until bounded settlement. IDs render literally; unknown reason
 codes get generic copy plus literal code. Other Routing previews stay labeled.
 
 Build/lint/discovery/diff and authorized targeted/native/browser acceptance
-are recorded in PROGRESS_HANDOFF.md; contracted is not verified.
+are recorded in PROGRESS_HANDOFF.md; implemented is not verified.

@@ -1832,5 +1832,5 @@
   evidence:
     - { file: "aigate:docs/superpowers/specs/2026-10-08-sp29-routing-simulator-design.md", line: 10, note: "Approved local product intent; not reference evidence" }
   newModule: routing
-  parityStatus: contracted
+  parityStatus: implemented
   labels: []
