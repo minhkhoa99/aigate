@@ -23,12 +23,22 @@ export const count = (value: unknown): number => (typeof value === "number" && N
 // By status and the upstream code only, never by message text.
 export function classifyStatus(status: number, upstreamCode: string | undefined): ErrorCode {
   if (status === 401 || status === 403) return "AUTH_ERROR";
-  if (status === 402 || (status === 429 && upstreamCode === "insufficient_quota")) return "QUOTA_EXHAUSTED";
+  // provider.codex-oauth: codex says usage_limit_reached when the ChatGPT plan's window is used up.
+  if (status === 402 || (status === 429 && (upstreamCode === "insufficient_quota" || upstreamCode === "usage_limit_reached"))) return "QUOTA_EXHAUSTED";
   if (status === 429) return "RATE_LIMIT";
   if (status === 404 || upstreamCode === "model_not_found") return "MODEL_UNAVAILABLE";
   if (status === 408) return "TIMEOUT";
   if (status >= 500) return "PROVIDER_UNAVAILABLE";
   return "INVALID_REQUEST";
+}
+
+// provider.codex-oauth (9router's CodexExecutor.parseError): the reset of a usage_limit_reached error, from resets_at
+// (epoch seconds) or else resets_in_seconds; only a time still ahead counts.
+export function usageResetMs(error: Readonly<Record<string, unknown>>, now: number): number | undefined {
+  const { resets_at: at, resets_in_seconds: inSeconds } = error;
+  if (typeof at === "number" && at > 0 && at * 1000 > now) return at * 1000;
+  if (typeof inSeconds === "number" && inSeconds > 0) return now + inSeconds * 1000;
+  return undefined;
 }
 
 // Retry only what a second try can fix: 502/503/504, or a transport failure with no status.
@@ -102,8 +112,11 @@ export abstract class HttpProviderAdapter {
     const retryAfter = response.headers["retry-after"];
     const seconds = retryAfter === undefined ? undefined : Number(retryAfter);
     const retryAfterMs = seconds !== undefined && Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined;
-    return new EngineError(code, `${this.provider.name} answered ${response.status}${message ? `: ${message}` : ""}`, {
+    const resetsAtMs = response.status === 429 && upstreamCode === "usage_limit_reached" ? usageResetMs(error, Date.now()) : undefined;
+    const resets = resetsAtMs === undefined ? "" : ` (resets at ${new Date(resetsAtMs).toISOString()})`;
+    return new EngineError(code, `${this.provider.name} answered ${response.status}${message ? `: ${message}` : ""}${resets}`, {
       provider: this.provider.id, status: response.status, ...(upstreamCode ? { upstreamCode } : {}), ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
+      ...(resetsAtMs !== undefined ? { resetsAtMs } : {}),
     });
   }
 

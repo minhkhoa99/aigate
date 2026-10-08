@@ -85,6 +85,7 @@ const PORTED_CATALOG = [...CATALOG, TRAE];
 // each connection fills the URL, and the connection test posts a one-token chat. provider.clinepass-headers-envelope:
 // Cline answers GET /models with 200 even without a key, so its test is a one-token chat too (user decision 2026-09-26).
 const PROBE_MESSAGES = [{ role: "user", content: "test" }];
+const CLINE_RECOMMENDED_URL = "https://api.cline.bot/api/v1/ai/cline/recommended-models";
 const firstModelProbe = (provider: CatalogProvider, invalidStatuses: readonly number[]): ProviderDescriptor["chatProbe"] => {
   const model = provider.models[0]?.id ?? "";
   return { model, body: { model, messages: PROBE_MESSAGES, max_tokens: 1 }, invalidStatuses };
@@ -99,7 +100,10 @@ const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Par
     chatProbe: { model: "gpt-4", body: { messages: PROBE_MESSAGES, max_completion_tokens: 1 }, invalidStatuses: [401, 403] },
   }),
   "cloudflare-ai": (provider) => ({ connectionFields: { required: ["accountId"], optional: [] }, chatProbe: firstModelProbe(provider, [401, 403, 404]) }),
-  clinepass: (provider) => ({ chatProbe: firstModelProbe(provider, [401, 403]) }),
+  // provider.cline-recommended-models (AIGate addition, user decision 2026-10-08): Cline's free and Pass models are listed
+  // only by its recommended-models endpoint, which the Cline extension reads; the model import adds them.
+  cline: () => ({ recommendedModels: { url: CLINE_RECOMMENDED_URL, groups: ["free", "recommended"] } }),
+  clinepass: (provider) => ({ chatProbe: firstModelProbe(provider, [401, 403]), recommendedModels: { url: CLINE_RECOMMENDED_URL, groups: ["clinePass"] } }),
   // provider.claude-oauth (kept from 9router): the OAuth token goes as Bearer, and the test only reads its expiry.
   claude: () => ({ auth: { kind: "api-key", header: "authorization", scheme: "bearer" }, testByExpiry: true }),
   // provider.codex-oauth (kept from 9router): the account id header, and the test's empty Responses call (400 is valid).

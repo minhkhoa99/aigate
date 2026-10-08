@@ -73,19 +73,24 @@ function toolInput(args: string): Json {
   return value;
 }
 
+function documentBlock(part: Extract<ContentPart, { type: "file" }>): Json {
+  if (part.mediaType !== "application/pdf") throw unsupported(`a ${part.mediaType} file (only PDF documents)`);
+  return { type: "document", source: source(part.source) };
+}
+
 function userBlock(part: ContentPart): Json {
   switch (part.type) {
     case "text": return textBlock(part);
     case "image": return imageBlock(part);
-    case "file":
-      if (part.mediaType !== "application/pdf") throw unsupported(`a ${part.mediaType} file (only PDF documents)`);
-      return { type: "document", source: source(part.source) };
+    case "file": return documentBlock(part);
     case "tool_result":
       return {
         type: "tool_result", tool_use_id: part.toolCallId,
+        // The Messages API takes text, image and document blocks inside a tool result.
         content: part.content.map((inner) => {
           if (inner.type === "text") return textBlock(inner);
           if (inner.type === "image") return imageBlock(inner);
+          if (inner.type === "file") return documentBlock(inner);
           throw unsupported(`${inner.type} in a tool result`);
         }),
         ...(part.isError ? { is_error: true } : {}),

@@ -202,8 +202,14 @@ export function exhausted(last: unknown, retryAfter: number | undefined): Error 
 }
 
 // Only errors caused by an upstream account get another account. Client validation errors are terminal.
-export function fallbackCooldown(error: unknown): number | undefined {
+// account.mark-unavailable-lock-reasons: a reset the provider reports (codex usage_limit_reached) locks the account until then,
+// at most 30 minutes; it takes precedence over the code's fixed cooldown.
+const MAX_RESET_COOLDOWN_MS = 30 * 60_000;
+
+export function fallbackCooldown(error: unknown, now = Date.now()): number | undefined {
   if (!(error instanceof EngineError)) return undefined;
+  const resetsAtMs = error.details.resetsAtMs;
+  if (typeof resetsAtMs === "number" && resetsAtMs > now) return Math.min(resetsAtMs - now, MAX_RESET_COOLDOWN_MS);
   if (error.code === "AUTH_ERROR") return 120_000;
   if (error.code === "RATE_LIMIT") return 2_000;
   if (error.code === "TIMEOUT" || error.code === "PROVIDER_UNAVAILABLE") return 30_000;

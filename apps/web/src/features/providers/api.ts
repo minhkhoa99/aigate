@@ -153,7 +153,8 @@ export const testModel = (model: string) => api<ModelProbe>("/api/models/test", 
 const OAUTH_TIMEOUT_MS = 35_000;
 const oauthPath = (provider: string, step: string) => `/api/oauth/${encodeURIComponent(provider)}/${step}`;
 
-export interface OAuthStart { authUrl: string | null; state: string; codeVerifier: string; redirectUri: string; flowType: OAuthFlow }
+// relayed: AIGate listens on the provider's fixed callback (codex: localhost:1455) and forwards it to /callback.
+export interface OAuthStart { authUrl: string | null; state: string; codeVerifier: string; redirectUri: string; flowType: OAuthFlow; relayed?: boolean }
 export interface DeviceCode { device_code: string; user_code: string; verification_uri_complete: string; expires_in: number; interval: number; providerData?: Record<string, string> }
 export type PollAnswer = { success: true; connection: { id: string } } | { success: false; error: string; errorDescription?: string | null; pending: boolean };
 

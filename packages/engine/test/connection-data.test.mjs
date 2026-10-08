@@ -78,6 +78,24 @@ test("cloudflare-ai: the account id fills the URL, text parts are joined, and an
   assert.deepEqual(await adapter.validateCredential(credential, ctx()), { valid: true });
 });
 
+test("cline and clinepass model lists add Cline's recommended-models groups; a failure of that list keeps /models", async () => {
+  const recommended = { recommended: [{ id: "openai/gpt-6-astra" }], free: [{ id: "cline-free/solar-mini4" }, { id: 5 }], clinePass: [{ id: "cline-pass/glm-5.3" }, { id: "cline-pass/glm-5.2" }] };
+  const pass = fakeTransport(json(200, { data: [{ id: "cline-pass/glm-5.2" }] }), json(200, recommended));
+  const listed = await new OpenAICompatibleAdapter(clinepass, pass).getModels(credential, ctx());
+  assert.deepEqual(listed.map((m) => m.id), ["cline-pass/glm-5.2", "cline-pass/glm-5.3"], "only the clinePass group, deduplicated");
+  assert.equal(listed[0].descriptor?.id, "cline-pass/glm-5.2", "a catalog id keeps its descriptor");
+  assert.equal(pass.calls[1].url, "https://api.cline.bot/api/v1/ai/cline/recommended-models");
+  const cline = builtinRegistry.provider("cline");
+  const free = await new OpenAICompatibleAdapter(cline, fakeTransport(json(200, { data: [] }), json(200, recommended))).getModels(credential, ctx());
+  assert.deepEqual(free.map((m) => m.id), ["cline-free/solar-mini4", "openai/gpt-6-astra"]);
+  const down = await new OpenAICompatibleAdapter(cline, fakeTransport(json(200, { data: [{ id: "a/b" }] }), json(503, { error: "down" }))).getModels(credential, ctx());
+  assert.deepEqual(down.map((m) => m.id), ["a/b"]);
+  const aborted = new AbortController();
+  const gone = { async send(request) { if (request.url.endsWith("/models")) return json(200, { data: [] }); aborted.abort(); throw new Error("aborted"); } };
+  await assert.rejects(new OpenAICompatibleAdapter(cline, gone).getModels(credential, { signal: aborted.signal, requestId: "t" }), "a caller abort is not swallowed");
+  assert.equal(builtinRegistry.provider("groq").recommendedModels, undefined);
+});
+
 test("clinepass: Cline headers naming AIGate, the { success, data } envelope unwrapped, and a real test", async () => {
   assert.equal(clinepass.headers["user-agent"], "AIGate/0.1.0");
   assert.equal(clinepass.headers["x-client-type"], "aigate");

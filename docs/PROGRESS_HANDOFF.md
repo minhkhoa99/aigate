@@ -924,3 +924,37 @@ Checks and status:
 - **Reviewed exclusions/rulings.** Noncore page copy is excluded by the approved scope (cost: those pages stay English). `app/screens.tsx` development-only `uiState` preview copy remains outside the listed runtime integrations (cost: preview headings stay English). Existing CopyField clipboard rejection/timer cleanup is not changed; locale introduces no new timer (cost: that pre-existing behavior persists). These are explicit rulings on the reviewer's declined-to-judge list, not silently discarded findings. No deferred minor remains after re-grading/fixing the collision.
 - **Self-evaluation.** Accuracy 4, completeness 3, clarity 4, actionability 4, conciseness 4 (3.8/5): native evidence is concrete, but browser acceptance and a writable git checkpoint remain outstanding. The improvement is the already-defined isolated browser acceptance, not another dependency or refactor.
 - **Next.** Obtain/run the planned isolated browser acceptance before marking SP28 complete, and checkpoint the preserved changes when normal git writes are available. Local ledger is `.superpowers/sdd/2026-10-06-sp28-core-ui-i18n/progress.md`; retain it while acceptance/checkpoint is blocked and do not repeat completed native work after compaction.
+
+## Codex sign-in fix — 1455 callback relay (2026-10-08)
+
+- **Cause.** Codex login failed for the user at "localhost:1455 can't be reached": OpenAI accepts only `http://localhost:1455/auth/callback`, and AIGate (SP16 decision) had nothing listening there, so the code never reached the dashboard unless pasted. Verified: authorize URL accepted (302 to log-in), token endpoint reachable from Node (bogus code → 401 `token_expired`), no codex row/conflict in the DB. Codex CLI 0.155 now also requests `api.connectors.read api.connectors.invoke`; the old scope is still accepted, unchanged.
+- **Fix (user approved).** `connections/infrastructure/fixed-callback-relay.ts`: on codex authorize with a dashboard `redirect_uri`, listen on `127.0.0.1:1455`, check `state`, 302 to the dashboard `/callback` with the same query, close after one callback/10 min/shutdown; `relayed` in the authorize answer. Dashboard paste remains the fallback (`sign-in.tsx`). Contract `oauth.md`, `API_UI_MAP.md` updated; matrix already recorded 9router's 1455 listener.
+- **Checks.** Server `pnpm test` 159 (156 pass, 0 fail, 3 skipped); new test in `claude-codex-lane.test.mjs` (stale state 400, other path 404, 302 with query, closes after one, `relayed:false` without dashboard callback, closed on shutdown). Web build + 33/33 tests; `pnpm lint` clean. Real ChatGPT sign-in not yet run by the user.
+- **Next.** User retries codex sign-in from `/providers/connections` (restart `pnpm dev` if the server did not reload).
+
+### Codex usage-limit reset (2026-10-08)
+
+- **Context.** User's codex model test answered 429 "usage limit" while 9router succeeded. Compared with installed 9router 0.5.55: same model probe (`/v1/chat/completions`, max_tokens 1024, "hi"), same `ChatGPT-Account-ID` source, same model list; so the 429 is the ChatGPT account's own quota (9router likely used another account/workspace, fell back across accounts, or ran before the limit). Not reproduced live: the AIGate codex connection had been deleted.
+- **Implemented (user approved).** Engine `http-adapter.ts`: 429 `usage_limit_reached` → `QUOTA_EXHAUSTED`, `usageResetMs` (resets_at, else resets_in_seconds) → `details.resetsAtMs`, message suffix `(resets at ISO)`. Server `fallbackCooldown`: a future `resetsAtMs` locks the account+model until reset, capped 30 min (matrix `account.mark-unavailable-lock-reasons`). Contracts `oauth.md`, `provider-openai.md`.
+- **Checks.** Engine 191/191 (new codex usage-limit test), server 160 (157 pass, 0 fail, 3 skipped; new lane test for probe message + cooldown cap), `pnpm lint`, `pnpm parity replay` pass.
+- **Next.** User reconnects codex, checks the Quotas page; if quota shows remaining but the test still 429s, keep the connection so the raw body can be inspected.
+
+### Cline recommended models (2026-10-08)
+
+- **Cause.** `cline-free/muse-spark-1.3-contributor` shows in the Cline extension but not in AIGate: Cline's `GET /api/v1/models` (467 entries) omits `cline-free/*` and Pass ids; the extension reads them from the public `GET /api/v1/ai/cline/recommended-models` (`recommended`, `free`, `clinePass`). AIGate's cline catalog is 9router's 8 models. A first hand-copied list from the extension was replaced, at the user's request, by this API.
+- **Fix.** Descriptor `recommendedModels { url, groups }` (cline: free, recommended; clinepass: clinePass) in `builtin-registry.ts`; `OpenAICompatibleAdapter.getModels` appends them (deduped, capped, failure ignored unless aborted). Contract `oauth.md` (`provider.cline-recommended-models`).
+- **Checks.** Engine 192/192 (new `connection-data` test); server 161 (158 pass, 0 fail, 3 skipped; `oauth-lane` import test + full id upstream); lint; parity replay. Live public call: cline import 471 models incl. the three `cline-free/*`, clinepass 481. `pnpm discovery validate` fails only because `.reference/9router` is not cloned (pre-existing).
+- **Next.** Restart the server; Providers → cline → Models → import, select `cline-free/muse-spark-1.3-contributor`, Test with the real account.
+
+### Undeclared models are open (2026-10-08)
+
+- **Cause.** `cline/cline-free/muse-spark-1.3-contributor` with an image answered `MODEL_UNAVAILABLE ... does not support: vision`: an imported model has no catalog descriptor, Cline's model APIs list ids only, so `resolveCapabilities` gave 9router's floor (tools only; vision only by name heuristic) and `assertModelSupports` refused the image before any upstream call. The Cline extension knows the model takes images from its bundled catalog.
+- **Fix (user decision: do not block).** `capabilities.ts`: undeclared models get `UNDECLARED_CAPABILITIES` (all on); declared catalog models stay final. `capacity.ts`: `modelFit.declared`; combo reorder puts undeclared refs (incl. nested combo names) after declared fully-capable ones. Contracts `engine.md` (`catalog.capability-undeclared-open`), `capacity-adapter.md`.
+- **Checks.** Engine 192/192; server 161 (158 pass, 0 fail, 3 skipped; capacity tests now use declared non-vision `o1-mini`, plus undeclared `m1` image forwarded upstream); web 33/33; lint; parity replay.
+- **Next.** Restart server; send an image to `cline/cline-free/muse-spark-1.3-contributor`.
+
+### Custom-provider media mapping (2026-10-08)
+
+- **Finding.** Custom providers (`nodeDescriptor`, `models: []`) were refused images by the capability floor too; fixed by `catalog.capability-undeclared-open`. Adapters still refused content with no OpenAI/Anthropic slot.
+- **Fix (user approved all five).** `openai-compatible.ts` (also used by Responses' text fallback): tool-result media hoisted into one user message after the run of tool messages (`[Image from tool result <id>]`); `video` → `video_url`; any base64 audio format → `input_audio.format` subtype, audio URL → `audio_url`; file by URL → `file_data` URL. `anthropic.ts`: PDF inside `tool_result` → document block. Remaining refusals are real Messages API limits (audio, video, non-PDF files). Contracts `provider-openai.md`, `provider-anthropic.md`.
+- **Checks.** Engine 193/193 (new mapping/hoist test; refusal list trimmed; Anthropic tool-result PDF); server 161 (158 pass, 0 fail, 3 skipped); lint; parity replay. Matrix probe of 3 node types × 9 media × 2 positions: only Anthropic audio/video/docx refuse.

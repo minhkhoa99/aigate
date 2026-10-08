@@ -131,12 +131,12 @@ test("defineRegistry reports every bad entry at once", () => {
   }
 });
 
-test("declared capabilities are final and undeclared models get the floor plus the vision heuristic", () => {
+test("declared capabilities are final and undeclared models are open", () => {
   const gpt41 = builtinRegistry.model("openai", "gpt-4.1");
   assert.deepEqual(resolveCapabilities(gpt41, "gpt-4.1"), gpt41.capabilities);
-  assert.equal(resolveCapabilities(undefined, "some-custom-model").vision, false);
-  assert.equal(resolveCapabilities(undefined, "some-custom-model").tools, true);
-  assert.equal(resolveCapabilities(undefined, "qwen3-vl-plus").vision, true);
+  assert.deepEqual(resolveCapabilities(undefined, "cline-free/muse-spark-1.3-contributor"),
+    { vision: true, pdf: true, audioInput: true, videoInput: true, tools: true, reasoning: true }, "an undeclared model is open (user decision 2026-10-08)");
+  assert.equal(resolveCapabilities({ ...gpt41, capabilities: { ...gpt41.capabilities, vision: false } }, "gpt-4.1").vision, false, "a declared model stays final");
 });
 
 test("the vision name heuristic checks NOT_VISION first", () => {
@@ -176,7 +176,7 @@ test("assertModelSupports names what is missing and enforces the output limit", 
     "MODEL_UNAVAILABLE", (error) => error.message.includes("audioInput"));
   expectCode(() => assertModelSupports({ model: "gpt-4o-mini", stream: false, maxOutputTokens: 20_000, messages: [user(text("x"))] }, "openai", model("gpt-4o-mini"), "gpt-4o-mini"),
     "INVALID_REQUEST", (error) => error.details.limit === 16_384);
-  expectCode(() => assertModelSupports({ model: "custom", stream: false, messages: [user(image)] }, "openai", undefined, "custom"), "MODEL_UNAVAILABLE");
+  assertModelSupports({ model: "custom", stream: false, reasoning: {}, messages: [user(image), user({ type: "audio", source: image.source })] }, "openai", undefined, "custom");
   const embedding = { id: "embed-1", name: "E", kind: "embedding", capabilities: resolveCapabilities(undefined, "x"), contextWindow: 8, maxOutputTokens: 1 };
   expectCode(() => assertModelSupports({ model: "embed-1", stream: false, messages: [user(text("x"))] }, "openai", embedding, "embed-1"), "MODEL_UNAVAILABLE");
 });

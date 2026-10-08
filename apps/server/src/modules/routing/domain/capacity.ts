@@ -43,17 +43,19 @@ export function parsePool(capability: CapacityCapability, input: unknown): Parse
 interface ModelFit {
   readonly capabilities: ModelCapabilities;
   readonly contextWindow: number | null;
+  // false for custom providers, unknown ids and combo names: their capabilities are open, not known.
+  readonly declared: boolean;
 }
 
 // "<provider or alias>/<model>" reads that catalog model; a bare id the first provider declaring it; anything else
-// (custom providers, unknown ids, combo names) the default floor and the vision name heuristic.
+// (custom providers, unknown ids, combo names) every capability (catalog.capability-undeclared-open).
 export function modelFit(ref: string): ModelFit {
   const slash = ref.indexOf("/");
   const prefixed = slash > 0 ? builtinRegistry.provider(ref.slice(0, slash)) : undefined;
   const id = splitThinkingSuffix(prefixed ? ref.slice(slash + 1) : ref).model;
   const provider = prefixed ?? builtinRegistry.providers.find((candidate) => builtinRegistry.model(candidate.id, id) !== undefined);
   const model = provider ? builtinRegistry.model(provider.id, id) : undefined;
-  return { capabilities: resolveCapabilities(model, id), contextWindow: model?.contextWindow ?? null };
+  return { capabilities: resolveCapabilities(model), contextWindow: model?.contextWindow ?? null, declared: model !== undefined };
 }
 
 const HARD: ReadonlySet<Capability> = new Set<Capability>(CAPACITY_CAPABILITIES);
@@ -65,16 +67,18 @@ const fits = (ref: string, needs: readonly Capability[]): boolean => {
   return needs.every((capability) => capabilities[capability]);
 };
 
-// combo.reorder-by-capabilities-tiers: stable; tier 0 reads everything required, tier 1 every hard capability, tier 2
-// misses a hard one. Nobody is dropped.
+// combo.reorder-by-capabilities-tiers: stable; tier 0 is declared to read everything required, tier 1 is undeclared
+// (open), tier 2 reads every hard capability, tier 3 misses a hard one. Nobody is dropped.
 export function reorderByCapabilities(models: readonly string[], required: ReadonlySet<Capability>): readonly string[] {
   if (required.size === 0 || models.length <= 1) return models;
   const hard = hardNeeds(required);
   const soft = [...required].filter((capability) => !HARD.has(capability));
+  // An undeclared ref is open, so it never falls behind; it follows the models known to read everything.
   const tier = (ref: string): number => {
-    const { capabilities } = modelFit(ref);
-    if (!hard.every((capability) => capabilities[capability])) return 2;
-    return soft.every((capability) => capabilities[capability]) ? 0 : 1;
+    const { capabilities, declared } = modelFit(ref);
+    if (!declared) return 1;
+    if (!hard.every((capability) => capabilities[capability])) return 3;
+    return soft.every((capability) => capabilities[capability]) ? 0 : 2;
   };
   return models.map((model, index) => ({ model, index, tier: tier(model) }))
     .sort((a, b) => a.tier - b.tier || a.index - b.index)

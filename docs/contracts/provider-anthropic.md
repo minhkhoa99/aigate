@@ -31,7 +31,7 @@ Scope, per spec §9 (SP14, provider adapters by protocol family): one `AIProvide
 | `file` PDF base64 / url | `{ type: "document", source: … }`; any other file type → `UnsupportedFeatureError` |
 | `audio`, `video` | `UnsupportedFeatureError` |
 | `tool_call` | `{ type: "tool_use", id, name, input }`; arguments that are not a JSON object → `INVALID_REQUEST` |
-| `tool_result` | `{ type: "tool_result", tool_use_id, content: [text or image blocks], is_error? }` |
+| `tool_result` | `{ type: "tool_result", tool_use_id, content: [text, image or PDF document blocks], is_error? }`; audio, video and other files have no Messages slot → `UnsupportedFeatureError` |
 | `thinking` with a signature / redacted | `{ type: "thinking", thinking, signature }` / `{ type: "redacted_thinking", data }`; without a signature → `UnsupportedFeatureError` |
 | `tools` | `{ name, description?, input_schema }`; `type: "custom"` added for providers with the `requireClaudeToolType` quirk; `strict: true` → `UnsupportedFeatureError` |
 | `toolChoice` | `auto` → `{type:"auto"}`, `none` → `{type:"none"}`, `required` → `{type:"any"}`, `{name}` → `{type:"tool", name}` |

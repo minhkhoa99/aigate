@@ -160,6 +160,25 @@ test("concurrent requests share one proactive refresh of a connection", () =>
     await app.close();
   }));
 
+test("cline: the model import adds the free and recommended models of Cline's recommended-models list", () =>
+  withTempDb(async (file) => {
+    const upstream = fakeUpstream(
+      json(200, { object: "list", data: [{ id: "meta/muse-spark-1.3-contributor" }, { id: "poolside/laguna-s-2.1:free" }] }),
+      json(200, { recommended: [{ id: "openai/gpt-6-astra" }, { id: "poolside/laguna-s-2.1:free" }], free: [{ id: "cline-free/muse-spark-1.3-contributor" }], clinePass: [{ id: "cline-pass/glm-5.3" }] }),
+      json(200, completion),
+    );
+    const { app, call, dash, key } = await ready(file, upstream);
+    await dash({ method: "POST", url: "/api/oauth/cline/exchange", body: { code: code({ accessToken: JWT(6), refreshToken: "r6", email: "f@x.dev", expiresAt: inSeconds(3600) }), redirectUri: "http://cb" } });
+    const connection = (await dash({ url: "/api/connections" })).json().find((c) => c.provider === "cline");
+    const models = (await dash({ url: `/api/connections/${connection.id}/models` })).json().models.map((m) => m.id);
+    assert.deepEqual(models, ["meta/muse-spark-1.3-contributor", "poolside/laguna-s-2.1:free", "cline-free/muse-spark-1.3-contributor", "openai/gpt-6-astra"], "free first, then recommended; duplicates once; no Pass models for cline");
+    assert.deepEqual([upstream.calls[1].request.url, upstream.calls[1].request.headers.authorization], ["https://api.cline.bot/api/v1/ai/cline/recommended-models", `Bearer workos:${JWT(6)}`]);
+    const answer = await call({ method: "POST", url: "/v1/chat/completions", body: hello("cline/cline-free/muse-spark-1.3-contributor"), headers: { authorization: `Bearer ${key}` } });
+    assert.equal(answer.statusCode, 200);
+    assert.equal(JSON.parse(upstream.calls[2].request.body).model, "cline-free/muse-spark-1.3-contributor", "the full id goes upstream");
+    await app.close();
+  }));
+
 test("kilocode: the device code is polled; the organization header follows; one account per provider", () =>
   withTempDb(async (file) => {
     const upstream = fakeUpstream(

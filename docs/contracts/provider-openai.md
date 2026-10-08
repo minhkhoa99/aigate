@@ -26,11 +26,12 @@ Scope, per spec §9: one `AIProviderPort` for the `openai-compatible` protocol f
 |---|---|---|
 | `system` | one `system` message; text parts only | image, file, or any non-text part |
 | user `text` / `image` | `text` / `image_url` (a URL, or a `data:` URL from base64) | — |
-| user `audio` | `input_audio`, base64 `audio/wav` or `audio/mpeg` only | an audio URL or another format |
-| user `file` | `file.file_data` as a `data:` URL, with `filename` | a file by URL |
-| user `video`, `thinking`, `tool_call` | — | always |
+| user `audio` | base64 → `input_audio` with `format` wav/mp3, else the media subtype (`audio/ogg` → `ogg`); URL → `audio_url` (user decision 2026-10-08: the provider answers a form it cannot take) | — |
+| user `file` | `file.file_data` as a `data:` URL or, by URL, the URL itself, with `filename` | — |
+| user `video` | `video_url` (data URL or URL), as Qwen/OpenRouter/vLLM read it | — |
+| user `thinking`, `tool_call` | — | always |
 | assistant `text`, `tool_call` | `content`, `tool_calls[]` | assistant `thinking`, media |
-| `tool_result` (in any message) | a `tool` message with `tool_call_id`; text parts only | non-text content, `isError: true` |
+| `tool_result` (in any message) | a `tool` message with `tool_call_id` and the text parts (or the label below when there are none); each image/file/audio/video part follows, after the run of tool messages, in one user message as `[Image from tool result <id>]` (File/Audio/Video) plus the part | `isError: true` |
 | `tools`, `toolChoice` | `tools[].function`, `tool_choice` | — |
 | `maxOutputTokens` | `max_completion_tokens` | — |
 | `temperature`, `topP`, `stop` | `temperature`, `top_p`, `stop` | — |
@@ -64,7 +65,7 @@ Scope, per spec §9: one `AIProviderPort` for the `openai-compatible` protocol f
 | Upstream | Code | In-place retry |
 |---|---|---|
 | 401, 403 | `AUTH_ERROR` | no |
-| 402; 429 with `code`/`type` `insufficient_quota` | `QUOTA_EXHAUSTED` | no |
+| 402; 429 with `code`/`type` `insufficient_quota` or `usage_limit_reached` (codex; reset in `details.resetsAtMs`, see `oauth.md`) | `QUOTA_EXHAUSTED` | no |
 | 429 | `RATE_LIMIT` | no |
 | 404; 400 with `code` `model_not_found` | `MODEL_UNAVAILABLE` | no |
 | 408 | `TIMEOUT` | no |

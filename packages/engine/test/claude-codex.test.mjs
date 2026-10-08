@@ -306,6 +306,23 @@ test("codex requests: headers, the account header, the stream collapsed for exec
   assert.deepEqual(codexModelIds(null), []);
 });
 
+test("codex usage_limit_reached: QUOTA_EXHAUSTED with the reset from resets_at, else resets_in_seconds; a past reset is ignored", async () => {
+  const request = { model: "gpt-5.5", stream: false, messages: [{ role: "user", content: [{ type: "text", text: "q" }] }] };
+  const limit = (extra) => json(429, { error: { type: "usage_limit_reached", message: "The usage limit has been reached", plan_type: "plus", ...extra } });
+  const fail = (answer) => createAdapter(codex, fakeTransport(answer)).execute(request, { kind: "api-key", apiKey: "at" }, ctx).then(() => assert.fail("expected a rejection"), (error) => error);
+  const at = Math.floor(Date.now() / 1000) + 3600;
+  const byAt = await fail(limit({ resets_at: at, resets_in_seconds: 60 }));
+  assert.deepEqual([byAt.code, byAt.details.status, byAt.details.upstreamCode, byAt.details.resetsAtMs], ["QUOTA_EXHAUSTED", 429, "usage_limit_reached", at * 1000], "resets_at wins");
+  assert.equal(byAt.message, `${codex.name} answered 429: The usage limit has been reached (resets at ${new Date(at * 1000).toISOString()})`);
+  const before = Date.now();
+  const byIn = await fail(limit({ resets_at: 1, resets_in_seconds: 120 }));
+  assert.ok(byIn.details.resetsAtMs >= before + 120_000 && byIn.details.resetsAtMs <= Date.now() + 120_000, "a past resets_at falls back to resets_in_seconds");
+  const none = await fail(limit({}));
+  assert.deepEqual([none.code, none.details.resetsAtMs, none.message], ["QUOTA_EXHAUSTED", undefined, `${codex.name} answered 429: The usage limit has been reached`]);
+  const plain = await fail(json(429, { error: { type: "rate_limit_exceeded", message: "slow down", resets_in_seconds: 5 } }));
+  assert.deepEqual([plain.code, plain.details.resetsAtMs], ["RATE_LIMIT", undefined], "only usage_limit_reached carries a reset");
+});
+
 test("codex compaction: the URL follows the previous request's flag (kept from 9router)", async () => {
   const stream = () => sse([{ type: "response.completed", response: { id: "r", usage: {} } }]);
   const transport = fakeTransport(stream(), stream(), stream());

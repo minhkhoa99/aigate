@@ -64,18 +64,21 @@ function textParts(parts: readonly ContentPart[], where: string, keepCache: bool
   });
 }
 
+// Media beyond OpenAI's own slots goes in the forms other compatible servers read (user decision 2026-10-08: AIGate does
+// not refuse content a provider may take; the provider answers what it cannot): any base64 audio format, an audio URL as
+// audio_url, video as video_url, and a file by URL in file_data.
+const audioFormat = (mediaType: string): string => AUDIO_FORMATS.get(mediaType) ?? mediaType.replace(/^audio\/(x-)?/, "");
+
 export function userPart(part: ContentPart): Json {
   switch (part.type) {
     case "text": return { type: "text", text: part.text };
     case "image": return { type: "image_url", image_url: { url: mediaUrl(part.source), ...(part.detail ? { detail: part.detail } : {}) } };
-    case "audio": {
-      const format = part.source.kind === "base64" ? AUDIO_FORMATS.get(part.source.mediaType) : undefined;
-      if (part.source.kind !== "base64" || format === undefined) throw unsupported("audio other than base64 wav or mp3");
-      return { type: "input_audio", input_audio: { data: part.source.data, format } };
-    }
-    case "file":
-      if (part.source.kind !== "base64") throw unsupported("a file by url");
-      return { type: "file", file: { filename: part.name ?? "file", file_data: mediaUrl(part.source) } };
+    case "audio":
+      return part.source.kind === "base64"
+        ? { type: "input_audio", input_audio: { data: part.source.data, format: audioFormat(part.source.mediaType) } }
+        : { type: "audio_url", audio_url: { url: part.source.url } };
+    case "video": return { type: "video_url", video_url: { url: mediaUrl(part.source) } };
+    case "file": return { type: "file", file: { filename: part.name ?? "file", file_data: mediaUrl(part.source) } };
     default: throw unsupported(`${part.type} in a user message`);
   }
 }
@@ -109,6 +112,12 @@ function toMessages(request: CanonicalRequest, keepCache: boolean): Json[] {
   if (request.system && request.system.length > 0) {
     out.push({ role: "system", content: compact(textParts(request.system, "the system prompt", keepCache)), ...messageMark({ cacheControl: request.systemCacheControl }) });
   }
+  // Media from tool results waits for the end of the run of tool messages, which must follow their tool calls directly.
+  let hoisted: Json[] = [];
+  const flush = () => {
+    if (hoisted.length > 0) out.push({ role: "user", content: hoisted });
+    hoisted = [];
+  };
   for (const message of request.messages) {
     const rest: ContentPart[] = [];
     // A tool result becomes its own `tool` message, wherever the client put it.
@@ -118,14 +127,32 @@ function toMessages(request: CanonicalRequest, keepCache: boolean): Json[] {
         continue;
       }
       if (part.isError) throw unsupported("a tool_result with isError");
-      out.push({ role: "tool", tool_call_id: part.toolCallId, content: compact(textParts(part.content, "a tool result", keepCache)), ...messageMark(message) });
+      out.push({ role: "tool", tool_call_id: part.toolCallId, content: toolResultContent(part.toolCallId, part.content, keepCache, hoisted), ...messageMark(message) });
     }
     if (rest.length === 0) continue;
+    flush();
     if (message.role === "assistant") out.push({ ...assistantMessage(rest, keepCache), ...messageMark(message) });
     else if (message.role === "user") out.push({ role: "user", content: compact(rest.map((part) => (part.type === "text" ? textJson(part, keepCache) : userPart(part)))), ...messageMark(message) });
     else throw unsupported("content other than tool_result in a tool message");
   }
+  flush();
   return out;
+}
+
+// A tool message carries text only. Each other part of a tool result (a screenshot, a document, audio) follows in a
+// user message after "[Image from tool result <id>]" and the like, as the Anthropic client path already does.
+function toolResultContent(toolCallId: string, parts: readonly ContentPart[], keepCache: boolean, hoisted: Json[]): string | readonly Json[] {
+  const texts: Json[] = [];
+  for (const part of parts) {
+    if (part.type === "text") {
+      texts.push(textJson(part, keepCache));
+      continue;
+    }
+    const label = `[${part.type === "image" ? "Image" : part.type === "file" ? "File" : part.type === "audio" ? "Audio" : "Video"} from tool result ${toolCallId}]`;
+    hoisted.push({ type: "text", text: label }, userPart(part));
+    if (texts.length === 0) texts.push({ type: "text", text: label });
+  }
+  return texts.length > 0 ? compact(texts) : "";
 }
 
 // Replaces a system message that is long or reads like a coding agent, keeping its string or block shape.
@@ -360,13 +387,30 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
     const data = record(parseJson(await readBoundedText(response.body))).data;
     if (!Array.isArray(data)) throw this.invalid("a model list without a data array");
     const listed: ListedModel[] = [];
-    for (const entry of data.slice(0, MAX_LISTED_MODELS)) {
+    const seen = new Set<string>();
+    for (const entry of [...data, ...await this.recommended(credential, ctx)].slice(0, MAX_LISTED_MODELS)) {
       const id = text(record(entry).id);
-      if (id === undefined || !MODEL_ID.test(id)) continue;
+      if (id === undefined || !MODEL_ID.test(id) || seen.has(id)) continue;
+      seen.add(id);
       const descriptor = this.known.get(id);
       listed.push(descriptor ? { id, descriptor } : { id });
     }
     return listed;
+  }
+
+  // provider.cline-recommended-models: the entries of the configured groups; a failure of this extra list leaves the
+  // main list alone, unless the caller gave up.
+  private async recommended(credential: Credential, ctx: ExecCtx): Promise<unknown[]> {
+    const source = this.provider.recommendedModels;
+    if (!source) return [];
+    try {
+      const response = await this.send(this.request("GET", source.url, credential, METADATA_TIMEOUT_MS), credential, ctx, 1);
+      const root = record(parseJson(await readBoundedText(response.body)));
+      return source.groups.flatMap((group) => { const items = root[group]; return Array.isArray(items) ? items : []; });
+    } catch (error) {
+      if (ctx.signal.aborted) throw error;
+      return [];
+    }
   }
 
   // One call, no retry. Only an answer about the key itself is returned; a network failure or a

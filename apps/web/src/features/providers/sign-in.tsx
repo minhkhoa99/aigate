@@ -134,7 +134,8 @@ function BrowserSignIn({ provider, onDone, metaOverride = {} }: { provider: Prov
   // provider.gitlab-duo-oauth: GitLab signs in with the operator's own OAuth application.
   const needsApp = provider.id === "gitlab";
   // provider.codex-oauth: a provider that returns only to its CLI's address (codex: localhost:1455) cannot reach /callback.
-  const elsewhere = session !== null && (provider.id === "kiro" || !session.redirectUri.startsWith(`${window.location.origin}/`));
+  // When AIGate relays that address to /callback, the window finishes by itself and the paste is only the fallback.
+  const elsewhere = session !== null && !session.relayed && (provider.id === "kiro" || !session.redirectUri.startsWith(`${window.location.origin}/`));
 
   const finish = (current: Session, data: CallbackData) => {
     if (handled.current) return;
@@ -209,7 +210,9 @@ function BrowserSignIn({ provider, onDone, metaOverride = {} }: { provider: Prov
         ? provider.id === "kiro"
           ? <>Kiro returns to its <code>kiro://</code> app callback. Copy the full address shown by the browser and paste it here.</>
           : <>{provider.name} returns to <code>{session.redirectUri}</code>, which this dashboard cannot receive. After you sign in, the window shows a page that cannot load: copy its full address and paste it here.</>
-        : "Finish in the window that opened. If it does not come back here (for example on a remote dashboard), paste the address of the page it ended on, or the code it shows."}</p>
+        : session.relayed
+          ? <>Finish in the window that opened; AIGate receives <code>{session.redirectUri}</code> and brings the sign-in back here. If that page cannot load (another program holds the port, or the browser is on another machine), copy its full address and paste it here.</>
+          : "Finish in the window that opened. If it does not come back here (for example on a remote dashboard), paste the address of the page it ended on, or the code it shows."}</p>
       <Field label="Callback URL or code"><Input name="callback" maxLength={8192} autoComplete="off" placeholder={`${session.redirectUri}?code=…`} /></Field>
       <Button type="submit" disabled={exchange.isPending}>{exchange.isPending ? "Signing in…" : "Finish sign-in"}</Button>
     </form>}

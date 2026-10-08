@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { withTempDb } from "./helpers.mjs";
 import { fakeUpstream, json, ready, sse } from "./lane-helpers.mjs";
 import { TokenRefresher } from "../dist/modules/connections/infrastructure/token-refresher.js";
+import { fallbackCooldown } from "../dist/modules/routing/infrastructure/chat-lane.js";
+import { EngineError } from "@aigate/engine";
 
 const OAT = "sk-ant-oat01-token";
 const jwt = (payload) => `h.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.s`;
@@ -113,6 +115,46 @@ test("codex: the fixed 1455 callback, the account from the id_token, and a non-s
     const models = (await dash({ url: `/api/connections/${connection.id}/models` })).json();
     assert.deepEqual(models.models.map((m) => m.id), ["gpt-5.5", "gpt-5.5-review"]);
     await app.close();
+  }));
+
+test("codex: AIGate listens on 1455 while the sign-in waits and sends the browser on to the dashboard's /callback", () =>
+  withTempDb(async (file) => {
+    const { app, dash } = await ready(file, fakeUpstream());
+    const relay = (query) => fetch(`http://127.0.0.1:1455/auth/callback?${query}`, { redirect: "manual" });
+    const stale = (await dash({ url: "/api/oauth/codex/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A5173%2Fcallback" })).json();
+    const begun = (await dash({ url: "/api/oauth/codex/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A20200%2Fcallback" })).json();
+    assert.equal(begun.relayed, true, "port 1455 must be free for this test");
+    assert.equal((await relay(`code=c&state=${stale.state}`)).status, 400, "only the latest sign-in is relayed");
+    assert.equal((await fetch("http://127.0.0.1:1455/other", { redirect: "manual" })).status, 404);
+    const sent = await relay(`code=cx1&scope=openid&state=${begun.state}`);
+    assert.deepEqual([sent.status, sent.headers.get("location")], [302, `http://127.0.0.1:20200/callback?code=cx1&scope=openid&state=${begun.state}`]);
+    await assert.rejects(relay(`code=again&state=${begun.state}`), "the listener closes after one callback");
+    const pasteOnly = (await dash({ url: "/api/oauth/codex/authorize" })).json();
+    assert.equal(pasteOnly.relayed, false, "no dashboard callback to relay to: paste only");
+    await dash({ url: "/api/oauth/codex/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A20200%2Fcallback" });
+    await app.close();
+    await assert.rejects(relay(`code=c&state=${begun.state}`), "closing the server stops the listener");
+  }));
+
+test("codex usage_limit_reached: the model test shows the reset; the account lock follows it, at most 30 minutes", () =>
+  withTempDb(async (file) => {
+    const resetsAt = Math.floor(Date.now() / 1000) + 7200;
+    const upstream = fakeUpstream(
+      json(200, { access_token: "codex-at", refresh_token: "codex-rt", id_token: jwt({ email: "ada@x.dev" }), expires_in: 864000 }),
+      json(429, { error: { type: "usage_limit_reached", message: "The usage limit has been reached", resets_at: resetsAt } }),
+    );
+    const { app, dash } = await ready(file, upstream);
+    await dash({ method: "POST", url: "/api/oauth/codex/exchange", body: { code: "c", redirectUri: "http://localhost:1455/auth/callback", codeVerifier: "v", state: "s" } });
+    const probe = (await dash({ method: "POST", url: "/api/models/test", body: { model: "codex/gpt-5.5" } })).json();
+    assert.deepEqual([probe.ok, probe.status], [false, 429]);
+    assert.ok(probe.error.endsWith(`The usage limit has been reached (resets at ${new Date(resetsAt * 1000).toISOString()})`), probe.error);
+    await app.close();
+
+    const now = 1_000_000;
+    const quota = (resetsAtMs) => new EngineError("QUOTA_EXHAUSTED", "x", { status: 429, resetsAtMs });
+    assert.equal(fallbackCooldown(quota(now + 90_000), now), 90_000, "locked until the reset");
+    assert.equal(fallbackCooldown(quota(now + 5 * 3600_000), now), 30 * 60_000, "capped at 30 minutes");
+    assert.equal(fallbackCooldown(new EngineError("RATE_LIMIT", "x", { status: 429, resetsAtMs: now - 1 }), now), 2_000, "a past reset leaves the code's cooldown");
   }));
 
 test("codex: a token within 5 days of expiry is refreshed before the request", () =>

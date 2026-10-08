@@ -56,6 +56,8 @@ export interface ProviderDescriptor {
   // passes (9router's test for azure and cloudflare-ai). {model} in the URL becomes `model`.
   readonly chatProbe?: { readonly model: string; readonly body: Readonly<Record<string, unknown>>; readonly invalidStatuses: readonly number[] };
   readonly models: readonly ModelDescriptor[];
+  // provider.cline-recommended-models: a second list the model import adds, from these arrays of { id } in its answer.
+  readonly recommendedModels?: { readonly url: string; readonly groups: readonly string[] };
   // Catalog quirks an adapter reads (docs/contracts/provider-anthropic.md: requireClaudeToolType;
   // docs/contracts/stream-only-providers.md: reasoningSummary, neutralAgentPrompt).
   readonly quirks?: readonly string[];

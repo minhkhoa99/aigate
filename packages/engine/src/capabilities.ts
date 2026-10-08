@@ -4,7 +4,8 @@ import type { ModelCapabilities, ModelDescriptor } from "./registry.js";
 
 export type Capability = keyof ModelCapabilities;
 
-// The floor for a model nobody declared (9router capabilities.js:42): tools on, every modality off.
+// 9router's floor for a model nobody declared (capabilities.js:42): tools on, every modality off. Kept for callers that
+// build a declared model; undeclared models use UNDECLARED_CAPABILITIES.
 export const DEFAULT_CAPABILITIES: ModelCapabilities = {
   vision: false, pdf: false, audioInput: false, videoInput: false, tools: true, reasoning: false,
 };
@@ -29,12 +30,16 @@ export function looksLikeVisionModel(modelId: string): boolean {
   return !NOT_VISION.test(modelId) && VISION_NAME.test(modelId);
 }
 
-// A declared model is final. An undeclared one gets the floor, and the heuristic may only turn
-// vision on, never off (catalog.capability-refine-additive-only).
-// ponytail: tiers 2-3 of 9router (exact-id and pattern tables) arrive with the full registry (SP13).
-export function resolveCapabilities(model: ModelDescriptor | undefined, modelId: string): ModelCapabilities {
-  if (model) return model.capabilities;
-  return looksLikeVisionModel(modelId) ? { ...DEFAULT_CAPABILITIES, vision: true } : DEFAULT_CAPABILITIES;
+// catalog.capability-undeclared-open (user decision 2026-10-08, replaces 9router's floor for undeclared models): an
+// imported or custom model has no declared capabilities, and the provider lists none, so AIGate does not refuse its
+// content; it gets every capability and the provider answers what it cannot take.
+export const UNDECLARED_CAPABILITIES: ModelCapabilities = {
+  vision: true, pdf: true, audioInput: true, videoInput: true, tools: true, reasoning: true,
+};
+
+// A declared model is final; an undeclared one is open (above).
+export function resolveCapabilities(model: ModelDescriptor | undefined): ModelCapabilities {
+  return model ? model.capabilities : UNDECLARED_CAPABILITIES;
 }
 
 function partNeeds(part: ContentPart, needs: Set<Capability>, pending: ContentPart[]): void {
@@ -76,7 +81,7 @@ export function assertModelSupports(request: CanonicalRequest, providerId: strin
   if (model && model.kind !== "chat") {
     throw new EngineError("MODEL_UNAVAILABLE", `${target} is a ${model.kind} model and cannot serve chat requests`, { target, kind: model.kind });
   }
-  const available = resolveCapabilities(model, modelId);
+  const available = resolveCapabilities(model);
   const missing = [...detectRequiredCapabilities(request)].filter((capability) => !available[capability]).sort();
   if (missing.length > 0) throw new EngineError("MODEL_UNAVAILABLE", `${target} does not support: ${missing.join(", ")}`, { target, missing });
   // Checked only when the catalog declares the limit; an undeclared one is the vendor's to enforce.
