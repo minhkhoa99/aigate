@@ -46,6 +46,9 @@ All endpoint errors reach inline UI via shared/errors.ts.
 
 Use existing catalog/custom-prefix precedence, thinking suffix, capability
 checks, combo/capacity ordering/history trimming and sticky account selection.
+Undeclared/imported/custom models use the shared open-capability rule; declared
+catalog capabilities remain final. Reordering prefers declared fully-capable
+models before undeclared candidates (see engine.md and capacity-adapter.md).
 Shared pure choices preserve live behavior; live transaction/decryption/refresh
 remain at their original owners. Read-only custom node metadata never opens
 sealed headers. Do not call selectActive, mutating order, byPrefix/stored,

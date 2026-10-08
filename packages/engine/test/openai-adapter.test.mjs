@@ -120,12 +120,7 @@ test("reasoning history goes back as reasoning_content, its signature as encrypt
 test("a feature OpenAI cannot carry is refused before any I/O", async () => {
   const user = (part) => ({ ...hello, messages: [{ role: "user", content: [part] }] });
   const cases = [
-    user({ type: "video", source: { kind: "url", url: "https://x/v.mp4" } }),
-    user({ type: "audio", source: { kind: "url", url: "https://x/a.wav" } }),
-    user({ type: "audio", source: { kind: "base64", mediaType: "audio/ogg", data: "AA" } }),
-    user({ type: "file", mediaType: "application/pdf", source: { kind: "url", url: "https://x/f.pdf" } }),
     user({ type: "tool_result", toolCallId: "c", content: [{ type: "text", text: "boom" }], isError: true }),
-    user({ type: "tool_result", toolCallId: "c", content: [{ type: "image", source: { kind: "url", url: "https://x/i.png" } }] }),
     { ...hello, messages: [{ role: "assistant", content: [{ type: "thinking", text: "hmm", redacted: true }] }] },
     { ...hello, system: [{ type: "image", source: { kind: "url", url: "https://x/i.png" } }] },
     { ...hello, reasoning: { budgetTokens: 1000 } },
@@ -136,6 +131,30 @@ test("a feature OpenAI cannot carry is refused before any I/O", async () => {
     await assert.rejects(new OpenAICompatibleAdapter(openai, transport).execute(request, credential, ctx()), UnsupportedFeatureError, JSON.stringify(request));
     assert.equal(transport.calls.length, 0);
   }
+});
+
+test("media OpenAI has no slot for goes in the forms other servers read; tool-result media follows the tool messages", async () => {
+  const transport = fakeTransport(json(200, ok));
+  const tools = [{ name: "f", parameters: { type: "object" } }];
+  const image = { type: "image", source: { kind: "base64", mediaType: "image/png", data: "AA" } };
+  await new OpenAICompatibleAdapter(openai, transport).execute({ ...hello, tools, messages: [
+    { role: "user", content: [{ type: "text", text: "q" }, { type: "video", source: { kind: "url", url: "https://x/v.mp4" } }, { type: "audio", source: { kind: "url", url: "https://x/a.wav" } },
+      { type: "audio", source: { kind: "base64", mediaType: "audio/ogg", data: "AA" } }, { type: "file", mediaType: "application/pdf", source: { kind: "url", url: "https://x/f.pdf" }, name: "f.pdf" }] },
+    { role: "assistant", content: [{ type: "tool_call", id: "c1", name: "f", arguments: "{}" }, { type: "tool_call", id: "c2", name: "f", arguments: "{}" }] },
+    { role: "tool", content: [{ type: "tool_result", toolCallId: "c1", content: [image] }] },
+    { role: "tool", content: [{ type: "tool_result", toolCallId: "c2", content: [{ type: "text", text: "done" }, { type: "file", mediaType: "application/pdf", source: { kind: "base64", mediaType: "application/pdf", data: "AA" } }] }] },
+    { role: "user", content: [{ type: "text", text: "next" }] },
+  ] }, credential, ctx());
+  const messages = JSON.parse(transport.calls[0].body).messages;
+  assert.deepEqual(messages[0].content.slice(1), [
+    { type: "video_url", video_url: { url: "https://x/v.mp4" } }, { type: "audio_url", audio_url: { url: "https://x/a.wav" } },
+    { type: "input_audio", input_audio: { data: "AA", format: "ogg" } }, { type: "file", file: { filename: "f.pdf", file_data: "https://x/f.pdf" } },
+  ]);
+  assert.deepEqual(messages.slice(2).map((m) => [m.role, typeof m.content === "string" ? m.content : m.content.map((p) => p.type === "text" ? p.text : p.type)]), [
+    ["tool", "[Image from tool result c1]"], ["tool", "done"],
+    ["user", ["[Image from tool result c1]", "image_url", "[File from tool result c2]", "file"]],
+    ["user", "next"],
+  ], "the hoisted media waits until the run of tool messages ends");
 });
 
 test("each upstream status maps to one error code, never by message text", async () => {

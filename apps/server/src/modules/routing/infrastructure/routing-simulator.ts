@@ -94,7 +94,7 @@ export class RoutingSimulator {
       try { assertModelSupports(upstream, providerId, model, target.catalogModelId); }
       catch (error) {
         if (!(error instanceof EngineError) || (error.code !== "MODEL_UNAVAILABLE" && error.code !== "INVALID_REQUEST")) throw error;
-        const available = resolveCapabilities(model, target.catalogModelId);
+        const available = resolveCapabilities(model);
         nodes[id].missingCapabilities = [...detectRequiredCapabilities(upstream)].filter(capability => !available[capability]);
         const classified = toOpenAIError(error);
         return reject(id, { status: classified.status, code: classified.body.error.code, message: classified.body.error.message });

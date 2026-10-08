@@ -147,10 +147,11 @@ test("a catalog entry without a version header still sends 2023-06-01; tool resu
   const transport = fakeTransport(json(200, { ...reply, content: [] }));
   await new AnthropicAdapter(bare, transport).execute({ ...hello, messages: [
     { role: "assistant", content: [{ type: "tool_call", id: "t1", name: "f", arguments: "{}" }] },
-    { role: "user", content: [{ type: "text", text: "note" }, { type: "tool_result", toolCallId: "t1", content: [{ type: "text", text: "r" }] }] },
+    { role: "user", content: [{ type: "text", text: "note" }, { type: "tool_result", toolCallId: "t1", content: [{ type: "text", text: "r" }, { type: "file", mediaType: "application/pdf", source: { kind: "base64", mediaType: "application/pdf", data: "AA" } }] }] },
   ] }, credential, ctx());
   const sent = JSON.parse(transport.calls[0].body);
   assert.deepEqual(sent.messages[1].content.map((b) => b.type), ["tool_result", "text"]);
+  assert.deepEqual(sent.messages[1].content[0].content[1], { type: "document", source: { type: "base64", media_type: "application/pdf", data: "AA" } }, "a PDF inside a tool result is a document block");
   assert.equal(transport.calls[0].headers["anthropic-version"], "2023-06-01");
 });
 

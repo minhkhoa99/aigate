@@ -9,6 +9,7 @@ import {
 import { builtinRegistry, createAdapter, EngineError, generatePkce, OAUTH_PROVIDERS, type HttpTransportPort, type OAuthProvider, type OAuthTokens, type ProviderDescriptor } from "@aigate/engine";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
 import { ConnectionsRepository } from "./connections.repo.js";
+import { FixedCallbackRelay } from "./fixed-callback-relay.js";
 
 // oauth.dashboard-flow (docs/contracts/oauth.md), kept as 9router has it (user decision 2026-09-27): authorize returns
 // state and the PKCE verifier to the dashboard, which sends them back on exchange unchecked. Protected by the global
@@ -44,7 +45,9 @@ export class OAuthController {
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
   ) {}
 
-  onModuleDestroy() { this.stopTraeProxy(); }
+  private readonly relay = new FixedCallbackRelay();
+
+  onModuleDestroy() { this.stopTraeProxy(); this.relay.stop(); }
 
   // GET /api/oauth/{provider}/authorize?redirect_uri=…[&meta] and /api/oauth/{provider}/device-code
   @Get(":provider/:action")
@@ -72,7 +75,9 @@ export class OAuthController {
       } catch (error) {
         flowError(error);
       }
-      return { authUrl, state: pkce.state, codeVerifier: pkce.codeVerifier, codeChallenge: pkce.codeChallenge, redirectUri, flowType: flow.flow, callbackPath: "/callback" };
+      // provider.codex-oauth: listen on the fixed address and relay the browser to the dashboard's callback.
+      const relayed = flow.fixedRedirect && authUrl && params.redirect_uri ? await this.relay.wait(flow.fixedRedirect, pkce.state, params.redirect_uri) : false;
+      return { authUrl, state: pkce.state, codeVerifier: pkce.codeVerifier, codeChallenge: pkce.codeChallenge, redirectUri, flowType: flow.flow, callbackPath: "/callback", relayed };
     }
     if (action === "device-code") {
       if (!flow.deviceCode) throw invalid("This provider does not sign in with a device code");
