@@ -1,9 +1,9 @@
 # SP29 — read-only routing simulator
 
-Status: conversational scope approved on 2026-10-08. Written spec awaits
-review; no product implementation or test execution is authorized by this
-checkpoint. After written-spec approval, prepare the implementation plan and
-agree its execution method.
+Status: conversational scope and written spec approved on 2026-10-08.
+Implementation plan: `../plans/2026-10-08-sp29-routing-simulator.md`, awaiting
+user review and execution-method selection. No product implementation or
+test execution is authorized by this planning checkpoint.
 
 ## Intent and baseline
 
