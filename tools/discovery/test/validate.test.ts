@@ -42,6 +42,12 @@ afterAll(() => {
 });
 
 describe("validateMatrix", () => {
+  it("validates local-spec evidence for an AIGate extension", () => {
+    writeFileSync(join(dir, "a.yaml"), JSON.stringify([entry({ evidence: [
+      { file: "aigate:docs/PROGRESS_HANDOFF.md", line: 1, note: "local contract" },
+    ] })]));
+    expect(validateMatrix(dir).ok).toBe(true);
+  });
   it("passes when every entry is valid and its evidence exists", () => {
     writeFileSync(join(dir, "a.yaml"), JSON.stringify([entry()]));
     const r = validateMatrix(dir);

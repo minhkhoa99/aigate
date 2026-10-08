@@ -34,6 +34,7 @@ import { collectPanel, judgeRequest, MAX_COMBO_DEPTH, memberFailover, panelReque
 import { CapacityPoolsRepository } from "./capacity-pools.repo.js";
 import { UsageRecorder, type UsageCall } from "../../usage/infrastructure/usage-recorder.js";
 import { CombosRepository } from "./combos.repo.js";
+import { resolveModelTarget } from "../domain/model-resolution.js";
 import { PxpipeService } from "./pxpipe.service.js";
 import { meter, meteredSend } from "./usage-meter.js";
 
@@ -1092,22 +1093,11 @@ export class ChatLane {
       const node = isReservedPrefix(prefix) ? undefined : await this.nodes.byPrefix(prefix);
       if (node) prefixed = nodeDescriptor(node);
     }
-    const modelId = prefixed ? ref.slice(slash + 1) : ref;
-    if (modelId === "") throw this.modelNotFound(ref);
-    const catalogModelId = splitThinkingSuffix(modelId).model;
-    const active = await this.activeProviders();
-    let provider = prefixed;
-    if (!provider) {
-      // Model ids may contain "/" (openrouter's "meta-llama/…"), so an unknown prefix is part of the id.
-      const declaring = builtinRegistry.providers.filter((p) => builtinRegistry.model(p.id, catalogModelId) !== undefined);
-      if (declaring.length === 0) throw this.modelNotFound(ref);
-      provider = declaring.find((p) => active.has(p.id));
-      if (!provider) {
-        const names = declaring.slice(0, 3).map((p) => p.name).join(", ");
-        throw new GatewayError(404, "not_found_error", "no_active_connection",
-          `No active connection serves "${ref}". Add or enable one for ${names}${declaring.length > 3 ? ", …" : ""} in AIGate: Providers → Connections.`);
-      }
-    }
+    const resolution = resolveModelTarget(ref, prefixed?.id, await this.activeProviders());
+    if (!resolution.ok) throw new GatewayError(resolution.status, resolution.type, resolution.code, resolution.message);
+    const { modelId, catalogModelId } = resolution;
+    const provider = prefixed ?? builtinRegistry.provider(resolution.providerId);
+    if (!provider) throw new Error("Resolved provider is missing from the registry");
     const upstream: CanonicalRequest = { ...request, model: modelId };
     const descriptor = builtinRegistry.model(provider.id, catalogModelId);
     if (expectedKind !== "chat") {
@@ -1201,11 +1191,6 @@ export class ChatLane {
   // One request row when a handler ends; a client that left is recorded as 499, as proxies log it.
   private finishRequest(request: FastifyRequest, reply: FastifyReply, row: { requestId: string; startedAt: number; requestedModel: string | null; stream: boolean; errorCode: string | null; clientGone: boolean }): void {
     this.usage.finish({ ...row, ...this.usageOf(request), httpStatus: row.clientGone ? 499 : reply.raw.statusCode });
-  }
-
-  private modelNotFound(ref: string): GatewayError {
-    return new GatewayError(404, "not_found_error", "model_not_found",
-      `The model "${ref}" is not in the catalog. Use "<provider>/<model>" such as "openai/gpt-4.1"; GET /v1/models lists the models of your connected providers.`);
   }
 
   private async activeProviders(): Promise<Set<string>> {

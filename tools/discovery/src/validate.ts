@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import fg from "fast-glob";
 import { parse } from "yaml";
 import { FeatureEntrySchema, type FeatureEntry } from "./schema.js";
-import { resolveRef } from "./paths.js";
+import { resolveEvidence } from "./paths.js";
 
 export type ValidationResult = {
   ok: boolean;
@@ -35,7 +35,7 @@ function lineCount(refPath: string): number {
   if (cached !== undefined) return cached;
   let n = -1;
   try {
-    const abs = resolveRef(refPath);
+    const abs = resolveEvidence(refPath);
     if (!existsSync(abs)) {
       n = -1;
     } else {
@@ -43,7 +43,7 @@ function lineCount(refPath: string): number {
       n = countLines(content);
     }
   } catch {
-    n = -1; // path escaped the 9router root
+    n = -1; // path escaped its declared evidence root
   }
   lineCounts.set(refPath, n);
   return n;
@@ -85,7 +85,7 @@ export function validateMatrix(dir: string): ValidationResult {
       for (const ev of entry.evidence) {
         const n = lineCount(ev.file);
         if (n === -1) {
-          errors.push(`${entry.id}: evidence file not found in 9router: ${ev.file}`);
+          errors.push(`${entry.id}: evidence file not found in its declared root: ${ev.file}`);
         } else if (ev.line > n) {
           errors.push(
             `${entry.id}: evidence ${ev.file} line ${ev.line} exceeds file length (${n})`,

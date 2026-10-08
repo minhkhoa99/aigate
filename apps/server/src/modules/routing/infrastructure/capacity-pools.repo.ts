@@ -51,4 +51,8 @@ export class CapacityPoolsRepository {
     this.rotations.set(capability, next);
     return order;
   }
+
+  peekOrder(capability: CapacityCapability, models: readonly string[]): readonly string[] {
+    return rotate(models, this.rotations.get(capability), 1).order;
+  }
 }

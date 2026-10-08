@@ -1800,3 +1800,37 @@
     expected: "A returned social OAuth state should be compared with the state associated with the exchanged authorization code."
     actual: "The reference Kiro social exchange has no state parameter and does not compare the state returned from authorize."
     impact: "A callback state mismatch is not detected; preserve the observed contract and track CSRF binding separately."
+
+- id: routing.simulator-dry-run
+  group: Request routing
+  feature: Routing simulator
+  subFeature: Read-only explanation of a chat routing decision
+  trigger: Explicit dashboard Simulator Run
+  input: "OpenAI Chat JSON envelope <=65536 bytes, nesting <=32, optional tokenSaverOptOut"
+  output: "200 metadata-only parent-linked tree; candidate, blocked, conditional or inconclusive"
+  businessRules:
+    - "AIGATE_EXTENSION: inspect local metadata with shared pure routing decisions; never call a vendor, refresh/decrypt a credential, write usage/locks or advance rotations"
+    - "AIGATE_EXTENSION: at most 512 nodes, 32 inspected providers and existing three-combo depth; source overflow is inconclusive, not a confident refusal"
+    - "AIGATE_EXTENSION: hypothetical fallback/fusion branches are conditional; candidate is neither credential/provider health nor a reserved next request"
+    - "AIGATE_EXTENSION: OpenAI Chat input only; local Token Saver stages only; Headroom/PXPIPE/provider preparation remain unchecked"
+  state:
+    reads: [settings, combos, capacity_pools, provider_connections metadata, account_locks, provider_nodes metadata]
+    writes: []
+    runtimeOnly: [bounded call-local inspection]
+  dependencies: [routing.model-resolution, routing.combo-dispatch, routing.capacity-adapter-solo, account.select-fill-first-default, account.select-round-robin-sticky, account.select-locked-and-excluded-filter, combo.mode-fallback, combo.mode-round-robin, combo.mode-fusion-panel-completion, capacity.augment-models-priority-prepend]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: "5 seconds local inspection", quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "malformed/oversized/non-JSON envelope or unsupported parser input", partial: false }
+    - { code: AUTH_ERROR, when: "dashboard guard refuses the session", partial: false }
+    - { code: TIMEOUT, when: "local inspection deadline expires", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["Source sentinels and node/provider caps bound reads and traversal before expansion"]
+  behavior: { streaming: false, cancellation: "Client close and deadline checked around local reads", concurrency: "One run per tab; no vendor calls" }
+  edgeCases: ["Expired locks remain stored", "Custom headers must not decrypt", "Concurrent live requests can change selection after capture"]
+  evidence:
+    - { file: "aigate:docs/superpowers/specs/2026-10-08-sp29-routing-simulator-design.md", line: 10, note: "Approved local product intent; not reference evidence" }
+  newModule: routing
+  parityStatus: contracted
+  labels: []

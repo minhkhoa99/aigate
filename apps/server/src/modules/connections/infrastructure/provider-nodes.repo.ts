@@ -27,6 +27,7 @@ export interface NodeView {
 }
 // A node with its opened header values, for building its descriptor; never sent to the dashboard.
 export type StoredNode = NodeView & { headers: Readonly<Record<string, string>> };
+export type RoutingNode = Pick<NodeView, "id" | "type" | "prefix">;
 
 const n = providerNodes;
 const columns = {
@@ -105,6 +106,12 @@ export class ProviderNodesRepository {
     const row = await this.database.db.select(columns).from(n).where(eq(n.prefix, prefix))
       .orderBy(sql`${n.type} <> 'openai-compatible'`, asc(n.createdAt)).limit(1).get();
     return row ? this.open(row) : undefined;
+  }
+
+  // Same precedence as byPrefix; no sealed/header/base-URL fields are read or decrypted.
+  routingNodeByPrefix(prefix: string): Promise<RoutingNode | undefined> {
+    return this.database.db.select({ id: n.id, type: n.type, prefix: n.prefix }).from(n).where(eq(n.prefix, prefix))
+      .orderBy(sql`${n.type} <> 'openai-compatible'`, asc(n.createdAt)).limit(1).get();
   }
 
   // The count and the insert share one transaction.

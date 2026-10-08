@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { resolve, sep } from "node:path";
+import { isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -30,5 +30,15 @@ export function resolveRef(relative: string): string {
   if (full !== NINEROUTER_ROOT && !full.startsWith(NINEROUTER_ROOT + sep)) {
     throw new Error(`Path escapes 9router root: ${relative}`);
   }
+  return full;
+}
+
+/** Explicit AIGate extension evidence; ordinary paths retain reference-only resolution. */
+export function resolveEvidence(path: string): string {
+  if (!path.startsWith("aigate:")) return resolveRef(path);
+  const relative = path.slice("aigate:".length);
+  if (!relative || isAbsolute(relative)) throw new Error("Evidence escapes AIGate root");
+  const full = resolve(REPO_ROOT, relative);
+  if (!full.startsWith(REPO_ROOT + sep)) throw new Error("Evidence escapes AIGate root");
   return full;
 }

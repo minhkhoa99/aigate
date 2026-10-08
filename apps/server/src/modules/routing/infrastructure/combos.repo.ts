@@ -99,4 +99,8 @@ export class CombosRepository {
     this.rotations.set(combo.id, next);
     return order;
   }
+
+  peekOrder(combo: Combo, stickyLimit: number): readonly string[] {
+    return rotate(combo.models, this.rotations.get(combo.id), stickyLimit).order;
+  }
 }

@@ -1,14 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, inArray, isNotNull, lt, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, lt, or } from "drizzle-orm";
 import { accountLocks, providerConnections, type AuthType, type DatabaseHandle, type TestStatus } from "@aigate/database";
 import type { OAuthTokens } from "@aigate/engine";
 import { DATABASE } from "../../../database.provider.js";
 import { SECRET_CIPHER, type SecretCipherPort } from "../../../secret-cipher.js";
 import { keyHint, maskHint, refreshContext, sealContext, type ConnectionChanges, type ConnectionFields } from "../domain/connection.js";
+import { chooseAccount, type AccountCandidate } from "../domain/account-selection.js";
 
 // SP11 allows one connection per registry provider; the bound only guards the listing.
 const MAX_CONNECTIONS = 100;
+export type RoutingAccount = AccountCandidate & { isActive: boolean };
+export type RoutingLock = { connectionId: string; model: string; until: Date };
+export type BoundedRows<T> = { rows: T[]; truncated: boolean };
 
 export interface ConnectionView {
   id: string;
@@ -248,13 +252,11 @@ export class ConnectionsRepository {
       }
       const available = rows.filter((row) => !excluded.has(row.id) && !blocked.has(row.id));
       if (available.length === 0) return { retryAt: [...blocked.values()].sort((a, b) => a.getTime() - b.getTime())[0] };
-      let chosen = available[0];
-      if (strategy === "round-robin") {
-        const recent = [...available].sort((a, b) => (b.lastUsedAt?.getTime() ?? -1) - (a.lastUsedAt?.getTime() ?? -1) || a.priority - b.priority)[0];
-        chosen = recent.lastUsedAt && recent.consecutiveUseCount < 3
-          ? recent
-          : [...available].sort((a, b) => (a.lastUsedAt?.getTime() ?? -1) - (b.lastUsedAt?.getTime() ?? -1) || a.priority - b.priority)[0];
-        await tx.update(t).set({ lastUsedAt: now, consecutiveUseCount: chosen.id === recent.id && recent.lastUsedAt ? recent.consecutiveUseCount + 1 : 1, updatedAt: now }).where(eq(t.id, chosen.id));
+      const choice = chooseAccount(available, strategy);
+      if (!choice) return {};
+      const chosen = choice.account;
+      if (choice.nextUseCount !== null) {
+        await tx.update(t).set({ lastUsedAt: now, consecutiveUseCount: choice.nextUseCount, updatedAt: now }).where(eq(t.id, chosen.id));
       }
       return { credential: this.open(chosen) };
     });
@@ -274,6 +276,26 @@ export class ConnectionsRepository {
   async activeProviders(): Promise<Set<string>> {
     const rows = await this.database.db.select({ provider: t.provider }).from(t).where(eq(t.isActive, true)).limit(MAX_CONNECTIONS);
     return new Set(rows.map((row) => row.provider));
+  }
+
+  // Simulator projections: no secret/hint/URL fields, no cleanup or rotation writes.
+  async routingActivity(): Promise<{ providers: Set<string>; truncated: boolean }> {
+    const rows = await this.database.db.select({ provider: t.provider }).from(t).where(eq(t.isActive, true)).limit(MAX_CONNECTIONS + 1);
+    return { providers: new Set(rows.slice(0, MAX_CONNECTIONS).map(row => row.provider)), truncated: rows.length > MAX_CONNECTIONS };
+  }
+
+  async routingAccounts(provider: string): Promise<BoundedRows<RoutingAccount>> {
+    const rows = await this.database.db.select({ id: t.id, isActive: t.isActive, priority: t.priority, lastUsedAt: t.lastUsedAt, consecutiveUseCount: t.consecutiveUseCount })
+      .from(t).where(eq(t.provider, provider)).orderBy(asc(t.priority)).limit(MAX_CONNECTIONS + 1);
+    return { rows: rows.slice(0, MAX_CONNECTIONS), truncated: rows.length > MAX_CONNECTIONS };
+  }
+
+  async routingLocks(provider: string, model: string, now: Date): Promise<BoundedRows<RoutingLock>> {
+    const rows = await this.database.db.select({ connectionId: accountLocks.connectionId, model: accountLocks.model, until: accountLocks.until })
+      .from(accountLocks).innerJoin(t, eq(t.id, accountLocks.connectionId))
+      .where(and(eq(t.provider, provider), gte(accountLocks.until, now), or(eq(accountLocks.model, model), eq(accountLocks.model, "__all"))))
+      .limit(MAX_CONNECTIONS * 2 + 1);
+    return { rows: rows.slice(0, MAX_CONNECTIONS * 2), truncated: rows.length > MAX_CONNECTIONS * 2 };
   }
 
   async activeCount(provider: string): Promise<number> {
