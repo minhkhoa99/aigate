@@ -60,3 +60,10 @@
 .overview-status .copy-wrap { display:flex; min-width:0; max-width:100%; }
 .overview-status .target-label { display:inline; }
 .settings-runtime td { white-space:normal; overflow-wrap:anywhere; }
+.simulation textarea { width:100%; resize:vertical; min-height:180px; }
+.simulation-tree { list-style:none; margin:0; padding:0; min-width:0; }
+.simulation-tree .simulation-tree { padding-inline-start:12px; border-inline-start:1px solid var(--line); }
+.simulation-tree li { min-width:0; margin-block:8px; }
+.simulation-tree summary { cursor:pointer; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.simulation-node { margin-block:8px; }
+.simulation-result, .simulation-result code, .simulation-result p { min-width:0; overflow-wrap:anywhere; white-space:normal; }

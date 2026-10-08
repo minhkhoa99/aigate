@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, apiVoid } from "../../shared/api";
+import { useEffect, useId } from "react";
+import { validateSimulationResult, type SimulationResult } from "./simulation-result";
 
 // docs/contracts/identity-apikeys.md, "API keys"
 export interface ApiKey {
@@ -173,3 +175,23 @@ export function useSaveCapacityPool() {
 // POST /api/models/test (docs/contracts/custom-models.md): the server bounds the probe at 15 s.
 export interface ModelProbe { ok: boolean; latencyMs: number; status: number; error: string | null; note?: string }
 export const testModel = (model: string) => api<ModelProbe>("/api/models/test", { method: "POST", body: { model }, timeoutMs: 20_000 });
+
+export function useRoutingSimulation() {
+  const client = useQueryClient(), owner = useId();
+  useEffect(() => () => {
+    // Wait for observer teardown, then clear pending gcTime:0 rescheduling as well as settled payloads.
+    queueMicrotask(() => {
+      const cache = client.getMutationCache();
+      for (const mutation of cache.findAll({ mutationKey: ["routing-simulation", owner], exact: true })) {
+        mutation.destroy(); cache.remove(mutation);
+      }
+    });
+  }, [client, owner]);
+  return useMutation({
+    mutationKey: ["routing-simulation", owner], retry: false, gcTime: 0,
+    mutationFn: async (body: { request: unknown; tokenSaverOptOut: boolean }) => {
+      const result = await api<SimulationResult>("/api/routing/simulate", { method: "POST", body });
+      validateSimulationResult(result); return result;
+    },
+  });
+}

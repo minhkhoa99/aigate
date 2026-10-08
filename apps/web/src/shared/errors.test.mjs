@@ -4,6 +4,16 @@ import assert from "node:assert/strict";
 import { ApiError } from "./api.ts";
 import { toProblem } from "./errors.ts";
 
+test("unsupported simulation input gets owned guidance without echoing unsafe detail", () => {
+  const error = new ApiError(400, "UNSUPPORTED_FEATURE", "private-prompt", { message: "private-prompt" });
+  for (const language of ["en", "vi"]) {
+    const problem = toProblem(error, language);
+    assert.equal(problem.code, "UNSUPPORTED_FEATURE");
+    assert.equal(problem.message.includes("private-prompt"), false);
+    assert.ok(problem.message.includes("OpenAI Chat"));
+  }
+});
+
 test("transport failures get their own codes and advice", () => {
   assert.equal(toProblem(new ApiError(0, "NETWORK_ERROR", "x")).message, "Could not reach AIGate. Check that the server is running, then try again.");
   assert.match(toProblem(new ApiError(0, "TIMEOUT", "x")).message, /10 seconds/);

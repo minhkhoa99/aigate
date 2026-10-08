@@ -5,6 +5,7 @@ import { Button, ConfirmDialog, CopyField, Dot, Field, Input, Modal, PageHeading
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
 import { CapacityTab } from "./capacity-pools";
+import { RoutingSimulatorTab } from "./routing-simulator";
 import {
   useApiKeys, useChatReadiness, useComboStickyLimit, useCombos, useCreateKey, useDeleteCombo, useDeleteKey, useRequireApiKey, useSetComboStickyLimit, useSetKeyActive,
   usePatchTokenSaverSettings, useTokenSaverSettings, usePxpipeStatus, useInstallPxpipe,
@@ -151,7 +152,7 @@ export function Routing() {
     <Tabs items={["Combo", "Overview", "Fallback", "Capacity adapter", "Simulator"]} active={tab} onChange={setTab} />
     {tab === "Combo" && <CombosTab />}
     {tab === "Capacity adapter" && <CapacityTab />}
-    {tab !== "Combo" && tab !== "Capacity adapter" && <div className="section-gap"><Warning>Preview with sample data: this tab is not connected to the gateway yet. Account fallback runs as described; choose its strategy in Settings → Auth & Access.</Warning></div>}
+    {(tab === "Overview" || tab === "Fallback") && <div className="section-gap"><Warning>Preview with sample data: this tab is not connected to the gateway yet. Account fallback runs as described; choose its strategy in Settings → Auth & Access.</Warning></div>}
     {tab === "Overview" && <div className="grid grid-2 section-gap"><Panel title="Active routes" detail="Current model resolution order">
       {["claude-3.5-sonnet → Anthropic primary", "gpt-4o → OpenAI primary", "gemini-2.5-pro → Google Vertex", "deepseek-r1 → DeepSeek pooled"].map((r, i) => <div className="list-row" key={r}><Dot tone={i === 3 ? "warning" : "healthy"} /><div><strong className="mono">{r}</strong><small>{i === 3 ? "Fallback available" : "Direct · healthy"}</small></div><Pill tone={i === 3 ? "warning" : "healthy"}>{i === 3 ? "Guarded" : "Active"}</Pill></div>)}
     </Panel><Panel title="Decision path" detail="Single request, from client to provider"><div className="flow-steps">{["Validate API key", "Resolve alias & capability", "Choose connection", "Translate request", "Dispatch with timeout", "Stream response"].map((s, i) => <div key={s}><span>{String(i + 1).padStart(2, "0")}</span><strong>{s}</strong><Dot /></div>)}</div></Panel></div>}
@@ -161,7 +162,7 @@ export function Routing() {
       ["Provider outage · 503", "Retry, then next route", "30 seconds", <Pill tone="warning">Fallback</Pill>],
       ["Client abort · 499", "Cancel upstream", "None", <Pill tone="healthy">Terminal</Pill>],
     ]} /></Panel></div>}
-    {tab === "Simulator" && <div className="split section-gap"><Panel title="Test a route" detail="Preview decisions without sending a provider request"><div className="stack"><Field label="Model"><Input defaultValue="claude-3.5-sonnet" /></Field><Field label="Input tokens"><Input type="number" defaultValue="2048" /></Field><Button variant="primary">Run simulation</Button></div></Panel><Panel title="Expected route"><div className="flow-steps"><div><span>01</span><strong>Anthropic primary</strong><Pill tone="healthy">Selected</Pill></div><div><span>02</span><strong>Anthropic secondary</strong><Pill>Standby</Pill></div></div></Panel></div>}
+    {tab === "Simulator" && <RoutingSimulatorTab />}
   </>;
 }
 
