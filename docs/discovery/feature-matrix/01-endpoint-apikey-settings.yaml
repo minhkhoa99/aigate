@@ -977,7 +977,7 @@
     - { file: src/app/api/locale/route.js, line: 8, note: "supported language check; reference persistence is a Next cookie, not AIGate's browser contract" }
     - { file: src/i18n/config.js, line: 38, note: "English default; AIGate's scope and invariants are in docs/contracts/i18n.md" }
   newModule: settings
-  parityStatus: implemented
+  parityStatus: verified
   labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
 
 - id: settings.portable-config-general
