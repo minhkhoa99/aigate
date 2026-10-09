@@ -30,3 +30,14 @@ RTK only rewrites successful tool output between 500 B and 10 MiB. It detects co
 ## Out of scope
 
 Persisted savings analytics and historical token totals are not part of this request pipeline. PXPIPE remains optional; installation is explicit and isolated to the AIGate data directory.
+
+## Dashboard EN/VI (SP35)
+
+The existing `/gateway/token-saver` screen uses the shared EN/VI catalog for
+owned labels, stage and PXPIPE status, validation/read errors and feedback.
+Locale changes retain the mounted Headroom URL draft and pending operations;
+they do not PATCH settings or install PXPIPE. A status read failure has code,
+diagnostic and Retry, distinct from an absent package. An installed package
+whose transform cannot load offers an explicit reinstall action. Stage IDs,
+the opt-out header and persisted level values remain literal. See
+`token-saver-ui-i18n.md` for the browser contract and acceptance boundary.

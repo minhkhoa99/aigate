@@ -12,8 +12,7 @@ import { clientProtocols, endpointSetup, type ClientProtocol } from "./endpoint-
 import type { MessageKey } from "../../shared/i18n";
 import {
   useApiKeys, useChatReadiness, useComboStickyLimit, useCombos, useCreateKey, useDeleteCombo, useDeleteKey, useRequireApiKey, useSetComboStickyLimit, useSetKeyActive,
-  usePatchTokenSaverSettings, useTokenSaverSettings, usePxpipeStatus, useInstallPxpipe,
-  useSetRequireApiKey, type ApiKey, type ChatReadiness, type Combo, type ComboStrategy, type CreatedApiKey, type GatewaySettings,
+  useSetRequireApiKey, type ApiKey, type ChatReadiness, type Combo, type ComboStrategy, type CreatedApiKey,
 } from "./api";
 
 const READINESS: Record<ChatReadiness, { tone: "healthy" | "warning"; label: MessageKey; hint?: MessageKey }> = {
@@ -164,46 +163,5 @@ export function Routing() {
     {tab === "Capacity adapter" && <CapacityTab />}
     {(tab === "Overview" || tab === "Fallback") && <RoutingStatusTab mode={tab === "Overview" ? "overview" : "fallback"} onSimulate={() => setTab("Simulator")} />}
     {tab === "Simulator" && <RoutingSimulatorTab />}
-  </>;
-}
-
-export function TokenSaver() {
-  const query = useTokenSaverSettings();
-  const pxpipe = usePxpipeStatus();
-  const installPxpipe = useInstallPxpipe();
-  const save = usePatchTokenSaverSettings();
-  const showToast = useToast();
-  const [headroomUrl, setHeadroomUrl] = useState("");
-  if (query.isPending) return <StateBlock state="loading" />;
-  if (query.isError || !query.data) return <StateBlock state="error" code={toProblem(query.error).code} action={<Button onClick={() => void query.refetch()}>Retry</Button>} />;
-  const config = query.data;
-  const pxpipeReady = pxpipe.data?.installed === true && pxpipe.data.loaded;
-  const patch = (fields: Partial<GatewaySettings>) => save.mutate(fields, { onError: (error) => showToast({ tone: "error", ...toProblem(error) }) });
-  const toggle = (label: string, description: string, checked: boolean, field: string, disabled = false) =>
-    <div className="list-row" key={field}><div><strong>{label}</strong><small>{description}</small></div><input type="checkbox" checked={checked} disabled={disabled || save.isPending} aria-label={`Enable ${label}`} onChange={(event) => patch({ [field]: event.target.checked })} /></div>;
-  const stage = (name: string, enabled: boolean) => <div key={name}><span>{String(["RTK", "Headroom", "Caveman", "Ponytail", "PXPIPE"].indexOf(name) + 1).padStart(2, "0")}</span><strong>{name}</strong><Pill tone={enabled ? "healthy" : "muted"}>{enabled ? "Enabled" : "Off"}</Pill></div>;
-  return <>
-    <PageHeading eyebrow="Gateway / Token Saver" title="Token Saver" description="Compression may reduce input tokens; style prompts add some, so net savings depend on the request and provider." action={<Pill tone={config.tokenSaverEnabled ? "healthy" : "warning"}>{config.tokenSaverEnabled ? "Enabled" : "Disabled"}</Pill>} />
-    <Panel title="Master switch" detail="Send x-aigate-token-saver: off to bypass every Token Saver stage for one request.">
-      {toggle("Enable Token Saver", "Apply enabled stages before provider dispatch.", config.tokenSaverEnabled, "tokenSaverEnabled")}
-    </Panel>
-    <Panel title="Optimization pipeline" detail="Stages run in this order. Optional services fail open." className="section-gap"><div className="pipeline">
-      {stage("RTK", config.tokenSaverEnabled && config.rtkEnabled)}{stage("Headroom", config.tokenSaverEnabled && config.headroomEnabled)}
-      {stage("Caveman", config.tokenSaverEnabled && config.cavemanEnabled)}{stage("Ponytail", config.tokenSaverEnabled && config.ponytailEnabled)}
-      {stage("PXPIPE", config.tokenSaverEnabled && config.pxpipeEnabled && pxpipeReady)}
-    </div></Panel>
-    <Panel title="Stage controls" className="section-gap">
-      {toggle("RTK · tool output compression", "Removes consecutive duplicate lines from large, non-error tool results.", config.rtkEnabled, "rtkEnabled", !config.tokenSaverEnabled)}
-      {toggle("Headroom · context compression", "Sends plain-text conversations to the configured local or remote Headroom endpoint.", config.headroomEnabled, "headroomEnabled", !config.tokenSaverEnabled)}
-      {config.headroomEnabled && <div className="list-row token-saver-url"><div><strong>Headroom URL</strong><small>POST /v1/compress; failures leave the request unchanged.</small></div><input className="input" type="url" aria-label="Headroom URL" value={headroomUrl || config.headroomUrl} onChange={(event) => setHeadroomUrl(event.target.value)} onBlur={() => { if (headroomUrl && headroomUrl !== config.headroomUrl) { patch({ headroomUrl }); setHeadroomUrl(""); } }} /></div>}
-      {config.headroomEnabled && toggle("Compress user messages", "Off by default; when on, Headroom may rewrite user-provided text too.", config.headroomCompressUserMessages, "headroomCompressUserMessages")}
-      {toggle("Caveman · concise response style", "Adds an instruction (and input tokens); shorter output is not guaranteed.", config.cavemanEnabled, "cavemanEnabled", !config.tokenSaverEnabled)}
-      {config.cavemanEnabled && <div className="list-row"><strong>Caveman level</strong><select className="input" aria-label="Caveman level" value={config.cavemanLevel} onChange={(event) => { const level = event.target.value; if (level === "lite" || level === "full" || level === "ultra") patch({ cavemanLevel: level }); }}>{["lite", "full", "ultra"].map((level) => <option key={level}>{level}</option>)}</select></div>}
-      {toggle("Ponytail · minimal coding style", "Adds coding instructions (and input tokens); shorter output is not guaranteed.", config.ponytailEnabled, "ponytailEnabled", !config.tokenSaverEnabled)}
-      {config.ponytailEnabled && <div className="list-row"><strong>Ponytail level</strong><select className="input" aria-label="Ponytail level" value={config.ponytailLevel} onChange={(event) => { const level = event.target.value; if (level === "lite" || level === "full" || level === "ultra") patch({ ponytailLevel: level }); }}>{["lite", "full", "ultra"].map((level) => <option key={level}>{level}</option>)}</select></div>}
-      <div className="list-row"><div><strong>PXPIPE · image block extraction</strong><small>{pxpipeReady ? "Installed" + (pxpipe.data?.version ? " · v" + pxpipe.data.version : "") + "; transforms eligible Anthropic requests in-process." : "Install pxpipe-proxy into AIGate's data directory. It is used only for Anthropic Messages requests."}</small></div>
-        {!pxpipeReady ? <Button disabled={installPxpipe.isPending || pxpipe.data?.installing} onClick={() => installPxpipe.mutate(undefined, { onError: (error) => showToast({ tone: "error", ...toProblem(error) }) })}>{installPxpipe.isPending ? "Installing…" : "Install PXPIPE"}</Button> : <input type="checkbox" checked={config.pxpipeEnabled} disabled={!config.tokenSaverEnabled || save.isPending} aria-label="Enable PXPIPE image block extraction" onChange={(event) => patch({ pxpipeEnabled: event.target.checked })} />}
-      </div>
-    </Panel>
   </>;
 }

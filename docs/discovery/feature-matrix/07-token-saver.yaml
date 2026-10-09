@@ -71,6 +71,36 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
+- id: tokensaver.dashboard-browser-i18n
+  group: Token Saver
+  feature: Token Saver dashboard
+  subFeature: EN/VI presentation and PXPIPE read states
+  trigger: Open Token Saver or change the browser language
+  input: Existing settings/PXPIPE reads, mounted Headroom URL draft, browser locale
+  output: Localized owned copy with literal setting keys, stage names and API diagnostics
+  businessRules:
+    - "AIGATE_EXTENSION: owned Token Saver UI copy renders through shared EN/VI catalogs without changing settings or PXPIPE requests"
+    - "AIGATE_EXTENSION: locale changes preserve draft and pending operations and never install PXPIPE or replay a PATCH"
+    - "AIGATE_EXTENSION: PXPIPE status read failure is distinct from not installed and exposes code, message and Retry"
+  state:
+    reads: [existing_settings, existing_pxpipe_status, browser_language_preference]
+    writes: []
+    runtimeOnly: [headroom_url_draft]
+  dependencies: [tokensaver.pipeline-execution-order, tokensaver.pxpipe-library-mode-status]
+  providerInteraction: "No vendor call; explicit existing PXPIPE Install can download a package only after user click"
+  fallback: { hasFallback: false, retry: "Explicit read Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["Existing browser-local aigate-language only"]
+  performanceConcerns: ["No new polling, request fan-out or cache"]
+  behavior: { streaming: false, cancellation: null, concurrency: "Existing in-flight mutation only" }
+  edgeCases: ["Draft across locale change", "Installed but transform unavailable", "Read error must not offer install"]
+  evidence:
+    - { file: "aigate:docs/contracts/token-saver-ui-i18n.md", line: 1, note: "SP35 scope and read-state boundary" }
+  newModule: routing
+  parityStatus: verified
+  labels: []
+
 - id: tokensaver.rtk-compress-shapes
   group: Token Saver
   feature: Token Saver

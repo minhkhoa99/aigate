@@ -1,6 +1,8 @@
 # UI ownership handoff
 
-Current integration note (2026-10-09): SP33 completes M3 U3's protocol-specific
+Current integration note (2026-10-09): SP35 completes Token Saver's scoped EN/VI
+presentation and PXPIPE read states over the already-wired SP21 APIs; see
+`docs/contracts/token-saver-ui-i18n.md`. SP33 completes M3 U3's protocol-specific
 Endpoint & Keys setup selector over the existing four client lanes, with EN/VI
 copy and no new API. See `docs/contracts/endpoint-setup.md`. M3 U5 Media Providers is wired to live
 catalog and connection state, with the existing TTS voice browser. SP31 closed
