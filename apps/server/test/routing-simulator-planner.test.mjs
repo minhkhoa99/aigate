@@ -54,7 +54,7 @@ test("combo and capacity peeks retain rotation and capability/history rules", ()
     assert.deepEqual(repo.peekOrder(combo, 1), order);
     await dash({ method: "PUT", url: "/api/capacity-pools/vision", body: { enabled: true, roundRobin: true, models: ["openai/gpt-4o", "openai/gpt-4.1"] } });
     pools.order("vision", ["openai/gpt-4o", "openai/gpt-4.1"]);
-    const looked = await inspect(app, { model: "openai/plain", messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "https://example.invalid/private-media" } }] }] });
+    const looked = await inspect(app, { model: "openai/o1-mini", messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "https://example.invalid/private-media" } }] }] });
     assert.equal(looked.nodes.find(n => n.kind === "model").model, "openai/gpt-4.1");
     assert.deepEqual(pools.peekOrder("vision", ["openai/gpt-4o", "openai/gpt-4.1"]), ["openai/gpt-4.1", "openai/gpt-4o"]);
     assert.equal(JSON.stringify(looked).includes("private-media"), false);

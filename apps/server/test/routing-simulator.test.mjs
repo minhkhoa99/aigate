@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { request as httpRequest } from "node:http";
 import { withTempDb } from "./helpers.mjs";
 import { fakeUpstream, ready, hello } from "./lane-helpers.mjs";
+import { RoutingSimulator } from "../dist/modules/routing/infrastructure/routing-simulator.js";
 
 test("simulation endpoint is protected, explicit 200/no-store and no vendor execution", () => withTempDb(async file => {
   const upstream = fakeUpstream();
@@ -43,4 +45,37 @@ test("HTTP byte/content/envelope/parser failures are precise and do not echo pay
       assert.equal(res.body.includes("synthetic-secret"), false, res.body);
     }
   } finally { await app.close(); }
+}));
+
+test("simulation deadline returns sanitized 504 and a departed client cancels local inspection", () => withTempDb(async file => {
+  const { app, dash } = await ready(file, fakeUpstream());
+  const planner = app.get(RoutingSimulator), original = planner.explain;
+  try {
+    planner.explain = (_input, signal) => new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+    const timeout = await dash({ method: "POST", url: "/api/routing/simulate", body: { request: hello } });
+    assert.deepEqual([timeout.statusCode, timeout.json().code, timeout.json().timeoutSeconds], [504, "TIMEOUT", 5]);
+    assert.equal(timeout.headers["cache-control"], "no-store");
+
+    let started;
+    const entered = new Promise(resolve => { started = resolve; });
+    let cancelled;
+    const left = new Promise(resolve => { cancelled = resolve; });
+    planner.explain = (_input, signal) => new Promise((_resolve, reject) => {
+      started();
+      signal.addEventListener("abort", () => { cancelled(); reject(signal.reason); }, { once: true });
+    });
+    await app.listen(0, "127.0.0.1");
+    const port = app.getHttpServer().address().port;
+    const login = await dash({ method: "POST", url: "/api/auth/login", body: { password: "correct horse battery" } });
+    const cookie = login.headers["set-cookie"].split(";")[0];
+    const req = httpRequest({ host: "127.0.0.1", port, method: "POST", path: "/api/routing/simulate",
+      headers: { cookie, "content-type": "application/json" } });
+    req.on("error", () => undefined);
+    req.end(JSON.stringify({ request: hello }));
+    await entered;
+    req.destroy();
+    await Promise.race([left, new Promise((_resolve, reject) => setTimeout(() => reject(new Error("client abort was not propagated")), 1000))]);
+  } finally { planner.explain = original; await app.close(); }
 }));

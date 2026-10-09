@@ -36,8 +36,10 @@ export function classifyStatus(status: number, upstreamCode: string | undefined)
 // (epoch seconds) or else resets_in_seconds; only a time still ahead counts.
 export function usageResetMs(error: Readonly<Record<string, unknown>>, now: number): number | undefined {
   const { resets_at: at, resets_in_seconds: inSeconds } = error;
-  if (typeof at === "number" && at > 0 && at * 1000 > now) return at * 1000;
-  if (typeof inSeconds === "number" && inSeconds > 0) return now + inSeconds * 1000;
+  const absolute = typeof at === "number" ? at * 1000 : NaN;
+  if (Number.isFinite(absolute) && absolute > now && absolute <= 8.64e15) return absolute;
+  const relative = typeof inSeconds === "number" ? now + inSeconds * 1000 : NaN;
+  if (Number.isFinite(relative) && relative > now && relative <= 8.64e15) return relative;
   return undefined;
 }
 

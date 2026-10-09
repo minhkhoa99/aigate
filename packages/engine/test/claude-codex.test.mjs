@@ -319,6 +319,11 @@ test("codex usage_limit_reached: QUOTA_EXHAUSTED with the reset from resets_at, 
   assert.ok(byIn.details.resetsAtMs >= before + 120_000 && byIn.details.resetsAtMs <= Date.now() + 120_000, "a past resets_at falls back to resets_in_seconds");
   const none = await fail(limit({}));
   assert.deepEqual([none.code, none.details.resetsAtMs, none.message], ["QUOTA_EXHAUSTED", undefined, `${codex.name} answered 429: The usage limit has been reached`]);
+  const overflow = await fail(limit({ resets_at: 1e20, resets_in_seconds: 1e20 }));
+  assert.deepEqual([overflow.code, overflow.details.resetsAtMs], ["QUOTA_EXHAUSTED", undefined], "unrepresentable reset dates do not mask the quota error");
+  const fallback = await fail(limit({ resets_at: 1e20, resets_in_seconds: 60 }));
+  assert.equal(fallback.code, "QUOTA_EXHAUSTED");
+  assert.ok(fallback.details.resetsAtMs >= Date.now() + 59_000 && fallback.details.resetsAtMs <= Date.now() + 60_000);
   const plain = await fail(json(429, { error: { type: "rate_limit_exceeded", message: "slow down", resets_in_seconds: 5 } }));
   assert.deepEqual([plain.code, plain.details.resetsAtMs], ["RATE_LIMIT", undefined], "only usage_limit_reached carries a reset");
 });

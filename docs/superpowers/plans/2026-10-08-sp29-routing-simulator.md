@@ -16,10 +16,11 @@ TanStack Query, static EN/VI catalogs, Node test runner and discovery Vitest.
 
 **Spec:** `docs/superpowers/specs/2026-10-08-sp29-routing-simulator-design.md`
 
-Status: spec/plan approved on 2026-10-08; user selected Native. Tasks 1–4 are
-implemented and committed; Task 5 acceptance is still open. Targeted/browser
-authorization is pending; one fresh review attempt failed on service usage
-limit. Checklists below retain planned steps, not claims of executed tests.
+Status: Native implementation and scoped Task 5 acceptance verified on
+2026-10-09. The user authorized targeted/browser checks. One independent
+reviewer cleared the SP29 diff and the Codex reset finding after its fix.
+Tasks 1–4 checklists remain historical planned steps; the Task 5 ledger below
+records executed verification rather than retroactive RED/GREEN claims.
 Planning baseline: clean `feat/m1-discovery` at `c87c0c8`; execution base `1a79f15`.
 
 ## Global Constraints
@@ -611,26 +612,26 @@ Temporary QA fixture source uses apply_patch and must not ship.
 targeted suites. Produces evidence of approved scope, clean fixture teardown,
 review resolution and a scoped local completion checkpoint.
 
-- [ ] After explicit browser authorization, start current built app on a
+- [x] After explicit browser authorization, start current built app on a
   free loopback port using synthetic data and a transport that records then
   throws on vendor calls. Use existing helpers or a task-owned PTY fixture;
   never bind a real user's database, keys or provider environment.
-- [ ] Exercise actual draft→Run→tree for direct/blocked/combo/capacity/fusion;
+- [x] Exercise actual draft→Run→tree for direct/blocked/combo/capacity/fusion;
   literal hostile-looking IDs, unknown reason injected test-only, malformed
   JSON, 64KiB UTF-8 boundary, errors/Retry, stale edits during pending response,
   opt-out, truncation and tab unmount/cache disposal. EN/VI switching preserves
   draft/result and changes no request count; one click is one POST/no retry.
-- [ ] Capture EN/VI at 1440/929/390, inspect tree/textarea/error wrapping and
+- [x] Capture EN/VI at 1440/929/390, inspect tree/textarea/error wrapping and
   keyboard labels/disclosures. Verify no horizontal page overflow or JS error.
   Basic accessibility/layout only, not a full WCAG/performance certification.
-- [ ] Confirm persisted before/after rows/expired locks/rotations and zero
+- [x] Confirm persisted before/after rows/expired locks/rotations and zero
   vendor/refresh/Headroom/PXPIPE/usage activity attributable to simulation.
   Native checks certify rules; browser checks certify effects/lifecycle.
-- [ ] Stop task servers and close task browser contexts/tabs. Resolve exact
+- [x] Stop task servers and close task browser contexts/tabs. Resolve exact
   run-prefixed synthetic directories inside the intended fixture folder
   before native removal; never delete older SP/user directories. Remove
   temporary source via apply_patch. Retain ignored screenshots if useful.
-- [ ] Run `pnpm build`, `pnpm lint`, `pnpm discovery validate`, diff checks,
+- [x] Run `pnpm build`, `pnpm lint`, `pnpm discovery validate`, diff checks,
   then rerun only the authorized final suites against the final build:
 
 ```powershell
@@ -641,19 +642,19 @@ git diff --check
 git diff --cached --check
 ```
 
-- [ ] Obtain the agreed fresh review (Native: one whole-range read-only review;
+- [x] Obtain the agreed fresh review (Native: one whole-range read-only review;
   subagent-driven: task gates plus final review). Review actual base-to-final
   diff and shared live callers; fix critical/important findings and rerun
   their scoped checks. Do not dispatch reviewers during planning.
-- [ ] Refresh existing AST-only graph after fixture removal using installed
+- [x] Refresh existing AST-only graph after fixture removal using installed
   `graphify update . --no-cluster`, then
   `python graphify-out/build_project_map.py`, following the graphify skill.
   No dependency install/new semantic extraction; retain existing warnings.
-- [ ] Record exact commands/counts, browser/mock boundaries, cleanup and any
+- [x] Record exact commands/counts, browser/mock boundaries, cleanup and any
   real blocker in handoff. Only then mark matrix `verified`, API row verified,
   and task board SP29 done. State excluded protocols/other Routing previews
   explicitly, not as unimplemented items in this approved slice.
-- [ ] Stage exact completed files and commit `feat: complete SP29 routing simulator`;
+- [x] Stage exact completed files and commit `feat: complete SP29 routing simulator`;
   verify git status/hash. If git is refused, do not reset/unstage user files
   or claim a commit; report preserved changes. No push/merge.
 
@@ -671,5 +672,14 @@ planner and wire types consistent, followed by one fresh whole-range review.
 **Subagent-driven** remains available if chosen, at higher per-task context
 cost. User must review this plan, choose the method and explicitly authorize
 SP29 targeted tests/browser acceptance before those steps run. Do not reuse
-SP28's method/test authorization as approval of this new plan. Method is now
-Native; only test/browser authorization and final review/acceptance remain open.
+SP28's method/test authorization as approval of this new plan. This paragraph
+records the pre-execution review; the completed Native gate is below.
+
+## Native verification ledger (2026-10-09)
+
+- Base: clean `38a0b52` after the two-parent merge; no reset, merge, push or user-data mutation. The ignored read-only 9router reference was restored at `39e36d3d` so discovery tests could run.
+- Final targeted commands: eight server files in Task 5 passed **56/56**; three web files **18/18**; discovery path/validator **20/20**. Five selected incoming engine files passed **68/68**; three selected Codex/Cline server cases passed **3/3**. Focused real-socket HTTP test verified 504/no-store and client abort. No broad `pnpm test` ran.
+- Built app, synthetic SQLite DB, fake rejecting transport and Edge headless: direct/blocked/combo/capacity/fusion, malformed/oversized input, error/Retry, pending/stale state, hostile literal/unknown reason, truncation, opt-out and keyboard disclosure passed. Main run recorded 11 POSTs; focused opt-out run one. EN/VI at 1440/929/390 px had no page overflow or JS error. The transport recorded **zero vendor calls** in both runs. Task browser/server processes, exact temp DB directories and temporary fixture source were removed.
+- Independent whole-range reviewer found a Codex reset timestamp overflow in the merged incoming code. Finite/Date-range validation and focused test fixed it; reviewer cleared the follow-up diff with no remaining SP29 finding. The stale `openai/plain` test expectation was updated to declared non-vision `openai/o1-mini` after the incoming open-capability change.
+- `pnpm build`, `pnpm lint` (637 modules/2238 dependencies), `pnpm discovery validate` (362 entries), staged/unstaged diff checks pass. Installed `graphify update . --no-cluster` refreshed AST with zero semantic tokens, preserving all 10,875 prior node IDs and 29 hyperedges; the graph remains merge-derived. `python graphify-out/build_project_map.py` retained 135 lines.
+- Contract, API↔UI map, feature matrix and handoff now record the verified OpenAI Chat scope. Other protocols and Routing Overview/Fallback previews are separate work. The local checkpoint was created and verified by Git; no push was requested or performed.

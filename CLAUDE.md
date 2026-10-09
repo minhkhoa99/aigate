@@ -31,10 +31,10 @@ SP29 / M3 U6 implements the existing Routing Simulator tab and session-guarded
 pure model/account choices, metadata-only projections/rotation peeks, bounded
 conditional tree, OpenAI Chat input only, no vendor/refresh/decryption/usage/
 rotation execution. New tab copy uses existing EN/VI; other Routing previews
-remain labeled. Native code is committed with build/lint gates passing, but
-targeted tests/browser acceptance are unrun pending authorization and the fresh
-review attempt hit the service usage limit. Do not mark SP29 verified or redo
-its completed code; resume from the latest handoff/plan ledger.
+remain labeled. Native implementation and scoped acceptance were verified on
+2026-10-09: targeted server/web/discovery checks, isolated browser acceptance,
+build/lint, and independent review passed after the review finding was fixed.
+See the latest handoff for exact counts and scope; do not redo completed SP29 work.
 
 ```powershell
 pnpm install --frozen-lockfile
