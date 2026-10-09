@@ -64,6 +64,11 @@ Rule 3 replaces "the first provider that declares it". With 41 providers, `glm-5
 The media screens use the catalog's `serviceKinds`; `features/providers/catalog.ts` only defines the nine endpoint paths.
 `routeKinds` is computed from the actual AIGate lane/adapter set, so a claimed capability without a working route is labeled unavailable even if the provider has a saved connection. Providers that are both LLM and web services (such as Ollama or GLM) remain in the LLM catalog.
 
+SP31 (`media-dashboard.md`) makes the media pages distinguish a catalog claim,
+a working route, and a route with an enabled saved account. Failed connection
+reads are shown as errors rather than as zero accounts; a provider outside the
+requested kind has an explicit not-found state.
+
 ## SP23 media and TTS voices
 
 The voice list and preview moved to the speech contract (`docs/contracts/speech.md`, "Dashboard API"): preset or live account voices, preview for every provider with a TTS route. A provider's `routeKinds` has `tts` exactly when `tts.ts` has a route for it; a TTS-only service (ElevenLabs, Inworld, Fish Audio) has no catalog models, so its detail lists the speech models from `tts.ts`.

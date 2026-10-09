@@ -101,3 +101,8 @@ All of these reach the voice browser through `apps/web/src/shared/errors.ts`.
 - Copy for the model string.
 - A "Connect <provider> to load its voices" state linking to Connections.
 - Retry for a failed live list.
+
+SP31 mounts this existing browser only after Media Providers has loaded both
+catalog and connection state successfully. Opening TTS may still fetch a live
+voice catalog from the provider through this existing dashboard API; Listen
+continues to require a user action.

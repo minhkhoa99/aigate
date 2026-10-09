@@ -1,5 +1,10 @@
 # UI ownership handoff
 
+Current integration note (2026-10-09): M3 U5 Media Providers is wired to live
+catalog and connection state, with the existing TTS voice browser. SP31 closed
+the remaining availability/error/link gaps; see `docs/contracts/media-dashboard.md`.
+The `UI_READY` table below records the original visual handoff snapshot.
+
 The user asked for the interface from `docs/design/stitch-export` to be built
 before Claude connects application logic. The implementation was built on
 `feat/ui-first` in `.worktrees/ui-first` and has been fast-forwarded into the

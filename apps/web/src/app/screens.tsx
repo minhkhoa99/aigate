@@ -1,7 +1,8 @@
 import { Overview } from "../features/overview/screens";
 import { EndpointKeys, Routing, TokenSaver } from "../features/gateway/screens";
 import { ComboCreate } from "../features/gateway/combo-create";
-import { Connections, LlmProviders, MediaProviders, ProviderDetail, Quota } from "../features/providers/screens";
+import { MediaProviders } from "../features/providers/media-dashboard";
+import { Connections, LlmProviders, ProviderDetail, Quota } from "../features/providers/screens";
 import { Console, RequestDetail, Requests, Usage } from "../features/traffic/screens";
 import { DeployWizard, Mitm, ProxyPools, Tunnel } from "../features/network/screens";
 import { ClaudeToolDetail, ClineToolDetail, CliToolDetail, CliTools, CopilotToolDetail, DroidToolDetail, GrokBuildToolDetail, HermesToolDetail, JcodeToolDetail, KiloToolDetail, ManagedJsonToolDetail, ManagedTomlToolDetail, Mcp, OmpToolDetail, OpenClawToolDetail, OpenCodeToolDetail, Skills } from "../features/integrations/screens";

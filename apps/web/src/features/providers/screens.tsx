@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
-import { Button, ConfirmDialog, CopyField, Field, Input, Metric, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
+import { Button, ConfirmDialog, Field, Input, Metric, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
-import { mediaGroups } from "./catalog";
 import { CustomProviderDetail, CustomProviderForm, CustomProviders } from "./custom";
 import { ProviderModels } from "./models";
 import {
@@ -12,7 +11,6 @@ import {
 } from "./api";
 import { describeTest, needsAttention, statusPill } from "./test-result";
 import { SignIn } from "./sign-in";
-import { VoiceBrowser } from "./voice-browser";
 import { useProxyPools } from "../network/api";
 
 const formText = (form: HTMLFormElement, name: string) => {
@@ -314,47 +312,5 @@ export function Quota() {
         const value = amount ? `$${(line.remaining ?? 0).toFixed(2)} available` : line.unlimited ? "Unlimited" : `${used}% used`;
         return <div className="quota-row" key={`${account.connectionId}:${line.name}`}><div className="row between"><strong>{account.name} <span className="muted">· {line.name}</span></strong><span className="muted mono">{value}</span></div><small>{account.plan ?? account.provider} · resets {reset(line.resetAt)}{account.cached ? " · cached" : ""}</small>{!line.unlimited && !amount && <div className={`progress ${used >= 100 ? "danger" : used >= 75 ? "warning" : ""}`}><span style={{ width: `${used}%` }} /></div>}</div>;
       })}{(quotas.data ?? []).filter((account) => account.quotas.length === 0).map((account) => <div className="quota-row" key={account.connectionId}><strong>{account.name}</strong><small>{account.message ?? "No quota windows reported."}</small></div>)}{(quotas.data ?? []).length === 0 && <StateBlock state="empty" />}</div>}</Panel>
-  </>;
-}
-
-export function MediaProviders({ kind, providerId }: { kind?: string; providerId?: string }) {
-  const catalog = useProviders();
-  const connections = useConnections();
-  const group = mediaGroups.find((item) => item.id === kind);
-  const providers = (catalog.data ?? []).filter((item) => !item.hidden && item.serviceKinds.includes(kind ?? ""));
-  const provider = providers.find((item) => item.id === providerId);
-  if (providerId && catalog.isPending) return <StateBlock state="loading" />;
-  if (providerId && catalog.isError) return <StateBlock state="error" code={toProblem(catalog.error).code} action={<Button onClick={() => void catalog.refetch()}>Retry</Button>} />;
-  if (provider) {
-    const connection = connections.data?.find((item) => item.provider === provider.id && item.isActive);
-    const routable = provider.routeKinds.includes(group!.id);
-    return <><PageHeading eyebrow={`Providers / Media / ${group!.title}`} title={provider.name} description={`Built-in ${group!.title.toLowerCase()} provider · ID ${provider.id}.`} action={provider.connectable && routable ? <a className="button button-primary" href={`/providers/connections?provider=${provider.id}`}>+ Add connection</a> : undefined} />
-      <div className="split"><Panel title="Connection setup">{catalog.isPending || connections.isPending ? <StateBlock state="loading" />
-        : catalog.isError || connections.isError ? <StateBlock state="error" code={toProblem(catalog.error ?? connections.error).code} action={<Button onClick={() => { void catalog.refetch(); void connections.refetch(); }}>Retry</Button>} />
-          : !routable ? <div className="state-block"><strong>Route not available</strong><p>AIGate lists this provider's capability but does not have a working route for it yet.</p></div>
-          : connection ? <div className="state-block"><strong>Connected · {connection.name}</strong><p>{connection.testStatus === "active" ? "The connection is enabled and its latest test passed." : connection.lastError ?? "Enabled; connection health has not been confirmed."}</p><a className="button" href="/providers/connections">Manage connection</a></div>
-            : provider.connectable ? <div className="state-block"><strong>No active connection</strong><p>Add a provider account to route requests through this media lane.</p></div>
-              : <div className="state-block"><strong>Not connectable yet</strong><p>{provider.reason ?? "This provider has no active adapter."}</p></div>}</Panel>
-        <Panel title="Endpoint">{group!.endpoint ? <CopyField label={`POST ${group!.endpoint}`} value={`${window.location.origin}${group!.endpoint}`} /> : <p>This kind has no AIGate endpoint yet.</p>}</Panel></div>
-      {kind === "tts" && <VoiceBrowser providers={providers} connections={connections.data ?? []} initialProvider={provider.id} />}
-    </>;
-  }
-  if (kind && !group) return <><PageHeading eyebrow="Providers / Media" title="Media kind not found" description="This capability is not in the current catalog." /><Link to="/providers/media" className="button">Back to media providers</Link></>;
-  if (group) return <><PageHeading eyebrow="Providers / Media" title={`${group.title} providers`} description={`${providers.filter((item) => item.routeKinds.includes(group.id)).length} of ${providers.length} catalog providers have an AIGate route for this kind.`} />
-    <nav className="tabs media-tabs" aria-label="Media kinds">{mediaGroups.map((item) => <a key={item.id} className={item.id === group.id ? "active" : ""} aria-current={item.id === group.id ? "page" : undefined} href={`/providers/media/catalog?kind=${item.id}`}>{item.title}</a>)}</nav>
-    <div className="section-gap">{group.endpoint ? <CopyField label="POST endpoint" value={`${window.location.origin}${group.endpoint}`} /> : <p className="muted">AIGate does not have an endpoint for this kind yet.</p>}</div>
-    {catalog.isPending ? <StateBlock state="loading" /> : catalog.isError ? <StateBlock state="error" code={toProblem(catalog.error).code} action={<Button onClick={() => void catalog.refetch()}>Retry</Button>} />
-      : providers.length ? <div className="catalog-grid section-gap">{providers.map((item) => {
-        const connection = connections.data?.find((c) => c.provider === item.id && c.isActive);
-        return <a className="catalog-card" href={`/providers/media/provider?kind=${group.id}&provider=${item.id}`} key={item.id}><span className="catalog-glyph" aria-hidden="true">{item.name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{item.name}</strong><small>{!item.routeKinds.includes(group.id) ? "Route not available" : connections.isPending ? "Loading connection…" : connection ? `Connected · ${connection.name}` : item.connectable ? "Ready to connect" : item.reason ?? "Not connectable yet"}</small></span></a>;
-      })}</div> : <div className="state-block"><strong>No providers listed</strong><p>No provider in the current catalog advertises this capability yet.</p><a className="button" href="/providers/connections">Manage connections</a></div>}
-    {kind === "tts" && !catalog.isPending && !catalog.isError && <VoiceBrowser providers={providers} connections={connections.data ?? []} />}</>;
-  return <><PageHeading eyebrow="Providers / Media" title="Media providers" description="Browse the providers available for each media capability." />
-    {catalog.isPending ? <StateBlock state="loading" /> : catalog.isError ? <StateBlock state="error" code={toProblem(catalog.error).code} action={<Button onClick={() => void catalog.refetch()}>Retry</Button>} />
-      : <div className="grid grid-3">{mediaGroups.map((item) => {
-        const matches = catalog.data.filter((p) => !p.hidden && p.serviceKinds.includes(item.id));
-        const count = matches.filter((p) => p.routeKinds.includes(item.id)).length;
-        return <a href={`/providers/media/catalog?kind=${item.id}`} className="media-card" key={item.id}><div className="row between"><span className="media-icon">{item.title.slice(0, 1)}</span><Pill tone={count ? "info" : undefined}>{count ? `${count} routable` : "Unconfigured"}</Pill></div><strong>{item.title}</strong><small>{matches.length ? `${matches.length} catalog providers · browse →` : "No provider advertises this capability yet."}</small></a>;
-      })}</div>}
   </>;
 }

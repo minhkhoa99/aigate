@@ -791,3 +791,34 @@
   newModule: media
   parityStatus: traced
   labels: [IMPLEMENTATION_ACCIDENT]
+- id: media.dashboard-availability
+  group: Media Providers
+  feature: Media Providers dashboard
+  subFeature: Distinguish catalog routes from configured and tested accounts
+  trigger: Dashboard opens a media kind or provider
+  input: Session-protected catalog and connection reads, URL kind/provider IDs
+  output: Accurate route/account states and TTS voice browser gating
+  businessRules:
+    - "AIGATE_EXTENSION: serviceKinds are catalog claims, routeKinds are working AIGate lanes, and a configured provider requires a route plus an enabled account"
+    - "AIGATE_EXTENSION: an unknown kind or provider outside that kind is a visible not-found state, not another provider's details"
+    - "AIGATE_EXTENSION: a failed connection read is unknown rather than an empty account list; TTS voices mount only after required metadata succeeds"
+    - "AIGATE_EXTENSION: provider detail offers endpoint copy only when its lane exists; existing TTS voice-list loading may contact the vendor when TTS is opened, while preview remains user-initiated"
+  state:
+    reads: [provider_catalog, provider_connections, tts_voice_catalog_on_user_navigation]
+    writes: []
+    runtimeOnly: [selected_media_kind, selected_provider]
+  dependencies: [media.tts-dashboard-browser, catalog.registry-entry-shape, catalog.connection-listing]
+  providerInteraction: "Existing TTS voice-list GET may contact the provider on TTS navigation; no new SP31 provider call, preview remains user-initiated"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "dashboard session is missing or expired (wire code UNAUTHENTICATED)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["Fixed nine kinds, bounded catalog and connection lists, no new fan-out or polling"]
+  behavior: { streaming: false, cancellation: "Existing TTS preview abort on browser departure", concurrency: "Existing TTS preview remains user-initiated" }
+  edgeCases: ["Provider claims capability without route", "Only disabled accounts", "Connection read fails", "Provider is in a different kind"]
+  evidence:
+    - { file: "aigate:docs/contracts/media-dashboard.md", line: 1, note: "Local SP31 view contract and ownership" }
+  newModule: media
+  parityStatus: verified
+  labels: []

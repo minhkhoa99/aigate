@@ -664,8 +664,8 @@
     "hash": "b17492a969ac1adbe9c6f40f4ba720eb"
   },
   "D:\\aigate\\apps\\web\\src\\app\\screens.tsx": {
-    "mtime": 1791387171.3353853,
-    "hash": "4dc6a978968bd8e3f32ce5c304353fc7"
+    "mtime": 1791517688.6715457,
+    "hash": "84f79293abe2d50a31033848ad9d0408"
   },
   "D:\\aigate\\apps\\web\\src\\app\\shell.tsx": {
     "mtime": 1791392830.7253075,
@@ -743,6 +743,18 @@
     "mtime": 1791387171.349247,
     "hash": "ebedc003d0769d9d595276b038f3d167"
   },
+  "D:\\aigate\\apps\\web\\src\\features\\providers\\media-dashboard.tsx": {
+    "mtime": 1791517680.3036792,
+    "hash": "258513352b70bb288fa6b723b589749a"
+  },
+  "D:\\aigate\\apps\\web\\src\\features\\providers\\media-rules.test.mjs": {
+    "mtime": 1791517763.9501314,
+    "hash": "fd6e53e84468226d8f041e0d91982f60"
+  },
+  "D:\\aigate\\apps\\web\\src\\features\\providers\\media-rules.ts": {
+    "mtime": 1791517680.2991533,
+    "hash": "0db8b9ef37fc159ddab43e219c7c139c"
+  },
   "D:\\aigate\\apps\\web\\src\\features\\providers\\model-rules.test.mjs": {
     "mtime": 1791387171.349247,
     "hash": "85c8b4deefe95948e8a4c9ef32bf5444"
@@ -764,8 +776,8 @@
     "hash": "520d0a5663f0a3a598d5894943d63561"
   },
   "D:\\aigate\\apps\\web\\src\\features\\providers\\screens.tsx": {
-    "mtime": 1791387171.3533201,
-    "hash": "1a773ab0bc3b93c47208299138d95ab0"
+    "mtime": 1791518022.1054296,
+    "hash": "49826c5fdc4f174fa38c326f0bdd5ff1"
   },
   "D:\\aigate\\apps\\web\\src\\features\\providers\\sign-in.tsx": {
     "mtime": 1791432523.7820187,
@@ -1480,8 +1492,8 @@
     "hash": "4d090f5fa7e890f878973a96545e8f07"
   },
   "D:\\aigate\\CLAUDE.md": {
-    "mtime": 1791516735.5042658,
-    "hash": "ec6e1c28bf6ecd2ca613baf59965900a"
+    "mtime": 1791518042.27972,
+    "hash": "dd5ad455e48cbf0fd657470ba590b61f"
   },
   "D:\\aigate\\pnpm-workspace.yaml": {
     "mtime": 1791387171.811181,
@@ -1500,11 +1512,11 @@
     "hash": "015898deb9f7c1bf8c34e21052d764d3"
   },
   "D:\\aigate\\docs\\PROGRESS_HANDOFF.md": {
-    "mtime": 1791516933.776278,
-    "hash": "0c4f4f76bbcec4f2fa34fc1081f12223"
+    "mtime": 1791517911.9182892,
+    "hash": "f8c6ad46e3b09e1e31aae64c112c9e6c"
   },
   "D:\\aigate\\docs\\PROJECT_MAP.md": {
-    "mtime": 1791516844.5808089,
+    "mtime": 1791516966.2797935,
     "hash": "5cab4112e6edae1f745b1685160b1731"
   },
   "D:\\aigate\\docs\\contracts\\capacity-adapter.md": {
@@ -1512,8 +1524,8 @@
     "hash": "e064eafa02cf123530ee3038b9fc1020"
   },
   "D:\\aigate\\docs\\contracts\\catalog-providers.md": {
-    "mtime": 1791387171.3967664,
-    "hash": "b87127e70df95d0002553b1950847001"
+    "mtime": 1791517911.919304,
+    "hash": "ed7aa703150dde49c483fc8db9915149"
   },
   "D:\\aigate\\docs\\contracts\\chat-lane.md": {
     "mtime": 1791387171.3977544,
@@ -1546,6 +1558,10 @@
   "D:\\aigate\\docs\\contracts\\identity-apikeys.md": {
     "mtime": 1791387171.4028687,
     "hash": "823b270ef509f953a68ec098b82d8867"
+  },
+  "D:\\aigate\\docs\\contracts\\media-dashboard.md": {
+    "mtime": 1791518042.2702043,
+    "hash": "03ffc8daa94383d94c8ed63b6171273d"
   },
   "D:\\aigate\\docs\\contracts\\multi-account.md": {
     "mtime": 1791387171.4028687,
@@ -1644,8 +1660,8 @@
     "hash": "6825d85907a3dde5223d53250abde989"
   },
   "D:\\aigate\\docs\\contracts\\speech.md": {
-    "mtime": 1791387171.4191842,
-    "hash": "de4fab98a549bff0e4ad50e63a842aac"
+    "mtime": 1791517911.9218738,
+    "hash": "f0645d18d5e131ae8ea222f6ed95140c"
   },
   "D:\\aigate\\docs\\contracts\\stream-only-providers.md": {
     "mtime": 1791387171.4202607,
@@ -1664,8 +1680,8 @@
     "hash": "1bf86922f9b8ec3936ca8ebcd2a962c9"
   },
   "D:\\aigate\\docs\\design\\API_UI_MAP.md": {
-    "mtime": 1791516717.2861931,
-    "hash": "267e584c579398ad56b50b4ecddbed56"
+    "mtime": 1791517859.9621704,
+    "hash": "33a9563f4644c0226cb04e60a6d79825"
   },
   "D:\\aigate\\docs\\design\\DESIGN.md": {
     "mtime": 1791387171.4261718,
@@ -1684,8 +1700,8 @@
     "hash": "41589beb69ba8c1a57e8b6e108c64386"
   },
   "D:\\aigate\\docs\\design\\UI_HANDOFF.md": {
-    "mtime": 1791387171.4266834,
-    "hash": "090573d34a2635767c76149ff87b2f93"
+    "mtime": 1791518042.278208,
+    "hash": "ec2de48f963925779f0c6370979acf13"
   },
   "D:\\aigate\\docs\\design\\stitch-export\\html\\authflow-modals.html": {
     "mtime": 1791387171.431996,
@@ -1832,8 +1848,8 @@
     "hash": "9bbc85aa650064a23976a4de2adb1a24"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\09-media-providers.yaml": {
-    "mtime": 1791387171.5268042,
-    "hash": "4327393770ec3ac3b0517ff38b41b427"
+    "mtime": 1791518042.272154,
+    "hash": "1a919a6f0079e5a4eb8f3ea222e78169"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\10-proxy-pools.yaml": {
     "mtime": 1791387171.5278208,
@@ -1878,6 +1894,10 @@
   "D:\\aigate\\docs\\superpowers\\plans\\2026-10-09-sp30-routing-status.md": {
     "mtime": 1791516933.7799456,
     "hash": "bc4a6c2b9331e869dab2983b32068266"
+  },
+  "D:\\aigate\\docs\\superpowers\\plans\\2026-10-09-sp31-media-dashboard.md": {
+    "mtime": 1791518042.2762425,
+    "hash": "833b624b556e12dd0d8fff4810e42fe3"
   },
   "D:\\aigate\\docs\\superpowers\\skill-tests\\2026-09-25-porting-behavior-not-code-green.md": {
     "mtime": 1791387171.539554,
