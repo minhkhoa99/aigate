@@ -1,5 +1,32 @@
 # Trace: Console Log, Remote functionality (Task 18)
 
+- id: console.dashboard-browser-i18n
+  group: Console Log
+  feature: AIGate Console dashboard
+  subFeature: Browser-local EN/VI, Developer mode gate, bounded live log and Clear states
+  trigger: Open /traffic/console or change browser language while mounted
+  input: Browser language, level/search controls, Pause/Resume/Clear
+  output: Localized UI with literal event metadata and stable stream/cache state
+  businessRules:
+    - "AIGATE_EXTENSION: Only explicit Clear sends DELETE; a pending Clear cannot be repeated"
+    - "AIGATE_EXTENSION: Locale changes do not fetch, reopen SSE, replay Clear or reset filters"
+    - "AIGATE_EXTENSION: GET and SSE retain the existing 200-event and eight-stream server bounds; read and Clear errors show code/diagnostic"
+  state: { reads: ["browser locale", "metadata log cache"], writes: ["local filter and pause state"], runtimeOnly: ["one EventSource while active"] }
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: "explicit read Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["explicit DELETE clears process-local logs and broadcasts clear"]
+  persistence: []
+  performanceConcerns: []
+  behavior: { streaming: true, cancellation: "EventSource closes on Pause/unmount", concurrency: "one stream and one Clear per mounted screen" }
+  edgeCases: ["language switch during pending Clear", "read failure", "mobile width"]
+  evidence:
+    - { file: "aigate:docs/contracts/console-ui-i18n.md", line: 1, note: "SP39 scoped UI contract and browser acceptance" }
+  newModule: tooling
+  parityStatus: verified
+  labels: []
+
 - id: console.ring-buffer-capacity
   group: Console Log
   feature: Console log capture

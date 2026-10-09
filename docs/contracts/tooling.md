@@ -60,6 +60,10 @@ The Skills page lists the eight repository skills and copies each raw `SKILL.md`
 
 `GET /api/tooling/logs` returns up to 200 recent request metadata events. `GET /api/tooling/logs/stream` sends new events over SSE; at most eight streams may be open. `DELETE /api/tooling/logs` clears the in-memory buffer and tells open streams to clear their local view. Events derive from completed usage records and contain the request ID, provider, model, status, error code, and token count. Request and response bodies, provider credentials, and API keys are not captured. The buffer is process-local and resets on restart.
 
+SP39 localizes the existing Developer Console's owned UI and its closed gate in
+EN/VI. It adds no API or log fields; see `console-ui-i18n.md` for read/Clear
+error, filter, locale switch and SSE lifecycle acceptance.
+
 ## Tunnel
 
 `GET /api/tooling/tunnel` reports Tailscale installation, Funnel status, the public URL for the AIGate route, and access readiness. `POST .../enable` requires dashboard login, a configured dashboard password, required API-key enforcement, and at least one active key. It starts `tailscale funnel --https=443 --bg --yes` for AIGate's loopback port. Before starting, it refuses an active unrelated Funnel route or an unverifiable status. `POST .../disable` disables only AIGate's loopback route. AIGate does not install Tailscale. Funnel is public internet access and must be enabled deliberately.

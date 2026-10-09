@@ -11,6 +11,12 @@ import { ClaudeToolDetail, ClineToolDetail, CliToolDetail, CliTools, CopilotTool
 import { Callback, Login, Onboarding, SettingsAuth, SettingsDeveloper, SettingsGeneral } from "../features/settings/screens";
 import { Button, PageHeading, Panel, StateBlock } from "../shared/ui";
 import { Link } from "@tanstack/react-router";
+import { useLocale } from "../shared/locale";
+
+function ConsoleGate() {
+  const { t } = useLocale();
+  return <><PageHeading eyebrow={t("nav.traffic")} title={t("console.gateTitle")} description={t("console.gateDescription")} /><StateBlock state="empty" action={<Link to="/settings/developer" className="button button-primary">{t("console.developerSettings")}</Link>} /></>;
+}
 
 export function ScreenView({ path, developerMode, onDeveloperMode, theme, onTheme, state = "ready" }: {
   path: string; developerMode: boolean; onDeveloperMode: (enabled: boolean) => void;
@@ -43,7 +49,7 @@ export function ScreenView({ path, developerMode, onDeveloperMode, theme, onThem
     case "/traffic/usage": return <Usage />;
     case "/traffic/requests": return <Requests />;
     case "/traffic/requests/detail": return <RequestDetail requestId={new URLSearchParams(window.location.search).get("id") ?? ""} />;
-    case "/traffic/console": return developerMode ? <Console /> : <><PageHeading eyebrow="Traffic" title="Developer mode required" description="Enable developer mode in Settings to inspect console events." /><StateBlock state="empty" action={<Link to="/settings/developer" className="button button-primary">Open developer settings</Link>} /></>;
+    case "/traffic/console": return developerMode ? <Console /> : <ConsoleGate />;
     case "/network/proxy-pools": return <ProxyPools />;
     case "/network/proxy-pools/deploy": return <DeployWizard />;
     case "/network/tunnel": return <Tunnel />;
