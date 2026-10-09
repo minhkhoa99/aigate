@@ -1,5 +1,13 @@
 # Speech contract (M2 SP23)
 
+SP32 dashboard localization: the existing Voice Browser labels, filters,
+notices and states render in EN/VI through the root locale. Native
+`Intl.DisplayNames` uses that selection for voice language/region; known gender
+labels are translated without changing filter values. Voice names/IDs, model
+IDs, API codes, raw provider diagnostics and the fixed English preview sample
+remain literal. Switching locale neither refetches the voice list nor starts a
+preview, and keeps the selected provider/model/filters and any audio URL.
+
 Text to speech on `/v1/audio/speech`, the public voice list `/v1/audio/voices`, and the dashboard's voice list and preview. Matrix: `docs/discovery/feature-matrix/09-media-providers.yaml` (`media.tts-lane`, `media.tts-voice-listing`, `media.tts-dashboard-browser`, `media.tts-openrouter-audio-chunks`, `media.tts-public-voices-omit-minimax`, `media.tts-deepgram-voices-without-synthesis`, `media.tts-unreachable-providers`).
 
 ## Providers

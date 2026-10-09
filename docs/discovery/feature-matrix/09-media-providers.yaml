@@ -822,3 +822,33 @@
   newModule: media
   parityStatus: verified
   labels: []
+
+- id: media.dashboard-browser-i18n
+  group: Media Providers
+  feature: Media dashboard and Voice Browser localization
+  subFeature: EN/VI browser presentation over existing catalog and voice data
+  trigger: Open a Media Providers route or change the local language preference
+  input: Browser locale preference and existing provider, connection and voice reads
+  output: Localized owned copy with literal provider/model/voice identifiers
+  businessRules:
+    - "AIGATE_EXTENSION: kind/status/voice controls and states use shared EN/VI catalogs; native language and region names follow the selected app locale"
+    - "AIGATE_EXTENSION: provider/model/voice IDs and names, endpoints, error codes, raw diagnostics and the preview sample remain literal"
+    - "AIGATE_EXTENSION: a locale change preserves voice selection/filters and causes no query refetch, replay or preview"
+  state:
+    reads: [browser_language_preference, existing_provider_catalog, existing_connection_list, existing_tts_voice_query]
+    writes: []
+    runtimeOnly: [selected_voice_filters]
+  dependencies: [media.dashboard-availability, media.tts-dashboard-browser]
+  providerInteraction: "Existing voice-list fetch may contact a provider on TTS navigation; locale changes and copy do not"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["Existing browser-only aigate-language preference; no new key"]
+  performanceConcerns: ["Fixed nine media kinds and existing 200-row voice display cap; no new fan-out"]
+  behavior: { streaming: false, cancellation: "Existing voice preview abort on departure", concurrency: "Existing user-initiated preview only" }
+  edgeCases: ["Missing voice locale", "Unknown gender preserved literally", "Raw provider diagnostics in a localized error"]
+  evidence:
+    - { file: "aigate:docs/contracts/i18n.md", line: 1, note: "SP32 locale lifecycle and literal-data boundary" }
+  newModule: media
+  parityStatus: verified
+  labels: []

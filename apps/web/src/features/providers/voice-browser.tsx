@@ -2,22 +2,27 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Field, Panel, StateBlock, Table } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
+import { useLocale } from "../../shared/locale";
+import type { Language, MessageKey } from "../../shared/i18n";
 import { previewTtsVoice, useProvider, useTtsVoices, type Connection, type ProviderSummary, type TtsVoice } from "./api";
 
 const sample = "Hello, this is an AIGate voice preview.";
 // Account catalogs can hold thousands of voices; the filters narrow them.
 const MAX_ROWS = 200;
+const genderKeys: Record<string, MessageKey> = { male: "voice.gender.male", female: "voice.gender.female", neutral: "voice.gender.neutral" };
 const localeParts = (locale: string) => {
   try { const parsed = new Intl.Locale(locale.replace("_", "-")); return { language: parsed.language, region: parsed.region ?? "" }; }
   catch { return { language: "", region: "" }; }
 };
-const display = (type: "language" | "region", code: string) => {
-  if (!code) return "Not specified";
-  try { return new Intl.DisplayNames([navigator.language], { type }).of(code) ?? code; }
+const display = (type: "language" | "region", code: string, appLanguage: Language) => {
+  if (!code) return "";
+  try { return new Intl.DisplayNames([appLanguage === "vi" ? "vi-VN" : "en-US"], { type }).of(code) ?? code; }
   catch { return code; }
 };
 
 export function VoiceBrowser({ providers, connections, initialProvider = "openai" }: { providers: ProviderSummary[]; connections: Connection[]; initialProvider?: string }) {
+  const { language: appLanguage, t } = useLocale();
+  const genderLabel = (value: string) => value ? (genderKeys[value.toLowerCase()] ? t(genderKeys[value.toLowerCase()]) : value) : t("voice.notSpecified");
   const showToast = useToast();
   const [chosenProvider, setChosenProvider] = useState(initialProvider);
   const [chosenModel, setChosenModel] = useState("");
@@ -41,7 +46,7 @@ export function VoiceBrowser({ providers, connections, initialProvider = "openai
   // docs/contracts/speech.md: any provider with a TTS route plays through the saved connection.
   const routable = Boolean(provider?.routeKinds.includes("tts"));
   const canPreview = isLocal || (routable && active);
-  const voicesProblem = voicesQuery.isError ? toProblem(voicesQuery.error) : undefined;
+  const voicesProblem = voicesQuery.isError ? toProblem(voicesQuery.error, appLanguage) : undefined;
   const languages = [...new Set(voices.map((voice) => localeParts(voice.locale).language).filter(Boolean))].sort();
   const regions = [...new Set(voices.map((voice) => localeParts(voice.locale).region).filter(Boolean))].sort();
   const genders = [...new Set(voices.map((voice) => voice.gender.toLowerCase()).filter(Boolean))].sort();
@@ -66,8 +71,8 @@ export function VoiceBrowser({ providers, connections, initialProvider = "openai
   const reset = () => { previewAbort.current?.abort(); setPreviewing(""); setLanguage(""); setRegion(""); setGender(""); setSearch(""); setAudioUrl(""); window.speechSynthesis?.cancel(); };
   // The string /v1/audio/speech takes as its model: provider/model/voice.
   const copyModel = (voice: TtsVoice) => navigator.clipboard.writeText(`${providerId}/${model}/${voice.id}`).then(
-    () => showToast({ tone: "success", message: `Copied ${providerId}/${model}/${voice.id}` }),
-    () => showToast({ tone: "error", message: "The browser did not allow copying. Select the voice ID and copy it by hand." }),
+    () => showToast({ tone: "success", localized: { key: "voice.copied", params: { model: `${providerId}/${model}/${voice.id}` } } }),
+    () => showToast({ tone: "error", localized: { key: "voice.copyFailed" } }),
   );
   const preview = async (voice: TtsVoice) => {
     if (isLocal) {
@@ -87,30 +92,30 @@ export function VoiceBrowser({ providers, connections, initialProvider = "openai
     try {
       const blob = await previewTtsVoice(providerId, model, voice.id, controller.signal);
       if (!controller.signal.aborted) setAudioUrl(URL.createObjectURL(blob));
-    } catch (error) { if (!controller.signal.aborted) showToast({ tone: "error", ...toProblem(error) }); }
+    } catch (error) { if (!controller.signal.aborted) showToast({ tone: "error", error }); }
     finally { if (previewAbort.current === controller) { previewAbort.current = null; setPreviewing(""); } }
   };
 
-  return <Panel title="Voice browser" detail="Browse preset and account voices. Preview requests may use provider credit." className="section-gap">
+  return <Panel title={t("voice.title")} detail={t("voice.detail")} className="section-gap">
     <div className="voice-filters">
-      <Field label="Provider"><select className="input" value={providerId} onChange={(event) => { setChosenProvider(event.target.value); setChosenModel(""); reset(); }}>{providers.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></Field>
-      <Field label="Model"><select className="input" value={model} disabled={models.length === 0} onChange={(event) => { setChosenModel(event.target.value); reset(); }}>{models.length ? models.map((item) => <option value={item.id} key={item.id}>{item.name}</option>) : <option value="">Provider default</option>}</select></Field>
-      <Field label="Language"><select className="input" value={language} onChange={(event) => setLanguage(event.target.value)}><option value="">All languages</option>{languages.map((code) => <option key={code} value={code}>{display("language", code)}</option>)}</select></Field>
-      <Field label="Region"><select className="input" value={region} onChange={(event) => setRegion(event.target.value)}><option value="">All regions</option>{regions.map((code) => <option key={code} value={code}>{display("region", code)}</option>)}</select></Field>
-      <Field label="Search"><input className="input" type="search" value={search} placeholder="Name or voice ID" onChange={(event) => setSearch(event.target.value)} /></Field>
-      <Field label="Gender"><select className="input" value={gender} onChange={(event) => setGender(event.target.value)}><option value="">All genders</option>{genders.map((value) => <option key={value} value={value}>{value}</option>)}</select></Field>
+      <Field label={t("voice.provider")}><select className="input" value={providerId} onChange={(event) => { setChosenProvider(event.target.value); setChosenModel(""); reset(); }}>{providers.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></Field>
+      <Field label={t("voice.model")}><select className="input" value={model} disabled={models.length === 0} onChange={(event) => { setChosenModel(event.target.value); reset(); }}>{models.length ? models.map((item) => <option value={item.id} key={item.id}>{item.name}</option>) : <option value="">{t("voice.providerDefault")}</option>}</select></Field>
+      <Field label={t("voice.language")}><select className="input" value={language} onChange={(event) => setLanguage(event.target.value)}><option value="">{t("voice.allLanguages")}</option>{languages.map((code) => <option key={code} value={code}>{display("language", code, appLanguage)}</option>)}</select></Field>
+      <Field label={t("voice.region")}><select className="input" value={region} onChange={(event) => setRegion(event.target.value)}><option value="">{t("voice.allRegions")}</option>{regions.map((code) => <option key={code} value={code}>{display("region", code, appLanguage)}</option>)}</select></Field>
+      <Field label={t("voice.search")}><input className="input" type="search" value={search} placeholder={t("voice.searchPlaceholder")} onChange={(event) => setSearch(event.target.value)} /></Field>
+      <Field label={t("voice.gender")}><select className="input" value={gender} onChange={(event) => setGender(event.target.value)}><option value="">{t("voice.allGenders")}</option>{genders.map((value) => <option key={value} value={value}>{genderLabel(value)}</option>)}</select></Field>
     </div>
-    {voicesProblem?.code === "NO_ACTIVE_CONNECTION" ? <div className="state-block"><strong>Connect {provider?.name} to load its voices</strong><p>{voicesProblem.message}</p><a className="button button-primary" href={`/providers/connections?provider=${encodeURIComponent(providerId)}`}>Add connection</a></div>
-      : voicesProblem && !isLocal ? <div className="state-block error"><code>{voicesProblem.code}</code><strong>Could not load the voices</strong><p>{voicesProblem.message}</p><Button onClick={() => void voicesQuery.refetch()}>Retry</Button></div>
-      : detail.isError ? <StateBlock state="error" code={toProblem(detail.error).code} action={<Button onClick={() => void detail.refetch()}>Retry</Button>} />
+    {voicesProblem?.code === "NO_ACTIVE_CONNECTION" ? <div className="state-block"><code>{voicesProblem.code}</code><strong>{t("voice.connectToLoad", { provider: provider?.name ?? providerId })}</strong><p>{voicesProblem.message}</p><a className="button button-primary" href={`/providers/connections?provider=${encodeURIComponent(providerId)}`}>{t("media.addConnection")}</a></div>
+      : voicesProblem && !isLocal ? <div className="state-block error"><code>{voicesProblem.code}</code><strong>{t("voice.loadFailed")}</strong><p>{voicesProblem.message}</p><Button onClick={() => void voicesQuery.refetch()}>{t("common.retry")}</Button></div>
+      : detail.isError ? <StateBlock state="error" code={toProblem(detail.error, appLanguage).code} action={<Button onClick={() => void detail.refetch()}>{t("common.retry")}</Button>} />
       : detail.isPending || (!isLocal && voicesQuery.isPending) ? <StateBlock state="loading" />
-        : voices.length === 0 ? <div className="state-block"><strong>No voice IDs available</strong><p>{isLocal ? "This browser has no installed speech voices." : "AIGate does not have a voice catalog for this provider yet."}</p></div>
-          : <><p className="muted voice-note">{filtered.length} of {voices.length} voices{filtered.length > MAX_ROWS ? `; the first ${MAX_ROWS} are shown, refine the filters to see the rest` : ""}. {!canPreview && (!routable ? "AIGate has no speech route for this provider, so playback is off." : "Connect this provider to enable playback.")}</p>
-            <Table columns={["Voice", "Language / region", "Gender", "Preview"]} rows={shown.map((voice) => {
+        : voices.length === 0 ? <div className="state-block"><strong>{t("voice.none")}</strong><p>{isLocal ? t("voice.noneLocal") : t("voice.noneProvider")}</p></div>
+          : <><p className="muted voice-note">{t("voice.count", { filtered: filtered.length, total: voices.length })} {filtered.length > MAX_ROWS && t("voice.truncated", { limit: MAX_ROWS })} {!canPreview && (!routable ? t("voice.noRoute") : t("voice.connectToPlay"))}</p>
+            <Table columns={[t("voice.voice"), t("voice.languageRegion"), t("voice.gender"), t("voice.preview")]} rows={shown.map((voice) => {
               const parts = localeParts(voice.locale);
-              return [<><strong>{voice.name}</strong><small className="muted voice-id">{voice.id}</small></>, parts.language ? `${display("language", parts.language)} · ${display("region", parts.region)}` : "Not specified", voice.gender || "Not specified", <span className="voice-actions"><button className="button button-ghost" aria-label={`Listen to ${voice.name}`} disabled={!canPreview || Boolean(previewing)} onClick={() => void preview(voice)}>{previewing === voice.id ? "Generating…" : "Listen"}</button>{routable && !isLocal && <button className="button button-ghost" aria-label={`Copy the model string for ${voice.name}`} onClick={() => void copyModel(voice)}>Copy</button>}</span>];
-            })} empty="No voices match these filters." />
-            {audioUrl && <audio className="voice-player" src={audioUrl} controls autoPlay aria-label="Voice preview" />}
+              return [<><strong>{voice.name}</strong><small className="muted voice-id">{voice.id}</small></>, parts.language ? `${display("language", parts.language, appLanguage)}${parts.region ? ` · ${display("region", parts.region, appLanguage)}` : ""}` : t("voice.notSpecified"), genderLabel(voice.gender), <span className="voice-actions"><button className="button button-ghost" aria-label={t("voice.listenTo", { name: voice.name })} disabled={!canPreview || Boolean(previewing)} onClick={() => void preview(voice)}>{previewing === voice.id ? t("voice.generating") : t("voice.listen")}</button>{routable && !isLocal && <button className="button button-ghost" aria-label={t("voice.copyModel", { name: voice.name })} onClick={() => void copyModel(voice)}>{t("voice.copy")}</button>}</span>];
+            })} empty={t("voice.emptyFilter")} />
+            {audioUrl && <audio className="voice-player" src={audioUrl} controls autoPlay aria-label={t("voice.player")} />}
           </>}
   </Panel>;
 }

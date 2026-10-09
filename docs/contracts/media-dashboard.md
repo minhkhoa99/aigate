@@ -33,6 +33,13 @@ loading/error/Retry, wrong links, TTS voice gating and mobile layout are
 verified with synthetic state and, where needed, an isolated browser fixture.
 No full test suite or real provider credential is required.
 
+SP32 extends this dashboard with EN/VI copy through `shared/locale.tsx`. Its
+nine route IDs and endpoints remain stable while kind labels, cards, account
+status, empty/not-found/read-error states and actions re-render in the chosen
+language. Provider names/IDs, account names, provider reasons and stored account
+errors remain literal. The route/account decision logic and fetch keys are
+unchanged. See `i18n.md` for locale lifecycle and `speech.md` for voice limits.
+
 Evidence: media/catalog/connection-status web checks 5/5, selected server
 catalog/voice checks 4/4, isolated Edge acceptance for route/account states,
 TTS, wrong links, network Retry and 390px layout. The disposable fixture made
