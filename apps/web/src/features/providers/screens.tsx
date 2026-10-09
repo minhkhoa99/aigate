@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
-import { Button, ConfirmDialog, Field, Input, Metric, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
+import { Button, ConfirmDialog, Field, Input, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
 import { CustomProviderDetail, CustomProviderForm, CustomProviders } from "./custom";
 import { ProviderModels } from "./models";
 import {
-  useConnections, useCreateConnection, useDeleteConnection, useProvider, useProviderNodes, useProviders, useQuotas, useRefreshQuotas, useSetThinking, useTestConnection, useUpdateConnection, type Connection,
+  useConnections, useCreateConnection, useDeleteConnection, useProvider, useProviderNodes, useProviders, useSetThinking, useTestConnection, useUpdateConnection, type Connection,
   type ConnectionField, type ProviderDetailView, type ThinkingLevel,
 } from "./api";
 import { describeTest, needsAttention, statusPill } from "./test-result";
@@ -288,29 +288,5 @@ export function Connections() {
       onSuccess: () => { setRemoving(null); showToast({ tone: "success", message: `Deleted ${removing.name}. Its key was removed.` }); },
       onError: (error) => { setRemoving(null); fail(error); },
     })} />}
-  </>;
-}
-
-export function Quota() {
-  const quotas = useQuotas();
-  const refresh = useRefreshQuotas();
-  const showToast = useToast();
-  const lines = (quotas.data ?? []).flatMap((account) => account.quotas.map((line) => ({ ...line, account })));
-  const windows = lines.filter((line) => !line.name.includes("(USD)"));
-  const percent = (line: typeof lines[number]) => line.unlimited || line.total === 0 ? 0 : Math.round(line.used / line.total * 100);
-  const healthy = windows.filter((line) => line.unlimited || percent(line) < 75).length;
-  const near = windows.filter((line) => !line.unlimited && percent(line) >= 75 && percent(line) < 100).length;
-  const exhausted = windows.filter((line) => !line.unlimited && percent(line) >= 100).length;
-  const reset = (value: string | null) => value ? new Date(value).toLocaleString() : "not reported";
-  return <><PageHeading eyebrow="Providers / Quota" title="Quota tracker" description="Vendor reported usage limits for active connections. Refreshes every minute while this tab is open." action={<Button variant="primary" disabled={refresh.isPending} onClick={() => refresh.mutate(undefined, { onError: (error) => showToast({ tone: "error", ...toProblem(error) }) })}>{refresh.isPending ? "Refreshing…" : "Refresh quotas"}</Button>} />
-    <div className="grid grid-3"><Metric label="Healthy quotas" value={String(healthy)} delta={`${windows.length} reported windows`} /><Metric label="Near limit" value={String(near)} delta="75% used or more" tone="warning" /><Metric label="Exhausted" value={String(exhausted)} delta="No remaining quota" tone="danger" /></div>
-    <Panel title="Account limits" detail="Each provider controls its own reset window and reported units." className="section-gap">{quotas.isPending ? <StateBlock state="loading" />
-      : quotas.isError ? <StateBlock state="error" code={toProblem(quotas.error).code} action={<Button onClick={() => void quotas.refetch()}>Retry</Button>} />
-      : <div className="stack">{(quotas.data ?? []).flatMap((account) => account.quotas.map((line) => ({ account, line }))).map(({ account, line }) => {
-        const amount = line.name.includes("(USD)");
-        const used = line.unlimited || line.total === 0 ? 0 : Math.min(100, Math.round(line.used / line.total * 100));
-        const value = amount ? `$${(line.remaining ?? 0).toFixed(2)} available` : line.unlimited ? "Unlimited" : `${used}% used`;
-        return <div className="quota-row" key={`${account.connectionId}:${line.name}`}><div className="row between"><strong>{account.name} <span className="muted">· {line.name}</span></strong><span className="muted mono">{value}</span></div><small>{account.plan ?? account.provider} · resets {reset(line.resetAt)}{account.cached ? " · cached" : ""}</small>{!line.unlimited && !amount && <div className={`progress ${used >= 100 ? "danger" : used >= 75 ? "warning" : ""}`}><span style={{ width: `${used}%` }} /></div>}</div>;
-      })}{(quotas.data ?? []).filter((account) => account.quotas.length === 0).map((account) => <div className="quota-row" key={account.connectionId}><strong>{account.name}</strong><small>{account.message ?? "No quota windows reported."}</small></div>)}{(quotas.data ?? []).length === 0 && <StateBlock state="empty" />}</div>}</Panel>
   </>;
 }

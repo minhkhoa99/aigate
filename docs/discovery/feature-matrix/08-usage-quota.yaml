@@ -122,6 +122,36 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
+- id: quota.dashboard-browser-i18n
+  group: Quota Tracker
+  feature: Quota dashboard
+  subFeature: EN/VI presentation and truthful unknown balances
+  trigger: Open /providers/quota or change the browser language
+  input: Existing quota read, manual refresh state, browser locale
+  output: Localized owned copy with literal vendor labels and diagnostics
+  businessRules:
+    - "AIGATE_EXTENSION: owned Quota UI copy renders through shared EN/VI catalogs without changing read/refresh requests"
+    - "AIGATE_EXTENSION: missing balances and pending/failed reads remain unknown rather than showing fabricated zero amounts"
+    - "AIGATE_EXTENSION: locale changes retain mounted query and pending refresh, with no extra GET or POST"
+  state:
+    reads: [existing_quota_snapshot, browser_language_preference]
+    writes: []
+    runtimeOnly: [pending_manual_refresh]
+  dependencies: [quota.dashboard-refresh-and-account-visibility]
+  providerInteraction: "Existing GET may refresh vendor cache; only explicit manual Refresh forces POST; locale changes cause neither"
+  fallback: { hasFallback: false, retry: "Explicit read Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["Existing browser-local aigate-language only"]
+  performanceConcerns: ["Existing 60-second mounted polling and server quota bounds; no new fan-out"]
+  behavior: { streaming: false, cancellation: null, concurrency: "Existing pending manual refresh only" }
+  edgeCases: ["Missing USD balance", "Read error", "Vendor raw message", "Locale change during refresh"]
+  evidence:
+    - { file: "aigate:docs/contracts/quota-ui-i18n.md", line: 1, note: "SP36 display and refresh boundary" }
+  newModule: usage
+  parityStatus: verified
+  labels: []
+
 - id: usage.write-not-synchronous
   group: Usage
   feature: Per-request usage capture

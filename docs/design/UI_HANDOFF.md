@@ -1,6 +1,8 @@
 # UI ownership handoff
 
-Current integration note (2026-10-09): SP35 completes Token Saver's scoped EN/VI
+Current integration note (2026-10-09): SP36 completes the Quota dashboard's
+scoped EN/VI presentation over the existing SP24c API; see
+`docs/contracts/quota-ui-i18n.md`. SP35 completes Token Saver's scoped EN/VI
 presentation and PXPIPE read states over the already-wired SP21 APIs; see
 `docs/contracts/token-saver-ui-i18n.md`. SP33 completes M3 U3's protocol-specific
 Endpoint & Keys setup selector over the existing four client lanes, with EN/VI

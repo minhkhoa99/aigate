@@ -16,6 +16,12 @@ Provider handlers use vendor-reported windows for Claude, GitHub Copilot, Codex,
 
 The page reports healthy/near/exhausted counts and each account's vendor windows, reset time, and cache status. Refresh errors use the standard API problem toast. Inactive connections are omitted from listing and rejected by per-connection refresh.
 
+SP36 localizes the existing Quota dashboard's owned EN/VI copy without
+changing the read/refresh API or polling. Vendor account, plan and window
+labels remain verbatim. Missing USD balances and pending/failed list reads
+show unknown values instead of invented zero amounts; stable error codes and
+permitted raw diagnostics remain visible with Retry. See `quota-ui-i18n.md`.
+
 ## What is recorded
 
 One **usage event** per upstream call the chat lane makes, on `/v1/chat/completions`, `/v1/messages`, `/v1/responses` (and its aliases), and `/v1beta/models/*` generate. Every combo member and every fusion panel or judge call is its own event. Fields:
