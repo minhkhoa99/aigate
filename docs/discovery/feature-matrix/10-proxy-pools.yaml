@@ -613,3 +613,29 @@
   newModule: transport
   parityStatus: implemented
   labels: [REFERENCE_BEHAVIOR]
+- id: proxypool.dashboard-browser-i18n
+  group: Proxy Pools
+  feature: AIGate Network dashboard
+  subFeature: Browser-local EN/VI Pool and Deploy Wizard states
+  trigger: Open pool list/deploy wizard or change browser language while mounted
+  input: Browser locale, existing pool/rotation data and explicit form actions
+  output: Localized owned UI with literal IDs, URLs, codes and diagnostics
+  businessRules:
+    - "AIGATE_EXTENSION: locale changes preserve drafts and pending work without refetch or mutation replay"
+    - "AIGATE_EXTENSION: failed pool/rotation reads show code, diagnostic and Retry"
+    - "AIGATE_EXTENSION: deploy token stays in component memory; only explicit Deploy submits it"
+  state: { reads: ["pool and rotation query cache", "browser locale"], writes: ["local form and wizard state"], runtimeOnly: ["pending mutation"] }
+  dependencies: []
+  providerInteraction: "None added; existing explicit deploy endpoints only"
+  fallback: { hasFallback: false, retry: "Explicit failed read Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Explicit pool/rotation/deploy mutations only"]
+  persistence: ["Existing server pool and rotation records; browser locale preference only"]
+  performanceConcerns: ["No locale fan-out; existing server pool/rotation bounds remain"]
+  behavior: { streaming: false, cancellation: "Existing Query unmount behavior", concurrency: "Existing mutation pending guards" }
+  edgeCases: ["Assigned pool delete refused", "held deploy across locale switch", "mobile wizard"]
+  evidence:
+    - { file: "aigate:docs/contracts/proxy-pools-ui-i18n.md", line: 1, note: "SP40 scoped UI contract" }
+  newModule: transport
+  parityStatus: verified
+  labels: []

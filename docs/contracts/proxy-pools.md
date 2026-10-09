@@ -1,5 +1,8 @@
 # Proxy pools contract (M2 SP18)
 
+SP40 adds scoped EN/VI presentation to Proxy Pools and Deploy Wizard without
+changing these APIs. See `proxy-pools-ui-i18n.md`.
+
 Proxy pools choose the network path of an upstream provider request.  They are
 configured through `/api/proxy-pools` and attached to an individual connection
 through its `proxyPoolId`.

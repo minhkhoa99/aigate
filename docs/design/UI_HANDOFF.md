@@ -1,6 +1,8 @@
 # UI ownership handoff
 
-Current integration note (2026-10-09): SP39 completes the Developer Console's
+Current integration note (2026-10-09): SP40 completes Proxy Pools and Deploy
+Wizard's scoped EN/VI presentation over existing SP18 APIs; see
+`docs/contracts/proxy-pools-ui-i18n.md`. SP39 completes the Developer Console's
 scoped EN/VI presentation over existing SP25 log APIs; see
 `docs/contracts/console-ui-i18n.md`. SP38 completes the Requests list/detail
 scoped EN/VI presentation over existing SP24b APIs; see
