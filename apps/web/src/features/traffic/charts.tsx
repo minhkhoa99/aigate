@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { UsageChart } from "./api";
 import { bucketLabel, formatCost, formatTokens, OTHER } from "./usage-format";
+import { useLocale } from "../../shared/locale";
 
 // docs/contracts/usage.md "UI": tokens stacked by provider, and cost on its own chart (one axis each). SVG marks follow
 // the dataviz spec: thin bars, 2px surface gaps, a 4px rounded data end, recessive grid, hover per bucket, a legend
@@ -69,6 +70,8 @@ function Tooltip({ left, title, rows }: { left: number; title: string; rows: { l
 const scaleTop = (values: readonly number[]) => ticks(Math.max(0, ...values)).at(-1) || 1;
 
 export function TokenChart({ chart, series }: { chart: UsageChart; series: Series[] }) {
+  const { language, t } = useLocale();
+  const locale = language === "vi" ? "vi-VN" : "en-US";
   const [hover, setHover] = useState<number | null>(null);
   const [ref, W] = useWidth();
   const PLOT_W = Math.max(0, W - PAD.left - PAD.right);
@@ -78,11 +81,11 @@ export function TokenChart({ chart, series }: { chart: UsageChart; series: Serie
     : bucket.tokens[item.key] ?? 0)));
   const totals = stacks.map((stack) => stack.reduce((sum, value) => sum + value, 0));
   const top = scaleTop(totals);
-  const labels = chart.buckets.map((bucket) => bucketLabel(bucket.start, chart.bucket, chart.timezone));
+  const labels = chart.buckets.map((bucket) => bucketLabel(bucket.start, chart.bucket, chart.timezone, locale));
   const band = PLOT_W / Math.max(1, chart.buckets.length);
   const barWidth = Math.max(2, Math.min(28, band * 0.6));
   return <div className="usage-chart-wrap" ref={ref}>
-    {W > 0 && <Frame width={W} top={top} format={formatTokens} labels={labels} onLeave={() => setHover(null)}>
+    {W > 0 && <Frame width={W} top={top} format={(value) => formatTokens(value, locale)} labels={labels} onLeave={() => setHover(null)}>
       {stacks.map((stack, index) => {
         const x = PAD.left + band * index + (band - barWidth) / 2;
         let base = PAD.top + PLOT_H;
@@ -100,35 +103,39 @@ export function TokenChart({ chart, series }: { chart: UsageChart; series: Serie
         </g>;
       })}
     </Frame>}
-    {hover !== null && W > 0 && <Tooltip left={((PAD.left + band * hover + band / 2) / W) * 100} title={`${labels[hover]} · ${formatTokens(totals[hover])} tokens`}
-      rows={series.map((item, index) => ({ label: item.label, value: formatTokens(stacks[hover][index]), color: seriesColor(item) })).filter((_, index) => stacks[hover][index] > 0)} />}
+    {hover !== null && W > 0 && <Tooltip left={((PAD.left + band * hover + band / 2) / W) * 100} title={t("usage.chartTokens", { time: labels[hover], count: formatTokens(totals[hover], locale) })}
+      rows={series.map((item, index) => ({ label: item.label, value: formatTokens(stacks[hover][index], locale), color: seriesColor(item) })).filter((_, index) => stacks[hover][index] > 0)} />}
   </div>;
 }
 
 export function CostChart({ chart }: { chart: UsageChart }) {
+  const { language, t } = useLocale();
+  const locale = language === "vi" ? "vi-VN" : "en-US";
   const [hover, setHover] = useState<number | null>(null);
   const [ref, W] = useWidth();
   const PLOT_W = Math.max(0, W - PAD.left - PAD.right);
   const values = chart.buckets.map((bucket) => bucket.cost);
   const top = scaleTop(values);
-  const labels = chart.buckets.map((bucket) => bucketLabel(bucket.start, chart.bucket, chart.timezone));
+  const labels = chart.buckets.map((bucket) => bucketLabel(bucket.start, chart.bucket, chart.timezone, locale));
   const band = PLOT_W / Math.max(1, values.length);
   const point = (value: number, index: number) => ({ x: PAD.left + band * index + band / 2, y: PAD.top + PLOT_H - (value / top) * PLOT_H });
   const line = values.map((value, index) => { const p = point(value, index); return `${index === 0 ? "M" : "L"}${p.x},${p.y}`; }).join("");
   const active = hover === null ? null : point(values[hover], hover);
   return <div className="usage-chart-wrap" ref={ref}>
-    {W > 0 && <Frame width={W} top={top} format={formatCost} labels={labels} onLeave={() => setHover(null)}>
+    {W > 0 && <Frame width={W} top={top} format={(value) => formatCost(value, locale)} labels={labels} onLeave={() => setHover(null)}>
       <path d={line} className="usage-line" />
       {active && <><line x1={active.x} x2={active.x} y1={PAD.top} y2={PAD.top + PLOT_H} className="usage-crosshair" /><circle cx={active.x} cy={active.y} r={4.5} className="usage-marker" /></>}
       {values.map((_, index) => <rect key={index} x={PAD.left + band * index} y={PAD.top} width={band} height={PLOT_H} fill="transparent" onMouseEnter={() => setHover(index)} />)}
     </Frame>}
     {hover !== null && W > 0 && <Tooltip left={((PAD.left + band * hover + band / 2) / W) * 100} title={labels[hover]}
-      rows={[{ label: "Cost", value: formatCost(values[hover]) }, { label: "Requests", value: String(chart.buckets[hover].requests) }]} />}
+      rows={[{ label: t("usage.cost"), value: formatCost(values[hover], locale) }, { label: t("usage.requests"), value: new Intl.NumberFormat(locale).format(chart.buckets[hover].requests) }]} />}
   </div>;
 }
 
 export function Legend({ series, totals }: { series: Series[]; totals: Readonly<Record<string, number>> }) {
-  return <ul className="usage-legend" aria-label="Providers">
-    {series.map((item) => <li key={item.key}><i style={{ background: seriesColor(item) }} /><span>{item.label}</span><b>{formatTokens(totals[item.key] ?? 0)}</b></li>)}
+  const { language, t } = useLocale();
+  const locale = language === "vi" ? "vi-VN" : "en-US";
+  return <ul className="usage-legend" aria-label={t("usage.providers")}>
+    {series.map((item) => <li key={item.key}><i style={{ background: seriesColor(item) }} /><span>{item.label}</span><b>{formatTokens(totals[item.key] ?? 0, locale)}</b></li>)}
   </ul>;
 }

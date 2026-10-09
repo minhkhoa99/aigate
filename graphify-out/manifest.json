@@ -824,12 +824,12 @@
     "hash": "12c8c56ae715c992dd3937bfa8c8c821"
   },
   "D:\\aigate\\apps\\web\\src\\features\\traffic\\charts.tsx": {
-    "mtime": 1791387171.3641405,
-    "hash": "5a76d55b9592e97ed003cccd80d9f0e1"
+    "mtime": 1791553670.9924607,
+    "hash": "891097ada08dc9eb24b9d26ef73ae3f9"
   },
   "D:\\aigate\\apps\\web\\src\\features\\traffic\\pricing-modal.tsx": {
-    "mtime": 1791387171.3651392,
-    "hash": "1bdf9b34d0f44f5562deca5b1622d124"
+    "mtime": 1791554056.703018,
+    "hash": "c1d57b88f60cced6cfeb2803da6601c1"
   },
   "D:\\aigate\\apps\\web\\src\\features\\traffic\\requests.tsx": {
     "mtime": 1791387171.365657,
@@ -840,16 +840,16 @@
     "hash": "23f46a2669c628162bf891794a29470e"
   },
   "D:\\aigate\\apps\\web\\src\\features\\traffic\\usage-format.test.mjs": {
-    "mtime": 1791387171.3666708,
-    "hash": "b7b980eb5af0b30a00ad22690fe47077"
+    "mtime": 1791554141.5613284,
+    "hash": "d0853a2c7a2e074a0cf1b4b7f3e0bf87"
   },
   "D:\\aigate\\apps\\web\\src\\features\\traffic\\usage-format.ts": {
-    "mtime": 1791387171.3682828,
-    "hash": "9d2bca19e5dbf1918e444b43695cc890"
+    "mtime": 1791553660.3215554,
+    "hash": "f486196d0cc4e44f55ecd366be65525a"
   },
   "D:\\aigate\\apps\\web\\src\\features\\traffic\\usage.tsx": {
-    "mtime": 1791387171.3693018,
-    "hash": "a9f563f31ebc141d7534f75e3edee483"
+    "mtime": 1791553734.5073812,
+    "hash": "7fb01b090f394ab9aaf19257eedaa59a"
   },
   "D:\\aigate\\apps\\web\\src\\shared\\api.ts": {
     "mtime": 1791387171.372341,
@@ -1504,8 +1504,8 @@
     "hash": "4d090f5fa7e890f878973a96545e8f07"
   },
   "D:\\aigate\\CLAUDE.md": {
-    "mtime": 1791553062.7859292,
-    "hash": "99391c54c15df30837146d3db8869df9"
+    "mtime": 1791554215.6826394,
+    "hash": "e90ea105ed00ebba3a24fb9ef53a26a1"
   },
   "D:\\aigate\\pnpm-workspace.yaml": {
     "mtime": 1791387171.811181,
@@ -1524,11 +1524,11 @@
     "hash": "015898deb9f7c1bf8c34e21052d764d3"
   },
   "D:\\aigate\\docs\\PROGRESS_HANDOFF.md": {
-    "mtime": 1791553074.075066,
-    "hash": "537a979d93c8a7abe32787ac24ae14d8"
+    "mtime": 1791554215.6865373,
+    "hash": "e8174c9396e32a620e3ac06da3da4d95"
   },
   "D:\\aigate\\docs\\PROJECT_MAP.md": {
-    "mtime": 1791539125.6391447,
+    "mtime": 1791553313.6566074,
     "hash": "5cab4112e6edae1f745b1685160b1731"
   },
   "D:\\aigate\\docs\\contracts\\capacity-adapter.md": {
@@ -1568,8 +1568,8 @@
     "hash": "51277e0132566ffbce374694f06e126f"
   },
   "D:\\aigate\\docs\\contracts\\i18n.md": {
-    "mtime": 1791553056.181245,
-    "hash": "fda02b41ac323d87aaadc54b298ee86f"
+    "mtime": 1791554204.0871632,
+    "hash": "9ee729c0e17e59c053019871c1faed78"
   },
   "D:\\aigate\\docs\\contracts\\identity-apikeys.md": {
     "mtime": 1791535924.810063,
@@ -1699,13 +1699,17 @@
     "mtime": 1791387171.4217985,
     "hash": "799f3f6b0d2b87891f7df23faf0a61aa"
   },
+  "D:\\aigate\\docs\\contracts\\usage-ui-i18n.md": {
+    "mtime": 1791553649.3575876,
+    "hash": "0ac099b2752eff645af10e562d6a8fad"
+  },
   "D:\\aigate\\docs\\contracts\\usage.md": {
-    "mtime": 1791553056.1797369,
-    "hash": "32f9ecab74ef9991663bf8e0702938d0"
+    "mtime": 1791554204.0871632,
+    "hash": "734cb6ee16d179ec202331463787cf37"
   },
   "D:\\aigate\\docs\\design\\API_UI_MAP.md": {
-    "mtime": 1791553056.1832664,
-    "hash": "319bacf12fbc08ea3eb24f258c808848"
+    "mtime": 1791554204.0901914,
+    "hash": "a6f30d89c1fb187a6c601c86349ab49c"
   },
   "D:\\aigate\\docs\\design\\DESIGN.md": {
     "mtime": 1791387171.4261718,
@@ -1724,8 +1728,8 @@
     "hash": "41589beb69ba8c1a57e8b6e108c64386"
   },
   "D:\\aigate\\docs\\design\\UI_HANDOFF.md": {
-    "mtime": 1791553056.1847854,
-    "hash": "fd1c37389813007eca1b75b7d20953a6"
+    "mtime": 1791554215.6861703,
+    "hash": "deec4b292b73145f7a8cb2c0dc114509"
   },
   "D:\\aigate\\docs\\design\\stitch-export\\html\\authflow-modals.html": {
     "mtime": 1791387171.431996,
@@ -1868,8 +1872,8 @@
     "hash": "237028e1bbb32e29624578add754c54f"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\08-usage-quota.yaml": {
-    "mtime": 1791553250.2523415,
-    "hash": "41f6710f6eba8cc24249455549c12db8"
+    "mtime": 1791554204.0857515,
+    "hash": "d8c3a78966d38c4084e3a49871d89bd0"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\09-media-providers.yaml": {
     "mtime": 1791535135.8405757,
@@ -1938,6 +1942,10 @@
   "D:\\aigate\\docs\\superpowers\\plans\\2026-10-09-sp36-quota-ui-i18n.md": {
     "mtime": 1791553250.253341,
     "hash": "b29c3904fd0ec75002cebac90a92b43d"
+  },
+  "D:\\aigate\\docs\\superpowers\\plans\\2026-10-09-sp37-usage-ui-i18n.md": {
+    "mtime": 1791553649.3596015,
+    "hash": "d13f7eb7d61064d4d5f01ebc7191c04f"
   },
   "D:\\aigate\\docs\\superpowers\\skill-tests\\2026-09-25-porting-behavior-not-code-green.md": {
     "mtime": 1791387171.539554,

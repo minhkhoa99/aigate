@@ -26,3 +26,11 @@ test("bucket labels use the usage zone", () => {
   assert.equal(bucketLabel(at, "hour", "Asia/Ho_Chi_Minh"), "00:00");
   assert.equal(bucketLabel(at, "day", "Asia/Ho_Chi_Minh"), "Oct 1");
 });
+
+test("Vietnamese display keeps the server zone and USD precision", () => {
+  const at = Date.UTC(2026, 8, 30, 17, 0);
+  assert.equal(bucketLabel(at, "hour", "Asia/Ho_Chi_Minh", "vi-VN"), "00:00");
+  assert.match(bucketLabel(at, "day", "Asia/Ho_Chi_Minh", "vi-VN"), /1.*10/);
+  assert.match(formatCost(0.0042, "vi-VN"), /0,0042.*US\$/);
+  assert.match(errorRate(1, 3, "vi-VN"), /33,3/);
+});

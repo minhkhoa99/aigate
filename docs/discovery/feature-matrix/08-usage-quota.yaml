@@ -152,6 +152,36 @@
   parityStatus: verified
   labels: []
 
+- id: usage.dashboard-browser-i18n
+  group: Usage
+  feature: Usage analytics
+  subFeature: EN/VI presentation of charts, live state and pricing controls
+  trigger: Open /traffic/usage, change browser language, or edit a price
+  input: Existing summary/chart/live/pricing data and browser locale
+  output: Localized owned copy and Intl values with literal identifiers and USD
+  businessRules:
+    - "AIGATE_EXTENSION: locale changes render Usage, charts and Pricing in EN/VI without changing query keys, SSE connection or mutations"
+    - "AIGATE_EXTENSION: server usage timezone defines chart buckets; browser locale only changes their displayed labels"
+    - "AIGATE_EXTENSION: incomplete custom dates neither query summary/chart nor export CSV; period and pricing drafts survive a locale change"
+  state:
+    reads: [existing_usage_snapshot, existing_pricing_snapshot, browser_language_preference]
+    writes: []
+    runtimeOnly: [mounted_period_draft, pricing_draft, chart_color_slots, existing_live_stream]
+  dependencies: [usage.request-field-trace-order]
+  providerInteraction: "None added; existing usage/pricing APIs only"
+  fallback: { hasFallback: false, retry: "Existing explicit Retry or Reconnect", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["Existing browser-local aigate-language and URL period only"]
+  performanceConcerns: ["Keep existing bounded live stream and 200-row usage table; no locale fan-out"]
+  behavior: { streaming: true, cancellation: "Existing SSE cleanup", concurrency: "Existing single pricing mutation" }
+  edgeCases: ["Incomplete custom period", "Small USD cost", "SSE disconnect", "Read error", "Locale change during price save"]
+  evidence:
+    - { file: "aigate:docs/contracts/usage-ui-i18n.md", line: 1, note: "SP37 presentation and live boundary" }
+  newModule: usage
+  parityStatus: verified
+  labels: []
+
 - id: usage.write-not-synchronous
   group: Usage
   feature: Per-request usage capture

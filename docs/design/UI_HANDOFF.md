@@ -1,6 +1,8 @@
 # UI ownership handoff
 
-Current integration note (2026-10-09): SP36 completes the Quota dashboard's
+Current integration note (2026-10-09): SP37 completes the Usage analytics and
+Pricing modal's scoped EN/VI presentation over existing SP24a APIs; see
+`docs/contracts/usage-ui-i18n.md`. SP36 completes the Quota dashboard's
 scoped EN/VI presentation over the existing SP24c API; see
 `docs/contracts/quota-ui-i18n.md`. SP35 completes Token Saver's scoped EN/VI
 presentation and PXPIPE read states over the already-wired SP21 APIs; see

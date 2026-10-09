@@ -188,3 +188,8 @@ See the matrix entries for each one:
 - Export CSV.
 - A warning when the writer dropped or failed.
 - The Pricing modal: pick a provider and model, see the resolved price and its source, edit the five rates, reset a model, a provider, or everything.
+
+SP37 adds EN/VI presentation to this existing page, its charts and Pricing
+modal. It changes no summary/chart/CSV/pricing route or SSE behavior. An
+incomplete custom period cannot export. Failed price resolution and catalog
+reads show their code, diagnostic and Retry. See `usage-ui-i18n.md`.
