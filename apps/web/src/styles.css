@@ -67,3 +67,5 @@
 .simulation-tree summary { cursor:pointer; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .simulation-node { margin-block:8px; }
 .simulation-result, .simulation-result code, .simulation-result p { min-width:0; overflow-wrap:anywhere; white-space:normal; }
+.routing-status code, .routing-status p, .routing-status td { overflow-wrap:anywhere; }
+.routing-status-small { display:block; color:var(--muted); margin-top:4px; }

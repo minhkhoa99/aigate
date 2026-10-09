@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { type FormEvent } from "react";
-import { Button, ConfirmDialog, CopyField, Dot, Field, Input, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
+import { Button, ConfirmDialog, CopyField, Field, Input, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
+import { useLocale } from "../../shared/locale";
 import { toProblem } from "../../shared/errors";
 import { CapacityTab } from "./capacity-pools";
 import { RoutingSimulatorTab } from "./routing-simulator";
+import { RoutingStatusTab } from "./routing-status";
 import {
   useApiKeys, useChatReadiness, useComboStickyLimit, useCombos, useCreateKey, useDeleteCombo, useDeleteKey, useRequireApiKey, useSetComboStickyLimit, useSetKeyActive,
   usePatchTokenSaverSettings, useTokenSaverSettings, usePxpipeStatus, useInstallPxpipe,
@@ -147,21 +149,15 @@ function CombosTab() {
 
 export function Routing() {
   const [tab, setTab] = useState("Combo");
+  const { t } = useLocale();
+  const labels: Record<string, string> = { Combo: t("routingStatus.tabCombo"), Overview: t("routingStatus.tabOverview"),
+    Fallback: t("routingStatus.tabFallback"), "Capacity adapter": t("routingStatus.tabCapacity"), Simulator: t("routingStatus.tabSimulator") };
   return <>
-    <PageHeading eyebrow="Gateway / Routing" title="Routing & fallback" description="Decide where traffic goes, when to retry, and how to recover from failure." action={<Link to="/gateway/routing/new" className="button button-primary">+ Create combo</Link>} />
-    <Tabs items={["Combo", "Overview", "Fallback", "Capacity adapter", "Simulator"]} active={tab} onChange={setTab} />
+    <PageHeading eyebrow={t("routingStatus.pageEyebrow")} title={t("routingStatus.pageTitle")} description={t("routingStatus.pageDescription")} action={<Link to="/gateway/routing/new" className="button button-primary">{t("routingStatus.createCombo")}</Link>} />
+    <Tabs items={["Combo", "Overview", "Fallback", "Capacity adapter", "Simulator"]} active={tab} onChange={setTab} getLabel={item => labels[item]} />
     {tab === "Combo" && <CombosTab />}
     {tab === "Capacity adapter" && <CapacityTab />}
-    {(tab === "Overview" || tab === "Fallback") && <div className="section-gap"><Warning>Preview with sample data: this tab is not connected to the gateway yet. Account fallback runs as described; choose its strategy in Settings → Auth & Access.</Warning></div>}
-    {tab === "Overview" && <div className="grid grid-2 section-gap"><Panel title="Active routes" detail="Current model resolution order">
-      {["claude-3.5-sonnet → Anthropic primary", "gpt-4o → OpenAI primary", "gemini-2.5-pro → Google Vertex", "deepseek-r1 → DeepSeek pooled"].map((r, i) => <div className="list-row" key={r}><Dot tone={i === 3 ? "warning" : "healthy"} /><div><strong className="mono">{r}</strong><small>{i === 3 ? "Fallback available" : "Direct · healthy"}</small></div><Pill tone={i === 3 ? "warning" : "healthy"}>{i === 3 ? "Guarded" : "Active"}</Pill></div>)}
-    </Panel><Panel title="Decision path" detail="Single request, from client to provider"><div className="flow-steps">{["Validate API key", "Resolve alias & capability", "Choose connection", "Translate request", "Dispatch with timeout", "Stream response"].map((s, i) => <div key={s}><span>{String(i + 1).padStart(2, "0")}</span><strong>{s}</strong><Dot /></div>)}</div></Panel></div>}
-    {tab === "Fallback" && <div className="stack section-gap"><Warning>Request-caused errors return directly to the client. Account fallback is reserved for recoverable provider failures.</Warning><Panel title="Fallback policy" detail="The first healthy route that can serve the request wins."><Table columns={["Condition", "Action", "Lock", "Status"]} rows={[
-      ["Invalid request · 400", "Return to client", "None", <Pill tone="healthy">Terminal</Pill>],
-      ["Rate limit · 429", "Next account", "Exponential", <Pill tone="warning">Fallback</Pill>],
-      ["Provider outage · 503", "Retry, then next route", "30 seconds", <Pill tone="warning">Fallback</Pill>],
-      ["Client abort · 499", "Cancel upstream", "None", <Pill tone="healthy">Terminal</Pill>],
-    ]} /></Panel></div>}
+    {(tab === "Overview" || tab === "Fallback") && <RoutingStatusTab mode={tab === "Overview" ? "overview" : "fallback"} onSimulate={() => setTab("Simulator")} />}
     {tab === "Simulator" && <RoutingSimulatorTab />}
   </>;
 }

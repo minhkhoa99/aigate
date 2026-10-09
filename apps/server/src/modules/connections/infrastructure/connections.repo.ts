@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, gte, inArray, isNotNull, lt, or } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, isNotNull, lt, or } from "drizzle-orm";
 import { accountLocks, providerConnections, type AuthType, type DatabaseHandle, type TestStatus } from "@aigate/database";
 import type { OAuthTokens } from "@aigate/engine";
 import { DATABASE } from "../../../database.provider.js";
@@ -13,6 +13,8 @@ const MAX_CONNECTIONS = 100;
 export type RoutingAccount = AccountCandidate & { isActive: boolean };
 export type RoutingLock = { connectionId: string; model: string; until: Date };
 export type BoundedRows<T> = { rows: T[]; truncated: boolean };
+export type RoutingStatusAccountRoute = { provider: string; activeAccounts: number };
+export type RoutingStatusLock = RoutingLock & { provider: string; name: string; isActive: boolean };
 
 export interface ConnectionView {
   id: string;
@@ -296,6 +298,24 @@ export class ConnectionsRepository {
       .where(and(eq(t.provider, provider), gte(accountLocks.until, now), or(eq(accountLocks.model, model), eq(accountLocks.model, "__all"))))
       .limit(MAX_CONNECTIONS * 2 + 1);
     return { rows: rows.slice(0, MAX_CONNECTIONS * 2), truncated: rows.length > MAX_CONNECTIONS * 2 };
+  }
+
+  // SP30 dashboard snapshot: aggregate before the row cap; no secret columns or live lock cleanup.
+  async routingProviderCounts(): Promise<BoundedRows<RoutingStatusAccountRoute>> {
+    const rows = await this.database.db.select({ provider: t.provider, activeAccounts: count() }).from(t)
+      .where(eq(t.isActive, true)).groupBy(t.provider).orderBy(asc(t.provider)).limit(MAX_CONNECTIONS + 1);
+    return { rows: rows.slice(0, MAX_CONNECTIONS), truncated: rows.length > MAX_CONNECTIONS };
+  }
+
+  async routingActiveLocks(now: Date): Promise<BoundedRows<RoutingStatusLock>> {
+    const rows = await this.database.db.select({
+      connectionId: accountLocks.connectionId, provider: t.provider, name: t.name, isActive: t.isActive,
+      model: accountLocks.model, until: accountLocks.until,
+    }).from(accountLocks).innerJoin(t, eq(t.id, accountLocks.connectionId))
+      .where(gte(accountLocks.until, now))
+      .orderBy(asc(accountLocks.until), asc(t.provider), asc(t.id), asc(accountLocks.model))
+      .limit(MAX_CONNECTIONS + 1);
+    return { rows: rows.slice(0, MAX_CONNECTIONS), truncated: rows.length > MAX_CONNECTIONS };
   }
 
   async activeCount(provider: string): Promise<number> {

@@ -84,8 +84,8 @@
     "hash": "0d6970500263bd84a0c5bde23e38c9ed"
   },
   "D:\\aigate\\apps\\server\\src\\modules\\connections\\infrastructure\\connections.repo.ts": {
-    "mtime": 1791513576.6568215,
-    "hash": "202e330f0b8632ce9332b4ba59ba86cc"
+    "mtime": 1791516099.782792,
+    "hash": "6e9cf7a1e8f9c9fa6f14e716de217d1f"
   },
   "D:\\aigate\\apps\\server\\src\\modules\\connections\\infrastructure\\fixed-callback-relay.ts": {
     "mtime": 1791432506.980502,
@@ -144,8 +144,8 @@
     "hash": "4d8b550901037808e5cb29636d85afe8"
   },
   "D:\\aigate\\apps\\server\\src\\modules\\routing\\routing.module.ts": {
-    "mtime": 1791513576.6692855,
-    "hash": "a82a504ca69fec2f07381520fc124442"
+    "mtime": 1791516099.7842436,
+    "hash": "8280d28f6de6693f3a2ad3a662188dae"
   },
   "D:\\aigate\\apps\\server\\src\\modules\\routing\\domain\\capacity.ts": {
     "mtime": 1791447716.0340748,
@@ -206,6 +206,10 @@
   "D:\\aigate\\apps\\server\\src\\modules\\routing\\infrastructure\\routing-simulator.ts": {
     "mtime": 1791513576.6672294,
     "hash": "6e1dab5276cd96f2b9f97cc52612f576"
+  },
+  "D:\\aigate\\apps\\server\\src\\modules\\routing\\infrastructure\\routing-status.controller.ts": {
+    "mtime": 1791516266.3198218,
+    "hash": "82f1cc0da6953423343c4c1394adca3b"
   },
   "D:\\aigate\\apps\\server\\src\\modules\\routing\\infrastructure\\speech-lane.ts": {
     "mtime": 1791387171.2513926,
@@ -615,6 +619,10 @@
     "mtime": 1791514645.2533197,
     "hash": "3372257ec044c8f840c7c19e2f71eb60"
   },
+  "D:\\aigate\\apps\\server\\test\\routing-status.test.mjs": {
+    "mtime": 1791516900.2619734,
+    "hash": "feb58bd30813cd19912ef0765bf3f354"
+  },
   "D:\\aigate\\apps\\server\\test\\settings.test.mjs": {
     "mtime": 1791387171.324731,
     "hash": "0dee56a7dfae2ec7fa6245ad5221938e"
@@ -664,8 +672,8 @@
     "hash": "885f9ecb6052d3197b0d8ffbeada1408"
   },
   "D:\\aigate\\apps\\web\\src\\features\\gateway\\api.ts": {
-    "mtime": 1791513576.6748426,
-    "hash": "7d833919666917318c857290230a8f68"
+    "mtime": 1791516158.5897076,
+    "hash": "57c9b5cbf2735b9e9773cc075ca83ede"
   },
   "D:\\aigate\\apps\\web\\src\\features\\gateway\\capacity-pools.tsx": {
     "mtime": 1791387171.3389168,
@@ -679,9 +687,13 @@
     "mtime": 1791513576.6748426,
     "hash": "fecb8d11730a4d5356c1382da62f66b0"
   },
+  "D:\\aigate\\apps\\web\\src\\features\\gateway\\routing-status.tsx": {
+    "mtime": 1791516200.9609883,
+    "hash": "781b40f78e858797ec4d4100dcbb85ea"
+  },
   "D:\\aigate\\apps\\web\\src\\features\\gateway\\screens.tsx": {
-    "mtime": 1791513576.679564,
-    "hash": "d80be2104d654a32f7702c75244f9161"
+    "mtime": 1791516695.1360102,
+    "hash": "414c3000575f4b8a83bb62f40a681eb9"
   },
   "D:\\aigate\\apps\\web\\src\\features\\gateway\\simulation-result.test.mjs": {
     "mtime": 1791513576.679564,
@@ -1468,8 +1480,8 @@
     "hash": "4d090f5fa7e890f878973a96545e8f07"
   },
   "D:\\aigate\\CLAUDE.md": {
-    "mtime": 1791514802.5603106,
-    "hash": "8f6518a125320470020d5eb6d90dfed6"
+    "mtime": 1791516735.5042658,
+    "hash": "ec6e1c28bf6ecd2ca613baf59965900a"
   },
   "D:\\aigate\\pnpm-workspace.yaml": {
     "mtime": 1791387171.811181,
@@ -1488,12 +1500,12 @@
     "hash": "015898deb9f7c1bf8c34e21052d764d3"
   },
   "D:\\aigate\\docs\\PROGRESS_HANDOFF.md": {
-    "mtime": 1791514836.0900464,
-    "hash": "21d0e84285a93f2ebecb16a4e7cd0a80"
+    "mtime": 1791516933.776278,
+    "hash": "0c4f4f76bbcec4f2fa34fc1081f12223"
   },
   "D:\\aigate\\docs\\PROJECT_MAP.md": {
-    "mtime": 1791387171.3853817,
-    "hash": "317f48c4291222541000a80f40cf10bc"
+    "mtime": 1791516844.5808089,
+    "hash": "5cab4112e6edae1f745b1685160b1731"
   },
   "D:\\aigate\\docs\\contracts\\capacity-adapter.md": {
     "mtime": 1791447829.8494844,
@@ -1623,6 +1635,10 @@
     "mtime": 1791514802.562505,
     "hash": "e94151a1324743d3d7379f0ebd92cc60"
   },
+  "D:\\aigate\\docs\\contracts\\routing-status.md": {
+    "mtime": 1791516705.5735793,
+    "hash": "b9fd1a7e6aa1854b357ccd90a03abf5e"
+  },
   "D:\\aigate\\docs\\contracts\\settings.md": {
     "mtime": 1791392830.7351544,
     "hash": "6825d85907a3dde5223d53250abde989"
@@ -1648,8 +1664,8 @@
     "hash": "1bf86922f9b8ec3936ca8ebcd2a962c9"
   },
   "D:\\aigate\\docs\\design\\API_UI_MAP.md": {
-    "mtime": 1791514809.9824946,
-    "hash": "ca454920c0a3aeac00e134653d17c762"
+    "mtime": 1791516717.2861931,
+    "hash": "267e584c579398ad56b50b4ecddbed56"
   },
   "D:\\aigate\\docs\\design\\DESIGN.md": {
     "mtime": 1791387171.4261718,
@@ -1804,8 +1820,8 @@
     "hash": "bb2acdba9440e35bf4e35f1c750848ce"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\05-request-routing-fallback.yaml": {
-    "mtime": 1791514802.5645063,
-    "hash": "7cb68dd7520c16f56ba73ec9b204325e"
+    "mtime": 1791516705.581409,
+    "hash": "dff2aa6dd00ccc33732cddd3308e0913"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\06-combo-capacity-adapter.yaml": {
     "mtime": 1791387171.5222242,
@@ -1856,8 +1872,12 @@
     "hash": "95478c5c852ecf506e2feea3b29672a6"
   },
   "D:\\aigate\\docs\\superpowers\\plans\\2026-10-08-sp29-routing-simulator.md": {
-    "mtime": 1791513576.704512,
-    "hash": "5e684a44ec11465a1f802d8caea666d6"
+    "mtime": 1791515082.7755866,
+    "hash": "0c2567f119b594aca09217c87978a20e"
+  },
+  "D:\\aigate\\docs\\superpowers\\plans\\2026-10-09-sp30-routing-status.md": {
+    "mtime": 1791516933.7799456,
+    "hash": "bc4a6c2b9331e869dab2983b32068266"
   },
   "D:\\aigate\\docs\\superpowers\\skill-tests\\2026-09-25-porting-behavior-not-code-green.md": {
     "mtime": 1791387171.539554,

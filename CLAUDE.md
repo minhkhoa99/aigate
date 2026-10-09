@@ -26,12 +26,19 @@ Read `docs/PROGRESS_HANDOFF.md` before resuming work. M-1 discovery is complete 
 
 ## Verify (PowerShell)
 
+SP30 / M3 U6 replaces the Routing Overview and Fallback sample tabs with the
+session-guarded, read-only `GET /api/routing/status` snapshot. See
+`docs/contracts/routing-status.md` for bounded provider/account and active-lock
+metadata, EN/VI UI, polling and countdown behavior. Targeted native and
+isolated browser acceptance passed on 2026-10-09 with zero vendor calls;
+this is configuration state, not a provider-health or model-eligibility probe.
+
 SP29 / M3 U6 implements the existing Routing Simulator tab and session-guarded
 `POST /api/routing/simulate`. See `docs/contracts/routing-simulator.md`: shared
 pure model/account choices, metadata-only projections/rotation peeks, bounded
 conditional tree, OpenAI Chat input only, no vendor/refresh/decryption/usage/
-rotation execution. New tab copy uses existing EN/VI; other Routing previews
-remain labeled. Native implementation and scoped acceptance were verified on
+rotation execution. New tab copy uses existing EN/VI. Native implementation
+and scoped acceptance were verified on
 2026-10-09: targeted server/web/discovery checks, isolated browser acceptance,
 build/lint, and independent review passed after the review finding was fixed.
 See the latest handoff for exact counts and scope; do not redo completed SP29 work.

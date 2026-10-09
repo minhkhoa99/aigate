@@ -1834,3 +1834,35 @@
   newModule: routing
   parityStatus: verified
   labels: []
+
+- id: routing.status-snapshot
+  group: Request routing
+  feature: Routing overview and fallback status
+  subFeature: Read-only local configuration and active-lock snapshot
+  trigger: Dashboard opens Routing Overview or Fallback
+  input: Authenticated GET with no body
+  output: Bounded provider-route and active-lock metadata with fallback settings
+  businessRules:
+    - "AIGATE_EXTENSION: show enabled-account provider groups and built-in keyless chat providers without claiming model or provider health"
+    - "AIGATE_EXTENSION: show account/model locks whose until is at or after the snapshot time, including disabled accounts; do not run live lock cleanup"
+    - "AIGATE_EXTENSION: cap provider routes and lock rows at 100 each, signal source overflow, and use SQL grouping for account counts"
+    - "AIGATE_EXTENSION: reuse current settings, combo and capacity repositories; no vendor, refresh, decryption, transport, usage or rotation effect"
+  state:
+    reads: [settings, provider_connections metadata, account_locks, combos, capacity_pools, builtin_registry]
+    writes: []
+    runtimeOnly: [snapshot timestamp]
+  dependencies: [routing.simulator-dry-run, account.select-locked-and-excluded-filter, combo.mode-fallback, combo.mode-round-robin, capacity.augment-models-priority-prepend]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "dashboard session is missing or expired (wire code UNAUTHENTICATED)", partial: false }
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["SQL aggregate and 101-row sentinels bound rows; no per-account query"]
+  behavior: { streaming: false, cancellation: "Request lifetime only; no upstream call", concurrency: "One bounded snapshot per mounted tab query" }
+  edgeCases: ["Lock until equals observedAt", "Disabled account has a lock", "Provider or lock source exceeds 100 rows", "Keyless provider has no saved account"]
+  evidence:
+    - { file: "aigate:docs/contracts/routing-status.md", line: 1, note: "Local SP30 wire contract and ownership" }
+  newModule: routing
+  parityStatus: verified
+  labels: []

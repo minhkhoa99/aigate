@@ -195,3 +195,20 @@ export function useRoutingSimulation() {
     },
   });
 }
+
+// docs/contracts/routing-status.md: bounded, read-only configuration snapshot.
+export interface RoutingStatus {
+  observedAt: string;
+  fallbackStrategy: "fill-first" | "round-robin";
+  comboStickyLimit: number;
+  comboCount: number;
+  enabledPoolCount: number;
+  routes: { provider: string; kind: "account" | "keyless"; activeAccounts: number }[];
+  routesTruncated: boolean;
+  locks: { connectionId: string; provider: string; name: string; model: string; until: string; isActive: boolean }[];
+  locksTruncated: boolean;
+}
+export const useRoutingStatus = () => useQuery({
+  queryKey: ["routing-status"], queryFn: () => api<RoutingStatus>("/api/routing/status"),
+  refetchInterval: 30_000,
+});
