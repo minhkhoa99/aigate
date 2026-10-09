@@ -1,5 +1,12 @@
 # Identity and API keys contract (M1 SP6)
 
+SP33 dashboard setup: `/gateway/endpoint` now selects one of the four
+implemented client protocol examples and renders its surrounding key controls
+in EN/VI. The create response's plaintext key stays only in the one-time
+modal and mutation state until that modal closes; it is never inserted into a
+setup command or the cached list. Key CRUD routes and limits are unchanged.
+See `endpoint-setup.md` for exact client URLs, snippets and UI acceptance.
+
 Scope, per spec §9: dashboard password login and API key issuing and validation. OIDC and SAML come later. The source is the Feature Matrix entries below in `docs/discovery/feature-matrix/01-endpoint-apikey-settings.yaml`. AIGate does not reproduce any rule labeled `SUSPECTED_BUG` or `IMPLEMENTATION_ACCIDENT`.
 
 The user settled four decisions on 2026-09-25:

@@ -1314,3 +1314,33 @@
   newModule: tooling
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+
+- id: endpoint.dashboard-protocol-setup
+  group: Endpoint & API Key
+  feature: Endpoint & Keys dashboard
+  subFeature: Protocol-specific client setup and EN/VI presentation
+  trigger: Open Gateway Endpoint & Keys or select a client protocol
+  input: Browser locale, selected protocol, existing key/settings/connection reads
+  output: Correct protocol URL, literal setup command and test request, localized surrounding UI
+  businessRules:
+    - "AIGATE_EXTENSION: OpenAI Chat and Responses clients use the /v1 base, Anthropic clients use the origin and /v1/messages, and Gemini shows its full /v1beta/models/* request URL"
+    - "AIGATE_EXTENSION: copied commands include a quoted placeholder rather than any saved or one-time real API key"
+    - "AIGATE_EXTENSION: selecting a protocol or language preserves key dialogs, mutations and cached queries without fetching or calling a provider"
+  state:
+    reads: [browser_language_preference, existing_api_keys, existing_settings, existing_connections]
+    writes: []
+    runtimeOnly: [selected_client_protocol]
+  dependencies: [endpoint.rewrite-lanes, apikey.generate-key, apikey.list-keys]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["Fixed four protocol variants; existing 100-key list cap; no new polling or fan-out"]
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: ["Unknown readiness when connection read fails", "Denied browser storage", "Switch while one-time key is visible"]
+  evidence:
+    - { file: "aigate:docs/contracts/endpoint-setup.md", line: 1, note: "Local SP33 display contract and protocol paths" }
+  newModule: apikeys
+  parityStatus: verified
+  labels: []

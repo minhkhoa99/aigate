@@ -8,26 +8,31 @@ import { toProblem } from "../../shared/errors";
 import { CapacityTab } from "./capacity-pools";
 import { RoutingSimulatorTab } from "./routing-simulator";
 import { RoutingStatusTab } from "./routing-status";
+import { clientProtocols, endpointSetup, type ClientProtocol } from "./endpoint-variants";
+import type { MessageKey } from "../../shared/i18n";
 import {
   useApiKeys, useChatReadiness, useComboStickyLimit, useCombos, useCreateKey, useDeleteCombo, useDeleteKey, useRequireApiKey, useSetComboStickyLimit, useSetKeyActive,
   usePatchTokenSaverSettings, useTokenSaverSettings, usePxpipeStatus, useInstallPxpipe,
   useSetRequireApiKey, type ApiKey, type ChatReadiness, type Combo, type ComboStrategy, type CreatedApiKey, type GatewaySettings,
 } from "./api";
 
-const READINESS: Record<ChatReadiness, { tone: "healthy" | "warning"; label: string; hint?: string }> = {
-  ready: { tone: "healthy", label: "Ready" },
-  "no-connection": { tone: "warning", label: "Connect a provider", hint: "The chat API answers once a provider is connected." },
-  "check-connection": { tone: "warning", label: "Check connection", hint: "A provider is connected, but its key has not passed a test yet." },
+const READINESS: Record<ChatReadiness, { tone: "healthy" | "warning"; label: MessageKey; hint?: MessageKey }> = {
+  ready: { tone: "healthy", label: "endpoint.ready" },
+  "no-connection": { tone: "warning", label: "endpoint.connectProvider", hint: "endpoint.noConnectionHint" },
+  "check-connection": { tone: "warning", label: "endpoint.checkConnection", hint: "endpoint.checkConnectionHint" },
 };
-const SAMPLE_BODY = JSON.stringify({ model: "openai/gpt-4.1-mini", messages: [{ role: "user", content: "Hello" }] });
-// docs/contracts/protocol-anthropic.md: the same models through the Anthropic Messages protocol.
-const ANTHROPIC_BODY = JSON.stringify({ model: "openai/gpt-4.1-mini", max_tokens: 256, stream: false, messages: [{ role: "user", content: "Hello" }] });
-// docs/contracts/protocol-responses.md: the same models through the OpenAI Responses protocol.
-const RESPONSES_BODY = JSON.stringify({ model: "openai/gpt-4.1-mini", stream: false, input: "Hello" });
-// docs/contracts/protocol-gemini.md: the same models through the Gemini generateContent protocol (text only).
-const GEMINI_BODY = JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Hello" }] }] });
+const PROTOCOL_LABELS: Record<ClientProtocol, MessageKey> = {
+  openai: "endpoint.protocolOpenai", anthropic: "endpoint.protocolAnthropic",
+  responses: "endpoint.protocolResponses", gemini: "endpoint.protocolGemini",
+};
+const PROTOCOL_NOTES: Record<ClientProtocol, MessageKey> = {
+  openai: "endpoint.noteOpenai", anthropic: "endpoint.noteAnthropic",
+  responses: "endpoint.noteResponses", gemini: "endpoint.noteGemini",
+};
 
 export function EndpointKeys() {
+  const { language, t } = useLocale();
+  const [protocol, setProtocol] = useState<ClientProtocol>("openai");
   const [showCreate, setShowCreate] = useState(false);
   const [created, setCreated] = useState<CreatedApiKey | null>(null);
   const [revoke, setRevoke] = useState<ApiKey | null>(null);
@@ -38,15 +43,14 @@ export function EndpointKeys() {
   const requireApiKey = useRequireApiKey();
   const setRequireApiKey = useSetRequireApiKey();
   const showToast = useToast();
-  const fail = (error: unknown) => showToast({ tone: "error", ...toProblem(error) });
-  // The chat API (docs/contracts/chat-lane.md) on this origin.
-  const baseUrl = `${window.location.origin}/v1`;
+  const fail = (error: unknown) => showToast({ tone: "error", error });
   const readiness = useChatReadiness();
   const state = readiness.data ? READINESS[readiness.data] : undefined;
-  const curl = `curl ${baseUrl}/chat/completions -H "Authorization: Bearer <your AIGate key>" -H "Content-Type: application/json" -d '${SAMPLE_BODY}'`;
-  const anthropicCurl = `curl ${baseUrl}/messages -H "x-api-key: <your AIGate key>" -H "Content-Type: application/json" -d '${ANTHROPIC_BODY}'`;
-  const responsesCurl = `curl ${baseUrl}/responses -H "Authorization: Bearer <your AIGate key>" -H "Content-Type: application/json" -d '${RESPONSES_BODY}'`;
-  const geminiCurl = `curl ${window.location.origin}/v1beta/models/openai/gpt-4.1-mini:generateContent -H "Authorization: Bearer <your AIGate key>" -H "Content-Type: application/json" -d '${GEMINI_BODY}'`;
+  const readinessProblem = readiness.isError ? toProblem(readiness.error, language) : null;
+  const keysProblem = keys.isError ? toProblem(keys.error, language) : null;
+  const settingsProblem = requireApiKey.isError ? toProblem(requireApiKey.error, language) : null;
+  const setup = endpointSetup(window.location.origin, protocol);
+  const date = new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US");
   const closeCreate = () => { setShowCreate(false); setCreated(null); createKey.reset(); };
 
   const submitCreate = (event: FormEvent<HTMLFormElement>) => {
@@ -56,39 +60,38 @@ export function EndpointKeys() {
   };
 
   return <>
-    <PageHeading eyebrow="Gateway / Endpoint & Keys" title="Gateway endpoints" description="Configure your client base URL and manage access tokens." />
-    <Panel title="Base URL" detail="Use this URL in OpenAI-compatible, Anthropic, and OpenAI Responses clients." action={state ? <Pill tone={state.tone}>{state.label}</Pill> : <Pill>{readiness.isError ? "Status unavailable" : "Checking…"}</Pill>}>
-      {state?.hint && <Warning>{state.hint} <a href="/providers/connections">Open Connections</a></Warning>}
-      <CopyField label="OpenAI compatible endpoint" value={baseUrl} />
-      <div className="endpoint-examples"><span>OpenAI</span><span>Anthropic</span><span>Responses</span><span>Gemini</span></div>
-      <p className="muted">OpenAI clients call <code>/v1/chat/completions</code>; Anthropic clients (Claude Code, the Anthropic SDK) call <code>/v1/messages</code> with the key in <code>x-api-key</code>; Responses clients (Codex CLI, the OpenAI SDK) call <code>/v1/responses</code>, also reachable as <code>/responses</code> and <code>/codex/…</code>. Gemini clients call <code>/v1beta/models/provider/model:generateContent</code> (or <code>:streamGenerateContent</code>) with <code>Authorization: Bearer</code>; only text reaches the model, and <code>x-goog-api-key</code> is read only for audio (TTS) requests, which go to Google through your Gemini connection. List models at <code>/v1/models</code>, or send <code>provider/model</code> such as <code>openai/gpt-4.1-mini</code>.</p>
-      <CopyField label="Terminal example" value={`export OPENAI_BASE_URL=${baseUrl}`} />
-      <CopyField label="Test request" value={curl} />
-      <CopyField label="Claude Code" value={`export ANTHROPIC_BASE_URL=${window.location.origin} ANTHROPIC_API_KEY=<your AIGate key>`} />
-      <CopyField label="Anthropic test request" value={anthropicCurl} />
-      <CopyField label="Codex CLI" value={`OPENAI_BASE_URL=${baseUrl} OPENAI_API_KEY=<your AIGate key> codex -m openai/gpt-4.1-mini`} />
-      <CopyField label="Responses test request" value={responsesCurl} />
-      <CopyField label="Gemini test request" value={geminiCurl} />
+    <PageHeading eyebrow={t("endpoint.eyebrow")} title={t("endpoint.title")} description={t("endpoint.description")} />
+    <Panel title={t("endpoint.baseTitle")} detail={t("endpoint.baseDetail")} action={state ? <Pill tone={state.tone}>{t(state.label)}</Pill> : <Pill>{t(readiness.isError ? "endpoint.statusUnavailable" : "endpoint.checking")}</Pill>}>
+      {state?.hint && <Warning>{t(state.hint)} <a href="/providers/connections">{t("endpoint.openConnections")}</a></Warning>}
+      {readinessProblem && <Warning tone="danger"><code>{readinessProblem.code}</code> · {readinessProblem.message} <Button onClick={() => void readiness.refetch()}>{t("common.retry")}</Button></Warning>}
+      <nav className="endpoint-examples" aria-label={t("endpoint.protocolLabel")}>{clientProtocols.map(item =>
+        <button key={item} type="button" aria-pressed={protocol === item} className={protocol === item ? "active" : ""} onClick={() => setProtocol(item)}>{t(PROTOCOL_LABELS[item])}</button>
+      )}</nav>
+      <p className="muted">{t(PROTOCOL_NOTES[protocol])}</p>
+      <CopyField label={t(protocol === "gemini" ? "endpoint.requestUrl" : "endpoint.clientBaseUrl")} value={setup.displayUrl} />
+      {setup.setup && <CopyField label={t("endpoint.posixSetup")} value={setup.setup} />}
+      <CopyField label={t("endpoint.testRequest")} value={setup.testRequest} />
     </Panel>
-    <Panel title="API keys" detail="Manage scoped gateway tokens for upstream client authentication." className="section-gap panel-flush" action={<Button variant="primary" onClick={() => setShowCreate(true)}>+ Create key</Button>}>
+    <Panel title={t("endpoint.keysTitle")} detail={t("endpoint.keysDetail")} className="section-gap panel-flush" action={<Button variant="primary" onClick={() => setShowCreate(true)}>+ {t("endpoint.createKey")}</Button>}>
       {keys.isPending ? <StateBlock state="loading" />
-        : keys.isError ? <StateBlock state="error" code={toProblem(keys.error).code} action={<Button onClick={() => void keys.refetch()}>Retry</Button>} />
-        : <Table empty="No API keys yet. Create one for each client." columns={["Name", "Masked key", "Created", "Status", "Actions"]} rows={keys.data.map((key) => [
-          key.name, <code>{key.maskedKey}</code>, new Date(key.createdAt).toLocaleDateString(),
-          <Pill tone={key.isActive ? "healthy" : "muted"}>{key.isActive ? "Active" : "Disabled"}</Pill>,
-          <><Button variant="ghost" disabled={setActive.isPending} onClick={() => setActive.mutate({ id: key.id, isActive: !key.isActive }, { onError: fail })}>{key.isActive ? "Disable" : "Enable"}</Button>
-            <Button variant="ghost" onClick={() => setRevoke(key)}>Revoke</Button></>,
+        : keys.isError ? <><StateBlock state="error" code={keysProblem?.code} action={<Button onClick={() => void keys.refetch()}>{t("common.retry")}</Button>} /><Warning tone="danger">{keysProblem?.message}</Warning></>
+        : <Table empty={t("endpoint.keysEmpty")} columns={[t("endpoint.name"), t("endpoint.maskedKey"), t("endpoint.created"), t("endpoint.status"), t("endpoint.actions")]} rows={keys.data.map((key) => [
+          key.name, <code>{key.maskedKey}</code>, date.format(new Date(key.createdAt)),
+          <Pill tone={key.isActive ? "healthy" : "muted"}>{t(key.isActive ? "endpoint.active" : "endpoint.disabled")}</Pill>,
+          <><Button variant="ghost" disabled={setActive.isPending} onClick={() => setActive.mutate({ id: key.id, isActive: !key.isActive }, { onError: fail })}>{t(key.isActive ? "endpoint.disable" : "endpoint.enable")}</Button>
+            <Button variant="ghost" onClick={() => setRevoke(key)}>{t("endpoint.revoke")}</Button></>,
         ])} />}
     </Panel>
-    <Panel title="Security settings" detail="Protect this gateway from requests without a valid key." className="section-gap">
-      <div className="list-row"><div><strong>Require API key</strong><small>Requests without a valid key are rejected. When off, only this machine can call the chat API.</small></div><input type="checkbox" checked={requireApiKey.data ?? true} disabled={requireApiKey.data === undefined || setRequireApiKey.isPending} onChange={(e) => setRequireApiKey.mutate(e.target.checked, { onError: fail })} aria-label="Require API key" /></div>
+    <Panel title={t("endpoint.securityTitle")} detail={t("endpoint.securityDetail")} className="section-gap">
+      <div className="list-row"><div><strong>{t("endpoint.requireKey")}</strong><small>{t("endpoint.requireKeyHint")}</small></div><input type="checkbox" checked={requireApiKey.data ?? true} disabled={requireApiKey.data === undefined || setRequireApiKey.isPending} onChange={(e) => setRequireApiKey.mutate(e.target.checked, { onError: fail })} aria-label={t("endpoint.requireKey")} /></div>
+      {settingsProblem && <Warning tone="danger"><code>{settingsProblem.code}</code> · {settingsProblem.message} <Button onClick={() => void requireApiKey.refetch()}>{t("common.retry")}</Button></Warning>}
     </Panel>
-    {showCreate && <Modal title="Create API key" onClose={closeCreate}>
-      {created ? <><Warning>Copy this key now. It is shown only once and cannot be recovered.</Warning><CopyField label={created.name} value={created.key} /><div className="modal-actions"><Button variant="primary" onClick={closeCreate}>Done</Button></div></>
-        : <form onSubmit={submitCreate}><p>Give this key a name. Its value will be shown once after issuance.</p><Field label="Name"><Input name="name" required maxLength={64} placeholder="e.g. Local development" /></Field><div className="modal-actions"><Button onClick={closeCreate}>Cancel</Button><Button type="submit" variant="primary" disabled={createKey.isPending}>{createKey.isPending ? "Creating…" : "Create key"}</Button></div></form>}
+    {showCreate && <Modal title={t("endpoint.createTitle")} onClose={closeCreate}>
+      {created ? <><Warning>{t("endpoint.onceWarning")}</Warning><CopyField label={created.name} value={created.key} /><div className="modal-actions"><Button variant="primary" onClick={closeCreate}>{t("endpoint.done")}</Button></div></>
+        : <form onSubmit={submitCreate}><p>{t("endpoint.namePrompt")}</p><Field label={t("endpoint.name")}><Input name="name" required maxLength={64} placeholder={t("endpoint.namePlaceholder")} /></Field><div className="modal-actions"><Button onClick={closeCreate}>{t("common.cancel")}</Button><Button type="submit" variant="primary" disabled={createKey.isPending}>{t(createKey.isPending ? "endpoint.creating" : "endpoint.createKey")}</Button></div></form>}
     </Modal>}
     {revoke && <ConfirmDialog name={revoke.name} onClose={() => setRevoke(null)} onConfirm={() => deleteKey.mutate(revoke.id, {
-      onSuccess: () => { setRevoke(null); showToast({ tone: "success", message: `Revoked ${revoke.name}.` }); },
+      onSuccess: () => { setRevoke(null); showToast({ tone: "success", localized: { key: "endpoint.revoked", params: { name: revoke.name } } }); },
       onError: (error) => { setRevoke(null); fail(error); },
     })} />}
   </>;

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "test": "node --no-warnings --test src/features/providers/catalog.test.mjs src/features/providers/media-rules.test.mjs src/shared/i18n.test.mjs src/shared/errors.test.mjs src/shared/usage-stream.test.mjs src/features/providers/test-result.test.mjs src/features/providers/node-rules.test.mjs src/features/providers/model-rules.test.mjs src/features/traffic/usage-format.test.mjs src/features/gateway/simulation-result.test.mjs"
+    "test": "node --no-warnings --test src/features/providers/catalog.test.mjs src/features/providers/media-rules.test.mjs src/shared/i18n.test.mjs src/shared/errors.test.mjs src/shared/usage-stream.test.mjs src/features/providers/test-result.test.mjs src/features/providers/node-rules.test.mjs src/features/providers/model-rules.test.mjs src/features/traffic/usage-format.test.mjs src/features/gateway/simulation-result.test.mjs src/features/gateway/endpoint-variants.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",

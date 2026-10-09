@@ -683,6 +683,14 @@
     "mtime": 1791387171.3396747,
     "hash": "3693a75892767c51e930844aa8690c1b"
   },
+  "D:\\aigate\\apps\\web\\src\\features\\gateway\\endpoint-variants.test.mjs": {
+    "mtime": 1791535706.3263195,
+    "hash": "6997db8a49f759d4d7bdeb4bb425c0a2"
+  },
+  "D:\\aigate\\apps\\web\\src\\features\\gateway\\endpoint-variants.ts": {
+    "mtime": 1791536004.2895436,
+    "hash": "bfa728bbcb2a68e8f4c40c94c862e215"
+  },
   "D:\\aigate\\apps\\web\\src\\features\\gateway\\routing-simulator.tsx": {
     "mtime": 1791513576.6748426,
     "hash": "fecb8d11730a4d5356c1382da62f66b0"
@@ -692,8 +700,8 @@
     "hash": "781b40f78e858797ec4d4100dcbb85ea"
   },
   "D:\\aigate\\apps\\web\\src\\features\\gateway\\screens.tsx": {
-    "mtime": 1791516695.1360102,
-    "hash": "414c3000575f4b8a83bb62f40a681eb9"
+    "mtime": 1791536031.4259763,
+    "hash": "a67dac3650812651ee1d09b4c40e074f"
   },
   "D:\\aigate\\apps\\web\\src\\features\\gateway\\simulation-result.test.mjs": {
     "mtime": 1791513576.679564,
@@ -1492,8 +1500,8 @@
     "hash": "4d090f5fa7e890f878973a96545e8f07"
   },
   "D:\\aigate\\CLAUDE.md": {
-    "mtime": 1791535265.6804774,
-    "hash": "b8655685902a706847b4fcd6bd371e35"
+    "mtime": 1791535971.586724,
+    "hash": "9e73250a519340b8536b296c509b8c4f"
   },
   "D:\\aigate\\pnpm-workspace.yaml": {
     "mtime": 1791387171.811181,
@@ -1512,11 +1520,11 @@
     "hash": "015898deb9f7c1bf8c34e21052d764d3"
   },
   "D:\\aigate\\docs\\PROGRESS_HANDOFF.md": {
-    "mtime": 1791535259.4773946,
-    "hash": "1e947433a5c7a07b0f5b7bb9f7ba571e"
+    "mtime": 1791535961.25934,
+    "hash": "1c611b23def5b2c49555e19b0657d1ea"
   },
   "D:\\aigate\\docs\\PROJECT_MAP.md": {
-    "mtime": 1791518079.3218126,
+    "mtime": 1791535315.7187724,
     "hash": "5cab4112e6edae1f745b1685160b1731"
   },
   "D:\\aigate\\docs\\contracts\\capacity-adapter.md": {
@@ -1547,17 +1555,21 @@
     "mtime": 1791387171.400329,
     "hash": "e88c25a814b177c239084b06d535d322"
   },
+  "D:\\aigate\\docs\\contracts\\endpoint-setup.md": {
+    "mtime": 1791535676.7676575,
+    "hash": "a836614ae233a948b88cf4e9350eee90"
+  },
   "D:\\aigate\\docs\\contracts\\engine.md": {
     "mtime": 1791447829.8504825,
     "hash": "51277e0132566ffbce374694f06e126f"
   },
   "D:\\aigate\\docs\\contracts\\i18n.md": {
-    "mtime": 1791535122.3875554,
-    "hash": "61db9322a7c66c8c2449043c705b0f96"
+    "mtime": 1791535924.8079996,
+    "hash": "6a4849918559c0d13fdd538b064fc504"
   },
   "D:\\aigate\\docs\\contracts\\identity-apikeys.md": {
-    "mtime": 1791387171.4028687,
-    "hash": "823b270ef509f953a68ec098b82d8867"
+    "mtime": 1791535924.810063,
+    "hash": "b082d8d66df2c14f3b23c7e82108c302"
   },
   "D:\\aigate\\docs\\contracts\\media-dashboard.md": {
     "mtime": 1791535122.3891969,
@@ -1680,8 +1692,8 @@
     "hash": "1bf86922f9b8ec3936ca8ebcd2a962c9"
   },
   "D:\\aigate\\docs\\design\\API_UI_MAP.md": {
-    "mtime": 1791535122.3915217,
-    "hash": "2bae13f30596f0268555fb3244a27237"
+    "mtime": 1791535971.586724,
+    "hash": "1e967431ea6f53eba786c0c4d7832c69"
   },
   "D:\\aigate\\docs\\design\\DESIGN.md": {
     "mtime": 1791387171.4261718,
@@ -1700,8 +1712,8 @@
     "hash": "41589beb69ba8c1a57e8b6e108c64386"
   },
   "D:\\aigate\\docs\\design\\UI_HANDOFF.md": {
-    "mtime": 1791518042.278208,
-    "hash": "ec2de48f963925779f0c6370979acf13"
+    "mtime": 1791535961.2613776,
+    "hash": "639f03d6ce5b30da62c77a35acfa82c8"
   },
   "D:\\aigate\\docs\\design\\stitch-export\\html\\authflow-modals.html": {
     "mtime": 1791387171.431996,
@@ -1820,8 +1832,8 @@
     "hash": "188e8bfbc33a2ff9705f2e5aaabfeef0"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\01-endpoint-apikey-settings.yaml": {
-    "mtime": 1791477101.1353848,
-    "hash": "2243f436f143da8e0835fdb0f818ac22"
+    "mtime": 1791535924.8054836,
+    "hash": "af28fc25948653f9416a611c44b32d48"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\02-providers-auth.yaml": {
     "mtime": 1791387171.5159743,
@@ -1902,6 +1914,10 @@
   "D:\\aigate\\docs\\superpowers\\plans\\2026-10-09-sp32-media-i18n.md": {
     "mtime": 1791535281.619347,
     "hash": "5caeefd42631c70d43267a2c7c9f95fe"
+  },
+  "D:\\aigate\\docs\\superpowers\\plans\\2026-10-09-sp33-endpoint-setup.md": {
+    "mtime": 1791535924.7973871,
+    "hash": "010977f9b521db47c042f87991143983"
   },
   "D:\\aigate\\docs\\superpowers\\skill-tests\\2026-09-25-porting-behavior-not-code-green.md": {
     "mtime": 1791387171.539554,

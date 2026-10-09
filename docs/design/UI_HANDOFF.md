@@ -1,6 +1,8 @@
 # UI ownership handoff
 
-Current integration note (2026-10-09): M3 U5 Media Providers is wired to live
+Current integration note (2026-10-09): SP33 completes M3 U3's protocol-specific
+Endpoint & Keys setup selector over the existing four client lanes, with EN/VI
+copy and no new API. See `docs/contracts/endpoint-setup.md`. M3 U5 Media Providers is wired to live
 catalog and connection state, with the existing TTS voice browser. SP31 closed
 the remaining availability/error/link gaps; see `docs/contracts/media-dashboard.md`.
 The `UI_READY` table below records the original visual handoff snapshot.
