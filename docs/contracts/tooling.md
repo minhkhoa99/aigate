@@ -77,3 +77,7 @@ error, filter, locale switch and SSE lifecycle acceptance.
 ## Local interception
 
 `GET /api/tooling/mitm` reports the local CA, leaf certificate, listener state, and the supported IDE API hosts. `POST /api/tooling/mitm/preview` and `POST /api/tooling/mitm/apply` use the same five-minute reviewed action flow for `generate`, `install`, `start`, `stop`, and `remove`. Start creates a leaf certificate for the supported hosts, binds a TLS listener to `127.0.0.1:443`, and adds only AIGate-marked hosts-file records. It proxies those requests to AIGate's local `PORT` (default `20200`). Stop and process shutdown close the listener and remove the marked records. CA installation/removal is implemented with Windows `certutil`; unsupported platforms report a typed error. The hosts file is backed up under `AIGATE_DATA_DIR/mitm` before every replacement.
+
+SP41 localizes the existing Tunnel and MITM dashboards in EN/VI without
+changing their system actions. See `network-safety-ui-i18n.md` for confirmation,
+preview, error and locale-switch boundaries.

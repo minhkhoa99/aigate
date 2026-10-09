@@ -639,3 +639,29 @@
   newModule: transport
   parityStatus: verified
   labels: []
+- id: network.tunnel-mitm-browser-i18n
+  group: Network
+  feature: AIGate Tunnel and local interception dashboards
+  subFeature: Browser-local EN/VI with guarded actions and reviewed MITM preview
+  trigger: Open Tunnel/MITM or change browser language while mounted
+  input: Browser locale, synthetic status, explicit confirmation and preview actions
+  output: Localized owned UI with literal URLs, paths, IDs and server changes
+  businessRules:
+    - "AIGATE_EXTENSION: locale changes do not submit actions, replay mutations or replace a MITM preview"
+    - "AIGATE_EXTENSION: Tunnel keeps server access/route gates and type-to-confirm; translated confirmation resets unsubmitted typing"
+    - "AIGATE_EXTENSION: MITM Apply needs an explicit reviewed preview ID; expiry clears stale preview"
+  state: { reads: ["browser locale", "Tunnel/MITM query cache"], writes: ["local confirmation and preview state"], runtimeOnly: ["pending action"] }
+  dependencies: []
+  providerInteraction: "None added; system actions remain behind existing server APIs"
+  fallback: { hasFallback: false, retry: "Explicit failed read Retry", timeout: "Existing five-minute MITM preview", quota: null }
+  errorCases: []
+  sideEffects: ["Only explicit server-mediated Funnel or MITM apply action"]
+  persistence: ["No new browser or server persistence"]
+  performanceConcerns: ["Existing five-second Tunnel status poll; no locale fan-out"]
+  behavior: { streaming: false, cancellation: "Existing Query unmount behavior", concurrency: "one pending action per screen" }
+  edgeCases: ["Access not ready", "route conflict", "expired preview", "mobile layout"]
+  evidence:
+    - { file: "aigate:docs/contracts/network-safety-ui-i18n.md", line: 1, note: "SP41 safety UI contract" }
+  newModule: tooling
+  parityStatus: verified
+  labels: []
