@@ -1,6 +1,8 @@
 # UI ownership handoff
 
-Current integration note (2026-10-09): SP37 completes the Usage analytics and
+Current integration note (2026-10-09): SP38 completes the Requests list/detail
+scoped EN/VI presentation over existing SP24b APIs; see
+`docs/contracts/requests-ui-i18n.md`. SP37 completes the Usage analytics and
 Pricing modal's scoped EN/VI presentation over existing SP24a APIs; see
 `docs/contracts/usage-ui-i18n.md`. SP36 completes the Quota dashboard's
 scoped EN/VI presentation over the existing SP24c API; see

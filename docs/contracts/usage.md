@@ -164,6 +164,11 @@ UI:
 - `/traffic/requests`: filters in the URL; a table of time, requested model, final provider, account, status and code, attempts, TTFT, latency, tokens, and cost; Load more by cursor, at most 500 rows on the page.
 - `/traffic/requests/detail?id=<id>`: metrics, the attempt timeline (provider, account, status, error, latency, tokens), and the metadata with a copyable request id.
 
+SP38 adds EN/VI presentation to these existing pages without changing their
+APIs, URL filters, cursor limits or metadata. Filter and next-page read errors
+show code/diagnostic/Retry; loaded rows remain visible after a page error.
+Detail errors offer Retry and Back. See `requests-ui-i18n.md`.
+
 ## Deviations from 9router
 
 See the matrix entries for each one:

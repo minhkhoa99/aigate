@@ -182,6 +182,36 @@
   parityStatus: verified
   labels: []
 
+- id: requests.dashboard-browser-i18n
+  group: Usage
+  feature: Request history
+  subFeature: EN/VI list, attempt detail and explicit read failures
+  trigger: Open /traffic/requests, a request detail, or change browser language
+  input: Existing request rows/filters/detail responses and browser locale
+  output: Localized owned copy and Intl values with literal IDs, names and codes
+  businessRules:
+    - "AIGATE_EXTENSION: locale changes render list/detail in EN/VI without changing filters, cursor pages or network requests"
+    - "AIGATE_EXTENSION: filter and next-page errors show code, permitted diagnostic and Retry; loaded rows remain visible after a next-page failure"
+    - "AIGATE_EXTENSION: detail errors offer Retry and Back; a missing id does not fetch"
+  state:
+    reads: [existing_request_pages, existing_filter_options, existing_request_detail, browser_language_preference]
+    writes: []
+    runtimeOnly: [mounted_filters, loaded_cursor_pages]
+  dependencies: [usage.request-field-trace-order]
+  providerInteraction: "None added; existing request metadata APIs only"
+  fallback: { hasFallback: false, retry: "Explicit list, filter, next-page or detail Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["Existing browser-local aigate-language and URL filters only"]
+  performanceConcerns: ["Existing 100-row cursor pages and 500-row visible cap; no locale fan-out"]
+  behavior: { streaming: false, cancellation: "Existing Query unmount behavior", concurrency: "Existing cursor fetch only" }
+  edgeCases: ["Missing request id", "No attempts", "Unpriced cost", "Next-page failure", "Raw codes/names"]
+  evidence:
+    - { file: "aigate:docs/contracts/requests-ui-i18n.md", line: 1, note: "SP38 UI and pagination boundary" }
+  newModule: usage
+  parityStatus: verified
+  labels: []
+
 - id: usage.write-not-synchronous
   group: Usage
   feature: Per-request usage capture

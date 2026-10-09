@@ -1,17 +1,17 @@
 # Graph Report - aigate  (2026-10-09)
 
 ## Corpus Check
-- 459 files · ~799,889 words
+- 461 files · ~801,078 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 11107 nodes · 24637 edges · 440 communities (396 shown, 44 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 808 edges (avg confidence: 0.83)
+- 11112 nodes · 24653 edges · 445 communities (398 shown, 47 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 811 edges (avg confidence: 0.83)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- SP37: installed `graphify update . --no-cluster` refreshed working-tree AST across 459 files (11,107 nodes, 24,637 edges); zero LLM tokens. Semantic artifacts and 29 hyperedges are inherited from the merge-derived graph; no fresh semantic extraction or reclustering was run. All 11,103 prior node IDs and 24,618 prior link identities remain.
-- Built from commit: `afe17d7c`
+- SP38: installed `graphify update . --no-cluster` refreshed working-tree AST across 461 files (11,112 nodes, 24,653 edges); zero LLM tokens. Semantic artifacts and 29 hyperedges are inherited from the merge-derived graph; no fresh semantic extraction or reclustering was run. All 11,107 prior node IDs and 24,637 prior link identities remain.
+- Built from commit: `c33c8327`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -379,9 +379,9 @@
 - [[_COMMUNITY_Community 360|Community 360]]
 - [[_COMMUNITY_Community 361|Community 361]]
 - [[_COMMUNITY_Community 362|Community 362]]
+- [[_COMMUNITY_Community 363|Community 363]]
+- [[_COMMUNITY_Community 364|Community 364]]
 - [[_COMMUNITY_Community 365|Community 365]]
-- [[_COMMUNITY_Community 366|Community 366]]
-- [[_COMMUNITY_Community 367|Community 367]]
 - [[_COMMUNITY_Community 368|Community 368]]
 - [[_COMMUNITY_Community 369|Community 369]]
 - [[_COMMUNITY_Community 370|Community 370]]
@@ -414,8 +414,8 @@
 - [[_COMMUNITY_Community 397|Community 397]]
 - [[_COMMUNITY_Community 398|Community 398]]
 - [[_COMMUNITY_Community 399|Community 399]]
-- [[_COMMUNITY_Community 400|Community 400]]
 - [[_COMMUNITY_Community 401|Community 401]]
+- [[_COMMUNITY_Community 402|Community 402]]
 - [[_COMMUNITY_Community 403|Community 403]]
 - [[_COMMUNITY_Community 404|Community 404]]
 - [[_COMMUNITY_Community 405|Community 405]]
@@ -436,10 +436,15 @@
 - [[_COMMUNITY_Community 420|Community 420]]
 - [[_COMMUNITY_Community 421|Community 421]]
 - [[_COMMUNITY_Community 422|Community 422]]
+- [[_COMMUNITY_Community 423|Community 423]]
+- [[_COMMUNITY_Community 424|Community 424]]
 - [[_COMMUNITY_Community 425|Community 425]]
 - [[_COMMUNITY_Community 426|Community 426]]
 - [[_COMMUNITY_Community 427|Community 427]]
-- [[_COMMUNITY_Community 437|Community 437]]
+- [[_COMMUNITY_Community 430|Community 430]]
+- [[_COMMUNITY_Community 431|Community 431]]
+- [[_COMMUNITY_Community 432|Community 432]]
+- [[_COMMUNITY_Community 442|Community 442]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `Credential` - 142 edges
@@ -454,6 +459,8 @@
 10. `toProblem()` - 93 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `Usage()` --calls--> `Cost`  [INFERRED]
+  apps/web/src/features/traffic/usage.tsx → docs/contracts/usage.md
 - `Keyless proxy strategy panel with empty state` --extends--> `Proxy Pools — /network/proxy-pools`  [EXTRACTED]
   apps/web/src/features/network/screens.tsx → docs/superpowers/specs/2026-09-22-aigate-design.md
 - `Platform-specific hosted relay deploy wizard` --extends--> `Proxy Pools — /network/proxy-pools`  [EXTRACTED]
@@ -462,8 +469,6 @@
   packages/engine/src/thinking.ts → docs/contracts/chat-lane.md
 - `Trae browser sign-in and callback/token import UI` --wires--> `Connections & AuthFlow — /providers/connections`  [EXTRACTED]
   apps/web/src/features/providers/sign-in.tsx → docs/superpowers/specs/2026-09-22-aigate-design.md
-- `Durable account and model lock storage` --implements--> `AccountLock entity`  [EXTRACTED]
-  packages/database/src/schema/connections.ts → docs/superpowers/specs/2026-09-22-aigate-design.md
 
 ## Hyperedges (group relationships)
 - **SP10 round trip: parse → CIP → provider adapter → render / encode** — protocol_parse_openai_chat, concept_cip, adapter_openai_compatible, protocol_completion_renderer, protocol_stream_encoder [EXTRACTED 1.00]
@@ -496,287 +501,287 @@
 - **SP8 transport stack: port, direct implementation, module, bounded reader** — port_http_transport, docs_contracts_transport_direct_transport, docs_contracts_transport_module, docs_contracts_transport_read_bounded_text, transport_http_request, transport_http_response [EXTRACTED 1.00]
 - **UI error pipeline (ApiError → toProblem → toast/inline/redirect)** — docs_design_api_ui_map_shared_api_client, docs_design_api_ui_map_to_problem, apps_web_src_shared_errors_test, docs_design_ui_handoff_use_toast, docs_design_api_ui_map_err_unauthenticated, docs_design_api_ui_map_screen_shell_gate, docs_design_api_ui_map_rule_failed_mutation_rereads [EXTRACTED 1.00]
 
-## Communities (440 total, 44 thin omitted)
+## Communities (445 total, 47 thin omitted)
 
 ### Community 0 - "Credential"
 Cohesion: 0.04
-Nodes (131): CONTENT_BLOCKS, HEAVY_AGENT_BETAS, NO_NAMES, NODE_BETAS, STOP_REASONS, THINKING_BUDGETS, collected(), applyThinking() (+123 more)
+Nodes (117): CONTENT_BLOCKS, HEAVY_AGENT_BETAS, NO_NAMES, NODE_BETAS, STOP_REASONS, THINKING_BUDGETS, usageOf(), collected() (+109 more)
 
 ### Community 1 - "record"
-Cohesion: 0.04
-Nodes (115): nodeBetas(), ANTIGRAVITY_IDE_BASE_URL, ANTIGRAVITY_IDE_USER_AGENT, ANTIGRAVITY_MODELS_URL, imageAspect(), imageModel(), normalizeContents(), PROMPT_REWRITES (+107 more)
+Cohesion: 0.05
+Nodes (102): CONTENT_BLOCKS, HEAVY_AGENT_BETAS, NO_NAMES, NODE_BETAS, STOP_REASONS, THINKING_BUDGETS, PROMPT_REWRITES, sessions (+94 more)
 
 ### Community 2 - "ConnectionsRepository"
-Cohesion: 0.04
-Nodes (134): usage.write-not-synchronous, validateCredential(): one call; valid:false only for AUTH_ERROR / QUOTA_EXHAUSTED, Audit finding: Console shown in sidebar regardless of Developer mode, Audit PASS: no credential leaked across 27 HTML exports, Audit FAIL: only the happy path was drawn (state rules §10.7), Audit finding: routing-fallback merged 4 tabs into one 3886px screen, Audit finding: settings-auth regenerated as settings-auth-v2, Audit FAIL: sidebar not identical across screens (+126 more)
+Cohesion: 0.05
+Nodes (121): apikey.delete-key, apikey.generate-key, apikey.legacy-format-unenforced, apikey.list-keys, apikey.update-key-status, apikey.validate-lookup, identity.auth-status-disclosure, identity.machine-id-derivation (+113 more)
 
 ### Community 3 - "OAuth sign-in contract (M2 SP16)"
-Cohesion: 0.03
-Nodes (76): AppModule, Module, DatabaseModule, Global, Module, ApiKeysModule, Module, CatalogModule (+68 more)
+Cohesion: 0.04
+Nodes (68): AccountCandidate, chooseAccount(), asBody(), ConnectionChanges, ConnectionFields, DATA_FIELD_NAMES, DATA_FIELDS, DataField (+60 more)
 
 ### Community 4 - "auth.controller.ts"
-Cohesion: 0.06
-Nodes (87): PROMPT_REWRITES, sessions, codeAssistMetadata(), lookupProject(), pending, platformEnum(), projects, randomProjectId() (+79 more)
+Cohesion: 0.05
+Nodes (28): AnthropicAdapter, nodeBetas(), stopReasonOf(), AntigravityAdapter, copilotMessagesBody(), GeminiCliAdapter, GeminiAdapter, effortOf() (+20 more)
 
 ### Community 5 - "provider-node.ts"
 Cohesion: 0.04
-Nodes (70): AccountCandidate, chooseAccount(), asBody(), ConnectionChanges, ConnectionFields, DATA_FIELD_NAMES, DATA_FIELDS, DataField (+62 more)
+Nodes (82): ANTIGRAVITY_IDE_BASE_URL, ANTIGRAVITY_IDE_USER_AGENT, ANTIGRAVITY_MODELS_URL, imageAspect(), imageModel(), normalizeContents(), PROMPT_REWRITES, rewrite() (+74 more)
 
 ### Community 6 - "chat-lane.ts"
-Cohesion: 0.05
-Nodes (118): apikey.delete-key, apikey.generate-key, apikey.legacy-format-unenforced, apikey.list-keys, apikey.update-key-status, apikey.validate-lookup, identity.auth-status-disclosure, identity.machine-id-derivation (+110 more)
+Cohesion: 0.04
+Nodes (104): ClaudePreview, ClaudeStatus, ClinePreview, ClineStatus, CliToolStatus, CodexPreview, CodexStatus, CopilotPreview (+96 more)
 
 ### Community 7 - "@nestjs/common"
-Cohesion: 0.03
-Nodes (96): STREAM_RETRY_DELAY_MS, ANTHROPIC_VERSION, builtinRegistry, CLINE_HEADERS, CLOUD_CODE_PROTOCOLS, connectable, EXECUTOR_QUIRKS, EXTRA_HEADERS (+88 more)
+Cohesion: 0.05
+Nodes (106): integrations/api.ts, ClaudePreview, ClaudeStatus, ClinePreview, ClineStatus, CliToolStatus, CodexPreview, CodexStatus (+98 more)
 
 ### Community 8 - "ChatLane"
-Cohesion: 0.03
-Nodes (113): endpoint.extract-header-order, endpoint.rewrite-lanes, Durable account and model lock storage, CIP ↔ chat completions mapping (max_completion_tokens, tool messages, data: URLs), Upstream message ≤300 chars, credential redacted, HTML pages dropped; bad API key → AUTH_ERROR before I/O, OpenAICompatibleAdapter (AIProviderPort for openai-compatible), Truncated stream or error event → PROVIDER_UNAVAILABLE with details.partial, readSseData() — bounded SSE reader (1 Mi chars per line/event, cancels body) (+105 more)
+Cohesion: 0.06
+Nodes (38): extractApiKey(), isReservedPrefix(), answerOf(), ANTHROPIC_MESSAGES, Call, ChatLane, claudeCodePrompt(), ClientGone (+30 more)
 
 ### Community 9 - "gateway/screens.tsx"
-Cohesion: 0.05
-Nodes (105): gateway/api.ts, ApiKey, CapacityCapability, capacityKey, CapacityPool, CapacityPoolFields, ChatReadiness, Combo (+97 more)
+Cohesion: 0.03
+Nodes (76): ANTHROPIC_VERSION, builtinRegistry, CLINE_HEADERS, CLOUD_CODE_PROTOCOLS, connectable, EXECUTOR_QUIRKS, EXTRA_HEADERS, GOOGLE_CLOUD (+68 more)
 
 ### Community 10 - "providers/screens.tsx"
 Cohesion: 0.04
-Nodes (108): app/screens.tsx, Routing(), integrations/api.ts, ClaudePreview, ClaudeStatus, ClinePreview, ClineStatus, CliToolStatus (+100 more)
+Nodes (81): CLOUD_CODE, cloudCodeCall(), codeAssistMetadata(), defaultTier(), discover(), errorMessage(), lookupProject(), onboard() (+73 more)
 
 ### Community 11 - "OpenAICompatibleAdapter (AIProviderPort for openai-compatible)"
-Cohesion: 0.05
-Nodes (27): AntigravityAdapter, GeminiCliAdapter, GeminiAdapter, effortOf(), GrokCliAdapter, IFlowAdapter, createAdapter(), familyAdapter() (+19 more)
+Cohesion: 0.06
+Nodes (94): validateCredential(): one call; valid:false only for AUTH_ERROR / QUOTA_EXHAUSTED, Audit finding: Console shown in sidebar regardless of Developer mode, Audit PASS: no credential leaked across 27 HTML exports, Audit FAIL: only the happy path was drawn (state rules §10.7), Audit finding: settings-auth regenerated as settings-auth-v2, Audit FAIL: sidebar not identical across screens, AuthFlow — declarative, data-driven auth step framework, CLI-tool config writes require diff preview + backup (+86 more)
 
 ### Community 12 - "openai-compatible.ts"
-Cohesion: 0.04
-Nodes (103): ClaudePreview, ClaudeStatus, ClinePreview, ClineStatus, CliToolStatus, CodexPreview, CodexStatus, CopilotPreview (+95 more)
-
-### Community 13 - "providers/api.ts"
-Cohesion: 0.06
-Nodes (43): extractApiKey(), isReservedPrefix(), answerOf(), ANTHROPIC_MESSAGES, Call, ChatLane, claudeCodePrompt(), ClientGone (+35 more)
-
-### Community 14 - "useToast"
-Cohesion: 0.03
-Nodes (74): cloudCodeCall(), defaultTier(), discover(), errorMessage(), onboard(), probeCodeAssist(), projectOf(), send() (+66 more)
-
-### Community 15 - "engine/src/index.ts"
-Cohesion: 0.04
-Nodes (69): callsTools(), CapacityPool, fits(), HARD, hardNeeds(), isCapacityCapability(), LABEL, messagesLength() (+61 more)
-
-### Community 16 - "EngineError"
 Cohesion: 0.05
 Nodes (53): field(), givenPassword(), newPassword(), Parsed, parseLogin(), parsePasswordChange(), parseSetup(), validateInitialPassword() (+45 more)
 
-### Community 17 - "replay.mjs"
+### Community 13 - "providers/api.ts"
 Cohesion: 0.04
-Nodes (72): Connection, ConnectionQuota, connectionsKey, CursorAutoImport, customKey(), CustomModel, DeviceCode, fetchConnectionModels() (+64 more)
+Nodes (92): endpoint.extract-header-order, endpoint.rewrite-lanes, Durable account and model lock storage, CIP ↔ chat completions mapping (max_completion_tokens, tool messages, data: URLs), Upstream message ≤300 chars, credential redacted, HTML pages dropped; bad API key → AUTH_ERROR before I/O, OpenAICompatibleAdapter (AIProviderPort for openai-compatible), Truncated stream or error event → PROVIDER_UNAVAILABLE with details.partial, readSseData() — bounded SSE reader (1 Mi chars per line/event, cancels body) (+84 more)
+
+### Community 14 - "useToast"
+Cohesion: 0.04
+Nodes (45): ApiKeysModule, CatalogModule, ConnectionsModule, ChatLimits, CustomModelView, DisplayNames, Names, Alert (+37 more)
+
+### Community 15 - "engine/src/index.ts"
+Cohesion: 0.03
+Nodes (57): AppModule, Module, DATABASE, DatabaseModule, DatabaseShutdown, Global, Inject, Injectable (+49 more)
+
+### Community 16 - "EngineError"
+Cohesion: 0.05
+Nodes (79): children(), cleanGeminiSchema(), constToEnum(), eachSchema(), enumToStrings(), flattenTypeArray(), flattenUnion(), inferTypes() (+71 more)
+
+### Community 17 - "replay.mjs"
+Cohesion: 0.07
+Nodes (64): ScreenView(), TONES, previewTtsVoice(), TtsVoice, useTtsVoices(), WindowLine, genderKeys, @tanstack/react-router (+56 more)
 
 ### Community 18 - "anthropic.ts"
 Cohesion: 0.04
-Nodes (57): callsTools(), CapacityPool, fits(), HARD, hardNeeds(), isCapacityCapability(), LABEL, messagesLength() (+49 more)
+Nodes (74): useProxyPools(), ApiType, ConnectionField, HeaderInput, NodeType, ProviderDetailView, ProviderNode, TestStatus (+66 more)
 
 ### Community 19 - "ConnectionsController — /api/connections CRUD + POST /:id/test (validateCredential outside any transaction)"
-Cohesion: 0.05
-Nodes (77): children(), cleanGeminiSchema(), constToEnum(), eachSchema(), enumToStrings(), flattenTypeArray(), flattenUnion(), inferTypes() (+69 more)
+Cohesion: 0.07
+Nodes (82): app/screens.tsx, ScreenView(), currentLabel(), Shell(), Combo, ComboFields, ComboStrategy, useCombos() (+74 more)
 
 ### Community 20 - "app/screens.tsx"
-Cohesion: 0.04
-Nodes (38): ApiKeysModule, CatalogModule, ConnectionsModule, ChatLimits, CustomModelsController, filled(), invalid(), CustomModelsRepository (+30 more)
+Cohesion: 0.03
+Nodes (69): cloudCodeCall(), codeAssistMetadata(), defaultTier(), discover(), onboard(), platformEnum(), projectOf(), send() (+61 more)
 
 ### Community 21 - "Milestone M-1 · Discovery"
-Cohesion: 0.05
-Nodes (75): providers/api.ts, ApiType, ConnectionField, ConnectionQuota, connectionsKey, cursorAutoImport, customKey(), CustomModel (+67 more)
+Cohesion: 0.04
+Nodes (84): transport.test.mjs: adapter streams end to end over DirectTransport, In-place retry: 502/503/504 + unreachable host, ≤3 attempts via withRetry, before first chunk, Status → ErrorCode by status + error.code/type only (never message text), capabilities.md — parity coverage denominator, Definition of Done — 13 items, not self-awarded, AIGate domain model (Provider, Credential, RoutingPolicy, AccountLock, …), Canonical error classification codes (8 values), Error taxonomy (8 ErrorCodes) (+76 more)
 
 ### Community 22 - "AnthropicAdapter — CIP <-> Messages (max_tokens rules, thinking budgets, tool_use, SSE events)"
-Cohesion: 0.05
-Nodes (64): useProvider(), useProviderNodes(), CatalogProvider(), groupOf(), useLiveUsage(), Attempt, ChartBucket, chartKey (+56 more)
+Cohesion: 0.04
+Nodes (62): callsTools(), CapacityPool, fits(), HARD, hardNeeds(), isCapacityCapability(), LABEL, messagesLength() (+54 more)
 
 ### Community 23 - "isRecord"
-Cohesion: 0.04
-Nodes (65): useProxyPools(), ApiType, ConnectionField, HeaderInput, NodeType, ProviderDetailView, ProviderNode, TestStatus (+57 more)
+Cohesion: 0.06
+Nodes (78): providers/api.ts, ConnectionQuota, connectionsKey, cursorAutoImport, customKey(), CustomModel, customPath(), DeviceCode (+70 more)
 
 ### Community 24 - "speech-lane.ts"
-Cohesion: 0.06
-Nodes (73): Connection, HeaderInput, nodePath(), NodeType, path(), ProviderNode, TestStatus, ThinkingLevel (+65 more)
-
-### Community 25 - "Bounded context: transport"
 Cohesion: 0.03
 Nodes (67): CATALOG, AuthKind, CATALOG_PROTOCOLS, CatalogAuth, CatalogModel, CatalogProtocol, CatalogProvider, checkUrl() (+59 more)
 
+### Community 25 - "Bounded context: transport"
+Cohesion: 0.05
+Nodes (71): ApiType, Connection, ConnectionField, HeaderInput, NodeType, previewTtsVoice(), ProviderNode, TestStatus (+63 more)
+
 ### Community 26 - "SP13 — catalog → runtime registry (41 connectable providers, /api/providers, /providers wired)"
-Cohesion: 0.06
-Nodes (63): extraRoutes, navigation, ScreenView(), currentLabel(), Shell(), overview/api.ts, Metrics, OverviewSummary (+55 more)
+Cohesion: 0.04
+Nodes (78): catalog.capability-refine-additive-only, catalog.capability-tier-fallback, catalog.capability-vision-pattern-order, catalog.model-registry-global, usage.write-not-synchronous, Adapter: catalog headers first, key last; raw or Bearer scheme; chatUrl/modelsUrl called directly, ListedModel { id, descriptor? } — getModels never invents limits (≤1000 ids), GET /api/providers/:id (chatUrl + models; 404 NOT_FOUND) (+70 more)
 
 ### Community 27 - "quota.service.ts"
-Cohesion: 0.07
-Nodes (43): AnthropicStreamEncoder, event(), array(), AUDIO_MEDIA_TYPES, cacheMark(), CompletionMeta, ERROR_SHAPES, errorBody() (+35 more)
+Cohesion: 0.04
+Nodes (78): AnthropicAdapter — CIP <-> Messages (max_tokens rules, thinking budgets, tool_use, SSE events), packages/engine/test/anthropic-adapter.test.mjs (10) + apps/server/test/anthropic-lane.test.mjs (4); 23 mutations caught, Deviations not ported: stop/top_p kept, none stays none, no Claude Code line, stream errors fail, same stop/usage mapping, 403 invalid, Claude Code anthropic-beta list for claude-* models on an Anthropic node (claude-code flag only on the official host), Anthropic node connection test: POST <base>/v1/messages, claude-3-haiku, only 401/403 invalid (9router), Anthropic node descriptor: <base>/messages, x-api-key, Bearer for third-party hosts, anthropicNode { official }, Descriptor chatProbe: connection test by a one-token chat (azure 401/403, cloudflare 401/403/404, clinepass 401/403), CIP image_delta chunk (delta.images) and vendorExtensions.openai.finish_reason honoured by the OpenAI renderer (+70 more)
 
 ### Community 28 - "provider-nodes.repo.ts"
-Cohesion: 0.07
-Nodes (29): extractApiKey(), ChatLane, claudeCodePrompt(), deadline(), errorOf(), exhausted(), fallbackCooldown(), googleKey() (+21 more)
+Cohesion: 0.05
+Nodes (45): CapacityPool, isCapacityCapability(), parsePool(), PoolFields, ACCOUNT_STATUSES, answerText(), assign(), collectPanel() (+37 more)
 
 ### Community 29 - "vertex.ts"
-Cohesion: 0.05
-Nodes (69): ApiKey, CapacityCapability, capacityKey, CapacityPool, CapacityPoolFields, ChatReadiness, Combo, ComboFields (+61 more)
+Cohesion: 0.04
+Nodes (41): addDays(), csvField(), dayKey(), daysBetween(), estimateTokens(), formatters, InvalidPeriod, offsetAt() (+33 more)
 
 ### Community 30 - "Identity and API keys contract (M1 SP6)"
-Cohesion: 0.04
-Nodes (75): catalog.capability-refine-additive-only, catalog.capability-tier-fallback, catalog.capability-vision-pattern-order, catalog.model-registry-global, Adapter: catalog headers first, key last; raw or Bearer scheme; chatUrl/modelsUrl called directly, ListedModel { id, descriptor? } — getModels never invents limits (≤1000 ids), GET /api/providers (all 121, connectable + reason), builtinRegistry built from CATALOG (41 connectable providers) (+67 more)
+Cohesion: 0.06
+Nodes (53): ConnectionsModule, Module, Parsed, API_TYPES, ApiType, asBody(), DEFAULT_BASE_URLS, fail() (+45 more)
 
 ### Community 31 - "pricing.repo.ts"
-Cohesion: 0.05
-Nodes (73): docs/capabilities.md (GENERATED capability specification), docs/discovery/gaps.md (Gap register), docs/discovery/inventory.json, Canonical Internal Protocol, Feature Matrix entry template (null never "" or "N/A"), Evidence with file:line — traced is a test, not a self-declaration, Fixed inventory counts (154 routes, 28 pages, 123 providers, 29 executors, 48 translators, 11 repos, 14 OAuth routes), parityStatus lifecycle (not-started → traced → contracted → implemented → verified) (+65 more)
+Cohesion: 0.06
+Nodes (68): traffic/api.ts, Attempt, ChartBucket, chartKey, ConsoleEvent, consoleKey, Counters, MAX_REQUEST_ROWS (+60 more)
 
 ### Community 32 - "database/src/index.ts"
 Cohesion: 0.05
-Nodes (74): transport.test.mjs: adapter streams end to end over DirectTransport, In-place retry: 502/503/504 + unreachable host, ≤3 attempts via withRetry, before first chunk, Status → ErrorCode by status + error.code/type only (never message text), Branding sweep to the bottom of the stack, capabilities.md — parity coverage denominator, Canonical error classification codes (8 values), Error taxonomy (8 ErrorCodes), Stated limits of tape-based parity (+66 more)
+Nodes (66): ApiKey, CapacityCapability, capacityKey, CapacityPool, CapacityPoolFields, ChatReadiness, Combo, ComboFields (+58 more)
 
 ### Community 33 - "Bounded context: routing (core)"
-Cohesion: 0.06
-Nodes (51): Parsed, API_TYPES, ApiType, asBody(), DEFAULT_BASE_URLS, fail(), HeaderInput, isApiType() (+43 more)
+Cohesion: 0.04
+Nodes (50): callsTools(), fits(), HARD, hardNeeds(), LABEL, messagesLength(), ModelFit, needsMedia() (+42 more)
 
 ### Community 34 - "api-keys.repo.ts"
+Cohesion: 0.05
+Nodes (59): STREAM_RETRY_DELAY_MS, CATALOG, engine/src/index.ts, mediaService, mediaServiceDescriptor(), mediaServices, SERVICES, HttpBytesResponse (+51 more)
+
+### Community 35 - "scripts"
 Cohesion: 0.04
 Nodes (56): extraRoutes, navigation, Metrics, OverviewSummary, @tanstack/react-query, apiBlob(), ApiError, apiStream() (+48 more)
 
-### Community 35 - "scripts"
-Cohesion: 0.06
-Nodes (52): parsePool(), ACCOUNT_STATUSES, answerText(), assign(), collectPanel(), worker(), Combo, ComboFields (+44 more)
-
 ### Community 36 - "ChatLane (modules/routing/infrastructure/chat-lane.ts)"
-Cohesion: 0.05
-Nodes (69): AntigravityAdapter - daily Cloud Code envelope, Gemini/Claude/image requests, Antigravity Google OAuth, userinfo, loadCodeAssist and onboarding, adapters/claude-code.ts (prepareClaudeRequest, billing header, user id, _ide + decoys), claude sign-in (claude.ai PKCE, code#state, 4 h lead), adapters/codex.ts (CodexExecutor body, compact URL, model list), codex sign-in (fixed localhost:1455 callback pasted back, id_token account, 5-day lead, 8-day age), adapters/collect.ts (stream collected into one response), copilotChatBody (Copilot part and parameter rules) (+61 more)
+Cohesion: 0.06
+Nodes (57): ConnectionQuota, connectionsKey, CursorAutoImport, customKey(), CustomModel, DeviceCode, fetchConnectionModels(), FieldValues (+49 more)
 
 ### Community 37 - "cursor.ts"
 Cohesion: 0.05
-Nodes (39): DATABASE, DatabaseShutdown, Inject, Injectable, HealthController, Controller, Get, Inject (+31 more)
+Nodes (35): ApiKeysModule, Module, ConsoleEvent, Draft, Entry, Draft, FILE, Subagents (+27 more)
 
 ### Community 38 - "Request routing"
 Cohesion: 0.06
-Nodes (60): traffic/api.ts, Attempt, ChartBucket, chartKey, ConsoleEvent, consoleKey, Counters, MAX_REQUEST_ROWS (+52 more)
+Nodes (52): parsePool(), ACCOUNT_STATUSES, answerText(), assign(), collectPanel(), worker(), Combo, ComboFields (+44 more)
 
 ### Community 39 - "Feature Matrix — mandatory 17-column artifact"
-Cohesion: 0.06
-Nodes (25): hostnameOf(), isLocalRequest(), isLoopbackIp(), LOCAL_HOSTNAMES, RequestOrigin, Entry, LOCK_STEPS_MS, LockState (+17 more)
+Cohesion: 0.07
+Nodes (61): currentLabel(), Shell(), useCombos(), useConnectedModels(), CapacityTab(), ComboCreate(), ComboForm(), RoutingSimulatorTab() (+53 more)
 
 ### Community 40 - "registry.ts"
-Cohesion: 0.05
-Nodes (32): RUNTIME_CONFIG, RuntimeConfig, RuntimeController, Controller, Get, Header, Inject, Req (+24 more)
+Cohesion: 0.08
+Nodes (41): array(), AUDIO_MEDIA_TYPES, cacheMark(), CompletionMeta, ERROR_SHAPES, errorBody(), FINISH_REASONS, frame() (+33 more)
 
 ### Community 41 - "OAuthController"
 Cohesion: 0.05
-Nodes (65): DELETE /api/provider-nodes/:id (cascades the connection), GET /api/provider-nodes, PATCH /api/provider-nodes/:id, POST /api/provider-nodes, /v1: <prefix>/<model> reaches a custom provider after built-in ids, aliases, and catalog prefixes, /v1 resolution: provider-or-alias/model; non-connectable prefix → provider_not_supported; bare id → first declaring provider with an active connection, CodeBuddy quirks: reasoningSummary (cn, intl), neutralAgentPrompt (cn) via EXECUTOR_QUIRKS, Custom headers - sealed values, hints, validation and merge (+57 more)
+Nodes (67): docs/capabilities.md (GENERATED capability specification), docs/discovery/gaps.md (Gap register), docs/discovery/inventory.json, Feature Matrix entry template (null never "" or "N/A"), Evidence with file:line — traced is a test, not a self-declaration, Fixed inventory counts (154 routes, 28 pages, 123 providers, 29 executors, 48 translators, 11 repos, 14 OAuth routes), parityStatus lifecycle (not-started → traced → contracted → implemented → verified), suspicion block — expected / actual / impact (+59 more)
 
 ### Community 42 - "lane-helpers.mjs"
-Cohesion: 0.05
-Nodes (65): AnthropicAdapter — CIP <-> Messages (max_tokens rules, thinking budgets, tool_use, SSE events), packages/engine/test/anthropic-adapter.test.mjs (10) + apps/server/test/anthropic-lane.test.mjs (4); 23 mutations caught, Deviations not ported: stop/top_p kept, none stays none, no Claude Code line, stream errors fail, same stop/usage mapping, 403 invalid, Claude Code anthropic-beta list for claude-* models on an Anthropic node (claude-code flag only on the official host), Anthropic node connection test: POST <base>/v1/messages, claude-3-haiku, only 401/403 invalid (9router), Anthropic node descriptor: <base>/messages, x-api-key, Bearer for third-party hosts, anthropicNode { official }, CIP image_delta chunk (delta.images) and vendorExtensions.openai.finish_reason honoured by the OpenAI renderer, CommandCodeAdapter — envelope, NDJSON events via readJsonLines, peek with in-band error classification and 5xx retries, collapse for non-streaming clients, ping test (+57 more)
+Cohesion: 0.06
+Nodes (25): hostnameOf(), isLocalRequest(), isLoopbackIp(), LOCAL_HOSTNAMES, RequestOrigin, Entry, LOCK_STEPS_MS, LockState (+17 more)
 
 ### Community 43 - "Overview — /"
 Cohesion: 0.06
-Nodes (45): domain/usage.ts, addDays(), csvField(), dayKey(), daysBetween(), formatters, InvalidPeriod, MAX_CUSTOM_DAYS (+37 more)
+Nodes (32): modelIds(), GeminiAdapter, streamUsage(), clean(), invalid(), sseBody(), streamError(), upstreamError() (+24 more)
 
 ### Community 44 - "GeminiAdapter — CIP <-> generateContent / streamGenerateContent?alt=sse (x-goog-api-key, safety off, thinking level/budget, 400 key test = invalid)"
 Cohesion: 0.1
-Nodes (42): TONES, previewTtsVoice(), TtsVoice, useTtsVoices(), kindKeys, testKeys, WindowLine, genderKeys (+34 more)
+Nodes (20): extractApiKey(), ChatLane, claudeCodePrompt(), deadline(), errorOf(), exhausted(), geminiGenerate(), googleKey() (+12 more)
 
 ### Community 45 - "traffic/api.ts"
 Cohesion: 0.06
-Nodes (39): addDays(), assertTimeZone(), csvField(), daysBetween(), estimateTokens(), formatters, InvalidPeriod, offsetAt() (+31 more)
+Nodes (57): gateway/api.ts, ApiKey, CapacityCapability, capacityKey, CapacityPool, CapacityPoolFields, ChatReadiness, comboPath() (+49 more)
 
 ### Community 46 - "Bounded context: identity"
-Cohesion: 0.08
-Nodes (43): [command, ...args], golden(), main(), option(), report(), ROOT, capabilityIds(), coverage() (+35 more)
+Cohesion: 0.06
+Nodes (46): auth, body, encoder, last, list, out, started, upstream (+38 more)
 
 ### Community 47 - "ProviderNodesController — /api/provider-nodes CRUD; PREFIX_RESERVED / PREFIX_TAKEN / NODE_LIMIT"
-Cohesion: 0.07
-Nodes (13): JcodeSettingsController, Controller, Get, Post, JcodeSettingsService, Injectable, ManagedJsonSettingsController, Controller (+5 more)
+Cohesion: 0.04
+Nodes (51): server/package.json, dependencies, @aigate/database, @aigate/engine, drizzle-orm, fastify, @fastify/static, @nestjs/common (+43 more)
 
 ### Community 48 - "web/package.json"
 Cohesion: 0.06
-Nodes (36): ACCOUNT_STATUSES, answerText(), assign(), collectPanel(), Combo, ComboFields, DEFAULTS, fail() (+28 more)
+Nodes (60): AntigravityAdapter - daily Cloud Code envelope, Gemini/Claude/image requests, Antigravity Google OAuth, userinfo, loadCodeAssist and onboarding, adapters/claude-code.ts (prepareClaudeRequest, billing header, user id, _ide + decoys), claude sign-in (claude.ai PKCE, code#state, 4 h lead), adapters/codex.ts (CodexExecutor body, compact URL, model list), codex sign-in (fixed localhost:1455 callback pasted back, id_token account, 5-day lead, 8-day age), adapters/collect.ts (stream collected into one response), copilotChatBody (Copilot part and parameter rules) (+52 more)
 
 ### Community 49 - "usage.tsx"
-Cohesion: 0.06
-Nodes (36): classifyStatus(), clean(), invalid(), isTransient(), request(), RETRY_STATUSES, shouldRetry(), sseBody() (+28 more)
+Cohesion: 0.07
+Nodes (60): settings.combo-rotation-reset, Audit finding: routing-fallback merged 4 tabs into one 3886px screen, Routing → Capacity adapter tab (Vision, Audio input pools), CombosRepository: cached list (200), per-combo rotation state, combos table (migration 0018) + settings.combo_sticky_limit, Routing → Combo tab + ComboCreate create/edit, sticky limit, The 23 feature groups required by behavioral.md §5, Canonical Internal Protocol (+52 more)
 
 ### Community 50 - "openai-chat.ts"
-Cohesion: 0.07
-Nodes (35): CHAT_LIMITS, ClientGone, GatewayError, mediaCooldown(), audioType(), badRequest(), decodeFailure(), formatOf() (+27 more)
+Cohesion: 0.06
+Nodes (38): memberFailover(), CHAT_LIMITS, ClientGone, fallbackCooldown(), GatewayError, mediaCooldown(), audioType(), badRequest() (+30 more)
 
 ### Community 51 - "OAuth providers"
-Cohesion: 0.09
-Nodes (49): ScreenView(), currentLabel(), Shell(), useCombos(), CapacityTab(), ComboCreate(), RoutingSimulatorTab(), SimulationResultView() (+41 more)
+Cohesion: 0.08
+Nodes (43): [command, ...args], golden(), main(), option(), report(), ROOT, capabilityIds(), coverage() (+35 more)
 
 ### Community 52 - "combos.repo.ts"
-Cohesion: 0.1
-Nodes (33): MarketServer, body(), bool(), fail(), name(), NewProxyPool, noProxy(), Parsed (+25 more)
+Cohesion: 0.05
+Nodes (57): DELETE /api/provider-nodes/:id (cascades the connection), GET /api/provider-nodes, PATCH /api/provider-nodes/:id, POST /api/provider-nodes, /v1: <prefix>/<model> reaches a custom provider after built-in ids, aliases, and catalog prefixes, CodeBuddy quirks: reasoningSummary (cn, intl), neutralAgentPrompt (cn) via EXECUTOR_QUIRKS, Custom headers - sealed values, hints, validation and merge, Custom provider thinking level (+49 more)
 
 ### Community 53 - "API ↔ UI map (docs/design/API_UI_MAP.md)"
-Cohesion: 0.07
-Nodes (35): budgetToLevel(), adjustMaxTokens(), AnthropicClientRequest, anthropicRequestFor(), AnthropicStreamEncoder, blocksOf(), blockText(), BUDGET_PROTOCOLS (+27 more)
+Cohesion: 0.06
+Nodes (33): CatalogModule, Module, CatalogController, find(), levelsOf(), mediaSummary(), ProviderSummary, routeKinds() (+25 more)
 
 ### Community 54 - "cursor.test.mjs"
 Cohesion: 0.07
-Nodes (32): CHAT_LIMITS, fallbackCooldown(), mediaCooldown(), REQUEST_BUDGET_MS, audioType(), badRequest(), decodeFailure(), formatOf() (+24 more)
+Nodes (32): b64url(), cacheKey(), googleAccessToken(), GoogleCredential, jsonPart(), remember(), signedAssertion(), tokens (+24 more)
 
 ### Community 55 - "Bounded context: tooling"
 Cohesion: 0.06
-Nodes (24): AccountCandidate, chooseAccount(), ConnectionFields, keyHint(), maskHint(), refreshContext(), sealContext(), BoundedRows (+16 more)
+Nodes (41): FINISH, FINISH_OF, GeminiRoute, GeminiStreamEncoder, GeminiStreamMeta, geminiTtsRequest(), invalid(), isGeminiTtsRequest() (+33 more)
 
 ### Community 56 - "anthropic-messages.ts"
-Cohesion: 0.05
-Nodes (38): { id }, { id, key }, { key, ...view }, repo, signedIn(), blocked, broken, claude (+30 more)
+Cohesion: 0.07
+Nodes (36): adjustMaxTokens(), AnthropicClientRequest, anthropicRequestFor(), AnthropicStreamEncoder, blocksOf(), blockText(), BUDGET_PROTOCOLS, countBlock() (+28 more)
 
 ### Community 57 - "requests.controller.ts"
 Cohesion: 0.07
-Nodes (37): auth, body, encoder, last, list, out, started, upstream (+29 more)
+Nodes (39): extraRoutes, navigation, overview/api.ts, Metrics, OverviewSummary, UsageSummary, paths, queryClient (+31 more)
 
 ### Community 58 - "direct-transport.ts"
-Cohesion: 0.04
-Nodes (38): bad, call, combo(), image, models, pool(), put(), tools (+30 more)
+Cohesion: 0.06
+Nodes (23): AccountCandidate, chooseAccount(), ConnectionFields, keyHint(), maskHint(), refreshContext(), sealContext(), BoundedRows (+15 more)
 
 ### Community 59 - "json"
-Cohesion: 0.07
-Nodes (33): b64url(), cacheKey(), googleAccessToken(), GoogleCredential, jsonPart(), remember(), signedAssertion(), tokens (+25 more)
+Cohesion: 0.06
+Nodes (37): { id }, { id, key }, { key, ...view }, repo, signedIn(), blocked, broken, claude (+29 more)
 
 ### Community 60 - "AIGate — Capability Specification"
-Cohesion: 0.11
-Nodes (38): array(), AUDIO_MEDIA_TYPES, cacheMark(), ERROR_SHAPES, errorBody(), FINISH_REASONS, frame(), invalid() (+30 more)
+Cohesion: 0.05
+Nodes (37): bad, call, combo(), image, models, pool(), put(), tools (+29 more)
 
 ### Community 61 - "gemini.ts"
-Cohesion: 0.05
-Nodes (41): airforce, bare, bearer, big, body(), cases, check(), chunk() (+33 more)
+Cohesion: 0.07
+Nodes (48): Descriptor auth.optional + connectionBaseUrl; withConnectionBaseUrl(); provider_connections.base_url (migration 0007), GET /api/connections/:id/models (adapter getModels, MODELS_FETCH_FAILED), Decision (user, 2026-09-25): AES-GCM with a key file and an env override; SP11 connects OpenAI only, SP16a user decisions (pick list, all providers, keep 9router bugs), Connections contract (M1 SP11), ConnectionsController — /api/connections CRUD + POST /:id/test (validateCredential outside any transaction), ConnectionsRepository — allowlisted view, onConflictDoNothing → 409, stale-test guard on sealed key, Rule: a test result is written only if the sealed key is unchanged (+40 more)
 
 ### Community 62 - "Parity verification — 3 tiers"
-Cohesion: 0.05
-Nodes (41): adapter, bare, before, body, chunks, claude, client, clientBody (+33 more)
+Cohesion: 0.08
+Nodes (38): API_TYPES, ApiType, asBody(), DEFAULT_BASE_URLS, fail(), HeaderInput, isApiType(), isNodeType() (+30 more)
 
 ### Community 63 - "CommandCodeAdapter — envelope, NDJSON events via readJsonLines, peek with in-band error classification and 5xx retries, collapse for non-streaming clients, ping test"
-Cohesion: 0.08
-Nodes (20): withClaudeCodePrompt(), GithubAdapter, isClaude(), servesResponses(), deviceModel(), KimiAdapter, OAuthIO, HttpTransportPort (+12 more)
+Cohesion: 0.06
+Nodes (18): IdentityModule, GrokBuildSettingsController, McpController, McpMarketplaceController, MarketServer, McpMarketplaceService, McpServer, TOOLING_DATA_DIR (+10 more)
 
 ### Community 64 - "OpenAIResponsesAdapter — CIP <-> Responses API (extends OpenAICompatibleAdapter; 9router request and stream, corrected non-stream)"
 Cohesion: 0.11
-Nodes (19): Body, ProxyPoolChanges, invalid(), missing(), ProxyPoolsController, Controller, Delete, Get (+11 more)
+Nodes (38): array(), AUDIO_MEDIA_TYPES, cacheMark(), ERROR_SHAPES, errorBody(), FINISH_REASONS, frame(), invalid() (+30 more)
 
 ### Community 65 - "rtk.ts"
-Cohesion: 0.07
-Nodes (17): dayKey(), pad(), decodeCursor(), encodeCursor(), instant(), invalid(), Query, RequestsController (+9 more)
+Cohesion: 0.05
+Nodes (41): airforce, bare, bearer, big, body(), cases, check(), chunk() (+33 more)
 
 ### Community 66 - "Providers"
-Cohesion: 0.13
-Nodes (25): QuotaController, CacheEntry, claude(), codebuddy(), codex(), deepseek(), endpoint(), github() (+17 more)
+Cohesion: 0.05
+Nodes (41): adapter, bare, before, body, chunks, claude, client, clientBody (+33 more)
 
 ### Community 67 - "protocols/openai-responses.ts"
-Cohesion: 0.09
-Nodes (38): database/src/index.ts, apiKeys, schema/catalog.ts, customModels, providerThinking, THINKING_LEVEL_VALUES, accountLocks, AUTH_TYPES (+30 more)
-
-### Community 68 - ".constructor"
-Cohesion: 0.08
-Nodes (29): AnthropicAdapter, assistantBlock(), CONTENT_BLOCKS, documentBlock(), HEAVY_AGENT_BETAS, imageBlock(), NO_NAMES, NODE_BETAS (+21 more)
-
-### Community 69 - "helpers.mjs"
 Cohesion: 0.13
 Nodes (30): agentBody(), agentValue(), bytes(), checksum(), CursorAdapter, cursorHeaders(), decode(), decodeAgentValue() (+22 more)
+
+### Community 68 - ".constructor"
+Cohesion: 0.09
+Nodes (27): Headers, isWellFormedKey(), KEY_PREFIX, maskKey(), MAX_KEYS, onlyKey(), Parsed, parseKeyName() (+19 more)
+
+### Community 69 - "helpers.mjs"
+Cohesion: 0.08
+Nodes (30): CHAT_LIMITS, REQUEST_BUDGET_MS, audioType(), badRequest(), decodeFailure(), formatOf(), isObject(), optionalText() (+22 more)
 
 ### Community 70 - "DirectTransport (direct branch implementation)"
 Cohesion: 0.1
@@ -784,51 +789,51 @@ Nodes (29): domain/settings.ts, EDITABLE, MAX_SETTINGS_DOCUMENT_BYTES, parseSett
 
 ### Community 71 - "Settings"
 Cohesion: 0.09
-Nodes (27): Headers, isWellFormedKey(), KEY_PREFIX, maskKey(), MAX_KEYS, onlyKey(), Parsed, parseKeyName() (+19 more)
-
-### Community 72 - "SettingsRepository"
-Cohesion: 0.09
 Nodes (27): domain/pricing.ts, isField(), isObject(), MAX_OVERRIDES, MAX_PATCH_MODELS, parsePricingPatch(), PriceEdit, validId() (+19 more)
 
+### Community 72 - "SettingsRepository"
+Cohesion: 0.1
+Nodes (38): useRoutingSimulation(), EXAMPLE, KIND, OUTCOME, RoutingSimulatorTab(), SimulationResultView(), STATUS, bad() (+30 more)
+
 ### Community 73 - "builtin-registry.ts"
-Cohesion: 0.12
-Nodes (30): agentBody(), agentValue(), checksum(), CursorAdapter, cursorHeaders(), decode(), decodeAgentValue(), decoder (+22 more)
+Cohesion: 0.09
+Nodes (38): database/src/index.ts, apiKeys, schema/catalog.ts, customModels, providerThinking, THINKING_LEVEL_VALUES, accountLocks, AUTH_TYPES (+30 more)
 
 ### Community 74 - "CustomModelsRepository"
-Cohesion: 0.08
-Nodes (43): GET /api/providers/:id (chatUrl + models; 404 NOT_FOUND), Descriptor auth.optional + connectionBaseUrl; withConnectionBaseUrl(); provider_connections.base_url (migration 0007), GET /api/connections/:id/models (adapter getModels, MODELS_FETCH_FAILED), Decision (user, 2026-09-25): AES-GCM with a key file and an env override; SP11 connects OpenAI only, Connections contract (M1 SP11), ConnectionsController — /api/connections CRUD + POST /:id/test (validateCredential outside any transaction), ConnectionsRepository — allowlisted view, onConflictDoNothing → 409, stale-test guard on sealed key, Rule: a test result is written only if the sealed key is unchanged (+35 more)
+Cohesion: 0.12
+Nodes (31): agentBody(), agentValue(), checksum(), CursorAdapter, cursorHeaders(), decode(), decodeAgentValue(), decoder (+23 more)
 
 ### Community 75 - "usage.repo.ts"
 Cohesion: 0.06
 Nodes (35): devDependencies, dependency-cruiser, eslint, eslint-plugin-boundaries, typescript-eslint, engines, node, name (+27 more)
 
 ### Community 76 - "network/api.ts"
-Cohesion: 0.06
-Nodes (17): IdentityModule, McpController, McpMarketplaceController, MarketServer, McpMarketplaceService, McpServer, TOOLING_DATA_DIR, MitmController (+9 more)
+Cohesion: 0.07
+Nodes (29): applyThinking(), BodyOptions, budgetFloor(), cachedSignature(), familyOf(), FINISH, functionResponse(), Intent (+21 more)
 
 ### Community 77 - "CLI Tools"
-Cohesion: 0.08
-Nodes (17): b64url(), cacheKey(), googleAccessToken(), GoogleCredential, jsonPart(), parseGoogleCredential(), remember(), signedAssertion() (+9 more)
+Cohesion: 0.07
+Nodes (27): drizzle-orm/sqlite-proxy/migrator, dir, drivers, file, migrationsFolder, results, lockedProxy(), drizzle-orm/sqlite-proxy (+19 more)
 
 ### Community 78 - "database/package.json"
 Cohesion: 0.05
-Nodes (38): 10.9 Đặc tả từng màn hình, 10 · Requests — `/traffic/requests`, `/:id` (mới), 11 · Console — `/traffic/console` (dev only), 12 · Proxy Pools — `/network/proxy-pools`, 13 · Tunnel — `/network/tunnel`, 14 · MITM — `/network/mitm`, 15 · CLI Tools — `/integrations/cli-tools`, `/:toolId`, 16 · Skills — `/integrations/skills` (+30 more)
+Nodes (39): 10.9 Đặc tả từng màn hình, 10 · Requests — `/traffic/requests`, `/:id` (mới), 11 · Console — `/traffic/console` (dev only), 13 · Tunnel — `/network/tunnel`, 14 · MITM — `/network/mitm`, 15 · CLI Tools — `/integrations/cli-tools`, `/:toolId`, 16 · Skills — `/integrations/skills`, 17 · MCP — `/integrations/mcp` (mới) (+31 more)
 
 ### Community 79 - "Model import and custom models contract (M2 SP16a)"
-Cohesion: 0.17
-Nodes (26): ConnectionView, CacheEntry, claude(), codebuddy(), codex(), deepseek(), endpoint(), github() (+18 more)
+Cohesion: 0.08
+Nodes (15): b64url(), cacheKey(), googleAccessToken(), jsonPart(), parseGoogleCredential(), remember(), signedAssertion(), authorize() (+7 more)
 
 ### Community 80 - "Descriptor connectionFields + withConnection(): {field} URL tokens filled per connection (encoded), OpenAI-Organization header, {model} filled per request"
 Cohesion: 0.12
 Nodes (6): GrokBuildSettingsController, Controller, Get, Post, GrokBuildSettingsService, Injectable
 
 ### Community 81 - "clients.ts"
-Cohesion: 0.09
-Nodes (38): settings.outbound-proxy-live-apply, settings.proxy-test-outbound-probe, transport.proxy-priority-chain, Audit finding: MITM CA buttons adjacent, type-to-confirm modal missing, Hard constraint: tunnel requires 'Require API key' enabled, Bounded context: transport, Cursor auto-detect and manual import dialog, Cursor local token import and no-refresh contract (+30 more)
+Cohesion: 0.08
+Nodes (22): ModelProbe, ModelTestController, Controller, Get, Header, HttpCode, Post, Res (+14 more)
 
 ### Community 82 - "conformance.mjs"
-Cohesion: 0.14
-Nodes (15): flowError(), invalid(), NO_PKCE, OAuthController, objectRecord(), stringifyQuery(), strings(), Controller (+7 more)
+Cohesion: 0.08
+Nodes (26): CommandCodeAdapter, COMMIT_EVENTS, eventOf(), FINISH, finishOf(), GUESSES, joinText(), Opened (+18 more)
 
 ### Community 83 - "catalog.controller.ts"
 Cohesion: 0.06
@@ -843,48 +848,48 @@ Cohesion: 0.12
 Nodes (8): MitmController, Controller, Get, Post, MitmService, run, Inject, Injectable
 
 ### Community 86 - "discovery/package.json"
-Cohesion: 0.15
-Nodes (37): network/api.ts, key, MitmPreview, MitmStatus, mutation(), path(), ProxyPool, ProxyPoolInput (+29 more)
+Cohesion: 0.12
+Nodes (10): OpenClawSettingsController, Controller, Get, Post, Draft, FILE, object(), OpenClawSettingsService (+2 more)
 
 ### Community 87 - "Translation"
-Cohesion: 0.1
-Nodes (17): EDITABLE, parseSettingsDocument(), parseSettingsPatch(), PatchResult, Settings, SettingsDocument, SettingsPatch, validHttpUrl() (+9 more)
+Cohesion: 0.14
+Nodes (15): flowError(), invalid(), NO_PKCE, OAuthController, objectRecord(), stringifyQuery(), strings(), Controller (+7 more)
 
 ### Community 88 - "Combo / Vision Adapter"
-Cohesion: 0.11
-Nodes (25): applyQuirks(), assistantMessage(), AUDIO_FORMATS, audioFormat(), compact(), copilotChatBody(), EPHEMERAL, KIMCHI_DROPS (+17 more)
-
-### Community 89 - "Translation / language functionality"
 Cohesion: 0.08
 Nodes (34): anthropic, bad, bare, body(), bodyOf(), cases, check(), collect() (+26 more)
 
-### Community 90 - "SP0 — 2 skills + mechanical lint suite"
+### Community 89 - "Translation / language functionality"
 Cohesion: 0.07
 Nodes (31): answer, anthropicSent, anthropicTransport, bare, base, body(), cases, chat (+23 more)
 
+### Community 90 - "SP0 — 2 skills + mechanical lint suite"
+Cohesion: 0.13
+Nodes (6): Draft, FILE, GrokBuildSettingsService, hash(), Subagents, TYPES
+
 ### Community 91 - "ResponsesStreamEncoder"
+Cohesion: 0.17
+Nodes (23): CacheEntry, claude(), codebuddy(), codex(), deepseek(), endpoint(), github(), glm() (+15 more)
+
+### Community 92 - "src/schema.ts"
 Cohesion: 0.1
 Nodes (20): claudeCodeBody(), cloak(), cloakTools(), copilotMessagesBody(), decode(), DECOY_NAMES, DECOYS, derivedUuid() (+12 more)
 
-### Community 92 - "src/schema.ts"
-Cohesion: 0.09
-Nodes (25): diff(), errorOf(), get(), mergeToolCalls(), normalizeResponse(), normalizeUpstream(), parseSse(), usageOf() (+17 more)
-
 ### Community 93 - "Port behavior, not code"
-Cohesion: 0.1
-Nodes (31): Parsed, API_TYPES, ApiType, asBody(), DEFAULT_BASE_URLS, fail(), HeaderInput, isApiType() (+23 more)
+Cohesion: 0.09
+Nodes (35): network/api.ts, key, MitmPreview, MitmStatus, mutation(), path(), ProxyPool, ProxyPoolInput (+27 more)
 
 ### Community 94 - "models.tsx"
-Cohesion: 0.09
-Nodes (32): key, MitmPreview, MitmStatus, mutation(), ProxyPool, ProxyPoolInput, ProxyPoolType, ProxyRotation (+24 more)
+Cohesion: 0.12
+Nodes (20): createAdapter(), familyAdapter(), ConnectionChanges, DATA_FIELD_NAMES, checkForProvider(), ConnectionsController, credentialOf(), invalid() (+12 more)
 
 ### Community 95 - "06-combo-capacity-adapter.yaml"
-Cohesion: 0.12
-Nodes (18): ask, message, withAnthropic(), encoder, textOf(), answer, stream, errorOf() (+10 more)
+Cohesion: 0.06
+Nodes (25): audio, body, frames, post(), sent, tts(), ttsBody, upstream (+17 more)
 
 ### Community 96 - "Usage"
-Cohesion: 0.12
-Nodes (19): createAdapter(), familyAdapter(), ConnectionChanges, DATA_FIELD_NAMES, isJsonCredential(), checkForProvider(), ConnectionsController, credentialOf() (+11 more)
+Cohesion: 0.09
+Nodes (32): key, MitmPreview, MitmStatus, mutation(), ProxyPool, ProxyPoolInput, ProxyPoolType, ProxyRotation (+24 more)
 
 ### Community 97 - "UsageRecorder"
 Cohesion: 0.12
@@ -892,95 +897,99 @@ Nodes (7): OpenClawSettingsController, Draft, FILE, hash(), object(), OpenClawSe
 
 ### Community 98 - "protocols/gemini-generate.ts — path parsing, text-only request, GenerateContentResponse, Gemini SSE encoder, model list, TTS request"
 Cohesion: 0.06
-Nodes (27): post(), refused(), reply, tested, upstream, fakeUpstream(), packageDir, request (+19 more)
+Nodes (27): adapter, body, chain, chatAnswer, chunks, credential, ctx, denied (+19 more)
 
 ### Community 99 - "openai-adapter.test.mjs"
 Cohesion: 0.07
-Nodes (14): AntigravityAdapter, imageAspect(), imageModel(), normalizeContents(), rewrite(), sanitize(), sessionId(), toolsOf() (+6 more)
+Nodes (27): adapter, adc, call, credential, encoder, escaped, form, [header, claims, signature] (+19 more)
 
 ### Community 100 - "Media Providers"
 Cohesion: 0.06
-Nodes (27): adapter, body, chain, chatAnswer, chunks, credential, ctx, denied (+19 more)
+Nodes (32): AIGate progress handoff, Cline recommended models (2026-10-08), Codex sign-in fix — 1455 callback relay (2026-10-08), Codex usage-limit reset (2026-10-08), Completed and verified, Custom-provider media mapping (2026-10-08), M0 SP0.1 in progress, Next concrete work (+24 more)
 
 ### Community 101 - "gemini-generate.ts"
-Cohesion: 0.07
-Nodes (27): adapter, adc, call, credential, encoder, escaped, form, [header, claims, signature] (+19 more)
-
-### Community 102 - "anthropic-adapter.test.mjs"
-Cohesion: 0.09
-Nodes (25): computeCoverage(), CoverageReport, Dimension, EVIDENCE_PATH, renderCoverage(), buildInventory(), glob(), IGNORE (+17 more)
-
-### Community 103 - "vertex-adapter.test.mjs"
 Cohesion: 0.06
 Nodes (32): 10. ARCHITECTURE MỚI KHÔNG PHỤ THUỘC 9ROUTER, 11. PROVIDER PHẢI QUA PORT, 12. ROUTER PHẢI LÀ BUSINESS ENGINE RIÊNG, 13. TRANSLATOR / PROTOCOL, 14. FEATURE PARITY KHÔNG CÓ NGHĨA CODE PARITY, 15. CODE QUALITY, 16. PERFORMANCE, 17. LATENCY (+24 more)
+
+### Community 102 - "anthropic-adapter.test.mjs"
+Cohesion: 0.12
+Nodes (11): CodexSettingsController, Controller, Get, Post, CodexSettingsService, CONFIG, digest(), Draft (+3 more)
+
+### Community 103 - "vertex-adapter.test.mjs"
+Cohesion: 0.1
+Nodes (20): DisplayNames, Injectable, decodeCursor(), encodeCursor(), instant(), invalid(), Query, RequestsController (+12 more)
 
 ### Community 104 - "inventory.ts"
 Cohesion: 0.06
 Nodes (32): web/package.json, dependencies, @radix-ui/react-dialog, react, react-dom, @tanstack/react-query, @tanstack/react-router, devDependencies (+24 more)
 
 ### Community 105 - "Bounded patterns"
-Cohesion: 0.1
-Nodes (24): CommandCodeAdapter, COMMIT_EVENTS, eventOf(), FINISH, finishOf(), GUESSES, joinText(), Opened (+16 more)
+Cohesion: 0.08
+Nodes (33): protocols/anthropic-messages.ts — parse to CIP, anthropicRequestFor (passthrough for Anthropic, claude→openai rules otherwise), message, SSE encoder, count_tokens, User decision 2026-09-27: SP15 Anthropic first; OpenAI-shaped errors and 9router non-stream/stream-default kept; real usage, live tool args, signature_delta corrected, User decision 2026-09-27: SP15b keeps 9router on all four asks (request pivot drops/leaks, SSE shapes, non-stream answer, compact), User decision 2026-09-27: SP15c keeps 9router on request, response and auth/path; TTS passthrough ported now, Anthropic Messages client protocol contract (M2 SP15), Gemini client protocol contract (M2 SP15c), OpenAI Responses client protocol contract (M2 SP15b), API_UI_MAP row: SP15 Anthropic Messages client protocol (+25 more)
 
 ### Community 106 - "Proxy Pools"
-Cohesion: 0.12
-Nodes (5): ManagedTomlSettingsController, Draft, hash(), ManagedTomlSettingsService, ManagedTomlTool
-
-### Community 107 - "database.ts"
 Cohesion: 0.11
 Nodes (6): JcodeSettingsController, CONFIG, Draft, ENV, hash(), JcodeSettingsService
 
-### Community 108 - "compilerOptions"
-Cohesion: 0.06
-Nodes (31): AIGate progress handoff, Cline recommended models (2026-10-08), Codex sign-in fix — 1455 callback relay (2026-10-08), Codex usage-limit reset (2026-10-08), Completed and verified, Custom-provider media mapping (2026-10-08), M0 SP0.1 in progress, Next concrete work (+23 more)
-
-### Community 109 - "Token Saver"
+### Community 107 - "database.ts"
 Cohesion: 0.12
-Nodes (11): CodexSettingsController, Controller, Get, Post, CodexSettingsService, CONFIG, digest(), Draft (+3 more)
+Nodes (5): ManagedTomlSettingsController, Draft, hash(), ManagedTomlSettingsService, ManagedTomlTool
 
-### Community 110 - "Provider authentication"
+### Community 108 - "compilerOptions"
 Cohesion: 0.13
 Nodes (7): ManagedTomlSettingsController, Controller, Get, Param, Post, ManagedTomlSettingsService, Injectable
 
-### Community 111 - "Milestone M1 · Walking skeleton (thin end-to-end slice)"
+### Community 109 - "Token Saver"
 Cohesion: 0.12
-Nodes (11): checkThinking(), invalid(), notFound(), ProviderNodesController, headersContext(), levelColumn(), nodeProtocol(), ProviderNodesRepository (+3 more)
+Nodes (32): transport.proxy-priority-chain, Audit finding: MITM CA buttons adjacent, type-to-confirm modal missing, Branding sweep to the bottom of the stack, Hard constraint: tunnel requires 'Require API key' enabled, Bounded context: transport, Cursor auto-detect and manual import dialog, Cursor local token import and no-refresh contract, Decision: do NOT clone 9Remote (+24 more)
 
-### Community 112 - "src/pricing.ts"
+### Community 110 - "Provider authentication"
+Cohesion: 0.12
+Nodes (16): EDITABLE, parseSettingsDocument(), parseSettingsPatch(), PatchResult, Settings, SettingsDocument, SettingsPatch, validHttpUrl() (+8 more)
+
+### Community 111 - "Milestone M1 · Walking skeleton (thin end-to-end slice)"
 Cohesion: 0.11
 Nodes (14): isField(), isObject(), parsePricingPatch(), PriceEdit, validId(), id(), invalid(), PricingController (+6 more)
 
-### Community 113 - "cli.ts"
+### Community 112 - "src/pricing.ts"
 Cohesion: 0.11
 Nodes (6): HermesSettingsController, CONFIG, Draft, ENV, hash(), HermesSettingsService
 
-### Community 114 - "coverage.ts"
-Cohesion: 0.09
-Nodes (22): ALLOWED, CODEX_MODELS, codexBody(), codexModelIds(), codexUrl(), DROPPED, EFFORT_SUFFIXES, HOSTED_TOOLS (+14 more)
-
-### Community 115 - "ready"
+### Community 113 - "cli.ts"
 Cohesion: 0.06
 Nodes (31): antigravity: Google OAuth with the public Antigravity client, the IDE's Cloud Code endpoint daily-cloudcode-pa.googleapis.com, Gemini and Claude models in one envelope, image generation, IDE request ids, Browser-assisted desktop login start and status polling, Browser login through GetLoginGuidance and loopback callback, plus Cloud-IDE-JWT token import, claude: PKCE sign-in at claude.ai, Messages at api.anthropic.com with Claude Code headers and, for sk-ant-oat tokens, cloaking, Cline and ClinePass sign-in, token format, refresh, and request headers, CodeBuddy browser state flow, OAuth token refresh, and stream-only OpenAI chat, codex: PKCE sign-in at auth.openai.com with a fixed 1455 callback, Responses at chatgpt.com/backend-api/codex, gemini-cli: Google OAuth with the public Gemini CLI client, project discovery through loadCodeAssist, generateContent wrapped in the Cloud Code envelope at cloudcode-pa.googleapis.com/v1internal (+23 more)
 
+### Community 114 - "coverage.ts"
+Cohesion: 0.21
+Nodes (24): ConnectionView, CacheEntry, claude(), codebuddy(), codex(), deepseek(), endpoint(), github() (+16 more)
+
+### Community 115 - "ready"
+Cohesion: 0.13
+Nodes (17): encoder, streamed(), audio, stream, chunk(), completion, encoder, events() (+9 more)
+
 ### Community 116 - "compilerOptions"
-Cohesion: 0.15
-Nodes (7): OpenClawSettingsController, Controller, Get, Post, object(), OpenClawSettingsService, Injectable
+Cohesion: 0.11
+Nodes (15): Headers, isWellFormedKey(), maskKey(), onlyKey(), Parsed, parseKeyName(), parseKeyStatus(), ApiKeysController (+7 more)
 
 ### Community 117 - "compilerOptions"
 Cohesion: 0.19
 Nodes (8): Access, flowError(), invalid(), NO_PKCE, OAuthController, objectRecord(), stringifyQuery(), strings()
 
 ### Community 118 - "engine/package.json"
-Cohesion: 0.11
-Nodes (15): Headers, isWellFormedKey(), maskKey(), onlyKey(), Parsed, parseKeyName(), parseKeyStatus(), ApiKeysController (+7 more)
+Cohesion: 0.07
+Nodes (25): post(), refused(), reply, tested, upstream, fakeUpstream(), aborted, at (+17 more)
 
 ### Community 119 - "OpenAIChatStreamEncoder"
-Cohesion: 0.12
-Nodes (19): loadOrExit(), MATRIX_DIR, OUT_DIR, r, port, defaultReference, here, NINEROUTER_ROOT (+11 more)
+Cohesion: 0.09
+Nodes (25): Attempt, ChartBucket, chartKey, ConsoleEvent, consoleKey, Counters, PeriodQuery, Price (+17 more)
+
+### Community 120 - "thinking.ts"
+Cohesion: 0.07
+Nodes (28): AIGate — Capability Specification, API-key providers, Batched SSE flush timer and log line formatting (ANSI strip, arg serialization), Console Log, Console-log routes live under /api/translator/ instead of a dedicated /api/console-log path, Distinguishing 'no accounts configured' from 'all accounts temporarily locked', with retry-after computed from the earliest lock, fill-first strategy — the default when no round-robin override applies, Filtering candidates by exclude-set, active model lock, and (Antigravity only) cached live quota before any strategy runs (+20 more)
 
 ### Community 121 - "gemini-adapter.test.mjs"
-Cohesion: 0.12
-Nodes (12): ClineSettingsController, Controller, Get, Post, ClineSettingsService, digest(), DIR, Draft (+4 more)
+Cohesion: 0.13
+Nodes (6): JcodeSettingsController, Controller, Get, Post, JcodeSettingsService, Injectable
 
 ### Community 122 - "ollama-adapter.test.mjs"
 Cohesion: 0.09
@@ -991,208 +1000,208 @@ Cohesion: 0.13
 Nodes (7): CodexSettingsController, CodexSettingsService, CONFIG, digest(), Draft, objectOf(), quote()
 
 ### Community 124 - "compilerOptions"
-Cohesion: 0.07
-Nodes (27): Active account quota rows, refresh, and visible error state, AIGate — Capability Specification, Antigravity's locally-counted/inferred quota — RAM cache plus a strike-based trust override, API-key providers, Batched SSE flush timer and log line formatting (ANSI strip, arg serialization), Bounded server reads for active saved connections, Codex reset credits — a redeemable pool that manually ends the current 5h window early, Console Log (+19 more)
+Cohesion: 0.1
+Nodes (20): ALLOWED, CODEX_MODELS, codexBody(), codexModelIds(), codexUrl(), DROPPED, EFFORT_SUFFIXES, HOSTED_TOOLS (+12 more)
 
 ### Community 125 - "dependencies"
-Cohesion: 0.07
-Nodes (27): code:ts (export type Language = "en" | "vi";), code:js (await page.getByRole("button", { name: "Show timeout" }).cli), code:tsx (const [failure, setFailure] = useState<{ error: unknown } | ), code:js (await page.getByLabel(/^Import settings JSON/).setInputFiles), code:tsx (const { language, t } = useLocale();), code:js (test("Overview comparison signs and compact values are local), code:js (const activity = { summary:0, stream:0 };), code:powershell (node --test apps/web/src/shared/i18n.test.mjs apps/web/src/s) (+19 more)
+Cohesion: 0.08
+Nodes (11): AntigravityAdapter, imageAspect(), imageModel(), normalizeContents(), rewrite(), sanitize(), sessionId(), toolsOf() (+3 more)
 
 ### Community 126 - ".summary"
 Cohesion: 0.07
-Nodes (28): code:ts (// connections/domain/account-selection.ts), code:ts (const append = (node: Omit<DecisionNode, "id">): number | un), code:js (test("catalog output limit refuses before dispatch", () => w), code:js (import { test } from "node:test";), code:ts (fastify.addHook("onRoute", options => {), code:js (import assert from "node:assert/strict";), code:ts (export const useRoutingSimulation = () => useMutation({), code:ts (const isStale = submitted !== null &&) (+20 more)
+Nodes (27): code:ts (export type Language = "en" | "vi";), code:js (await page.getByRole("button", { name: "Show timeout" }).cli), code:tsx (const [failure, setFailure] = useState<{ error: unknown } | ), code:js (await page.getByLabel(/^Import settings JSON/).setInputFiles), code:tsx (const { language, t } = useLocale();), code:js (test("Overview comparison signs and compact values are local), code:js (const activity = { summary:0, stream:0 };), code:powershell (node --test apps/web/src/shared/i18n.test.mjs apps/web/src/s) (+19 more)
 
 ### Community 127 - "Endpoint & API Key"
-Cohesion: 0.13
-Nodes (6): HermesSettingsController, Controller, Get, Post, HermesSettingsService, Injectable
+Cohesion: 0.07
+Nodes (28): code:ts (// connections/domain/account-selection.ts), code:ts (const append = (node: Omit<DecisionNode, "id">): number | un), code:js (test("catalog output limit refuses before dispatch", () => w), code:js (import { test } from "node:test";), code:ts (fastify.addHook("onRoute", options => {), code:js (import assert from "node:assert/strict";), code:ts (export const useRoutingSimulation = () => useMutation({), code:ts (const isStale = submitted !== null &&) (+20 more)
 
 ### Community 128 - "Rule 4 — Every workload must be BOUNDED"
-Cohesion: 0.13
-Nodes (11): McpController, Controller, Delete, Get, Param, Patch, Post, Res (+3 more)
+Cohesion: 0.12
+Nodes (12): ClineSettingsController, Controller, Get, Post, ClineSettingsService, digest(), DIR, Draft (+4 more)
 
 ### Community 129 - "GithubAdapter"
 Cohesion: 0.13
-Nodes (5): OmpSettingsController, Draft, FILE, hash(), OmpSettingsService
+Nodes (6): HermesSettingsController, Controller, Get, Post, HermesSettingsService, Injectable
 
 ### Community 130 - "AnthropicStreamEncoder"
-Cohesion: 0.07
-Nodes (21): answer, anthropicAnswer, approved, begun, body, connection, device, exchange (+13 more)
+Cohesion: 0.12
+Nodes (12): McpController, Controller, Delete, Get, Param, Patch, Post, Res (+4 more)
 
 ### Community 131 - "commandcode-adapter.test.mjs"
-Cohesion: 0.11
-Nodes (23): streamRequested(), CUSTOM_PARAMETERS, customInput(), DETAILS, EFFORTS, inputItems(), invalid(), messageParts() (+15 more)
+Cohesion: 0.18
+Nodes (16): ProxyPoolView, cloudflareId(), multipart(), pause(), project(), record(), RelayDeployError, RelayDeployService (+8 more)
 
 ### Community 132 - "connection-data.test.mjs"
-Cohesion: 0.07
-Nodes (23): controller, earlierImage, embedding, error, everything, fast, final, gpt41 (+15 more)
+Cohesion: 0.12
+Nodes (19): CommandCodeAdapter, COMMIT_EVENTS, eventOf(), FINISH, finishOf(), GUESSES, joinText(), Opened (+11 more)
 
 ### Community 133 - "github-copilot.test.mjs"
 Cohesion: 0.13
-Nodes (10): KiloSettingsController, Controller, Get, Post, AUTH, Draft, KiloSettingsService, object() (+2 more)
+Nodes (5): OmpSettingsController, Draft, FILE, hash(), OmpSettingsService
 
 ### Community 134 - "openai-responses-adapter.test.mjs"
-Cohesion: 0.14
-Nodes (9): ClaudeSettingsController, Controller, Get, Post, ClaudeSettingsService, CONFIG, Draft, object() (+1 more)
+Cohesion: 0.07
+Nodes (21): answer, anthropicAnswer, approved, begun, body, connection, device, exchange (+13 more)
 
 ### Community 135 - "Body"
-Cohesion: 0.14
-Nodes (10): DroidSettingsController, Controller, Get, Post, Draft, DroidSettingsService, FILE, managed() (+2 more)
+Cohesion: 0.07
+Nodes (23): controller, earlierImage, embedding, error, everything, fast, final, gpt41 (+15 more)
 
 ### Community 136 - "parity/package.json"
-Cohesion: 0.12
-Nodes (18): decodeCursor(), encodeCursor(), instant(), invalid(), Query, RequestsController, text(), Controller (+10 more)
+Cohesion: 0.13
+Nodes (10): KiloSettingsController, Controller, Get, Post, AUTH, Draft, KiloSettingsService, object() (+2 more)
 
 ### Community 137 - ".test"
+Cohesion: 0.13
+Nodes (21): allowedUrl(), asErrno(), classifiedBody(), classify(), DirectTransport, dispatcher(), dnsCache, envProxy() (+13 more)
+
+### Community 138 - "Rule 1 — Write LEAN code, no over-engineering"
+Cohesion: 0.1
+Nodes (13): image, limited(), said(), limited(), said(), tools, errorOf(), json() (+5 more)
+
+### Community 139 - "usage-meter.ts"
 Cohesion: 0.08
 Nodes (24): all, at, call, chart, database, detail, { dropped, failed, queued }, extra (+16 more)
 
-### Community 138 - "Rule 1 — Write LEAN code, no over-engineering"
-Cohesion: 0.07
-Nodes (26): database/package.json, dependencies, better-sqlite3, drizzle-orm, sql.js, devDependencies, drizzle-kit, @types/better-sqlite3 (+18 more)
-
-### Community 139 - "usage-meter.ts"
-Cohesion: 0.07
-Nodes (19): adapter, bare, body, chunks, ctx, legacy, lookupThrows, METADATA (+11 more)
-
 ### Community 140 - "Model mapping"
-Cohesion: 0.07
-Nodes (27): A provider exposing more than one wire format for the same account (transport.transports[]), Anthropic-compatible nodes: create and update rules, /v1 precedence, request URL and headers, and the connection test, apiType chat or responses on an OpenAI-compatible node: create, update, id, and the request URL, azure: an Azure OpenAI resource per connection (endpoint, deployment, api-version, organization) and its test, Build PROVIDERS / PROVIDER_OAUTH / PROVIDER_MEDIA from the per-provider registry at module load, Canonical per-provider registry entry contract (REGISTRY_TEMPLATE.js), clinepass with an API key: Cline client headers, the non-stream { success, data } envelope, and the test, cloudflare-ai: the Cloudflare account id per connection, filled into the Workers AI URL, and its test (+19 more)
+Cohesion: 0.11
+Nodes (16): AnthropicAdapter, assistantBlock(), documentBlock(), imageBlock(), nodeBetas(), openaiExtensions(), source(), stopReasonOf() (+8 more)
 
 ### Community 141 - "Model registry"
 Cohesion: 0.07
-Nodes (27): Combo rotation state invalidated when combo strategy settings change, Dashboard session cookie issuance, verification, and destruction (login/dashboardGuard/logout), DEFAULT_SETTINGS shape and migration-free merge with persisted data, GET /api/auth/saml/metadata — public SP metadata document, GET /api/auth/status — unauthenticated auth-configuration probe, GET /api/health and GET /api/init — liveness/init-ping endpoints, GET /api/settings/require-login — public pre-auth login-page context, GET /api/settings response shaping — secret stripping and env-only fields (+19 more)
+Nodes (19): adapter, bare, body, chunks, ctx, legacy, lookupThrows, METADATA (+11 more)
 
 ### Community 142 - "Usage contract (M2 SP24a, SP24b)"
 Cohesion: 0.07
-Nodes (26): 10 · Media Providers — `/providers/media/:kind`, 11 · Proxy Pools — `/network/proxy-pools`, 12 · Tunnel — `/network/tunnel`, 13 · MITM — `/network/mitm`, 14 · CLI Tools — `/integrations/cli-tools` and `/:toolId`, 15 · MCP — `/integrations/mcp`, 16 · Skills — `/integrations/skills`, 17 · Settings — `/settings/general`, `/auth`, `/developer` (+18 more)
+Nodes (27): A provider exposing more than one wire format for the same account (transport.transports[]), Anthropic-compatible nodes: create and update rules, /v1 precedence, request URL and headers, and the connection test, apiType chat or responses on an OpenAI-compatible node: create, update, id, and the request URL, azure: an Azure OpenAI resource per connection (endpoint, deployment, api-version, organization) and its test, Build PROVIDERS / PROVIDER_OAUTH / PROVIDER_MEDIA from the per-provider registry at module load, Canonical per-provider registry entry contract (REGISTRY_TEMPLATE.js), clinepass with an API key: Cline client headers, the non-stream { success, data } envelope, and the test, cloudflare-ai: the Cloudflare account id per connection, filled into the Workers AI URL, and its test (+19 more)
 
 ### Community 143 - "catalog/schema.ts"
+Cohesion: 0.07
+Nodes (27): Combo rotation state invalidated when combo strategy settings change, Dashboard session cookie issuance, verification, and destruction (login/dashboardGuard/logout), DEFAULT_SETTINGS shape and migration-free merge with persisted data, GET /api/auth/saml/metadata — public SP metadata document, GET /api/auth/status — unauthenticated auth-configuration probe, GET /api/health and GET /api/init — liveness/init-ping endpoints, GET /api/settings/require-login — public pre-auth login-page context, GET /api/settings response shaping — secret stripping and env-only fields (+19 more)
+
+### Community 144 - "claude-codex.test.mjs"
+Cohesion: 0.07
+Nodes (26): 10 · Media Providers — `/providers/media/:kind`, 11 · Proxy Pools — `/network/proxy-pools`, 12 · Tunnel — `/network/tunnel`, 13 · MITM — `/network/mitm`, 14 · CLI Tools — `/integrations/cli-tools` and `/:toolId`, 15 · MCP — `/integrations/mcp`, 16 · Skills — `/integrations/skills`, 17 · Settings — `/settings/general`, `/auth`, `/developer` (+18 more)
+
+### Community 145 - "gemini-cli.test.mjs"
 Cohesion: 0.14
 Nodes (6): OmpSettingsController, Controller, Get, Post, OmpSettingsService, Injectable
 
-### Community 144 - "claude-codex.test.mjs"
+### Community 146 - "Remote functionality"
+Cohesion: 0.14
+Nodes (9): ClaudeSettingsController, Controller, Get, Post, ClaudeSettingsService, CONFIG, Draft, object() (+1 more)
+
+### Community 147 - "Multi-account"
+Cohesion: 0.14
+Nodes (9): OpenCodeSettingsController, Controller, Get, Post, CONFIG, Draft, object(), OpenCodeSettingsService (+1 more)
+
+### Community 148 - "compilerOptions"
+Cohesion: 0.14
+Nodes (10): DroidSettingsController, Controller, Get, Post, Draft, DroidSettingsService, FILE, managed() (+2 more)
+
+### Community 149 - "`porting-behavior-not-code` RED baseline"
+Cohesion: 0.11
+Nodes (16): autodetect(), compact(), compressToolOutput(), Filter, filterFind(), filterSearchList(), groupPaths(), applyHeadroomResult() (+8 more)
+
+### Community 150 - "`writing-lean-bounded-code` RED baseline"
 Cohesion: 0.11
 Nodes (16): Alert, empty(), lowQuota(), Metrics, OverviewController, Controller, Get, Header (+8 more)
 
-### Community 145 - "gemini-cli.test.mjs"
-Cohesion: 0.17
-Nodes (27): settings/api.ts, AuthStatus, downloadSettingsFile(), RuntimeInfo, Settings, settingsKey, SettingsPreview, useAuthStatus() (+19 more)
+### Community 151 - "Database"
+Cohesion: 0.07
+Nodes (26): database/package.json, dependencies, better-sqlite3, drizzle-orm, sql.js, devDependencies, drizzle-kit, @types/better-sqlite3 (+18 more)
 
-### Community 146 - "Remote functionality"
-Cohesion: 0.15
-Nodes (27): settings.combo-rotation-reset, Routing → Capacity adapter tab (Vision, Audio input pools), CombosRepository: cached list (200), per-combo rotation state, combos table (migration 0018) + settings.combo_sticky_limit, Routing → Combo tab + ComboCreate create/edit, sticky limit, Routing simulator (decision-tree dry run), Bounded context: routing (core), /gateway/routing*, /gateway/token-saver → Routing (Combo and Capacity adapter tabs wired), ComboCreate, TokenSaver (+19 more)
-
-### Community 147 - "Multi-account"
+### Community 153 - "AIGate — Project Map"
 Cohesion: 0.15
 Nodes (5): ManagedJsonSettingsController, Draft, hash(), ManagedJsonSettingsService, ManagedJsonTool
 
-### Community 149 - "`porting-behavior-not-code` RED baseline"
+### Community 154 - "GeminiStreamEncoder"
 Cohesion: 0.13
 Nodes (8): ClineSettingsController, ClineSettingsService, digest(), DIR, Draft, object(), SECRETS, STATE
 
-### Community 150 - "`writing-lean-bounded-code` RED baseline"
-Cohesion: 0.1
-Nodes (23): UpstreamReply, Auth, authHeaders(), bearer, connectedUrl(), first(), geminiPrompt(), MINIMAX_GROUPS (+15 more)
+### Community 155 - "engine.test.mjs"
+Cohesion: 0.16
+Nodes (7): ManagedJsonSettingsController, Controller, Get, Param, Post, ManagedJsonSettingsService, Injectable
 
-### Community 151 - "Database"
-Cohesion: 0.12
-Nodes (19): FINISH, FINISH_OF, GeminiRoute, GeminiStreamEncoder, GeminiStreamMeta, geminiTtsRequest(), invalid(), isGeminiTtsRequest() (+11 more)
+### Community 156 - "responses-protocol.test.mjs"
+Cohesion: 0.19
+Nodes (14): signedIn(), server/test/catalog.test.mjs, encoder, signedIn(), boot(), PASSWORD, sessionCookie(), setUp() (+6 more)
 
-### Community 152 - "Provider account management"
+### Community 157 - "scripts"
 Cohesion: 0.09
 Nodes (13): accounts, usage, client, dir, drivers, failing, file, migrationsFolder (+5 more)
 
-### Community 153 - "AIGate — Project Map"
-Cohesion: 0.18
-Nodes (15): signedIn(), server/test/catalog.test.mjs, reply, encoder, signedIn(), boot(), PASSWORD, sessionCookie() (+7 more)
+### Community 158 - "usage.test.mjs"
+Cohesion: 0.14
+Nodes (20): diff(), errorOf(), get(), mergeToolCalls(), normalizeResponse(), normalizeUpstream(), parseSse(), usageOf() (+12 more)
 
-### Community 154 - "GeminiStreamEncoder"
+### Community 159 - "Quota Tracker"
 Cohesion: 0.08
 Nodes (23): answer, anthropic, base, claude, codebuddy, cut, empty, encoder (+15 more)
 
-### Community 155 - "engine.test.mjs"
+### Community 160 - "Speech contract (M2 SP23)"
 Cohesion: 0.09
 Nodes (21): aborted, adapter, answer(), azure, byModel, cline, clinepass, cloudflare (+13 more)
 
-### Community 156 - "responses-protocol.test.mjs"
+### Community 161 - "AIGate schema conventions"
 Cohesion: 0.08
 Nodes (25): A combo member that names another combo is routed as that combo, with no depth or cycle bound, /api/combos CRUD routes — name validation, a duplicate pre-check race, and reuse outside the chat lane, augmentModelsWithCapacityAdapter prepends adapter models first — the file's own header comment says the opposite, Combo persistence shape — id / unique name / kind / models(JSON) / timestamps, Combo / Vision Adapter, comboRotationState Map — ownership, every reset trigger, and non-durability across restart, detectRequiredCapabilities scans only the trailing user turn for modality requirements, "Fallback" strategy — sequential try-until-success across combo members (+17 more)
 
-### Community 157 - "scripts"
-Cohesion: 0.12
-Nodes (16): port, DEFAULT_REFRESH_RETRY_DELAY_MS, DEFAULT_STREAM_IDLE_TIMEOUT_MS, registerSimulationBoundary(), assertTimeZone(), DEFAULT_RETENTION_DAYS, AesGcmCipher, decodeKey() (+8 more)
+### Community 162 - ".stream"
+Cohesion: 0.17
+Nodes (18): MarketServer, body(), bool(), fail(), name(), NewProxyPool, noProxy(), Parsed (+10 more)
 
-### Community 158 - "usage.test.mjs"
-Cohesion: 0.16
-Nodes (6): OpenCodeSettingsController, CONFIG, Draft, hash(), object(), OpenCodeSettingsService
-
-### Community 159 - "Quota Tracker"
+### Community 163 - "OAuthProvider"
 Cohesion: 0.15
 Nodes (7): DroidSettingsController, Draft, DroidSettingsService, FILE, hash(), managed(), obj()
 
-### Community 160 - "Speech contract (M2 SP23)"
+### Community 164 - "anthropic-protocol.test.mjs"
 Cohesion: 0.15
 Nodes (7): KiloSettingsController, AUTH, Draft, hash(), KiloSettingsService, object(), VSCODE
 
-### Community 161 - "AIGate schema conventions"
+### Community 165 - "antigravity.test.mjs"
 Cohesion: 0.16
 Nodes (6): ClaudeSettingsController, ClaudeSettingsService, CONFIG, Draft, hash(), object()
 
-### Community 162 - ".stream"
+### Community 166 - "oauth-lane.test.mjs"
+Cohesion: 0.16
+Nodes (6): OpenCodeSettingsController, CONFIG, Draft, hash(), object(), OpenCodeSettingsService
+
+### Community 167 - "SPIKE-1: SQLite drivers through Drizzle"
 Cohesion: 0.13
 Nodes (21): useRoutingSimulation(), EXAMPLE, KIND, OUTCOME, STATUS, bad(), CAPABILITIES, capabilitiesValid() (+13 more)
 
-### Community 163 - "OAuthProvider"
-Cohesion: 0.1
-Nodes (13): drizzle-orm/sqlite-proxy/migrator, dir, drivers, file, migrationsFolder, results, migrationsFolder, fixture/schema.ts (+5 more)
+### Community 168 - "oauth.test.mjs"
+Cohesion: 0.12
+Nodes (22): Auth, authHeaders(), bearer, connectedUrl(), first(), geminiPrompt(), MINIMAX_GROUPS, noAudio() (+14 more)
 
-### Community 164 - "anthropic-protocol.test.mjs"
-Cohesion: 0.11
-Nodes (18): DriverName, FILE_PRAGMAS, Method, openBunSqlite(), openers, openNodeSqlite(), openSqlJs(), SqlValue (+10 more)
-
-### Community 165 - "antigravity.test.mjs"
+### Community 169 - "trae.test.mjs"
 Cohesion: 0.12
 Nodes (23): adapter, body(), collect(), credential, ctx(), deep, encoded, encoder (+15 more)
 
-### Community 166 - "oauth-lane.test.mjs"
-Cohesion: 0.11
-Nodes (20): cell(), renderCapabilities(), BOUNDED_CONTEXTS, ERROR_CODES, ErrorCase, Evidence, FeatureEntry, FeatureEntrySchema (+12 more)
-
-### Community 167 - "SPIKE-1: SQLite drivers through Drizzle"
+### Community 170 - "Hoàn thiện SP23: TTS lane + voice listing + preview"
 Cohesion: 0.08
 Nodes (24): code:bash (git add docs/discovery/), code:bash (git add docs/discovery/), code:bash (git add docs/discovery/), code:bash (git add docs/discovery/), code:bash (git add docs/discovery/), code:bash (git add docs/discovery/), code:bash (git add docs/discovery/), code:bash (git add docs/discovery/) (+16 more)
 
-### Community 168 - "oauth.test.mjs"
-Cohesion: 0.15
-Nodes (14): AnthropicAdapter, assistantBlock(), imageBlock(), openaiExtensions(), source(), stopReasonOf(), textBlock(), toMessages() (+6 more)
+### Community 171 - "SP24a: ghi usage, cost theo pricing, thống kê, SSE live, màn Usage và chỉnh giá"
+Cohesion: 0.23
+Nodes (12): Body, invalid(), missing(), ProxyPoolsController, Controller, Delete, Get, Header (+4 more)
 
-### Community 169 - "trae.test.mjs"
+### Community 172 - "SP24b: request detail (metadata + attempts), usage của media lanes, màn Requests"
 Cohesion: 0.15
 Nodes (5): CopilotSettingsController, CopilotSettingsService, Draft, Entry, hash()
 
-### Community 170 - "Hoàn thiện SP23: TTS lane + voice listing + preview"
+### Community 173 - "DatabaseShutdown"
 Cohesion: 0.15
 Nodes (17): allowedUrl(), classifiedBody(), classify(), DirectTransport, dispatcher(), dnsCache, envProxy(), fetchBody() (+9 more)
 
-### Community 171 - "SP24a: ghi usage, cost theo pricing, thống kê, SSE live, màn Usage và chỉnh giá"
-Cohesion: 0.09
-Nodes (17): completion, body, frames, geminiAnswer, sent, upstream, connections, cookie (+9 more)
-
-### Community 172 - "SP24b: request detail (metadata + attempts), usage của media lanes, màn Requests"
+### Community 174 - "claude-codex-lane.test.mjs"
 Cohesion: 0.09
 Nodes (23): all-statuses batches 13 per-tool GETs into one response, Array-based upsert into chatLanguageModels.json, and a missing install-detection step, auth.json write plus a best-effort, error-swallowed VS Code settings.json write, Both POST and DELETE replace the entire config.toml with a fixed template, discarding unrelated content, CLI Tools, CodeWhale and ForgeCode TOML configuration, confbox TOML provider entry plus a separate quoted-KEY=VALUE env file for the API key, Crush, Pi, and Smelt JSON configuration (+15 more)
 
-### Community 173 - "DatabaseShutdown"
-Cohesion: 0.17
-Nodes (7): OpenCodeSettingsController, Controller, Get, Post, object(), OpenCodeSettingsService, Injectable
-
-### Community 174 - "claude-codex-lane.test.mjs"
-Cohesion: 0.13
-Nodes (12): PxpipeController, Controller, Get, Header, HttpCode, Post, isPxpipeTransform(), PXPIPE_DATA_DIR (+4 more)
-
 ### Community 175 - "Token Saver contract (M2 SP21)"
-Cohesion: 0.13
-Nodes (14): FINISH, FINISH_OF, GEMINI_TTS_TIMEOUT_MS, GeminiRoute, GeminiStreamEncoder, GeminiStreamMeta, geminiTtsRequest(), invalid() (+6 more)
+Cohesion: 0.11
+Nodes (9): ConsoleLogService, Injectable, ToolingController, Controller, Delete, Get, HttpCode, Res (+1 more)
 
 ### Community 176 - "Gap register"
 Cohesion: 0.11
@@ -1203,252 +1212,248 @@ Cohesion: 0.1
 Nodes (19): approved, { authUrl, callbackUrl, state }, begun, chat(), connection, device, expiresAt, hello() (+11 more)
 
 ### Community 178 - "scripts"
+Cohesion: 0.13
+Nodes (13): Connection, ProviderSummary, mediaGroups, kindKeys, MediaProviderDetail(), testKeys, mediaAvailability(), providersForMediaKind() (+5 more)
+
+### Community 179 - "Names"
 Cohesion: 0.11
 Nodes (19): adapter, calls, context, credential, ctx, encoder, f(), frame() (+11 more)
 
-### Community 179 - "Names"
-Cohesion: 0.17
-Nodes (6): CopilotSettingsController, Controller, Get, Post, CopilotSettingsService, Injectable
-
 ### Community 180 - "AIGate"
+Cohesion: 0.09
+Nodes (21): 0. Tóm tắt, 12. Branding, 13. Những gì spec này CHƯA quyết, 1.1 Rủi ro kỹ thuật cần spike trước, 1. Quyết định kiến trúc đã khoá, 2. Layout monorepo, 3.1 Hai luật bắt buộc của CIP, 3. Canonical Internal Protocol (CIP) (+13 more)
+
+### Community 181 - "Parity report (M1 gate)"
 Cohesion: 0.19
 Nodes (8): Controller, Get, Post, TunnelController, publicUrl(), run, Injectable, TunnelService
 
-### Community 181 - "Parity report (M1 gate)"
-Cohesion: 0.17
-Nodes (13): streamed(), audio, chunk(), completion, encoder, events(), SECRET, sse() (+5 more)
-
 ### Community 182 - "antigravity-config.ts"
+Cohesion: 0.17
+Nodes (6): CopilotSettingsController, Controller, Get, Post, CopilotSettingsService, Injectable
+
+### Community 183 - "toDescriptor"
+Cohesion: 0.13
+Nodes (17): UsageRange, blankToNull(), ChartRow, Columns, Counters, Dimension, DIMENSIONS, GroupRow (+9 more)
+
+### Community 184 - "Registry"
+Cohesion: 0.12
+Nodes (11): Get, Header, Req, Names, counters(), Query, Controller, Get (+3 more)
+
+### Community 185 - "gemini-protocol.test.mjs"
 Cohesion: 0.25
 Nodes (9): cloudflareId(), multipart(), pause(), project(), record(), RelayDeployService, required(), string() (+1 more)
 
-### Community 183 - "toDescriptor"
+### Community 186 - "secret-cipher.test.mjs"
 Cohesion: 0.1
 Nodes (18): customModels, providerThinking, THINKING_LEVEL_VALUES, accountLocks, AUTH_TYPES, AuthType, providerConnections, providerNodes (+10 more)
 
-### Community 184 - "Registry"
+### Community 187 - "provider"
 Cohesion: 0.2
 Nodes (20): adapter, collect(), commandcode, credential, ctx(), done(), early(), effortOf() (+12 more)
 
-### Community 185 - "gemini-protocol.test.mjs"
+### Community 188 - "app.test.mjs"
 Cohesion: 0.1
 Nodes (15): adapter, badTransport, bytes, crc32(), ctx, encoder, eventFrame(), join() (+7 more)
 
-### Community 186 - "secret-cipher.test.mjs"
+### Community 189 - "web/CLAUDE.md"
 Cohesion: 0.1
 Nodes (21): aws-polly has no synthesis handler; local-device synthesis only works on macOS, Browser voice catalog, filters, and audible preview, COMBO_KINDS is a permanently-empty Set — combo creation/listing UI for image and tts kinds is unreachable, and the code that would render it is dead, Deepgram voices are listed although Deepgram cannot synthesize speech, getEffectiveStatus displays a stale "unavailable" testStatus as "active" once its lock has actually expired, imageToText has no dedicated request lane — it is a catalog label for vision-capable chat models, served entirely through /v1/chat/completions, MEDIA_PROVIDER_KINDS — the 9 kinds, their labels/icons, and each kind's declared REST endpoint, Media Providers (+13 more)
 
-### Community 187 - "provider"
-Cohesion: 0.11
-Nodes (16): audio, body, frames, post(), sent, tts(), ttsBody, upstream (+8 more)
-
-### Community 188 - "app.test.mjs"
-Cohesion: 0.1
-Nodes (14): answer, created, events, reply, tested, upstream, calls, fake (+6 more)
-
 ### Community 190 - "tts.test.mjs"
-Cohesion: 0.1
-Nodes (19): antigravity (SP16c2), claude (SP16b), codebuddy (SP16d), codex (SP16b), Dashboard, gemini-cli (SP16c), github (SP16b2), grok-cli (SP16d) (+11 more)
+Cohesion: 0.16
+Nodes (7): Inject, ProxyPoolsRepository, Inject, Injectable, view(), Inject, Inject
 
 ### Community 191 - ".dependency-cruiser.cjs"
 Cohesion: 0.18
-Nodes (19): CLAUDE_CODE_PROMPT, claudeCodeBody(), cloak(), copilotMessagesBody(), decode(), DECOY_NAMES, DECOYS, derivedUuid() (+11 more)
+Nodes (12): ask, message, withAnthropic(), textOf(), reply, answer, fakeUpstream(), frames() (+4 more)
 
 ### Community 192 - "audit.py"
+Cohesion: 0.1
+Nodes (14): answer, created, events, reply, tested, upstream, calls, fake (+6 more)
+
+### Community 194 - "engine/test/catalog.test.mjs"
+Cohesion: 0.1
+Nodes (19): antigravity (SP16c2), claude (SP16b), codebuddy (SP16d), codex (SP16b), Dashboard, gemini-cli (SP16c), github (SP16b2), grok-cli (SP16d) (+11 more)
+
+### Community 195 - "pricing.test.mjs"
+Cohesion: 0.14
+Nodes (13): answer, ndjson(), send(), body(), ndjson(), reply, bytes(), jsonAnswer() (+5 more)
+
+### Community 196 - "vitest.config.ts"
+Cohesion: 0.1
+Nodes (20): fast-glob, tsx, yaml, discovery/package.json, dependencies, fast-glob, yaml, zod (+12 more)
+
+### Community 197 - "Community 197"
 Cohesion: 0.15
 Nodes (9): CatalogController, find(), levelsOf(), ProviderSummary, routeKinds(), summary(), ThinkingView, ProviderThinkingRepository (+1 more)
 
-### Community 193 - "nav.py"
+### Community 198 - "Community 198"
 Cohesion: 0.2
 Nodes (4): TunnelController, publicUrl(), run, TunnelService
 
-### Community 194 - "engine/test/catalog.test.mjs"
+### Community 199 - "Community 199"
 Cohesion: 0.11
 Nodes (8): again, members, panel, plan, prompt, started, tools, upstream
 
-### Community 195 - "pricing.test.mjs"
-Cohesion: 0.13
-Nodes (11): CommandCodeAdapter, eventOf(), finishOf(), joinText(), reasoningEffort(), toEnvelope(), toMessages(), toolInput() (+3 more)
-
-### Community 196 - "vitest.config.ts"
-Cohesion: 0.11
-Nodes (17): anthropic, base, body, choiceOf(), codebuddy, empty, encoder, events (+9 more)
-
-### Community 197 - "Community 197"
-Cohesion: 0.11
-Nodes (19): api/translator/console-logs and console-logs/stream — buffered + live console output for the playground UI, api/translator/translate, load, save, send — step through and manually fire the pivot, Base64 data-URI encode/parse shared by every image-capable translator, Claude OAuth anti-ban tool cloaking and fingerprint injection, Every registered source:target request/response pair, filterToOpenAIFormat: what happens to a client's cache_control on the way to an OpenAI-format provider, How Kiro EventStream, Cursor protobuf, and CommandCode NDJSON avoid the translator's pivot dispatch, Literal-keyed runtime DOM text substitution (not a conventional key-based i18n library) (+11 more)
-
-### Community 198 - "Community 198"
-Cohesion: 0.11
-Nodes (19): aggregateEntryToDay — per-day rollup by provider/model/account/apiKey/endpoint, /api/pricing — GET merged pricing, PATCH validated overrides, DELETE reset-to-default, /api/usage/history is not a history-rows endpoint — it returns the same aggregate shape as /api/usage/stats, appendRequestLog is an empty no-op; the log view is derived read-side from usageHistory, calculateCost — pricing lookup and cache-inclusive token math, Every field recorded for one request, in the order it becomes known, GET /api/usage/providers — distinct-provider filter list for the request-details tab, GET /api/usage/request-details — pagination plus mandatory content redaction (+11 more)
-
-### Community 199 - "Community 199"
+### Community 200 - "Community 200"
 Cohesion: 0.11
 Nodes (19): Anthropic Messages client request to the OpenAI pivot (claudeToOpenAIRequest), or near passthrough to an Anthropic provider, Anthropic Messages response (JSON and SSE) to OpenAI chat completions, and upstream error handling, cloudflare-ai: every message content array is flattened to a string, Command Code NDJSON AI SDK v5 events to OpenAI chunks, and the collapsed answer for non-streaming clients, Gemini generateContent client request to the OpenAI chat body (convertGeminiToInternal), then the ordinary chat pipeline, Gemini SSE chunks and generateContent JSON to OpenAI chat completion chunks and body, Ollama NDJSON stream and JSON body to OpenAI chat completion chunks and body, OpenAI chat answer back to the Gemini client: SSE chunks (transformOpenAISSEToGeminiSSE) and the GenerateContentResponse (convertOpenAIResponseToGemini) (+11 more)
 
-### Community 200 - "Community 200"
-Cohesion: 0.18
-Nodes (15): classifiedBody(), dispatcher(), dnsCache, envProxy(), fetchBody(), googleAddress(), LOOPBACK_HOSTS, MAX_TIMEOUT_MS (+7 more)
-
 ### Community 201 - "Community 201"
+Cohesion: 0.11
+Nodes (19): api/translator/console-logs and console-logs/stream — buffered + live console output for the playground UI, api/translator/translate, load, save, send — step through and manually fire the pivot, Base64 data-URI encode/parse shared by every image-capable translator, Claude OAuth anti-ban tool cloaking and fingerprint injection, Every registered source:target request/response pair, filterToOpenAIFormat: what happens to a client's cache_control on the way to an OpenAI-format provider, How Kiro EventStream, Cursor protobuf, and CommandCode NDJSON avoid the translator's pivot dispatch, Literal-keyed runtime DOM text substitution (not a conventional key-based i18n library) (+11 more)
+
+### Community 202 - "Community 202"
+Cohesion: 0.11
+Nodes (19): aggregateEntryToDay — per-day rollup by provider/model/account/apiKey/endpoint, /api/pricing — GET merged pricing, PATCH validated overrides, DELETE reset-to-default, /api/usage/history is not a history-rows endpoint — it returns the same aggregate shape as /api/usage/stats, appendRequestLog is an empty no-op; the log view is derived read-side from usageHistory, calculateCost — pricing lookup and cache-inclusive token math, Every field recorded for one request, in the order it becomes known, GET /api/usage/providers — distinct-provider filter list for the request-details tab, GET /api/usage/request-details — pagination plus mandatory content redaction (+11 more)
+
+### Community 203 - "Community 203"
+Cohesion: 0.22
+Nodes (18): domain/usage.ts, addDays(), csvField(), dayKey(), daysBetween(), formatters, InvalidPeriod, MAX_CUSTOM_DAYS (+10 more)
+
+### Community 204 - "Community 204"
+Cohesion: 0.19
+Nodes (14): basename(), buildInventory(), glob(), IGNORE, settingsKeys(), defaultReference, here, NINEROUTER_ROOT (+6 more)
+
+### Community 205 - "Community 205"
+Cohesion: 0.16
+Nodes (10): assertTimeZone(), registerSimulationBoundary(), registerV1Routes(), port, API_PREFIXES, createServer(), ServerOptions, database (+2 more)
+
+### Community 206 - "Community 206"
+Cohesion: 0.27
+Nodes (17): asBody(), Body, DATA_FIELDS, DataField, fail(), isJsonCredential(), NewConnection, parseApiKey() (+9 more)
+
+### Community 207 - "Community 207"
 Cohesion: 0.12
 Nodes (4): RecentEvent, ConsoleEvent, ConsoleLogService, ToolingController
 
-### Community 202 - "Community 202"
-Cohesion: 0.1
-Nodes (15): aborted, at, inspect(), nested, order, pools, repo, upstream (+7 more)
-
-### Community 203 - "Community 203"
-Cohesion: 0.16
-Nodes (17): adapter, answer, body(), cloud, collect(), credential, ctx(), encoder (+9 more)
-
-### Community 204 - "Community 204"
-Cohesion: 0.11
-Nodes (17): Claude Code config, CLI tool discovery (SP25 slice), Cline config, Codex config, Console log, Copilot, Crush, Pi, and Smelt config, DeepSeek TUI config, Droid config (+9 more)
-
-### Community 205 - "Community 205"
-Cohesion: 0.14
-Nodes (9): image, limited(), said(), json(), send(), upstream(), { privateKey }, SERVICE_ACCOUNT (+1 more)
-
-### Community 206 - "Community 206"
-Cohesion: 0.16
-Nodes (14): bad(), CAPABILITIES, capabilitiesValid(), Capability, DecisionNode, REASONS, simulationChildren(), SimulationResult (+6 more)
-
-### Community 207 - "Community 207"
-Cohesion: 0.15
-Nodes (16): zod, discovery/src/capabilities.ts, cell(), renderCapabilities(), src/schema.ts, BOUNDED_CONTEXTS, ERROR_CODES, ErrorCase (+8 more)
-
 ### Community 208 - "Community 208"
 Cohesion: 0.11
-Nodes (15): Error taxonomy and fallback, Rules, Before implementing, Checks for suspected bugs, Columns, Feature Matrix entry, Trace questions, Golden scenarios (+7 more)
+Nodes (16): cut, entry, failed, fetchModels(), idle, ids, listed, models (+8 more)
 
 ### Community 209 - "Community 209"
 Cohesion: 0.11
-Nodes (17): Claude Code config, CLI tool discovery (SP25 slice), Cline config, Codex config, Console log, Copilot, Crush, Pi, and Smelt config, DeepSeek TUI config, Droid config (+9 more)
+Nodes (16): anthropic, base, body, codebuddy, empty, encoder, events, failing (+8 more)
 
 ### Community 210 - "Community 210"
+Cohesion: 0.16
+Nodes (17): adapter, answer, body(), cloud, collect(), credential, ctx(), encoder (+9 more)
+
+### Community 211 - "Community 211"
+Cohesion: 0.11
+Nodes (17): Claude Code config, CLI tool discovery (SP25 slice), Cline config, Codex config, Console log, Copilot, Crush, Pi, and Smelt config, DeepSeek TUI config, Droid config (+9 more)
+
+### Community 212 - "Community 212"
+Cohesion: 0.18
+Nodes (8): QuotaController, Controller, Get, Header, Param, Post, QuotaService, Injectable
+
+### Community 213 - "Community 213"
+Cohesion: 0.11
+Nodes (15): Error taxonomy and fallback, Rules, Before implementing, Checks for suspected bugs, Columns, Feature Matrix entry, Trace questions, Golden scenarios (+7 more)
+
+### Community 214 - "Community 214"
+Cohesion: 0.11
+Nodes (17): Claude Code config, CLI tool discovery (SP25 slice), Cline config, Codex config, Console log, Copilot, Crush, Pi, and Smelt config, DeepSeek TUI config, Droid config (+9 more)
+
+### Community 215 - "Community 215"
 Cohesion: 0.19
 Nodes (9): autodetect(), compact(), compressToolOutput(), Filter, filterFind(), filterSearchList(), filterStatus(), filterTree() (+1 more)
 
-### Community 211 - "Community 211"
-Cohesion: 0.12
-Nodes (16): a, answer, body, claudeReply, connection, db, failing, gateway (+8 more)
+### Community 216 - "Community 216"
+Cohesion: 0.17
+Nodes (17): applyQuirks(), assistantMessage(), audioFormat(), compact(), copilotChatBody(), kimchiBody(), mediaUrl(), messageMark() (+9 more)
 
-### Community 212 - "Community 212"
+### Community 217 - "Community 217"
 Cohesion: 0.21
 Nodes (13): FILE_PRAGMAS, Method, openBetterSqlite(), openBunSqlite(), openers, openNodeSqlite(), openSqlJs(), SqlValue (+5 more)
 
-### Community 213 - "Community 213"
-Cohesion: 0.15
-Nodes (10): applyThinking(), budgetFloor(), GeminiAdapter, intentOf(), normalize(), streamUsage(), thinkingFormat(), toBody() (+2 more)
-
-### Community 214 - "Community 214"
-Cohesion: 0.15
-Nodes (7): autodetect(), compact(), compressToolOutput(), Filter, filterFind(), filterSearchList(), groupPaths()
-
-### Community 215 - "Community 215"
-Cohesion: 0.15
-Nodes (9): answer, ndjson(), send(), body(), get(), OPTIONS, recorderOf(), send() (+1 more)
-
-### Community 216 - "Community 216"
-Cohesion: 0.18
-Nodes (13): ALLOWED, CODEX_MODELS, codexBody(), codexUrl(), DROPPED, EFFORT_SUFFIXES, HOSTED_TOOLS, CODEX_DEFAULT_INSTRUCTIONS (+5 more)
-
-### Community 217 - "Community 217"
+### Community 218 - "Community 218"
 Cohesion: 0.14
 Nodes (12): airforce, body(), credential, encoder, hello, isCode(), json(), noSecret() (+4 more)
-
-### Community 218 - "Community 218"
-Cohesion: 0.32
-Nodes (15): asBody(), Body, DATA_FIELDS, DataField, fail(), NewConnection, parseApiKey(), parseChanges() (+7 more)
 
 ### Community 219 - "Community 219"
 Cohesion: 0.18
 Nodes (5): PxpipeController, isPxpipeTransform(), PXPIPE_DATA_DIR, PxpipeService, PxpipeTransform
 
-### Community 220 - "Community 220"
+### Community 221 - "Community 221"
 Cohesion: 0.12
 Nodes (12): adapter, chunks, early, events, late, provider, proxy, server (+4 more)
 
-### Community 221 - "Community 221"
+### Community 222 - "Community 222"
 Cohesion: 0.23
 Nodes (3): invalid(), missing(), ProxyPoolsController
 
-### Community 222 - "Community 222"
+### Community 223 - "Community 223"
 Cohesion: 0.12
 Nodes (15): answer, audio, bare, body, encoder, meta, { models }, names (+7 more)
 
-### Community 223 - "Community 223"
+### Community 224 - "Community 224"
 Cohesion: 0.18
 Nodes (15): adapter, body(), collect(), credential, ctx(), encoder, fakeTransport(), hello (+7 more)
 
-### Community 224 - "Community 224"
+### Community 225 - "Community 225"
 Cohesion: 0.12
 Nodes (13): anthropic, copilotClaude, disabled, github, openai, override, own, ownBudget (+5 more)
 
-### Community 225 - "Community 225"
+### Community 226 - "Community 226"
 Cohesion: 0.12
 Nodes (16): A real (non-noAuth) connection is bound to a proxy pool via its own create/update body, Cached undici ProxyAgent dispatchers, keyed by normalized proxy URL, GET/POST /api/proxy-pools — list (with optional usage enrichment) and create, GET/PUT/DELETE /api/proxy-pools/[id], MITM_BYPASS_HOSTS — manual DNS resolution + raw-socket TLS to dodge local DNS/hosts poisoning, OpenCode Free uses persisted fixed/round-robin/random pool selection on real chat traffic, pickProxyPoolId() rotation for free/noAuth providers, keyed by settings.providerStrategies, POST /api/proxy-pools/cloudflare-deploy — uploads a Worker relay script and resolves its workers.dev URL (+8 more)
 
-### Community 226 - "Community 226"
+### Community 227 - "Community 227"
 Cohesion: 0.12
 Nodes (14): 1 · Lộ trình, 1 · Lộ trình, 2 · UI sub-project (M3) — thứ tự dựng, 2 · UI sub-project (M3) — thứ tự dựng, 3 · Màn hình → backend → feature → design, 3 · Màn hình → backend → feature → design, 4 · Bounded context → ai dùng nó, 4 · Bounded context → ai dùng nó (+6 more)
 
-### Community 227 - "Community 227"
-Cohesion: 0.12
-Nodes (15): 0. Tóm tắt, 12. Branding, 13. Những gì spec này CHƯA quyết, 1.1 Rủi ro kỹ thuật cần spike trước, 1. Quyết định kiến trúc đã khoá, 2. Layout monorepo, 3.1 Hai luật bắt buộc của CIP, 3. Canonical Internal Protocol (CIP) (+7 more)
-
 ### Community 228 - "Community 228"
-Cohesion: 0.12
-Nodes (16): server/package.json, devDependencies, @types/node, typescript, @aigate/engine, drizzle-orm, @types/node, typescript (+8 more)
-
-### Community 229 - "Community 229"
-Cohesion: 0.17
-Nodes (12): testModel(), useSaveCapacityPool(), PoolCard(), probe(), status(), ComboForm(), changeMembers(), handleSubmit() (+4 more)
-
-### Community 230 - "Community 230"
 Cohesion: 0.14
 Nodes (11): anthropic, body(), credential, encoder, gateway, hello, json(), minimax (+3 more)
 
-### Community 231 - "Community 231"
+### Community 229 - "Community 229"
 Cohesion: 0.16
 Nodes (10): encoder, hello, json(), partner, { privateKey, publicKey }, reply(), sse(), stream() (+2 more)
 
-### Community 232 - "Community 232"
+### Community 231 - "Community 231"
 Cohesion: 0.35
 Nodes (12): body(), bool(), fail(), name(), noProxy(), Parsed, parseNewProxyPool(), parseProxyPoolChanges() (+4 more)
+
+### Community 232 - "Community 232"
+Cohesion: 0.21
+Nodes (12): [command, ...args], golden(), main(), option(), report(), ROOT, capabilityIds(), coverage() (+4 more)
+
+### Community 233 - "Community 233"
+Cohesion: 0.15
+Nodes (12): CoverageReport, Dimension, EVIDENCE_PATH, renderCoverage(), Inventory, base, entries, inv (+4 more)
 
 ### Community 234 - "Community 234"
 Cohesion: 0.22
 Nodes (12): DriverName, Database, DatabaseHandle, fallbackOrder(), MIGRATIONS_FOLDER, openClient(), openDatabase(), call() (+4 more)
 
 ### Community 235 - "Community 235"
-Cohesion: 0.21
-Nodes (12): [command, ...args], golden(), main(), option(), report(), ROOT, capabilityIds(), coverage() (+4 more)
+Cohesion: 0.2
+Nodes (5): asRecord(), events(), partsText(), TraeAdapter, usageOf()
 
 ### Community 236 - "Community 236"
 Cohesion: 0.13
-Nodes (15): fast-glob, tsx, yaml, discovery/package.json, dependencies, fast-glob, yaml, zod (+7 more)
-
-### Community 237 - "Community 237"
-Cohesion: 0.22
-Nodes (11): basename(), buildInventory(), glob(), IGNORE, settingsKeys(), defaultReference, here, NINEROUTER_ROOT (+3 more)
-
-### Community 238 - "Community 238"
-Cohesion: 0.21
-Nodes (10): loadOrExit(), MATRIX_DIR, OUT_DIR, resolveEvidence(), countLines(), lineCount(), lineCounts, validateMatrix() (+2 more)
-
-### Community 239 - "Community 239"
-Cohesion: 0.13
 Nodes (12): Bounded patterns, Cache with a TTL and a size cap, Circuit breaker and cursor pagination, Four concurrent calls at most, Queue, stream, and SSE backpressure, Retry within one deadline, Database checks, Review gate (+4 more)
 
-### Community 240 - "Community 240"
+### Community 237 - "Community 237"
+Cohesion: 0.2
+Nodes (4): CustomModelsController, filled(), invalid(), CustomModelsRepository
+
+### Community 238 - "Community 238"
 Cohesion: 0.24
-Nodes (8): format(), OllamaAdapter, textOf(), toBody(), toMessages(), toolArguments(), unsupported(), usageOf()
+Nodes (9): headers(), call(), cleanup(), login(), record(), NOISE_HEADERS, render(), SECRET_HEADERS (+1 more)
+
+### Community 239 - "Community 239"
+Cohesion: 0.16
+Nodes (11): as(), create(), encoder, { id }, network, rekeyed, renamed, run() (+3 more)
+
+### Community 240 - "Community 240"
+Cohesion: 0.14
+Nodes (9): adapter, body, chunks, ctx, descriptor, exchange, guidance, login (+1 more)
 
 ### Community 241 - "Community 241"
 Cohesion: 0.14
-Nodes (9): adapter, body, chunks, ctx, descriptor, exchange, guidance, login (+1 more)
+Nodes (14): BaseExecutor's own buildHeaders fallback — used by dedicated-executor providers that don't override header construction, Config-driven generic OAuth refresh (REFRESH_GRANTS / refreshFromGrant) for the standard refresh_token grant shape, Find local desktop API key and optional session identity, Hand-written per-provider refresh methods for providers whose token endpoint doesn't fit the generic grant shape, Import an API key or session credential, OAUTH_INJECT_FIELDS — clientId/clientSecret/tokenUrl injected from the oauth block, not stored per connection, POST /api/provider-nodes/validate — probe a user-supplied baseUrl+apiKey before a custom provider node is saved, POST /api/providers/[id]/test — probe one connection's credential validity against its provider and persist the result (+6 more)
 
 ### Community 242 - "Community 242"
 Cohesion: 0.14
@@ -1456,107 +1461,103 @@ Nodes (14): 6 api/headroom/* routes: process lifecycle for headroom, an external
 
 ### Community 243 - "Community 243"
 Cohesion: 0.14
-Nodes (14): BaseExecutor's own buildHeaders fallback — used by dedicated-executor providers that don't override header construction, Config-driven generic OAuth refresh (REFRESH_GRANTS / refreshFromGrant) for the standard refresh_token grant shape, Find local desktop API key and optional session identity, Hand-written per-provider refresh methods for providers whose token endpoint doesn't fit the generic grant shape, Import an API key or session credential, OAUTH_INJECT_FIELDS — clientId/clientSecret/tokenUrl injected from the oauth block, not stored per connection, POST /api/provider-nodes/validate — probe a user-supplied baseUrl+apiKey before a custom provider node is saved, POST /api/providers/[id]/test — probe one connection's credential validity against its provider and persist the result (+6 more)
+Nodes (13): AIGate — Design System, code:block1 (Overview), Color, Components, Density, Destructive actions, Hard rule, Layout (+5 more)
 
 ### Community 244 - "Community 244"
 Cohesion: 0.14
-Nodes (13): AIGate — Design System, code:block1 (Overview), Color, Components, Density, Destructive actions, Hard rule, Layout (+5 more)
+Nodes (14): server/tsconfig.json, compilerOptions, emitDecoratorMetadata, experimentalDecorators, module, moduleResolution, outDir, rootDir (+6 more)
 
 ### Community 245 - "Community 245"
 Cohesion: 0.14
-Nodes (14): server/tsconfig.json, compilerOptions, emitDecoratorMetadata, experimentalDecorators, module, moduleResolution, outDir, rootDir (+6 more)
-
-### Community 246 - "Community 246"
-Cohesion: 0.14
 Nodes (14): web/tsconfig.json, compilerOptions, allowImportingTsExtensions, jsx, lib, module, moduleResolution, noEmit (+6 more)
 
-### Community 247 - "Community 247"
-Cohesion: 0.19
-Nodes (11): computeCoverage(), CoverageReport, Dimension, EVIDENCE_PATH, renderCoverage(), Inventory, base, entries (+3 more)
+### Community 246 - "Community 246"
+Cohesion: 0.22
+Nodes (9): loadOrExit(), MATRIX_DIR, OUT_DIR, countLines(), lineCount(), lineCounts, validateMatrix(), ValidationResult (+1 more)
 
-### Community 248 - "Community 248"
+### Community 247 - "Community 247"
 Cohesion: 0.22
 Nodes (11): builtin(), PATTERNS, Price, PRICE_FIELDS, PriceField, PriceOverride, PriceSource, resolvePrice() (+3 more)
 
-### Community 249 - "Community 249"
-Cohesion: 0.18
-Nodes (10): as(), create(), encoder, { id }, network, rekeyed, renamed, run() (+2 more)
-
-### Community 250 - "Community 250"
+### Community 248 - "Community 248"
 Cohesion: 0.23
 Nodes (3): asRecord(), TraeAdapter, usageOf()
 
-### Community 251 - "Community 251"
+### Community 249 - "Community 249"
 Cohesion: 0.15
 Nodes (8): adapter, body, capped, chunks, ctx, provider, streamTransport, url
 
-### Community 252 - "Community 252"
-Cohesion: 0.26
-Nodes (9): call(), cleanup(), login(), record(), TAPES_DIR, NOISE_HEADERS, render(), SECRET_HEADERS (+1 more)
-
-### Community 253 - "Community 253"
+### Community 250 - "Community 250"
 Cohesion: 0.19
-Nodes (7): McpMarketplaceController, Controller, Get, Query, McpMarketplaceService, Inject, Injectable
+Nodes (11): cell(), renderCapabilities(), FeatureEntry, base, bugsSection, capSection, cells, entries (+3 more)
 
-### Community 254 - "Community 254"
+### Community 251 - "Community 251"
+Cohesion: 0.28
+Nodes (10): defaultReference, here, NINEROUTER_ROOT, referenceCandidates, REPO_ROOT, resolveEvidence(), resolveRef(), countLines() (+2 more)
+
+### Community 252 - "Community 252"
 Cohesion: 0.15
 Nodes (13): database/tsconfig.json, compilerOptions, declaration, module, moduleResolution, outDir, rootDir, skipLibCheck (+5 more)
 
-### Community 255 - "Community 255"
+### Community 253 - "Community 253"
 Cohesion: 0.15
 Nodes (13): engine/package.json, devDependencies, @types/node, typescript, exports, @types/node, typescript, name (+5 more)
 
-### Community 256 - "Community 256"
-Cohesion: 0.28
-Nodes (8): format(), OllamaAdapter, textOf(), toBody(), toMessages(), toolArguments(), unsupported(), usageOf()
-
-### Community 257 - "Community 257"
+### Community 254 - "Community 254"
 Cohesion: 0.18
 Nodes (7): body(), credential, encoder, gemini, hello, json(), sse()
 
-### Community 258 - "Community 258"
+### Community 255 - "Community 255"
 Cohesion: 0.18
 Nodes (9): answer, body(), cloud, credential, encoder, hello, json(), local (+1 more)
 
-### Community 259 - "Community 259"
+### Community 256 - "Community 256"
 Cohesion: 0.18
 Nodes (10): body(), credential, ctx, enc, meta, openai, response, send() (+2 more)
 
-### Community 260 - "Community 260"
+### Community 257 - "Community 257"
 Cohesion: 0.15
 Nodes (13): engine/tsconfig.json, compilerOptions, declaration, module, moduleResolution, outDir, rootDir, skipLibCheck (+5 more)
 
-### Community 262 - "Community 262"
+### Community 259 - "Community 259"
 Cohesion: 0.17
 Nodes (10): eleven, fish, gemini, mimo, minimax, nvidia, openai, router (+2 more)
 
-### Community 263 - "Community 263"
+### Community 260 - "Community 260"
+Cohesion: 0.18
+Nodes (8): loadOrExit(), MATRIX_DIR, OUT_DIR, r, validateMatrix(), ValidationResult, dirs, r
+
+### Community 261 - "Community 261"
 Cohesion: 0.17
 Nodes (12): Create a new API key (POST /api/keys), Derive the stable per-install machineId embedded in new API keys, Endpoint & API Key, Extract the inbound API key from request headers, Gate chat requests behind settings.requireApiKey, Legacy sk-{random8} keys and the never-invoked CRC/format validation, List all API keys (GET /api/keys), Permanently remove a key (DELETE /api/keys/[id]) (+4 more)
 
-### Community 264 - "Community 264"
+### Community 262 - "Community 262"
 Cohesion: 0.17
 Nodes (11): code:block1 (cost = input × input + cacheRead × (cached ?? input) + cache), Cost, Dashboard API (session), Days, periods, retention, Deviations from 9router, Requests (SP24b), UI, Usage contract (M2 SP24a, SP24b) (+3 more)
 
-### Community 265 - "Community 265"
-Cohesion: 0.17
-Nodes (11): code:block1 (tools/discovery/), code:ts (import { describe, expect, it } from "vitest";), code:ts (import type { FeatureEntry } from "./schema.js";), code:ts (import { mkdirSync, writeFileSync } from "node:fs";), code:bash (mkdir -p docs/discovery/feature-matrix && touch docs/discove), code:bash (git add tools/discovery/src/capabilities.ts tools/discovery/), File Structure, Fixed inventory counts (measured 2026-09-22 against `E:\9router`) (+3 more)
-
-### Community 266 - "Community 266"
+### Community 263 - "Community 263"
 Cohesion: 0.17
 Nodes (12): 11.1 Nguyên tắc chia: theo *kiểu thất bại*, không theo *file nguồn*, 11.2 Phân tuyến: máy chặn vs skill dạy, 11.3 Skill 1 — `writing-lean-bounded-code`, 11.4 Skill 2 — `porting-behavior-not-code`, 11.5 Hai skill khớp nhau, 11.6 Iron Law — skill không được viết trước khi có test đỏ, 11.7 SP0 chẻ nhỏ, 11. Hai skill (SP0) (+4 more)
 
-### Community 267 - "Community 267"
+### Community 264 - "Community 264"
 Cohesion: 0.17
 Nodes (12): 10.10 Chẻ sub-project UI (M3), 10.1 Phê bình IA hiện tại của 9router, 10.2 IA mới — 7 nhóm theo *việc*, 10.3 Stack web, 10.4 Cấu trúc feature-based, 10.5 Quản lý state — tối thiểu, 10.6 Ràng buộc performance UI (`rules.md` mục 4), 10.7 Quy ước trạng thái cho mọi màn hình (+4 more)
 
-### Community 268 - "Community 268"
+### Community 265 - "Community 265"
 Cohesion: 0.17
 Nodes (11): Acceptance and verification, Architecture and ownership, Errors and notifications, Intent and baseline, Language state and storage, Lifecycle and resource bounds, Number, time and money presentation, Review and next gate (+3 more)
 
-### Community 269 - "Community 269"
-Cohesion: 0.17
-Nodes (12): dependencies, @aigate/database, @aigate/engine, drizzle-orm, fastify, @fastify/static, @nestjs/common, @nestjs/core (+4 more)
+### Community 266 - "Community 266"
+Cohesion: 0.2
+Nodes (7): McpMarketplaceController, Controller, Get, Query, McpMarketplaceService, Inject, Injectable
+
+### Community 267 - "Community 267"
+Cohesion: 0.3
+Nodes (11): assistantBlock(), imageBlock(), openaiExtensions(), source(), textBlock(), toMessages(), toolChoice(), toolInput() (+3 more)
+
+### Community 268 - "Community 268"
+Cohesion: 0.45
+Nodes (3): GithubAdapter, isClaude(), servesResponses()
 
 ### Community 270 - "Community 270"
 Cohesion: 0.2
@@ -1575,174 +1576,182 @@ Cohesion: 0.2
 Nodes (8): body(), credential, encoder, hello, json(), pplx, reply, sse()
 
 ### Community 274 - "Community 274"
-Cohesion: 0.17
-Nodes (12): @aigate/server, parity/package.json, description, devDependencies, @aigate/engine, @aigate/server, @aigate/engine, name (+4 more)
+Cohesion: 0.23
+Nodes (10): computeCoverage(), CoverageReport, Dimension, EVIDENCE_PATH, renderCoverage(), Inventory, FeatureEntry, base (+2 more)
 
 ### Community 275 - "Community 275"
 Cohesion: 0.17
-Nodes (11): File ownership and order, Global Constraints, Plan self-review and execution gate, Review Focus, SP28 Core Dashboard Localization Implementation Plan, Task 1: Translation, storage and formatting contract, Task 2: Root locale, General selection and translated shell, Task 3: Render-time errors, toast and shared defaults (+3 more)
+Nodes (12): @aigate/server, parity/package.json, description, devDependencies, @aigate/engine, @aigate/server, @aigate/engine, name (+4 more)
 
 ### Community 276 - "Community 276"
 Cohesion: 0.17
-Nodes (11): Acceptance and verification, Architecture and ownership, Errors and notifications, Intent and baseline, Language state and storage, Lifecycle and resource bounds, Number, time and money presentation, Review and next gate (+3 more)
+Nodes (11): File ownership and order, Global Constraints, Plan self-review and execution gate, Review Focus, SP28 Core Dashboard Localization Implementation Plan, Task 1: Translation, storage and formatting contract, Task 2: Root locale, General selection and translated shell, Task 3: Render-time errors, toast and shared defaults (+3 more)
 
 ### Community 277 - "Community 277"
-Cohesion: 0.24
-Nodes (12): User decision 2026-09-27: SP15c keeps 9router on request, response and auth/path; TTS passthrough ported now, Gemini client protocol contract (M2 SP15c), API_UI_MAP row: SP15c Gemini client protocol, catalog.v1beta-generate-content-dispatch, catalog.v1beta-models-listing, translator.gemini-client-request, translator.openai-to-gemini-client-response, protocols/gemini-generate.ts — path parsing, text-only request, GenerateContentResponse, Gemini SSE encoder, model list, TTS request (+4 more)
+Cohesion: 0.17
+Nodes (11): Acceptance and verification, Architecture and ownership, Errors and notifications, Intent and baseline, Language state and storage, Lifecycle and resource bounds, Number, time and money presentation, Review and next gate (+3 more)
 
 ### Community 278 - "Community 278"
-Cohesion: 0.18
-Nodes (9): ask, bad, body, events, message, ok, out, sent (+1 more)
-
-### Community 279 - "Community 279"
-Cohesion: 0.18
-Nodes (5): GrokBuildSettingsController, Draft, FILE, Subagents, TYPES
-
-### Community 280 - "Community 280"
 Cohesion: 0.29
 Nodes (8): aigateRules, findInScope(), FUNCTION_TYPES, isBoundedSignal(), isFetch(), isMember(), isRetryShapedTry(), isTimeoutCall()
 
-### Community 281 - "Community 281"
+### Community 279 - "Community 279"
 Cohesion: 0.18
-Nodes (11): A user-defined model alias resolves to a real provider/model pair before any capability lookup or dispatch happens, Background models.dev sync — daily refresh, cross-gateway majority vote, tolerance band, fail-open, Disabling a model only hides it from listing endpoints — an alias (or a direct provider/model string) pointing at a disabled model still routes normally, GET /api/tags — fixed two-entry fixture list mimicking Ollama's model-discovery response, used by Ollama-compatible tools before they call the ollama chat lane (05's routing.ollama-lane-transform), GET /v1beta/models — Gemini-format static model catalog for Gemini-native clients (e.g. Gemini CLI, the @google/genai SDK), getCapabilitiesForModel's 4-tier priority chain — first match wins, no cross-tier merge, Model mapping, NOT_VISION is tested before VISION_NAME in looksLikeVisionModel, and can only turn vision on (+3 more)
+Nodes (6): DEVIATIONS, ERROR_SHAPE, SCENARIOS, USAGE_BUFFER, usageChunk, weatherTool
+
+### Community 280 - "Community 280"
+Cohesion: 0.18
+Nodes (9): ask, bad, body, events, message, ok, out, sent (+1 more)
+
+### Community 281 - "Community 281"
+Cohesion: 0.2
+Nodes (9): BOUNDED_CONTEXTS, ERROR_CODES, ErrorCase, Evidence, FeatureEntrySchema, LABELS, Prose, r (+1 more)
 
 ### Community 282 - "Community 282"
 Cohesion: 0.18
-Nodes (11): /api/models/availability — dashboard-facing, model-centric aggregation of per-connection cooldown/unavailable locks, plus a manual clear-cooldown action, /api/models/custom — operator-added custom models, atomic upsert that preserves unset fields, /api/models/disabled — per-provider disable/enable list with an atomic merge inside a DB transaction, /api/models/test — synchronous per-model connectivity probe, self-dispatched through 9router's own /v1/* endpoints, Deleting a custom provider node leaves its customModels rows behind, GET /v1/models/{kind} and GET /v1/models/{provider}/{model} — kind-filtered listing and single-model lookup on the OpenAI-compatible lane, Model registry, Provider detail 'Available Models' — add a model id by hand, or 'Import from /models' every id the connection's upstream lists, each shown as <prefix>/<id> with Copy, Test and Delete (+3 more)
+Nodes (11): A user-defined model alias resolves to a real provider/model pair before any capability lookup or dispatch happens, Background models.dev sync — daily refresh, cross-gateway majority vote, tolerance band, fail-open, Disabling a model only hides it from listing endpoints — an alias (or a direct provider/model string) pointing at a disabled model still routes normally, GET /api/tags — fixed two-entry fixture list mimicking Ollama's model-discovery response, used by Ollama-compatible tools before they call the ollama chat lane (05's routing.ollama-lane-transform), GET /v1beta/models — Gemini-format static model catalog for Gemini-native clients (e.g. Gemini CLI, the @google/genai SDK), getCapabilitiesForModel's 4-tier priority chain — first match wins, no cross-tier merge, Model mapping, NOT_VISION is tested before VISION_NAME in looksLikeVisionModel, and can only turn vision on (+3 more)
 
 ### Community 283 - "Community 283"
 Cohesion: 0.18
-Nodes (10): Answer (non-streaming), Anthropic Messages client protocol contract (M2 SP15), count_tokens, Matrix, Matrix entries, Other deviations, Request (Anthropic body → CIP), Routes and auth (+2 more)
+Nodes (11): /api/models/availability — dashboard-facing, model-centric aggregation of per-connection cooldown/unavailable locks, plus a manual clear-cooldown action, /api/models/custom — operator-added custom models, atomic upsert that preserves unset fields, /api/models/disabled — per-provider disable/enable list with an atomic merge inside a DB transaction, /api/models/test — synchronous per-model connectivity probe, self-dispatched through 9router's own /v1/* endpoints, Deleting a custom provider node leaves its customModels rows behind, GET /v1/models/{kind} and GET /v1/models/{provider}/{model} — kind-filtered listing and single-model lookup on the OpenAI-compatible lane, Model registry, Provider detail 'Available Models' — add a model id by hand, or 'Import from /models' every id the connection's upstream lists, each shown as <prefix>/<id> with Copy, Test and Delete (+3 more)
 
 ### Community 284 - "Community 284"
 Cohesion: 0.18
-Nodes (10): Anthropic Messages provider contract (M2 SP14a), Connection test and models, Deviations from 9router (not ported, user decision), Errors, Matrix, Matrix entries, Registry changes, Request (CIP → Messages) (+2 more)
+Nodes (10): Answer (non-streaming), Anthropic Messages client protocol contract (M2 SP15), count_tokens, Matrix, Matrix entries, Other deviations, Request (Anthropic body → CIP), Routes and auth (+2 more)
 
 ### Community 285 - "Community 285"
 Cohesion: 0.18
-Nodes (10): Answer (JSON body, kept 9router), Gemini provider contract (M2 SP14e), Matrix, Matrix entries, Models and connection test, Other forced deviations, Request (CIP → generateContent), Stream (SSE → StreamChunk, kept 9router) (+2 more)
+Nodes (10): Anthropic Messages provider contract (M2 SP14a), Connection test and models, Deviations from 9router (not ported, user decision), Errors, Matrix, Matrix entries, Registry changes, Request (CIP → Messages) (+2 more)
 
 ### Community 286 - "Community 286"
 Cohesion: 0.18
-Nodes (10): Connection test (corrected), Credentials, Endpoints, Matrix, Matrix entries, Models, Other deviations, Request and answer (+2 more)
+Nodes (10): Answer (JSON body, kept 9router), Gemini provider contract (M2 SP14e), Matrix, Matrix entries, Models and connection test, Other forced deviations, Request (CIP → generateContent), Stream (SSE → StreamChunk, kept 9router) (+2 more)
 
 ### Community 287 - "Community 287"
 Cohesion: 0.18
-Nodes (11): 8.1 Ba tầng, chỉ tầng 1–2 là cổng chặn, 8.2 Thu tape — lợi dụng chính tính năng của 9router, 8.3 Chuẩn hoá trước khi diff, 8.4 Golden scenarios (`§25`) — 13 kịch bản, áp cho **mọi** lane, 8.5 Đo coverage, 8.6 Giới hạn phải nói thẳng, 8. Parity verification, code:block11 (client ──> 9router :20128 ──> recording proxy ──> vendor thậ) (+3 more)
+Nodes (10): Connection test (corrected), Credentials, Endpoints, Matrix, Matrix entries, Models, Other deviations, Request and answer (+2 more)
 
 ### Community 288 - "Community 288"
 Cohesion: 0.18
-Nodes (5): claude, codex, ctx, message, ok
+Nodes (11): 8.1 Ba tầng, chỉ tầng 1–2 là cổng chặn, 8.2 Thu tape — lợi dụng chính tính năng của 9router, 8.3 Chuẩn hoá trước khi diff, 8.4 Golden scenarios (`§25`) — 13 kịch bản, áp cho **mọi** lane, 8.5 Đo coverage, 8.6 Giới hạn phải nói thẳng, 8. Parity verification, code:block11 (client ──> 9router :20128 ──> recording proxy ──> vendor thậ) (+3 more)
 
 ### Community 289 - "Community 289"
+Cohesion: 0.18
+Nodes (5): claude, codex, ctx, message, ok
+
+### Community 290 - "Community 290"
 Cohesion: 0.2
 Nodes (5): ctx, json(), METADATA, provider, send()
 
-### Community 290 - "Community 290"
+### Community 291 - "Community 291"
+Cohesion: 0.2
+Nodes (10): zod, src/schema.ts, BOUNDED_CONTEXTS, ERROR_CODES, ErrorCase, Evidence, FeatureEntrySchema, LABELS (+2 more)
+
+### Community 292 - "Community 292"
 Cohesion: 0.18
 Nodes (10): Cost, Dashboard API (session), Days, periods, retention, Deviations from 9router, Requests (SP24b), UI, Usage contract (M2 SP24a, SP24b), Vendor quota (SP24c) (+2 more)
 
-### Community 291 - "Community 291"
+### Community 293 - "Community 293"
 Cohesion: 0.18
 Nodes (10): File responsibilities and interfaces, Global Constraints, Plan self-review and execution handoff, Review Focus, SP29 Routing Simulator Implementation Plan, Task 1: Contracted shared decisions and read-only inspection, Task 2: Bounded decision planner, Task 3: Protected HTTP boundary and no-side-effect contract (+2 more)
 
-### Community 292 - "Community 292"
+### Community 294 - "Community 294"
 Cohesion: 0.2
 Nodes (7): NewProxyPool, ProxyPoolChanges, columns, ProxyPoolView, rotateState, Row, TransportModule
 
-### Community 293 - "Community 293"
-Cohesion: 0.2
-Nodes (10): Distinguishing 'no accounts configured' from 'all accounts temporarily locked', with retry-after computed from the earliest lock, fill-first strategy — the default when no round-robin override applies, Filtering candidates by exclude-set, active model lock, and (Antigravity only) cached live quota before any strategy runs, In-memory Antigravity live-quota cache that pre-filters accounts before a request is even attempted, Multi-account, Mutex scope around getProviderCredentials, options.preferredConnectionId pins selection to one connection, bypassing fill-first/round-robin, "Public" virtual connection injected for noAuth providers (+2 more)
-
-### Community 294 - "Community 294"
-Cohesion: 0.2
-Nodes (10): 9Remote button + promo modal — zero backend, zero routes, zero persistence, Full state machine across the 7 /api/tunnel/* routes for both the Cloudflare quick-tunnel and Tailscale Funnel lanes, GET /api/tunnel/status — coalesced polling across both lanes plus download progress, Hosts-file DNS entries — atomic write+rollback on Windows vs direct overwrite on macOS/Linux, and unconditional cleanup on stop, POST /api/tunnel/enable and /api/tunnel/disable — Cloudflare quick-tunnel lifecycle, POST /api/tunnel/tailscale-enable and /api/tunnel/tailscale-disable — daemon start, login, Funnel activation, POST /api/tunnel/tailscale-install (SSE) and GET /api/tunnel/tailscale-check, Remote functionality (+2 more)
-
 ### Community 295 - "Community 295"
-Cohesion: 0.2
-Nodes (9): Anthropic-compatible (SP14b, `connection.anthropic-compatible-node`), API (dashboard session), Custom providers contract (M2 SP13b, SP14b; custom headers and stream retries 2026-09-28), Matrix, Matrix entries, Table `provider_nodes` (migrations `0003`, `0004`, `0005`, `0006`), UI, `/v1` (changes to `catalog-providers.md` resolution) (+1 more)
+Cohesion: 0.31
+Nodes (7): buildInventory(), glob(), IGNORE, settingsKeys(), sorted(), inv, KEYS
 
 ### Community 296 - "Community 296"
 Cohesion: 0.2
-Nodes (9): Answer (non-streaming), Matrix, Matrix entries, OpenAI Responses client protocol contract (M2 SP15b), Other deviations, Request (9router's Responses → chat pivot, in CIP), Routes and auth, Stream (+1 more)
+Nodes (10): 9Remote button + promo modal — zero backend, zero routes, zero persistence, Full state machine across the 7 /api/tunnel/* routes for both the Cloudflare quick-tunnel and Tailscale Funnel lanes, GET /api/tunnel/status — coalesced polling across both lanes plus download progress, Hosts-file DNS entries — atomic write+rollback on Windows vs direct overwrite on macOS/Linux, and unconditional cleanup on stop, POST /api/tunnel/enable and /api/tunnel/disable — Cloudflare quick-tunnel lifecycle, POST /api/tunnel/tailscale-enable and /api/tunnel/tailscale-disable — daemon start, login, Funnel activation, POST /api/tunnel/tailscale-install (SSE) and GET /api/tunnel/tailscale-check, Remote functionality (+2 more)
 
 ### Community 297 - "Community 297"
 Cohesion: 0.2
-Nodes (9): code:block1 ({ threadId: <uuid>, memory: "", config: { workingDir: "/", d), Command Code provider contract (M2 SP14h), Connection test (corrected), Matrix, Matrix entries, Models, Non-streaming clients, Request (CIP → envelope) (+1 more)
+Nodes (9): Anthropic-compatible (SP14b, `connection.anthropic-compatible-node`), API (dashboard session), Custom providers contract (M2 SP13b, SP14b; custom headers and stream retries 2026-09-28), Matrix, Matrix entries, Table `provider_nodes` (migrations `0003`, `0004`, `0005`, `0006`), UI, `/v1` (changes to `catalog-providers.md` resolution) (+1 more)
 
 ### Community 298 - "Community 298"
 Cohesion: 0.2
-Nodes (10): code:ts (import { resolve, sep } from "node:path";), code:bash (git add .gitattributes package.json pnpm-workspace.yaml tool), code:block3 (* text=auto eol=lf), code:yaml (packages:), code:json ({), code:json ({), code:json ({), code:ts (import { defineConfig } from "vitest/config";) (+2 more)
+Nodes (9): Answer (non-streaming), Matrix, Matrix entries, OpenAI Responses client protocol contract (M2 SP15b), Other deviations, Request (9router's Responses → chat pivot, in CIP), Routes and auth, Stream (+1 more)
 
 ### Community 299 - "Community 299"
 Cohesion: 0.2
-Nodes (9): Acceptance and delivery, API and trust boundary, Bounded reads and lifecycle, code:text ({), Intent and baseline, Planning behavior, Scope and alternatives, SP29 — read-only routing simulator (+1 more)
+Nodes (9): code:block1 ({ threadId: <uuid>, memory: "", config: { workingDir: "/", d), Command Code provider contract (M2 SP14h), Connection test (corrected), Matrix, Matrix entries, Models, Non-streaming clients, Request (CIP → envelope) (+1 more)
 
 ### Community 300 - "Community 300"
-Cohesion: 0.27
-Nodes (6): QuotaController, Controller, Get, Header, Param, Post
+Cohesion: 0.2
+Nodes (10): code:ts (import { resolve, sep } from "node:path";), code:bash (git add .gitattributes package.json pnpm-workspace.yaml tool), code:block3 (* text=auto eol=lf), code:yaml (packages:), code:json ({), code:json ({), code:json ({), code:ts (import { defineConfig } from "vitest/config";) (+2 more)
 
 ### Community 301 - "Community 301"
 Cohesion: 0.2
-Nodes (10): discovery/tsconfig.json, compilerOptions, module, moduleResolution, noUncheckedIndexedAccess, skipLibCheck, strict, target (+2 more)
+Nodes (9): code:block1 (tools/discovery/), code:ts (import { describe, expect, it } from "vitest";), code:ts (import type { Inventory } from "./inventory.js";), code:bash (git add tools/discovery/src/coverage.ts tools/discovery/test), File Structure, Fixed inventory counts (measured 2026-09-22 against `E:\9router`), Global Constraints, M-1 Discovery Implementation Plan (+1 more)
 
 ### Community 302 - "Community 302"
+Cohesion: 0.2
+Nodes (9): Acceptance and delivery, API and trust boundary, Bounded reads and lifecycle, code:text ({), Intent and baseline, Planning behavior, Scope and alternatives, SP29 — read-only routing simulator (+1 more)
+
+### Community 303 - "Community 303"
+Cohesion: 0.2
+Nodes (10): discovery/tsconfig.json, compilerOptions, module, moduleResolution, noUncheckedIndexedAccess, skipLibCheck, strict, target (+2 more)
+
+### Community 304 - "Community 304"
 Cohesion: 0.28
 Nodes (6): base, bytes(), jsonAnswer(), pcm, setUp(), upstream()
 
-### Community 304 - "Community 304"
-Cohesion: 0.22
-Nodes (9): Auto fallback, BaseExecutor.execute — multi-baseUrl loop and connect timeout, In-place retry (tryRetry) and computeRetryDelay, and the end-to-end retry ceiling, Per-provider account loop — select, execute, classify, exclude, repeat, Reactive 401/403 handling — refresh credentials, re-execute once, Turning an executor exception or non-2xx response into an error result, Upstream failure after tokens have already reached the client, What the client receives when the account loop runs out (+1 more)
-
 ### Community 305 - "Community 305"
 Cohesion: 0.22
-Nodes (8): API (dashboard session), Catalog providers contract (M2 SP13), Matrix, Registry and adapter changes, SP23 media and TTS voices, UI, `/v1` model resolution (changes to `chat-lane.md`), Which providers are connectable
+Nodes (7): body, encoded, entered, left, planner, req, upstream
 
 ### Community 306 - "Community 306"
 Cohesion: 0.22
-Nodes (8): code:block1 (recorder ──> 9router :20128 ──> scripted vendor (tools/parit), Commands, How a tape is judged, How a tape is recorded, M1 acceptance gate (spec §9), Parity harness contract (M0 SP3) and the M1 acceptance gate, Tests, What recording 9router 0.5.55 showed
+Nodes (9): Auto fallback, BaseExecutor.execute — multi-baseUrl loop and connect timeout, In-place retry (tryRetry) and computeRetryDelay, and the end-to-end retry ceiling, Per-provider account loop — select, execute, classify, exclude, repeat, Reactive 401/403 handling — refresh credentials, re-execute once, Turning an executor exception or non-2xx response into an error result, Upstream failure after tokens have already reached the client, What the client receives when the account loop runs out (+1 more)
 
 ### Community 307 - "Community 307"
 Cohesion: 0.22
-Nodes (8): Answer (non-streaming), Gemini client protocol contract (M2 SP15c), Matrix, Matrix entries, Model list, Path, key and request, Stream, TTS passthrough
+Nodes (9): Active account quota rows, refresh, and visible error state, Antigravity's locally-counted/inferred quota — RAM cache plus a strike-based trust override, Bounded server reads for active saved connections, Codex reset credits — a redeemable pool that manually ends the current 5h window early, Quota Tracker, quotaAutoPing scheduler — opt-in pings that start a new quota window right after reset, The /dashboard/quota page — auto-refresh cadence, per-provider throttling, client cache, visibility settings, The four categories behavioral.md §21 asks about — which exist in 9router and how (+1 more)
 
 ### Community 308 - "Community 308"
 Cohesion: 0.22
-Nodes (8): code:block1 (body ─▶ parseOpenAIChatRequest ─▶ { request: CanonicalReques), Errors: `toOpenAIError(error)`, Inbound: `parseOpenAIChatRequest(body)`, OpenAI Chat Completions protocol adapter contract (M1 SP10), Outbound: `toOpenAIChatCompletion(response, { created, fallbackId })`, Rules from the reference, Streaming: `OpenAIChatStreamEncoder`, Tests
+Nodes (8): API (dashboard session), Catalog providers contract (M2 SP13), Matrix, Registry and adapter changes, SP23 media and TTS voices, UI, `/v1` model resolution (changes to `chat-lane.md`), Which providers are connectable
 
 ### Community 309 - "Community 309"
 Cohesion: 0.22
-Nodes (8): Answer (JSON body), Matrix, Matrix entries, Models, ollama-local, Ollama provider contract (M2 SP14d), Request (CIP → /api/chat), Stream (NDJSON → StreamChunk)
+Nodes (8): code:block1 (recorder ──> 9router :20128 ──> scripted vendor (tools/parit), Commands, How a tape is judged, How a tape is recorded, M1 acceptance gate (spec §9), Parity harness contract (M0 SP3) and the M1 acceptance gate, Tests, What recording 9router 0.5.55 showed
 
 ### Community 310 - "Community 310"
 Cohesion: 0.22
-Nodes (8): OpenAI-compatible provider adapter contract (M1 SP9), Other methods, Request mapping (CIP → chat completions), Response mapping, Rules from the reference, Status classification, Streaming (SSE) bounds, Tests
+Nodes (8): Answer (non-streaming), Gemini client protocol contract (M2 SP15c), Matrix, Matrix entries, Model list, Path, key and request, Stream, TTS passthrough
 
 ### Community 311 - "Community 311"
 Cohesion: 0.22
-Nodes (8): Discovery coverage, Entries per bounded context, Labels, Missing — executors, Missing — pages, Missing — providers, Missing — settingsKeys, Missing — translators
+Nodes (8): code:block1 (body ─▶ parseOpenAIChatRequest ─▶ { request: CanonicalReques), Errors: `toOpenAIError(error)`, Inbound: `parseOpenAIChatRequest(body)`, OpenAI Chat Completions protocol adapter contract (M1 SP10), Outbound: `toOpenAIChatCompletion(response, { created, fallbackId })`, Rules from the reference, Streaming: `OpenAIChatStreamEncoder`, Tests
 
 ### Community 312 - "Community 312"
 Cohesion: 0.22
-Nodes (8): A. Urgent connection fan-out, B. Sunk-cost usage report, C. Senior-requested permanent cache, code:ts (const results: Awaited<ReturnType<typeof checkConnection>>[]), code:ts (import { eq } from "drizzle-orm";), code:ts (const modelCache = new Map<string, { value: Promise<Model[]>), Skill target, `writing-lean-bounded-code` RED baseline
+Nodes (8): Answer (JSON body), Matrix, Matrix entries, Models, ollama-local, Ollama provider contract (M2 SP14d), Request (CIP → /api/chat), Stream (NDJSON → StreamChunk)
 
 ### Community 313 - "Community 313"
 Cohesion: 0.22
-Nodes (9): 4.1 Domain model (`behavioral.md §9`), 4.2 Port — đúng 6, cho 154 endpoint, 4.3 Cấu trúc một bounded context, 4.4 Mười bounded context, 4. Domain model & Port, code:block3 (Provider · ProviderAccount · Credential · Model · ModelCapab), code:ts (type AccountLock = {), code:ts (interface AIProviderPort {) (+1 more)
+Nodes (8): OpenAI-compatible provider adapter contract (M1 SP9), Other methods, Request mapping (CIP → chat completions), Response mapping, Rules from the reference, Status classification, Streaming (SSE) bounds, Tests
 
 ### Community 314 - "Community 314"
-Cohesion: 0.28
-Nodes (7): Context, Implementation steps, Quyết định cần duyệt (mặc định tôi đề xuất), Quyết định cần duyệt (mặc định tôi đề xuất), SP24a: ghi usage, cost theo pricing, thống kê, SSE live, màn Usage và chỉnh giá, SP24a: ghi usage, cost theo pricing, thống kê, SSE live, màn Usage và chỉnh giá, Verification
+Cohesion: 0.22
+Nodes (8): Discovery coverage, Entries per bounded context, Labels, Missing — executors, Missing — pages, Missing — providers, Missing — settingsKeys, Missing — translators
 
 ### Community 315 - "Community 315"
-Cohesion: 0.33
-Nodes (6): allowedUrl(), asErrno(), classify(), DirectTransport, http2Client(), Injectable
+Cohesion: 0.22
+Nodes (8): A. Urgent connection fan-out, B. Sunk-cost usage report, C. Senior-requested permanent cache, code:ts (const results: Awaited<ReturnType<typeof checkConnection>>[]), code:ts (import { eq } from "drizzle-orm";), code:ts (const modelCache = new Map<string, { value: Promise<Model[]>), Skill target, `writing-lean-bounded-code` RED baseline
 
 ### Community 316 - "Community 316"
 Cohesion: 0.22
-Nodes (3): limited(), said(), tools
+Nodes (9): 4.1 Domain model (`behavioral.md §9`), 4.2 Port — đúng 6, cho 154 endpoint, 4.3 Cấu trúc một bounded context, 4.4 Mười bounded context, 4. Domain model & Port, code:block3 (Provider · ProviderAccount · Credential · Model · ModelCapab), code:ts (type AccountLock = {), code:ts (interface AIProviderPort {) (+1 more)
 
 ### Community 317 - "Community 317"
+Cohesion: 0.28
+Nodes (7): Context, Implementation steps, Quyết định cần duyệt (mặc định tôi đề xuất), Quyết định cần duyệt (mặc định tôi đề xuất), SP24b: request detail (metadata + attempts), usage của media lanes, màn Requests, SP24b: request detail (metadata + attempts), usage của media lanes, màn Requests, Verification
+
+### Community 318 - "Community 318"
 Cohesion: 0.22
 Nodes (3): bun:sqlite, Database, Statement
 
@@ -1756,7 +1765,7 @@ Nodes (7): Fan-out and cache micro-tests, `writing-lean-bounded-code` GREEN and 
 
 ### Community 321 - "Community 321"
 Cohesion: 0.28
-Nodes (7): Context, Implementation steps, Quyết định cần duyệt (mặc định tôi đề xuất), Quyết định cần duyệt (mặc định tôi đề xuất), SP24b: request detail (metadata + attempts), usage của media lanes, màn Requests, SP24b: request detail (metadata + attempts), usage của media lanes, màn Requests, Verification
+Nodes (7): Context, Implementation steps, Quyết định cần duyệt (mặc định tôi đề xuất), Quyết định cần duyệt (mặc định tôi đề xuất), SP24a: ghi usage, cost theo pricing, thống kê, SSE live, màn Usage và chỉnh giá, SP24a: ghi usage, cost theo pricing, thống kê, SSE live, màn Usage và chỉnh giá, Verification
 
 ### Community 322 - "Community 322"
 Cohesion: 0.22
@@ -1764,259 +1773,263 @@ Nodes (8): Acceptance and delivery, API and trust boundary, Bounded reads and li
 
 ### Community 324 - "Community 324"
 Cohesion: 0.25
-Nodes (8): clearAccountError — lazy cleanup of expired locks and conditional error-state reset on a successful request, createProviderConnection — identity-based dedup on re-import, and automatic priority assignment for new connections, deleteProviderConnection — row removal followed by a priority renumber for the remaining accounts of that provider, Every distinct reason markAccountUnavailable() locks an account+model pair, and that reason's expiry rule, Provider account management, The providerConnections row shape — fixed SQL columns vs. an open-ended JSON blob for everything else, updateProviderConnection — atomic read-merge-write per connection, and priority reorder triggered by a priority change, Where modelLock_* (and all other per-connection state) is stored, and whether it survives a restart
+Nodes (6): computeCoverage(), coverage, MATRIX_DIR, REQUIRED_GROUPS, result, seen
 
 ### Community 325 - "Community 325"
 Cohesion: 0.25
-Nodes (7): Chat lane contract (M1 SP12), Model resolution, Request flow and limits, Rules from the reference, Streaming, Tests, UI
+Nodes (8): clearAccountError — lazy cleanup of expired locks and conditional error-state reset on a successful request, createProviderConnection — identity-based dedup on re-import, and automatic priority assignment for new connections, deleteProviderConnection — row removal followed by a priority renumber for the remaining accounts of that provider, Every distinct reason markAccountUnavailable() locks an account+model pair, and that reason's expiry rule, Provider account management, The providerConnections row shape — fixed SQL columns vs. an open-ended JSON blob for everything else, updateProviderConnection — atomic read-merge-write per connection, and priority reorder triggered by a priority change, Where modelLock_* (and all other per-connection state) is stored, and whether it survives a restart
 
 ### Community 326 - "Community 326"
 Cohesion: 0.25
-Nodes (7): API (dashboard session required), Connections contract (M1 SP11), Rules from the reference, Secret storage (`SecretCipherPort`), Table `provider_connections`, Tests, UI
+Nodes (7): Chat lane contract (M1 SP12), Model resolution, Request flow and limits, Rules from the reference, Streaming, Tests, UI
 
 ### Community 327 - "Community 327"
 Cohesion: 0.25
-Nodes (7): Custom models, Dashboard, Live model list, Matrix entries, Model import and custom models contract (M2 SP16a), Model test, /v1/models
+Nodes (7): API (dashboard session required), Connections contract (M1 SP11), Rules from the reference, Secret storage (`SecretCipherPort`), Table `provider_connections`, Tests, UI
 
 ### Community 328 - "Community 328"
 Cohesion: 0.25
-Nodes (7): azure (kept 9router), clinepass, cloudflare-ai, Connection fields, Matrix, Matrix entries, Per-connection data providers contract (M2 SP14g)
+Nodes (7): Custom models, Dashboard, Live model list, Matrix entries, Model import and custom models contract (M2 SP16a), Model test, /v1/models
 
 ### Community 329 - "Community 329"
 Cohesion: 0.25
-Nodes (7): Matrix, Matrix entries, Models and connection test, Non-streaming answer (corrected), OpenAI Responses provider contract (M2 SP14c), Request (CIP → Responses, 9router), Stream (Responses SSE → StreamChunk, 9router)
+Nodes (7): azure (kept 9router), clinepass, cloudflare-ai, Connection fields, Matrix, Matrix entries, Per-connection data providers contract (M2 SP14g)
 
 ### Community 330 - "Community 330"
 Cohesion: 0.25
-Nodes (7): Levels, Matrix entries, Model suffix (part 2), On /v1, Provider thinking contract (2026-09-28), Storage and API, UI
+Nodes (7): Matrix, Matrix entries, Models and connection test, Non-streaming answer (corrected), OpenAI Responses provider contract (M2 SP14c), Request (CIP → Responses, 9router), Stream (Responses SSE → StreamChunk, 9router)
 
 ### Community 331 - "Community 331"
 Cohesion: 0.25
-Nodes (7): HTTP contract, Keys in SP5, Rules from the reference, Settings contract (M1 SP5), SP27 / M3 U2 — General, runtime and portable settings, SP28 browser presentation, Tests that prove it
+Nodes (7): Levels, Matrix entries, Model suffix (part 2), On /v1, Provider thinking contract (2026-09-28), Storage and API, UI
 
 ### Community 332 - "Community 332"
 Cohesion: 0.25
-Nodes (7): CodeBuddy, Collapse (SSE → CIP response), Matrix, Matrix entries, Registry, Stream-only providers contract (M2 SP14b), Upstream call
+Nodes (7): HTTP contract, Keys in SP5, Rules from the reference, Settings contract (M1 SP5), SP27 / M3 U2 — General, runtime and portable settings, SP28 browser presentation, Tests that prove it
 
 ### Community 333 - "Community 333"
+Cohesion: 0.25
+Nodes (7): CodeBuddy, Collapse (SSE → CIP response), Matrix, Matrix entries, Registry, Stream-only providers contract (M2 SP14b), Upstream call
+
+### Community 334 - "Community 334"
 Cohesion: 0.25
 Nodes (7): A. Port a 9Router file to TS, B. "Trivial, skip the Feature Matrix", C. "Keep `global._*` exactly, to be safe", code:ts (const VALID_TYPES = ["http", "vercel", "cloudflare"] as cons), code:ts (assert.deepEqual(normalizeProxyPoolUpdate({ type: 'socks', i), `porting-behavior-not-code` RED baseline, Skill target
 
 ### Community 335 - "Community 335"
+Cohesion: 0.32
+Nodes (4): migrationsFolder, fixture/schema.ts, accounts, usage
+
+### Community 337 - "Community 337"
 Cohesion: 0.25
 Nodes (6): anthropic, base, codebuddy, gemini, openai, perplexity
 
-### Community 336 - "Community 336"
+### Community 338 - "Community 338"
 Cohesion: 0.36
 Nodes (6): Context, Critical Files, Hoàn thiện SP23: TTS lane + voice listing + preview, Hoàn thiện SP23: TTS lane + voice listing + preview, Implementation steps, Verification
 
-### Community 337 - "Community 337"
+### Community 339 - "Community 339"
 Cohesion: 0.43
 Nodes (3): FixedCallbackRelay, parseUrl(), Waiting
 
-### Community 338 - "Community 338"
+### Community 340 - "Community 340"
+Cohesion: 0.29
+Nodes (6): before, now, provider, repo, rows, upstream
+
+### Community 341 - "Community 341"
 Cohesion: 0.29
 Nodes (6): CAPACITY_CAPABILITIES, CapacityCapability, capacityPools, COMBO_STRATEGIES, combos, ComboStrategy
 
-### Community 339 - "Community 339"
+### Community 342 - "Community 342"
 Cohesion: 0.29
 Nodes (6): pricingOverrides, USAGE_STATUSES, usageDaily, usageEvents, usageRequests, UsageStatus
 
-### Community 342 - "Community 342"
+### Community 345 - "Community 345"
 Cohesion: 0.29
 Nodes (6): API (dashboard session), Capacity adapter contract (M2 SP20), Chat lanes, Rules from the reference, Storage, UI
 
-### Community 343 - "Community 343"
+### Community 346 - "Community 346"
 Cohesion: 0.29
 Nodes (6): API (dashboard session), Chat lanes, Combo contract (M2 SP19), Rules from the reference, Storage, UI
 
-### Community 344 - "Community 344"
+### Community 347 - "Community 347"
 Cohesion: 0.29
 Nodes (6): Access to `/api/*`, HTTP contract, Identity and API keys contract (M1 SP6), Rules from the reference, Shared machines (decided 2026-09-25: option A), Who counts as local
 
-### Community 345 - "Community 345"
+### Community 348 - "Community 348"
 Cohesion: 0.29
 Nodes (6): Mapping (labels per `porting-behavior-not-code`), Registry extraction contract (M0 SP4), Result (2026-09-26), Source and output, Tests, Verification (spec exit criterion: "verified by diff")
 
-### Community 346 - "Community 346"
-Cohesion: 0.29
-Nodes (6): Dashboard API (session), `GET /v1/audio/voices?provider=<id>[&model=<id>][&lang=<code>]` (API key), `POST /v1/audio/speech` (API key, as every `/v1` route), Providers, Speech contract (M2 SP23), UI
-
-### Community 347 - "Community 347"
-Cohesion: 0.29
-Nodes (6): API ↔ UI map, Engine and non-HTTP work, Error handling, Rule: an API is done only when its screen is wired, Waiting for backend, Wired
-
-### Community 348 - "Community 348"
-Cohesion: 0.29
-Nodes (6): 1 · Credential / key / token — PASS, 2 · Sidebar đồng nhất — FAIL (nghiêm trọng), 3 · State rules (§10.7) — FAIL (chỉ vẽ happy path), 4 · Lệch brief khác (mức thấp, ghi để sửa ở U1+), AIGate — Stitch output audit, Việc cần làm trước khi vào U0/U1
-
 ### Community 349 - "Community 349"
 Cohesion: 0.29
-Nodes (6): AIGate schema conventions, Growth and hot paths, Integrity, Secrets, Shape, Where things live
+Nodes (6): Dashboard API (session), `GET /v1/audio/voices?provider=<id>[&model=<id>][&lang=<code>]` (API key), `POST /v1/audio/speech` (API key, as every `/v1` route), Providers, Speech contract (M2 SP23), UI
 
 ### Community 350 - "Community 350"
 Cohesion: 0.29
-Nodes (7): scripts, build, dev, dev:node, dev:tsc, start, test
+Nodes (6): API ↔ UI map, Engine and non-HTTP work, Error handling, Rule: an API is done only when its screen is wired, Waiting for backend, Wired
 
 ### Community 351 - "Community 351"
-Cohesion: 0.38
-Nodes (5): bytes(), jsonAnswer(), send(), setUp(), upstream()
+Cohesion: 0.29
+Nodes (6): 1 · Credential / key / token — PASS, 2 · Sidebar đồng nhất — FAIL (nghiêm trọng), 3 · State rules (§10.7) — FAIL (chỉ vẽ happy path), 4 · Lệch brief khác (mức thấp, ghi để sửa ở U1+), AIGate — Stitch output audit, Việc cần làm trước khi vào U0/U1
 
 ### Community 352 - "Community 352"
 Cohesion: 0.29
-Nodes (5): anthropic, base, codebuddy, gemini, openai
+Nodes (6): AIGate schema conventions, Growth and hot paths, Integrity, Secrets, Shape, Where things live
+
+### Community 353 - "Community 353"
+Cohesion: 0.33
+Nodes (3): get(), OPTIONS, recorderOf()
 
 ### Community 354 - "Community 354"
 Cohesion: 0.29
+Nodes (5): anthropic, base, codebuddy, gemini, openai
+
+### Community 356 - "Community 356"
+Cohesion: 0.29
 Nodes (6): Dashboard API (session), `GET /v1/audio/voices?provider=<id>[&model=<id>][&lang=<code>]` (API key), `POST /v1/audio/speech` (API key, as every `/v1` route), Providers, Speech contract (M2 SP23), UI
 
-### Community 355 - "Community 355"
+### Community 357 - "Community 357"
 Cohesion: 0.29
 Nodes (6): AIGate schema conventions, Growth and hot paths, Integrity, Secrets, Shape, Where things live
 
-### Community 356 - "Community 356"
+### Community 359 - "Community 359"
 Cohesion: 0.33
 Nodes (5): Behavior, Deferred, Engine contract (M1 SP7), Rules from the reference, Tests
 
-### Community 357 - "Community 357"
+### Community 360 - "Community 360"
 Cohesion: 0.33
 Nodes (5): Hosted relay deploy, Pool data and management, Proxy pools contract (M2 SP18), Reference deviations, Request dispatch
 
-### Community 358 - "Community 358"
+### Community 361 - "Community 361"
 Cohesion: 0.33
 Nodes (5): Behavior: every failure has one mapping, Deferred, Rules from the reference, Tests, Transport contract (M1 SP8)
 
-### Community 359 - "Community 359"
+### Community 362 - "Community 362"
 Cohesion: 0.33
 Nodes (5): Architecture and source of truth, Claude's integration boundary, UI ownership handoff, Visual implementation status, Work completed on 2026-09-24 for Claude
 
-### Community 360 - "Community 360"
+### Community 363 - "Community 363"
 Cohesion: 0.33
 Nodes (6): code:ts (import { describe, expect, it } from "vitest";), code:ts (import { z } from "zod";), code:ts (import { describe, expect, it, beforeEach, afterAll } from "), code:ts (import { readFileSync, existsSync } from "node:fs";), code:bash (git add tools/discovery/src/schema.ts tools/discovery/src/va), Task 2: Feature Matrix schema and validator
 
-### Community 361 - "Community 361"
+### Community 364 - "Community 364"
 Cohesion: 0.33
-Nodes (6): 9. Lộ trình, M0 · Nền, M1 · Lát mỏng xuyên suốt (walking skeleton), M2 · Nhân rộng (nhiều nhánh song song), M3 · UI, M-1 · DISCOVERY
+Nodes (6): code:ts (import { describe, expect, it } from "vitest";), code:ts (import type { FeatureEntry } from "./schema.js";), code:ts (import { mkdirSync, writeFileSync } from "node:fs";), code:bash (mkdir -p docs/discovery/feature-matrix && touch docs/discove), code:bash (git add tools/discovery/src/capabilities.ts tools/discovery/), Task 5: capabilities.md generator and CLI
 
-### Community 362 - "Community 362"
-Cohesion: 0.33
-Nodes (5): Findings, Recommendation, Results, SPIKE-1: SQLite drivers through Drizzle, What "works" means
-
-### Community 366 - "Community 366"
+### Community 365 - "Community 365"
 Cohesion: 0.33
 Nodes (5): Findings, Recommendation, Results, SPIKE-1: SQLite drivers through Drizzle, What "works" means
-
-### Community 367 - "Community 367"
-Cohesion: 0.4
-Nodes (3): eslint, featuresDir, fixture
-
-### Community 368 - "Community 368"
-Cohesion: 0.4
-Nodes (4): AIGate, code:powershell (pnpm install --frozen-lockfile), Repository map, Verify (PowerShell)
 
 ### Community 369 - "Community 369"
-Cohesion: 0.4
-Nodes (4): API and UI, Fallback and locks, Multi-account routing contract (M2 SP17), Selection
+Cohesion: 0.47
+Nodes (5): discovery/src/capabilities.ts, cell(), renderCapabilities(), base, entries
 
 ### Community 370 - "Community 370"
-Cohesion: 0.4
-Nodes (4): Decisions, bounds and privacy, HTTP, Routing simulator (SP29 / M3 U6), UI / acceptance
+Cohesion: 0.33
+Nodes (5): Findings, Recommendation, Results, SPIKE-1: SQLite drivers through Drizzle, What "works" means
 
 ### Community 371 - "Community 371"
 Cohesion: 0.4
-Nodes (4): Behavior 9router does not have — AIGate must add, Gap register, Implementation accidents — behavior required, mechanism not, Suspected bugs — analyse before deciding
+Nodes (4): packageDir, request, service, upstream
 
 ### Community 372 - "Community 372"
 Cohesion: 0.4
-Nodes (5): code:ts (import { describe, expect, it } from "vitest";), code:bash (pnpm discovery inventory), code:markdown (# Gap register), code:bash (git add docs/ tools/discovery/test/gate.test.ts), Task 19: M-1 exit gate
+Nodes (3): eslint, featuresDir, fixture
 
 ### Community 373 - "Community 373"
 Cohesion: 0.4
-Nodes (4): Limits, SP0.6 skill discovery, Test, Wiring
+Nodes (4): AIGate, code:powershell (pnpm install --frozen-lockfile), Repository map, Verify (PowerShell)
 
 ### Community 374 - "Community 374"
 Cohesion: 0.4
-Nodes (5): 6.1 IMPLEMENTATION ACCIDENT — không mang sang, 6.2 SUSPECTED BUG — không tự động tái tạo (`§26`), 6.3 Feature KHÔNG clone, 6.4 Feature phải quyết dứt điểm ở Phase C, 6. Technical debt KHÔNG được thừa kế
+Nodes (4): API and UI, Fallback and locks, Multi-account routing contract (M2 SP17), Selection
 
 ### Community 375 - "Community 375"
 Cohesion: 0.4
-Nodes (5): 7.1 Feature Matrix — artifact bắt buộc (`§6`), 7.2 Definition of Done (`§29`) — 13 mục, không tự phong, 7. Quy trình bắt buộc cho mỗi feature, code:block10 ([ ] Feature inventory complete      [ ] Unit tests passed), code:block9 (Feature · Sub-feature · Trigger · Input · Output · Business )
+Nodes (4): Decisions, bounds and privacy, HTTP, Routing simulator (SP29 / M3 U6), UI / acceptance
 
-### Community 377 - "Community 377"
-Cohesion: 0.4
-Nodes (5): devDependencies, tsx, @types/node, typescript, vitest
-
-### Community 378 - "Community 378"
-Cohesion: 0.4
-Nodes (4): Decisions, Out of scope, Runtime guarantees, Token Saver contract (M2 SP21)
-
-### Community 379 - "Community 379"
+### Community 376 - "Community 376"
 Cohesion: 0.4
 Nodes (4): Behavior 9router does not have — AIGate must add, Gap register, Implementation accidents — behavior required, mechanism not, Suspected bugs — analyse before deciding
 
-### Community 380 - "Community 380"
+### Community 377 - "Community 377"
+Cohesion: 0.4
+Nodes (5): code:ts (import { describe, expect, it } from "vitest";), code:bash (pnpm discovery inventory), code:markdown (# Gap register), code:bash (git add docs/ tools/discovery/test/gate.test.ts), Task 19: M-1 exit gate
+
+### Community 378 - "Community 378"
 Cohesion: 0.4
 Nodes (4): Limits, SP0.6 skill discovery, Test, Wiring
 
-### Community 381 - "Community 381"
+### Community 379 - "Community 379"
+Cohesion: 0.4
+Nodes (5): 7.1 Feature Matrix — artifact bắt buộc (`§6`), 7.2 Definition of Done (`§29`) — 13 mục, không tự phong, 7. Quy trình bắt buộc cho mỗi feature, code:block10 ([ ] Feature inventory complete      [ ] Unit tests passed), code:block9 (Feature · Sub-feature · Trigger · Input · Output · Business )
+
+### Community 380 - "Community 380"
+Cohesion: 0.4
+Nodes (5): 6.1 IMPLEMENTATION ACCIDENT — không mang sang, 6.2 SUSPECTED BUG — không tự động tái tạo (`§26`), 6.3 Feature KHÔNG clone, 6.4 Feature phải quyết dứt điểm ở Phase C, 6. Technical debt KHÔNG được thừa kế
+
+### Community 382 - "Community 382"
+Cohesion: 0.4
+Nodes (4): Decisions, Out of scope, Runtime guarantees, Token Saver contract (M2 SP21)
+
+### Community 383 - "Community 383"
+Cohesion: 0.4
+Nodes (4): Behavior 9router does not have — AIGate must add, Gap register, Implementation accidents — behavior required, mechanism not, Suspected bugs — analyse before deciding
+
+### Community 384 - "Community 384"
+Cohesion: 0.4
+Nodes (4): Limits, SP0.6 skill discovery, Test, Wiring
+
+### Community 385 - "Community 385"
 Cohesion: 0.4
 Nodes (4): Decisions, bounds and privacy, HTTP, Routing simulator (SP29 / M3 U6), UI / acceptance
 
-### Community 382 - "Community 382"
+### Community 386 - "Community 386"
 Cohesion: 0.5
 Nodes (3): Request, Response, Trae SOLO provider
 
-### Community 383 - "Community 383"
+### Community 387 - "Community 387"
 Cohesion: 0.5
 Nodes (3): Full registry acceptance, Provider parity with 9Router, UI reference captured 2026-09-24
 
-### Community 384 - "Community 384"
-Cohesion: 0.5
-Nodes (3): Deferred golden scenarios, Parity report (M1 gate), Tapes
-
-### Community 385 - "Community 385"
-Cohesion: 0.5
-Nodes (4): code:ts (import { describe, expect, it } from "vitest";), code:ts (import type { Inventory } from "./inventory.js";), code:bash (git add tools/discovery/src/coverage.ts tools/discovery/test), Task 4: Coverage checker
-
-### Community 386 - "Community 386"
-Cohesion: 0.5
-Nodes (4): code:ts (import { describe, expect, it } from "vitest";), code:ts (import { readFileSync } from "node:fs";), code:bash (git add tools/discovery/src/inventory.ts tools/discovery/tes), Task 3: Inventory extractor
-
-### Community 387 - "Community 387"
-Cohesion: 0.5
-Nodes (4): code:yaml (- id: apikey.validate), Mapping of `behavioral.md` questions to schema fields, The entry template, The Tracing Protocol
-
 ### Community 388 - "Community 388"
 Cohesion: 0.5
-Nodes (3): code:ts (const rows = await db.select().from(usage).where(eq(usage.ac), Fan-out and cache micro-tests, `writing-lean-bounded-code` GREEN and micro-tests
+Nodes (3): Deferred golden scenarios, Parity report (M1 gate), Tapes
 
 ### Community 389 - "Community 389"
 Cohesion: 0.5
-Nodes (3): meta, route, usage
+Nodes (4): code:ts (import { describe, expect, it } from "vitest";), code:ts (import { readFileSync } from "node:fs";), code:bash (git add tools/discovery/src/inventory.ts tools/discovery/tes), Task 3: Inventory extractor
 
 ### Community 390 - "Community 390"
 Cohesion: 0.5
-Nodes (3): vitest, inv, KEYS
+Nodes (4): code:yaml (- id: apikey.validate), Mapping of `behavioral.md` questions to schema fields, The entry template, The Tracing Protocol
 
 ### Community 391 - "Community 391"
 Cohesion: 0.5
-Nodes (3): AIGate, Repository map, Verify (PowerShell)
+Nodes (3): code:ts (const rows = await db.select().from(usage).where(eq(usage.ac), Fan-out and cache micro-tests, `writing-lean-bounded-code` GREEN and micro-tests
 
 ### Community 392 - "Community 392"
 Cohesion: 0.5
-Nodes (3): Deferred golden scenarios, Parity report (M1 gate), Tapes
+Nodes (3): meta, route, usage
 
 ### Community 393 - "Community 393"
 Cohesion: 0.5
+Nodes (3): vitest, inv, KEYS
+
+### Community 394 - "Community 394"
+Cohesion: 0.5
+Nodes (3): AIGate, Repository map, Verify (PowerShell)
+
+### Community 395 - "Community 395"
+Cohesion: 0.5
+Nodes (3): Deferred golden scenarios, Parity report (M1 gate), Tapes
+
+### Community 396 - "Community 396"
+Cohesion: 0.5
 Nodes (4): §15 Code quality — shortest CLEAR implementation, not shortest possible, Rule 1 — Write LEAN code, no over-engineering, Rule 2 — Code must be maintainable, no magic values or hidden side effects, Rule 12 — Priority order: Correctness → Simplicity → Maintainability → Predictable resources → Latency → Throughput → Optimization
 
-### Community 399 - "Community 399"
+### Community 403 - "Community 403"
 Cohesion: 0.67
 Nodes (3): code:block32 (model resolution → provider selection → account selection → ), code:bash (git add docs/discovery/), Task 10: Trace — Request routing, Auto fallback
-
-### Community 401 - "Community 401"
-Cohesion: 0.67
-Nodes (3): 7 · Connections & AuthFlow — `/providers/connections`, code:block23 (┌─ Bảng: provider · nhãn · kiểu cred · trạng thái · hết hạn ), code:ts (type AuthStep =)
 
 ## Ambiguous Edges - Review These
 - `UI error code: TIMEOUT` → `ErrorCode: TIMEOUT`  [AMBIGUOUS]
@@ -2031,9 +2044,9 @@ Nodes (3): 7 · Connections & AuthFlow — `/providers/connections`, code:block2
   docs/contracts/engine.md · relation: rationale_for
 
 ## Knowledge Gaps
-- **3358 isolated node(s):** `port`, `API_PREFIXES`, `ServerOptions`, `Parsed`, `Headers` (+3353 more)
+- **3361 isolated node(s):** `port`, `API_PREFIXES`, `ServerOptions`, `Parsed`, `Headers` (+3356 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **44 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **47 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -2048,7 +2061,7 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `detectRequiredCapabilities()` and `Open decision (user confirmation pending): scan every message + system prompt for required capabilities`?**
   _Edge tagged AMBIGUOUS (relation: rationale_for) - confidence is low._
-- **Why does `@nestjs/common` connect `OAuth sign-in contract (M2 SP16)` to `Rule 4 — Every workload must be BOUNDED`, `provider-node.ts`, `openai-responses-adapter.test.mjs`, `Body`, `github-copilot.test.mjs`, `parity/package.json`, `providers/api.ts`, `engine/src/index.ts`, `EngineError`, `claude-codex.test.mjs`, `scripts`, `Bounded context: routing (core)`, `scripts`, `cursor.ts`, `registry.ts`, `Overview — /`, `claude-codex-lane.test.mjs`, `combos.repo.ts`, `AIGate`, `cursor.test.mjs`, `DirectTransport (direct branch implementation)`, `Settings`, `Community 200`, `SettingsRepository`, `Model import and custom models contract (M2 SP16a)`, `conformance.mjs`, `Community 228`, `Token Saver`, `gemini-adapter.test.mjs`, `Community 253`?**
-  _High betweenness centrality (0.197) - this node is a cross-community bridge._
-- **Why does `toProblem()` connect `speech-lane.ts` to `Community 229`, `Request routing`, `gateway/screens.tsx`, `providers/screens.tsx`, `gemini-cli.test.mjs`, `Milestone M-1 · Discovery`, `discovery/package.json`, `SP13 — catalog → runtime registry (41 connectable providers, /api/providers, /providers wired)`?**
-  _High betweenness centrality (0.129) - this node is a cross-community bridge._
+- **Why does `@nestjs/common` connect `cursor.ts` to `Rule 4 — Every workload must be BOUNDED`, `OAuth sign-in contract (M2 SP16)`, `commandcode-adapter.test.mjs`, `ChatLane`, `parity/package.json`, `.test`, `openai-compatible.ts`, `engine/src/index.ts`, `Remote functionality`, `Multi-account`, `compilerOptions`, `AnthropicAdapter — CIP <-> Messages (max_tokens rules, thinking budgets, tool_use, SSE events)`, ``writing-lean-bounded-code` RED baseline`, `Identity and API keys contract (M1 SP6)`, `.stream`, `Request routing`, `ProviderNodesController — /api/provider-nodes CRUD; PREFIX_RESERVED / PREFIX_TAKEN / NODE_LIMIT`, `API ↔ UI map (docs/design/API_UI_MAP.md)`, `Parity report (M1 gate)`, `toDescriptor`, `.constructor`, `helpers.mjs`, `DirectTransport (direct branch implementation)`, `Settings`, `Community 203`, `clients.ts`, `Community 212`, `discovery/package.json`, `Translation`, `anthropic-adapter.test.mjs`, `vertex-adapter.test.mjs`, `coverage.ts`?**
+  _High betweenness centrality (0.184) - this node is a cross-community bridge._
+- **Why does `toProblem()` connect `isRecord` to `@nestjs/common`, `SettingsRepository`, `traffic/api.ts`, `ConnectionsController — /api/connections CRUD + POST /:id/test (validateCredential outside any transaction)`, `Bounded context: transport`, `requests.controller.ts`, `Port behavior, not code`, `pricing.repo.ts`?**
+  _High betweenness centrality (0.127) - this node is a cross-community bridge._
