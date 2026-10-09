@@ -880,3 +880,33 @@
     expected: "The rotation belongs to the pool: one state per capability, bounded by the four capabilities"
     actual: "One state per requested model string, unbounded"
     impact: "Client input grows server memory; the same pool rotates differently per requested model"
+
+- id: routing.editors-browser-i18n
+  group: Combo / Vision Adapter
+  feature: Routing editors
+  subFeature: EN/VI presentation for Combo list/form and Capacity adapter
+  trigger: Open the Routing Combo/Capacity tabs or change the browser language
+  input: Existing combo/pool/model reads, draft state, browser locale
+  output: Localized owned copy with literal names, IDs, limits and raw diagnostics
+  businessRules:
+    - "AIGATE_EXTENSION: Combo and Capacity owned UI copy renders through the shared EN/VI catalogs without changing saved payloads or query keys"
+    - "AIGATE_EXTENSION: a locale change preserves the selected tab, form/pool drafts and pending mutations; it never probes a model or replays a save"
+    - "AIGATE_EXTENSION: combo/model names, API codes, numeric limits and upstream diagnostics remain literal"
+  state:
+    reads: [existing_combo_list, existing_capacity_pools, existing_connected_models, browser_language_preference]
+    writes: []
+    runtimeOnly: [selected_routing_tab, combo_form_draft, pool_draft]
+  dependencies: [combo.mode-fallback, combo.mode-round-robin, combo.mode-fusion-panel-completion, capacity.capability-pool-config]
+  providerInteraction: "Only existing user-initiated model Test may reach a provider; locale changes cause none"
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["Existing browser-local aigate-language only"]
+  performanceConcerns: ["Existing 16-member combo and 16-model pool caps; no new fan-out or polling"]
+  behavior: { streaming: false, cancellation: null, concurrency: "Existing user-initiated model Test only" }
+  edgeCases: ["Duplicate model draft", "Pending save during locale change", "Raw diagnostic in localized error"]
+  evidence:
+    - { file: "aigate:docs/contracts/routing-editor-i18n.md", line: 1, note: "SP34 scope and lifecycle boundary" }
+  newModule: routing
+  parityStatus: verified
+  labels: []

@@ -44,3 +44,8 @@ Errors: 404 `NOT_FOUND` for another capability; 400 `INVALID_REQUEST` (message n
 ## UI
 
 `/gateway/routing` → `Routing`, Capacity adapter tab: one card each for Vision and Audio input (9router hides PDF and video; the API serves all four). Each card has an On switch (disabled until the pool has a model), Round-robin, the ordered model list (add with the connected-model list, ↑/↓, remove, Test through `POST /api/models/test`), and Save. Every code above reaches the user through `apps/web/src/shared/errors.ts`.
+
+SP34 localizes both visible cards, their controls, hints, errors and notices in
+EN/VI (`routing-editor-i18n.md`). A locale switch preserves unsaved model lists,
+drafts and pending saves; model identifiers and raw permitted diagnostics stay
+literal. The pool cap remains 16; Test remains user initiated.

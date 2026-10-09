@@ -52,3 +52,8 @@ Validation (400 `INVALID_REQUEST`, message names the field): unknown field; `nam
 ## UI
 
 `/gateway/routing` → `Routing`, Combo tab: live list (name with Copy, strategy, members, Edit, Delete with type-to-confirm) and the round-robin sticky limit. `/gateway/routing/new` → `ComboCreate` creates; `?combo=<id>` edits. Members are ordered with ↑/↓; each non-combo member has Test (`POST /api/models/test`). Fusion shows minimum panel, judge model, straggler grace, hard timeout, and the fixed parallel limit. Every code above reaches the user through `apps/web/src/shared/errors.ts`.
+
+SP34 localizes the list/form labels, hints, validation, status, aria labels and
+notices in EN/VI using `routing-editor-i18n.md`. Draft fields and strategy stay
+mounted on locale changes. Stable names, IDs, bounds and save/test payloads
+remain as above; Test remains an explicit provider-reaching action.
