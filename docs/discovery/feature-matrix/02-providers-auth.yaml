@@ -13,6 +13,33 @@
 #     One entry per mechanism, not per vendor (brief Step 1) - individual providers are named only
 #     inside businessRules/edgeCases as examples.
 
+- id: providers.authflow-connections-browser-i18n
+  group: Providers
+  feature: Providers, AuthFlow and Connections dashboard
+  subFeature: Browser-local EN/VI over the existing provider, model, connection and sign-in UI
+  trigger: Open a U4 provider screen or change browser language while it is mounted
+  input: Browser locale, existing catalog/connections/models query state and explicit provider actions
+  output: Localized owned UI with literal provider/model data, URLs, codes, diagnostics and credential values
+  businessRules:
+    - "AIGATE_EXTENSION: locale changes preserve catalog/detail/connection query state, typed custom-provider and connection drafts, OAuth callback/device sessions, and pending actions without refetch or replay"
+    - "AIGATE_EXTENSION: built-in/custom names and IDs, endpoints, callback values, protocol/wire values, API codes and raw diagnostics remain literal; credentials are never copied into catalogs or messages"
+    - "AIGATE_EXTENSION: existing explicit Add/Save/Test/Import/OAuth/Enable/Delete actions and SP13–SP17/M2 payloads remain unchanged"
+  state: { reads: ["browser locale", "existing provider, node, connection and model query cache"], writes: ["browser locale only", "existing explicit provider UI state"], runtimeOnly: ["existing pending mutation or AuthFlow session"] }
+  dependencies: []
+  providerInteraction: "None added; existing explicit connection tests and OAuth/model actions retain their current provider interactions"
+  fallback: { hasFallback: false, retry: "existing read Retry", timeout: "existing hooks and OAuth/device deadlines", quota: null }
+  errorCases: []
+  sideEffects: ["Only existing explicit provider/connection/model/OAuth actions"]
+  persistence: ["Existing provider/connection/model records", "browser locale preference"]
+  performanceConcerns: ["No locale fan-out or duplicate query; existing model/display bounds remain"]
+  behavior: { streaming: false, cancellation: "Existing query and AuthFlow cleanup", concurrency: "Existing mutation/polling guards remain" }
+  edgeCases: ["mounted EN/VI switch", "OAuth/device callback fallback", "read error with code/diagnostic", "custom-provider draft", "390px provider/connection modal"]
+  evidence:
+    - { file: "aigate:docs/contracts/providers-authflow-connections-ui-i18n.md", line: 1, note: "SP45 scope, literal-data and lifecycle boundary" }
+  newModule: catalog
+  parityStatus: verified
+  labels: []
+
 - id: catalog.registry-build
   group: Providers
   feature: Provider catalog
