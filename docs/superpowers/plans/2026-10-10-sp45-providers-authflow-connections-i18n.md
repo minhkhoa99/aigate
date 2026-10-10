@@ -51,4 +51,4 @@ query keys, payloads, credential boundaries and mutation lifecycle unchanged.
 - [x] Isolated browser acceptance with synthetic responses and zero vendor calls: EN→VI,
   literal provider retention, three initial API reads and zero locale-triggered reads.
 - [x] Build, lint, discovery (378 entries), AST graph/project map refresh and diff gates.
-- [ ] Handoff, API↔UI map, matrix evidence and local checkpoint commit.
+- [x] Handoff, API↔UI map, matrix evidence and local checkpoint `987a94f` (amended with final hash reference).
