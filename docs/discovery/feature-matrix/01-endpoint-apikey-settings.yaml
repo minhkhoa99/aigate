@@ -2,6 +2,32 @@
 # 9router reference read at E:\9router. Read-only; every evidence line was
 # read directly, not inferred from names (behavioral.md §7).
 
+- id: settings.auth-sso-browser-i18n
+  group: Settings
+  feature: Auth settings presentation
+  subFeature: Browser-local EN/VI for the visual-only OIDC and SAML tabs
+  trigger: Open Settings → Auth and switch language while OIDC or SAML is selected
+  input: Browser locale, selected tab and existing visual-only field state
+  output: Localized owned panel copy with literal protocol names, URLs and credential-shaped values
+  businessRules:
+    - "AIGATE_EXTENSION: locale changes preserve the selected OIDC/SAML tab, field values and copied assertion URL without network calls or submit replay"
+    - "AIGATE_EXTENSION: this is presentation only; no OIDC/SAML backend route, save, test or identity-provider interaction is claimed"
+  state: { reads: ["browser locale", "local Auth settings tab/input state"], writes: ["browser locale only", "existing visual-only input state"], runtimeOnly: [] }
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: ["browser locale preference only"]
+  performanceConcerns: ["No locale-triggered API or vendor call"]
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: ["OIDC tab draft across EN/VI", "SAML assertion URL remains literal", "390px settings layout"]
+  evidence:
+    - { file: "aigate:docs/contracts/auth-settings-sso-ui-i18n.md", line: 1, note: "SP46 presentation-only boundary" }
+  newModule: settings
+  parityStatus: verified
+  labels: []
+
 - id: identity.machine-id-derivation
   group: Endpoint & API Key
   feature: Machine identity

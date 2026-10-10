@@ -74,6 +74,7 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | SP43 / M3 U10 CLI Tools discovery and core adapters EN/VI | Done, UI wired; targeted native/browser acceptance passed | `docs/contracts/cli-core-ui-i18n.md`, latest SP43 section |
 | SP44 / M3 U10 remaining CLI adapter details EN/VI | Done, UI wired; targeted native/browser acceptance passed | `docs/contracts/cli-secondary-ui-i18n.md`, latest SP44 section |
 | SP45 / M3 U4 Providers, AuthFlow and Connections EN/VI | Done, UI wired; targeted native/browser acceptance passed | `docs/contracts/providers-authflow-connections-ui-i18n.md`, latest SP45 section |
+| SP46 / M3 U2 Auth settings OIDC/SAML EN/VI | Done, visual-only UI localized; targeted native/browser acceptance passed | `docs/contracts/auth-settings-sso-ui-i18n.md`, latest SP46 section |
 
 ## Completed and verified
 
@@ -1150,3 +1151,11 @@ Checks and status:
 - **Browser acceptance.** Built Vite on an ephemeral loopback port and ran Edge headless against a same-origin fixture with synthetic catalog, connection and provider-node responses. Mounted EN→VI switched the actual locale provider, translated-title marker was true, the literal `Demo Provider` remained visible, and exactly three initial API reads occurred with zero locale-triggered reads. No real vendor, credential or user data was used; the temporary fixture was removed.
 - **Final graph/diff state.** Installed `graphify update . --no-cluster` refreshed the AST graph to 11,209 nodes and 25,048 edges across 479 code files; semantic extraction was not run and the graph remains merge-derived. `python graphify-out/build_project_map.py` regenerated the 135-line map. Staged and unstaged `git diff --check` pass. The matrix entry `providers.authflow-connections-browser-i18n` is verified; the U4 contract, API↔UI map and plan ledger contain the evidence.
 - **Checkpoint.** Local checkpoint `987a94f` (`feat: localize providers authflow and connections`) contains the verified implementation, docs and AST graph refresh. No push was performed. The tracked graph HTML remains retained because graphify skips visualization for the >5,000-node graph.
+
+### SP46 Native Auth settings OIDC/SAML EN/VI (2026-10-10)
+
+- **Starting point and scope.** Started from clean `44146a9` after SP45. Selected the remaining visual-only OIDC/SAML copy in `/settings/auth`, while keeping the M2 SSO backend explicitly deferred. Added the plan, contract and Feature Matrix entry before product edits. No API, hook, payload, dependency, database field or authentication behavior changed.
+- **Implementation.** OIDC and SAML panel titles/descriptions now use the shared EN/VI catalog. Existing `SecretField`, `CopyField`, tabs, field state, technical protocol names and literal assertion URL remain unchanged; visual-only Save remains visual-only.
+- **Native/browser evidence.** Focused shared locale/provider checks pass 10/10. Isolated Edge fixture used one synthetic `/api/settings` read, switched from OIDC to SAML across EN→VI, preserved the selected SAML tab, confirmed the Vietnamese description marker and retained `http://localhost:20128/api/auth/saml/acs` literally. No SSO/vendor call or credential was used; fixture was removed.
+- **Final gates/state.** `pnpm build` passes (existing Vite >500 kB advisory), `pnpm lint` passes (651 modules/2339 dependencies), discovery validates 379 entries, and staged/unstaged diff checks pass. `graphify update . --no-cluster` refreshed the AST graph to 11,219 nodes and 25,056 edges across 481 code files; semantic extraction was not run and the graph remains merge-derived. The project map remains 135 lines and tracked graph HTML was retained. Matrix `settings.auth-sso-browser-i18n` is verified; contract, API↔UI map and plan ledger record the evidence.
+- **Checkpoint.** This SP46 change is ready for its local checkpoint commit; no push. The M2 OIDC/SAML backend and functional save/test/login flow remain future work.

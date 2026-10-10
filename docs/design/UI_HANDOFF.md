@@ -1,6 +1,8 @@
 # UI ownership handoff
 
-Current integration note (2026-10-10): SP44 completes the remaining 14 CLI
+Current integration note (2026-10-10): SP46 completes the scoped visual-only
+OIDC/SAML Auth settings EN/VI extension; see
+`docs/contracts/auth-settings-sso-ui-i18n.md`. SP44 completes the remaining 14 CLI
 detail routes in EN/VI over existing SP25 APIs; see
 `docs/contracts/cli-secondary-ui-i18n.md`. SP43 covers CLI Tools discovery and
 Claude Code, Codex, OpenCode and Cline details; see
