@@ -6,6 +6,11 @@
 
 The dashboard distinguishes a present config file from an installed command. A config file's existence does not imply it points to AIGate. Results describe the machine running AIGate, which can differ from the machine displaying the browser.
 
+SP43 localizes the discovery list and Claude Code, Codex, OpenCode and Cline
+detail screens in EN/VI over these existing APIs. It adds no host actions:
+Preview and Apply remain explicit, separate requests. Expired or changed
+previews clear the review and require a new diff. See `cli-core-ui-i18n.md`.
+
 ### Codex config
 
 `GET /api/tooling/cli-tools/codex` returns install/configuration status, target path, and current model only; it never returns the saved key or raw TOML. `POST .../preview` accepts `{ action: "configure", baseUrl, apiKey, model, subagentModel? }` or `{ action: "reset" }` and returns a five-minute, one-use preview ID plus a redacted diff. `POST .../apply` accepts that ID, checks the config has not changed since review, saves a recoverable `.aigate.bak`, and atomically replaces `~/.codex/config.toml`. Config and diff inputs are bounded to 1 MiB and 200 diff lines; at most 20 previews exist per process. POSIX config permissions are restricted to owner read/write. A custom existing `[model_providers.9router]` section is a conflict unless it is named `9Router`.

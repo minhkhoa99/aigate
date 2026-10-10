@@ -887,3 +887,30 @@
   newModule: tooling
   parityStatus: verified
   labels: []
+
+- id: integrations.cli-core-browser-i18n
+  group: Integrations
+  feature: AIGate CLI discovery and core configuration UI
+  subFeature: Browser-local EN/VI for list and Claude/Codex/OpenCode/Cline review flows
+  trigger: Open CLI list/detail or change browser language while mounted
+  input: Browser locale, existing status and explicit Preview/Apply/Reset actions
+  output: Localized owned UI with literal tool names, paths, models, codes and redacted diffs
+  businessRules:
+    - "AIGATE_EXTENSION: CLI list is read-only host detection; locale changes do not refetch or submit actions"
+    - "AIGATE_EXTENSION: four core detail screens keep the server-owned one-use redacted preview and explicit apply boundary"
+    - "AIGATE_EXTENSION: pending actions cannot overlap; stale/expired preview clears and requires a fresh review"
+  state: { reads: ["browser locale", "CLI status query cache"], writes: ["local draft and preview state"], runtimeOnly: ["pending mutation"] }
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: "explicit failed read Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Only explicit SP25 Apply can write the selected local CLI config"]
+  persistence: ["Existing host CLI files only through SP25 Apply; browser locale preference"]
+  performanceConcerns: ["No locale fan-out; server preview caps and deadlines remain"]
+  behavior: { streaming: false, cancellation: "Existing Query unmount behavior", concurrency: "one pending preview/apply per mounted detail screen" }
+  edgeCases: ["Held Apply across locale change", "expired or changed preview", "read error", "mobile diff"]
+  evidence:
+    - { file: "aigate:docs/contracts/cli-core-ui-i18n.md", line: 1, note: "SP43 scoped UI contract" }
+  newModule: tooling
+  parityStatus: verified
+  labels: []

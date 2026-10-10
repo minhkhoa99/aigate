@@ -1,6 +1,9 @@
 # UI ownership handoff
 
-Current integration note (2026-10-10): SP42 completes Integrations Skills and
+Current integration note (2026-10-10): SP43 completes the CLI Tools discovery
+and Claude Code, Codex, OpenCode and Cline detail EN/VI slice over SP25 APIs;
+see `docs/contracts/cli-core-ui-i18n.md`. Other CLI detail screens remain
+English. SP42 completes Integrations Skills and
 MCP's scoped EN/VI presentation over existing SP25 APIs; see
 `docs/contracts/integrations-skills-mcp-ui-i18n.md`. CLI Tools list and detail
 flows remain English. SP41 completes Tunnel and MITM's scoped
