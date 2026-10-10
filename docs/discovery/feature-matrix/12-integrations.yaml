@@ -34,6 +34,7 @@
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
 
+
 - id: clitools.claude-settings-config
   group: CLI Tools
   feature: Claude Code CLI settings integration
@@ -859,3 +860,30 @@
   newModule: tooling
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+
+- id: integrations.skills-mcp-browser-i18n
+  group: Integrations
+  feature: AIGate Skills and MCP dashboards
+  subFeature: Browser-local EN/VI with stable registry and marketplace actions
+  trigger: Open Skills/MCP or change browser language while mounted
+  input: Browser locale, saved registry, bounded marketplace and explicit actions
+  output: Localized owned UI with literal IDs, URLs, names, codes and copied JSON
+  businessRules:
+    - "AIGATE_EXTENSION: locale changes preserve tab, form draft and pending mutation without refetch or replay"
+    - "AIGATE_EXTENSION: failed registry/marketplace reads show code, permitted diagnostic and Retry; failed mutations retain drafts"
+    - "AIGATE_EXTENSION: skill URLs are copied without fetching; AIGate never connects to or executes MCP endpoints"
+  state: { reads: ["browser locale", "MCP registry and marketplace query cache"], writes: ["local tab, form and client selection"], runtimeOnly: ["pending mutation"] }
+  dependencies: []
+  providerInteraction: "None added; marketplace retains the existing bounded server fetch"
+  fallback: { hasFallback: false, retry: "explicit failed read Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Explicit MCP registry create/update/delete only"]
+  persistence: ["Existing MCP server records; browser locale preference only"]
+  performanceConcerns: ["No locale fan-out; existing 100-entry registry cap and marketplace cache remain"]
+  behavior: { streaming: false, cancellation: "Existing Query unmount behavior", concurrency: "Pending MCP actions disabled while one mutation runs" }
+  edgeCases: ["Held save across locale switch", "read and save failure", "mobile table"]
+  evidence:
+    - { file: "aigate:docs/contracts/integrations-skills-mcp-ui-i18n.md", line: 1, note: "SP42 scoped UI contract and synthetic browser acceptance" }
+  newModule: tooling
+  parityStatus: verified
+  labels: []

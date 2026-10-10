@@ -56,6 +56,9 @@ Oh My Pi uses `GET/POST /api/tooling/cli-tools/omp` plus `/preview` and `/apply`
 
 The Skills page lists the eight repository skills and copies each raw `SKILL.md` URL on request. URLs target `decolua/9router`'s `master` branch. Skills are not installed by the dashboard.
 
+SP42 localizes the Skills page's owned text in EN/VI while copied URLs, skill
+IDs and endpoint paths remain literal. See `integrations-skills-mcp-ui-i18n.md`.
+
 ## Console log
 
 `GET /api/tooling/logs` returns up to 200 recent request metadata events. `GET /api/tooling/logs/stream` sends new events over SSE; at most eight streams may be open. `DELETE /api/tooling/logs` clears the in-memory buffer and tells open streams to clear their local view. Events derive from completed usage records and contain the request ID, provider, model, status, error code, and token count. Request and response bodies, provider credentials, and API keys are not captured. The buffer is process-local and resets on restart.
@@ -73,6 +76,11 @@ error, filter, locale switch and SSE lifecycle acceptance.
 `GET/POST /api/tooling/mcp/servers`, `PATCH/DELETE /api/tooling/mcp/servers/:id` manage up to 100 server endpoint records in `mcp-servers.json` under `AIGATE_DATA_DIR`. Records are explicitly scoped to `user` or `project`. HTTPS is required except localhost; URL credentials, query strings, and fragments are rejected. Writes use an atomic replacement and a `.bak` copy. The UI copies enabled entries as Claude Code or Cursor JSON; it does not write workstation files. AIGate does not connect to or probe remote servers or implement MCP transport.
 
 `GET /api/tooling/mcp/marketplace` reads direct HTTPS entries from the fixed Anthropic MCP registry through AIGate's transport, with an eight-second deadline, 1 MiB response cap, and one-hour in-memory cache. Entries routed through Claude-hosted intermediaries are excluded. Adding a marketplace entry creates an ordinary user-scoped registry record; OAuth remains the selected client's responsibility.
+
+SP42 localizes the MCP registry/marketplace/storage UI in EN/VI without
+changing these limits or server validation. Failed reads show code, permitted
+diagnostic and Retry; locale changes preserve tabs, drafts and pending actions.
+See `integrations-skills-mcp-ui-i18n.md`.
 
 ## Local interception
 

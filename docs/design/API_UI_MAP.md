@@ -93,8 +93,8 @@ Each screen keeps its fixture data until the SP in the second column lands. When
 | `GET/POST /api/tooling/cli-tools/jcode*` → `/integrations/cli-tools/jcode` `JcodeToolDetail` | SP25 slice | Wired: a combined TOML/env preview that keeps the key out of TOML, with restore markers and rollback |
 | `GET/POST /api/tooling/cli-tools/omp*` → `/integrations/cli-tools/omp` `OmpToolDetail` | SP25 slice | Wired: a targeted models.yml provider entry with stale-file refusal, backup, and atomic apply/reset |
 | `GET/POST /api/tooling/cli-tools/grok-build*` → `/integrations/cli-tools/grok-build` `GrokBuildToolDetail` | SP25 slice | Wired: AIGate model-slot/default mapping with context window, prior-default restoration, and atomic apply/reset |
-| `/integrations/skills` → `Skills` | SP25 slice | Wired: eight raw skill URLs with copy; agents fetch from the repository |
-| `GET/POST/PATCH/DELETE /api/tooling/mcp/servers*`, `GET /api/tooling/mcp/marketplace` → `/integrations/mcp` `Mcp` | SP25 slice | Wired: persisted user/project URL registry, safe URL validation, edit/pause/delete, copy enabled-server snippets for Claude Code and Cursor, and direct HTTPS marketplace discovery; AIGate does not proxy MCP transport |
+| `/integrations/skills` → `Skills` | SP25, SP42 | Eight raw skill URLs with copy; agents fetch from the repository. SP42 localizes owned copy in EN/VI while IDs, paths and URLs stay literal. `contracts/integrations-skills-mcp-ui-i18n.md`. |
+| `GET/POST/PATCH/DELETE /api/tooling/mcp/servers*`, `GET /api/tooling/mcp/marketplace` → `/integrations/mcp` `Mcp` | SP25, SP42 | Persisted user/project URL registry, safe URL validation, edit/pause/delete, copy enabled-server snippets for Claude Code and Cursor, and bounded direct HTTPS marketplace discovery; AIGate does not proxy MCP transport. SP42 localizes owned UI; failed reads show code/diagnostic/Retry, failed mutations preserve drafts, and pending actions cannot be repeated. `contracts/integrations-skills-mcp-ui-i18n.md`. |
 
 ## Engine and non-HTTP work
 

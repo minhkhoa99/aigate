@@ -1,6 +1,9 @@
 # UI ownership handoff
 
-Current integration note (2026-10-09): SP41 completes Tunnel and MITM's scoped
+Current integration note (2026-10-10): SP42 completes Integrations Skills and
+MCP's scoped EN/VI presentation over existing SP25 APIs; see
+`docs/contracts/integrations-skills-mcp-ui-i18n.md`. CLI Tools list and detail
+flows remain English. SP41 completes Tunnel and MITM's scoped
 EN/VI presentation over existing SP25 safety APIs; see
 `docs/contracts/network-safety-ui-i18n.md`. SP40 completes Proxy Pools and Deploy
 Wizard's scoped EN/VI presentation over existing SP18 APIs; see

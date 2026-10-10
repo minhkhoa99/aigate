@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Button, ConfirmDialog, CopyField, Field, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
-import { useApplyClaudePreview, useApplyClinePreview, useApplyCodexPreview, useApplyCopilotPreview, useApplyDroidPreview, useApplyGrokBuildPreview, useApplyHermesPreview, useApplyJcodePreview, useApplyKiloPreview, useApplyManagedJsonPreview, useApplyManagedTomlPreview, useApplyOmpPreview, useApplyOpenClawPreview, useApplyOpenCodePreview, useClaudePreview, useClaudeStatus, useClinePreview, useClineStatus, useCliTools, useCodexPreview, useCodexStatus, useCopilotPreview, useCopilotStatus, useCreateMcpServer, useDeleteMcpServer, useDroidPreview, useDroidStatus, useGrokBuildPreview, useGrokBuildStatus, useHermesPreview, useHermesStatus, useJcodePreview, useJcodeStatus, useKiloPreview, useKiloStatus, useManagedJsonPreview, useManagedJsonStatus, useManagedTomlPreview, useManagedTomlStatus, useMcpMarketplace, useMcpServers, useOmpPreview, useOmpStatus, useOpenClawPreview, useOpenClawStatus, useOpenCodePreview, useOpenCodeStatus, useUpdateMcpServer, type ClaudePreview, type ClinePreview, type CodexPreview, type CopilotPreview, type DroidPreview, type GrokBuildPreview, type HermesPreview, type JcodePreview, type KiloPreview, type ManagedJsonPreview, type ManagedJsonTool, type ManagedTomlPreview, type ManagedTomlTool, type McpServer, type OmpPreview, type OpenClawPreview, type OpenCodePreview } from "./api";
+import { Button, CopyField, Field, PageHeading, Panel, Pill, StateBlock, Warning } from "../../shared/ui";
+import { useApplyClaudePreview, useApplyClinePreview, useApplyCodexPreview, useApplyCopilotPreview, useApplyDroidPreview, useApplyGrokBuildPreview, useApplyHermesPreview, useApplyJcodePreview, useApplyKiloPreview, useApplyManagedJsonPreview, useApplyManagedTomlPreview, useApplyOmpPreview, useApplyOpenClawPreview, useApplyOpenCodePreview, useClaudePreview, useClaudeStatus, useClinePreview, useClineStatus, useCliTools, useCodexPreview, useCodexStatus, useCopilotPreview, useCopilotStatus, useDroidPreview, useDroidStatus, useGrokBuildPreview, useGrokBuildStatus, useHermesPreview, useHermesStatus, useJcodePreview, useJcodeStatus, useKiloPreview, useKiloStatus, useManagedJsonPreview, useManagedJsonStatus, useManagedTomlPreview, useManagedTomlStatus, useOmpPreview, useOmpStatus, useOpenClawPreview, useOpenClawStatus, useOpenCodePreview, useOpenCodeStatus, type ClaudePreview, type ClinePreview, type CodexPreview, type CopilotPreview, type DroidPreview, type GrokBuildPreview, type HermesPreview, type JcodePreview, type KiloPreview, type ManagedJsonPreview, type ManagedJsonTool, type ManagedTomlPreview, type ManagedTomlTool, type OmpPreview, type OpenClawPreview, type OpenCodePreview } from "./api";
 import { toProblem } from "../../shared/errors";
 import { useToast } from "../../shared/toast";
 
@@ -149,61 +149,4 @@ export function CliToolDetail() {
   </>;
 }
 
-export function Skills() {
-  const skills = [
-    ["9router", "9Router (Entry)", "Setup and index of all capabilities.", null],
-    ["9router-chat", "Chat", "Chat and code generation with streaming.", "/v1/chat/completions"],
-    ["9router-image", "Image Generation", "Generate images through supported providers.", "/v1/images/generations"],
-    ["9router-tts", "Text-to-Speech", "Generate speech through supported providers.", "/v1/audio/speech"],
-    ["9router-stt", "Speech-to-Text", "Transcribe audio through supported providers.", "/v1/audio/transcriptions"],
-    ["9router-embeddings", "Embeddings", "Create vectors for RAG and semantic search.", "/v1/embeddings"],
-    ["9router-web-search", "Web Search", "Search the web through configured providers.", "/v1/search"],
-    ["9router-web-fetch", "Web Fetch", "Fetch a URL as markdown, text, or HTML.", "/v1/web/fetch"],
-  ] as const;
-  const rawUrl = (id: string) => `https://raw.githubusercontent.com/decolua/9router/refs/heads/master/skills/${id}/SKILL.md`;
-  return <><PageHeading eyebrow="Integrations / Skills" title="Agent skills" description="Copy a skill entry URL into your coding agent. The agent fetches the instructions from GitHub." />
-    <Warning>These links point to the 9router repository's master branch.</Warning>
-    <Panel title="Available skills" detail="Start with the entry skill, then add only the capabilities your agent needs." className="panel-flush"><Table columns={["Skill", "Purpose", "Endpoint", "Entry URL"]} rows={skills.map(([id, name, description, endpoint]) => [<strong>{name}</strong>, description, endpoint ? <code>{endpoint}</code> : <Pill tone="info">Start here</Pill>, <CopyField value={rawUrl(id)} />])} /></Panel>
-  </>;
-}
-
-export function Mcp() {
-  const [tab, setTab] = useState("Servers");
-  const [exportClient, setExportClient] = useState<"claude" | "cursor">("claude");
-  const [editing, setEditing] = useState<McpServer | "new" | null>(null);
-  const [remove, setRemove] = useState<McpServer | null>(null);
-  const servers = useMcpServers();
-  const marketplace = useMcpMarketplace();
-  const create = useCreateMcpServer();
-  const update = useUpdateMcpServer();
-  const deletion = useDeleteMcpServer();
-  const toast = useToast();
-  const fail = (error: unknown) => toast({ tone: "error", ...toProblem(error) });
-  const exportServers = (servers.data ?? []).filter((server) => server.enabled);
-  const exportConfig = JSON.stringify({ mcpServers: Object.fromEntries(exportServers.map((server) => [server.name, exportClient === "claude" ? { type: "http", url: server.url } : { url: server.url }])) }, null, 2);
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const scope: McpServer["scope"] = form.get("scope") === "project" ? "project" : "user";
-    const input = { name: String(form.get("name") ?? ""), url: String(form.get("url") ?? ""), scope };
-    const done = () => { setEditing(null); toast({ tone: "success", message: editing === "new" ? "MCP server saved." : "MCP server updated." }); };
-    if (editing === "new") create.mutate(input, { onSuccess: done, onError: fail });
-    else if (editing) update.mutate({ id: editing.id, ...input }, { onSuccess: done, onError: fail });
-  };
-  return <><PageHeading eyebrow="Integrations / MCP" title="MCP server registry" description="Save remote MCP server endpoints for later client setup." action={<Button variant="primary" onClick={() => setEditing("new")}>+ Add server</Button>} />
-    <Warning>MCP endpoints are stored on the AIGate host; AIGate does not connect to, probe, or expose these servers yet. HTTPS is required except for localhost.</Warning>
-    <Tabs items={["Servers", "Marketplace", "Storage"]} active={tab} onChange={setTab} />
-    {tab === "Servers" && <Panel title="Saved servers" detail="Enabled controls the saved entry only; it does not start a connection." className="section-gap panel-flush">
-      {servers.isPending ? <StateBlock state="loading" /> : servers.isError ? <StateBlock state="error" code={toProblem(servers.error).code} action={<Button onClick={() => void servers.refetch()}>Retry</Button>} />
-        : <Table empty="No MCP servers saved. Add an HTTPS server URL to begin." columns={["Server", "Endpoint", "Scope", "State", ""]} rows={(servers.data ?? []).map((server) => [<strong>{server.name}</strong>, <code>{server.url}</code>, server.scope, <Pill tone={server.enabled ? "info" : "muted"}>{server.enabled ? "Saved" : "Paused"}</Pill>, <><Button variant="ghost" onClick={() => update.mutate({ id: server.id, enabled: !server.enabled }, { onError: fail })}>{server.enabled ? "Pause" : "Enable"}</Button><Button variant="ghost" onClick={() => setEditing(server)}>Edit</Button><Button variant="ghost" onClick={() => setRemove(server)}>Delete</Button></>])} />}
-    </Panel>}
-    {tab === "Marketplace" && <Panel title="MCP marketplace" detail="Direct HTTPS servers from the Anthropic MCP registry. OAuth servers must be authorized in the client." className="section-gap panel-flush">{marketplace.isPending ? <StateBlock state="loading" /> : marketplace.isError ? <StateBlock state="error" code={toProblem(marketplace.error).code} action={<Button onClick={() => void marketplace.refetch()}>Retry</Button>} /> : <Table empty="No direct-connect MCP servers are currently available." columns={["Server", "Description", "Transport", ""]} rows={(marketplace.data?.servers ?? []).map((server) => [<strong>{server.title}</strong>, <span>{server.description || server.url}</span>, <Pill tone={server.requiresAuth ? "info" : "healthy"}>{server.requiresAuth ? "OAuth" : server.transport}</Pill>, <Button variant="ghost" disabled={create.isPending || (servers.data ?? []).some((saved) => saved.name.toLowerCase() === server.name.toLowerCase())} onClick={() => create.mutate({ name: server.name, url: server.url, scope: "user" }, { onSuccess: () => toast({ tone: "success", message: `${server.title} saved.` }), onError: fail })}>Add</Button>])} />}</Panel>}
-    {tab === "Storage" && <div className="stack section-gap"><Panel title="AIGate storage"><p>Server definitions are stored in <code>mcp-servers.json</code> under AIGATE_DATA_DIR with owner-only file permissions and an atomic backup.</p></Panel>
-      <Panel title="Copy client configuration" detail="Only enabled servers are included. Copy and merge this snippet into the selected client on your workstation."><div className="stack"><Field label="Client"><select className="input" value={exportClient} onChange={(event) => setExportClient(event.target.value === "cursor" ? "cursor" : "claude")}><option value="claude">Claude Code</option><option value="cursor">Cursor</option></select></Field>
-        {servers.isError ? <StateBlock state="error" code={toProblem(servers.error).code} /> : servers.isPending ? <StateBlock state="loading" /> : exportServers.length ? <><pre className="code-block">{exportConfig}</pre><Button onClick={() => void navigator.clipboard.writeText(exportConfig).then(() => toast({ tone: "success", message: "MCP config copied." }), () => toast({ tone: "error", message: "Clipboard access was denied." }))}>Copy JSON</Button></> : <p className="muted">Enable at least one saved server to create a config snippet.</p>}
-        <Warning>AIGate does not write to the client config. The browser may run on a different machine from the AIGate server.</Warning>
-      </div></Panel></div>}
-    {editing && <Modal title={editing === "new" ? "Add MCP server" : `Edit ${editing.name}`} onClose={() => setEditing(null)}><form onSubmit={submit} className="stack"><Field label="Name"><input className="input" name="name" defaultValue={editing === "new" ? "" : editing.name} maxLength={64} required /></Field><Field label="Server URL" hint="HTTPS only; HTTP is allowed for localhost. URL credentials and query parameters are not accepted."><input className="input" name="url" type="url" defaultValue={editing === "new" ? "" : editing.url} maxLength={2048} required /></Field><Field label="Scope"><select className="input" name="scope" defaultValue={editing === "new" ? "user" : editing.scope}><option value="user">User</option><option value="project">Project</option></select></Field><div className="modal-actions"><Button onClick={() => setEditing(null)}>Cancel</Button><Button type="submit" variant="primary" disabled={create.isPending || update.isPending}>{create.isPending || update.isPending ? "Saving…" : "Save server"}</Button></div></form></Modal>}
-    {remove && <ConfirmDialog name={remove.name} detail="Remove this saved server entry from AIGate?" onClose={() => setRemove(null)} onConfirm={() => deletion.mutate(remove.id, { onSuccess: () => { setRemove(null); toast({ tone: "success", message: `Removed ${remove.name}.` }); }, onError: fail })} />}
-  </>;
-}
+export { Skills, Mcp } from "./skills-mcp";
