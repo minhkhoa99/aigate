@@ -1215,5 +1215,18 @@
   "cli.previewLimit": "Có quá nhiều bản xem trước cấu hình đang chờ. Đợi bản cũ hết hạn rồi thử lại.",
   "cli.reviewAgain": "Cấu hình đã xem thay đổi hoặc hết hạn. Hãy xem một diff mới trước khi áp dụng.",
   "cli.resetDone": "Đã đặt lại cấu hình {tool}.",
-  "cli.applyDone": "Đã áp dụng cấu hình {tool}."
+  "cli.applyDone": "Đã áp dụng cấu hình {tool}.",
+  "cli.droidDescription": "Xem trước thay đổi model Droid trên máy chủ, rồi áp dụng đúng phần thay đổi đó.",
+  "cli.copilotDescription": "Xem trước thay đổi model ngôn ngữ của VS Code trên máy chủ, rồi áp dụng đúng phần thay đổi đó.",
+  "cli.genericDescription": "Xem trước thay đổi cấu hình {tool} trên máy chủ, rồi áp dụng đúng phần thay đổi đó.",
+  "cli.kiloDescription": "Xem trước cài đặt Kilo và VS Code, rồi áp dụng đúng phần thay đổi đó.",
+  "cli.hermesDescription": "Xem trước config.yaml và .env cùng nhau, rồi áp dụng đúng phần thay đổi đó.",
+  "cli.jcodeDescription": "Xem trước TOML của provider và tệp env chứa bí mật cùng nhau, rồi áp dụng đúng phần thay đổi đó.",
+  "cli.ompDescription": "Xem trước mục provider 9router trong models.yml, rồi áp dụng đúng phần thay đổi đó.",
+  "cli.grokBuildDescription": "Xem trước vị trí model AIGate và ánh xạ mặc định trước khi áp dụng.",
+  "cli.openClawDescription": "Xem trước tệp model chính và của agent, rồi áp dụng một thay đổi đã kiểm tra.",
+  "cli.contextWindow": "Cửa sổ ngữ cảnh",
+  "cli.agent": "Agent {id}",
+  "cli.agentCurrent": "Hiện tại: {model}. Để trống để dùng model mặc định.",
+  "cli.agentDefault": "Để trống để dùng model mặc định."
 }

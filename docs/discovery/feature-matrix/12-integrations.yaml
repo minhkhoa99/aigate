@@ -914,3 +914,30 @@
   newModule: tooling
   parityStatus: verified
   labels: []
+
+- id: integrations.cli-secondary-browser-i18n
+  group: Integrations
+  feature: Remaining AIGate CLI adapter detail UI
+  subFeature: Browser-local EN/VI for 14 SP25 adapter routes
+  trigger: Open a CLI detail route or change language while mounted
+  input: Browser locale, existing status and explicit Preview/Apply/Reset
+  output: Localized owned UI with literal paths, model IDs, codes and redacted diffs
+  businessRules:
+    - "AIGATE_EXTENSION: locale changes preserve drafts and reviewed previews without requests"
+    - "AIGATE_EXTENSION: pending actions cannot overlap; expired/changed reviews require fresh preview"
+    - "AIGATE_EXTENSION: no local CLI file write before explicit SP25 Apply"
+  state: { reads: ["browser locale", "CLI status query cache"], writes: ["local draft and review"], runtimeOnly: ["pending mutation"] }
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: "explicit read Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Only explicit SP25 Apply may write the selected local CLI config"]
+  persistence: ["Existing host CLI files through SP25 Apply", "browser locale preference"]
+  performanceConcerns: ["No locale fan-out; unchanged server preview caps"]
+  behavior: { streaming: false, cancellation: "Existing Query unmount behavior", concurrency: "one pending preview/apply per mounted screen" }
+  edgeCases: ["held Apply across locale change", "empty diff", "read Retry", "mobile diff"]
+  evidence:
+    - { file: "aigate:docs/contracts/cli-secondary-ui-i18n.md", line: 1, note: "SP44 scoped UI contract" }
+  newModule: tooling
+  parityStatus: verified
+  labels: []

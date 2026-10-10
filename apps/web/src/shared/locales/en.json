@@ -1215,5 +1215,18 @@
   "cli.previewLimit": "Too many configuration previews are pending. Wait for an earlier preview to expire, then retry.",
   "cli.reviewAgain": "The reviewed configuration changed or expired. Preview a fresh diff before applying.",
   "cli.resetDone": "{tool} settings reset.",
-  "cli.applyDone": "{tool} settings applied."
+  "cli.applyDone": "{tool} settings applied.",
+  "cli.droidDescription": "Preview a local Droid model change, then apply that exact diff.",
+  "cli.copilotDescription": "Preview a local VS Code language-model change, then apply that exact diff.",
+  "cli.genericDescription": "Preview a local {tool} configuration change, then apply that exact diff.",
+  "cli.kiloDescription": "Preview Kilo and VS Code settings, then apply that exact diff.",
+  "cli.hermesDescription": "Preview config.yaml and .env together, then apply that exact diff.",
+  "cli.jcodeDescription": "Preview the provider TOML and secret env file together, then apply that exact diff.",
+  "cli.ompDescription": "Preview the 9router provider entry in models.yml, then apply that exact diff.",
+  "cli.grokBuildDescription": "Preview the AIGate model slot and default mapping before applying it.",
+  "cli.openClawDescription": "Preview the main and agent model files, then apply one reviewed change.",
+  "cli.contextWindow": "Context window",
+  "cli.agent": "Agent {id}",
+  "cli.agentCurrent": "Current: {model}. Leave blank to use the default model.",
+  "cli.agentDefault": "Leave blank to use the default model."
 }
