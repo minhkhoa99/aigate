@@ -1479,3 +1479,33 @@
   newModule: settings
   parityStatus: verified
   labels: []
+
+- id: settings.signed-update-check
+  group: Settings
+  feature: System lifecycle
+  subFeature: Explicit signed release availability check
+  trigger: Dashboard user clicks Check for updates in General Settings
+  input: "Operator-pinned HTTPS manifest URL and Ed25519 public-key file"
+  output: "Current/latest version and availability metadata, or precise error"
+  businessRules:
+    - "AIGATE_EXTENSION: no network call without explicit user action; absent channel is shown as unconfigured"
+    - "AIGATE_EXTENSION: validate the exact SP49 manifest and signature against a separately pinned key before comparing full SemVer"
+    - "AIGATE_EXTENSION: no archive download, installation, restart, process kill or manifest-supplied URL is used in this slice"
+  state:
+    reads: ["server package version", "operator channel settings", "fixed HTTPS manifest"]
+    writes: []
+    runtimeOnly: ["one last successful check", "one in-flight check"]
+  dependencies: [settings.release-foundation]
+  providerInteraction: "Operator-configured release manifest only; no AI vendor call"
+  fallback: { hasFallback: false, retry: "manual Retry only", timeout: "5 s overall", quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["4 KiB body, 4 s transport, 5 s deadline, one concurrent check"]
+  behavior: { streaming: false, cancellation: "client abort and deadline", concurrency: "one in flight" }
+  edgeCases: ["Prerelease comparison", "Redirect refused", "Wrong key", "Oversize body", "Prior good result survives failure"]
+  evidence:
+    - { file: "aigate:docs/contracts/signed-update-check.md", line: 1, note: "SP50 native check contract" }
+  newModule: settings
+  parityStatus: verified
+  labels: []

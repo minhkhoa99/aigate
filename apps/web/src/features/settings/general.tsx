@@ -8,6 +8,7 @@ import { useToast } from "../../shared/toast";
 import { downloadSettingsFile, useRuntimeInfo, useSettingsImport, type SettingsPreview } from "./api";
 import { InstallationBackup } from "./installation-backup";
 import { WindowsStartupSettings } from "./windows-startup";
+import { SignedUpdateSettings } from "./signed-update";
 
 const MAX_FILE_BYTES = 64 * 1024;
 
@@ -101,6 +102,7 @@ export function SettingsGeneral({ theme, onTheme }: { theme: string; onTheme: (t
     </Panel>
     <InstallationBackup />
     <WindowsStartupSettings />
+    <SignedUpdateSettings />
     {confirming && review && <Modal title={t("settings.applyTitle")} onClose={() => { if (!imports.apply.isPending) setConfirming(false); }}>
       <p>{t("settings.importConfirm", { count: f.number(review.changes.length) })}</p>
       <input className="input" aria-label={t("settings.confirmAria")} autoComplete="off" value={typed} disabled={imports.apply.isPending} onChange={(event) => setTyped(event.target.value)} />

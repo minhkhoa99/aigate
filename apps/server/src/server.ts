@@ -14,6 +14,7 @@ import { registerSimulationBoundary } from "./modules/routing/infrastructure/rou
 import { registerSamlBoundary } from "./modules/identity/infrastructure/sso.controller.js";
 import { applyPendingRestore } from "./modules/settings/infrastructure/installation-backup.js";
 import type { StartupConfig } from "./modules/settings/infrastructure/windows-startup.js";
+import type { UpdateConfig } from "./modules/settings/infrastructure/signed-update.js";
 import { assertTimeZone } from "./modules/usage/domain/usage.js";
 import { DEFAULT_RETENTION_DAYS } from "./modules/usage/infrastructure/usage-recorder.js";
 import { AesGcmCipher, loadSecretKey } from "./secret-cipher.js";
@@ -51,11 +52,13 @@ export interface ServerOptions {
   usageFlushIntervalMs?: number;
   // Tests only: an isolated synthetic Startup folder and built entry paths.
   startupConfig?: StartupConfig;
+  // Tests only: a synthetic signed release channel.
+  updateConfig?: UpdateConfig;
 }
 
 export async function createServer({
   databaseFile, dataDir = dirname(databaseFile), webDist, secretKey, transport, streamIdleTimeoutMs = DEFAULT_STREAM_IDLE_TIMEOUT_MS, refreshRetryDelayMs = DEFAULT_REFRESH_RETRY_DELAY_MS, streamRetryDelayMs = STREAM_RETRY_DELAY_MS,
-  usageTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone, usageRetentionDays = DEFAULT_RETENTION_DAYS, usageFlushIntervalMs = 1_000, startupConfig,
+  usageTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone, usageRetentionDays = DEFAULT_RETENTION_DAYS, usageFlushIntervalMs = 1_000, startupConfig, updateConfig,
 }: ServerOptions): Promise<NestFastifyApplication> {
   if (!Number.isInteger(streamIdleTimeoutMs) || streamIdleTimeoutMs < 1_000 || streamIdleTimeoutMs > 600_000) {
     throw new RangeError("AIGATE_STREAM_IDLE_TIMEOUT_MS must be an integer from 1000 to 600000");
@@ -81,7 +84,7 @@ export async function createServer({
     // body these handlers accept; Fastify's own JSON parser (prototype-poisoning safe) stays.
     const startup = startupConfig ?? { platform: process.platform, appData: process.env.APPDATA, nodePath: process.execPath,
       serverEntry: join(import.meta.dirname, "main.js"), webIndex: webDist ? join(webDist, "index.html") : "", secretKeyOverride: Boolean(secretKey) };
-    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { databaseFile, dataDir, key, envKey: Boolean(secretKey) }, startup, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, dataDir, { timezone: usageTimezone, retentionDays: usageRetentionDays, flushIntervalMs: usageFlushIntervalMs }, transport), new FastifyAdapter(), { bodyParser: false });
+    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { databaseFile, dataDir, key, envKey: Boolean(secretKey) }, startup, updateConfig ?? { manifestUrl: process.env.AIGATE_UPDATE_MANIFEST_URL, publicKeyFile: process.env.AIGATE_UPDATE_PUBLIC_KEY_FILE }, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, dataDir, { timezone: usageTimezone, retentionDays: usageRetentionDays, flushIntervalMs: usageFlushIntervalMs }, transport), new FastifyAdapter(), { bodyParser: false });
   } catch (error) {
     await database?.close();
     await restore?.rollback();

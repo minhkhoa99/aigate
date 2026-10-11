@@ -1,7 +1,8 @@
 # SP49 release foundation
 
-The installed version is the `version` in `apps/server/package.json`. It is a
-SemVer prerelease until a release is published. Authenticated
+The installed version is the `version` in `apps/server/package.json`. Release
+versions use SemVer core and optional prerelease identifiers (no build
+metadata); this is a prerelease until a release is published. Authenticated
 `GET /api/settings/runtime` includes `appVersion`; General displays it.
 
 `pnpm release:pack <new-output-dir> <private-key.pem>` requires a prior `pnpm build`

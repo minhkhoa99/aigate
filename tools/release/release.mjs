@@ -10,7 +10,9 @@ const run = promisify(execFile);
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const MAX_BYTES = 512 * 1024 * 1024;
 const MAX_FILES = 10_000;
-const VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/;
+const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const validVersion = value => typeof value === "string" && value.length <= 128 && VERSION.test(value) &&
+  !VERSION.exec(value)[4]?.split(".").some(part => /^\d+$/.test(part) && part.length > 1 && part.startsWith("0"));
 const files = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "apps/server/package.json", "packages/database/package.json", "packages/engine/package.json"];
 const directories = ["apps/server/dist", "apps/web/dist", "packages/database/dist", "packages/database/drizzle", "packages/engine/dist"];
 
@@ -40,7 +42,7 @@ function payload(version, artifact, bytes, sha256) {
 
 export async function pack(outputDir, privateKeyPath) {
   const version = JSON.parse(await readFile(join(root, "apps/server/package.json"), "utf8")).version;
-  if (typeof version !== "string" || !VERSION.test(version)) throw new Error("Server package version must be SemVer.");
+  if (!validVersion(version)) throw new Error("Server package version must be SemVer without build metadata.");
   const key = createPrivateKey(await readFile(privateKeyPath));
   if (key.asymmetricKeyType !== "ed25519") throw new Error("An Ed25519 private key is required.");
   const output = resolve(outputDir);
@@ -79,7 +81,7 @@ export async function verifyRelease(manifestPath, publicKeyPath) {
   if (info.size > 4096) throw new Error("Release manifest exceeds 4 KiB.");
   const value = JSON.parse(await readFile(manifestPath, "utf8"));
   if (!value || typeof value !== "object" || Object.keys(value).sort().join(",") !== "artifact,bytes,format,sha256,signature,version" ||
-      value.format !== "aigate-release" || typeof value.version !== "string" || !VERSION.test(value.version) ||
+      value.format !== "aigate-release" || !validVersion(value.version) ||
       value.artifact !== `aigate-${value.version}.tar.gz` || !Number.isSafeInteger(value.bytes) || value.bytes < 1 || value.bytes > MAX_BYTES ||
       typeof value.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.sha256) ||
       typeof value.signature !== "string" || !/^[A-Za-z0-9_-]{86}$/.test(value.signature)) throw new Error("Invalid release manifest.");

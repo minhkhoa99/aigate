@@ -81,7 +81,7 @@ test("localized errors keep codes, numeric context and raw diagnostics", () => {
   assert.equal(toProblem(new ApiError(400,"PROVIDER_NOT_SUPPORTED","",{message:raw}),"vi").message,raw);
   assert.ok(toProblem(new ApiError(502,"VOICES_FETCH_FAILED","",{message:raw}),"vi").message.includes(raw));
   assert.equal(toProblem(new ApiError(409,"SETTINGS_CHANGED",""),"vi").code,"SETTINGS_CHANGED");
-  for (const code of ["BACKUP_INVALID", "BACKUP_TOO_LARGE", "BACKUP_CHANGED", "BACKUP_PENDING", "BACKUP_KEY_CONFLICT", "STARTUP_INVALID_REQUEST", "STARTUP_UNSUPPORTED", "STARTUP_CONFLICT", "STARTUP_IO_ERROR"]) {
+  for (const code of ["BACKUP_INVALID", "BACKUP_TOO_LARGE", "BACKUP_CHANGED", "BACKUP_PENDING", "BACKUP_KEY_CONFLICT", "STARTUP_INVALID_REQUEST", "STARTUP_UNSUPPORTED", "STARTUP_CONFLICT", "STARTUP_IO_ERROR", "UPDATE_INVALID_REQUEST", "UPDATE_CHANNEL_UNCONFIGURED", "UPDATE_CHANNEL_INVALID", "UPDATE_BUSY", "UPDATE_CHECK_FAILED", "UPDATE_MANIFEST_INVALID"]) {
     const localized = toProblem(new ApiError(409, code, ""), "vi");
     assert.equal(localized.code, code);
     assert.notEqual(localized.message, toProblem(new ApiError(409, code, ""), "en").message);
@@ -133,11 +133,19 @@ test("real shared UI renders the saved locale and treats supplied copy as litera
     assert.ok((await render(Overview)).includes("Tổng quan gateway"), "Overview owned heading must be Vietnamese");
     Object.defineProperty(globalThis,"window",{configurable:true,value:{location:{origin:"http://localhost:20200"}}});
     const runtimeClient = new QueryClient(); runtimeClient.setQueryData(["settings","runtime"],{
-      at:0,bindAddress:"127.0.0.1",port:20200,dataDir:"D:/raw/model-x",nodeVersion:"v22.raw",databaseDriver:"node:sqlite",
+      at:0,bindAddress:"127.0.0.1",port:20200,dataDir:"D:/raw/model-x",appVersion:"0.1.0-dev.0",nodeVersion:"v22.raw",databaseDriver:"node:sqlite",
       uptimeSeconds:120,streamIdleTimeoutMs:30000,usageTimezone:"UTC",usageRetentionDays:12345,dailyRetentionDays:365,
       writer:{queued:12345,dropped:2,failed:0},
     });
+    runtimeClient.setQueryData(["settings","update"],{currentVersion:"0.1.0-dev.0",channel:"ready",checking:false,
+      lastCheck:{at:0,latestVersion:"0.1.0-dev.1",hasUpdate:true,artifactBytes:1234}});
     const runtimeHtml = await render(() => h(SettingsGeneral,{theme:"dark",onTheme:()=>{}}),runtimeClient);
+    assert.ok(runtimeHtml.includes(mod.translate("vi","update.available",{version:"0.1.0-dev.1"})));
+    assert.ok(runtimeHtml.includes(mod.translate("vi","update.check")));
+    language = "en";
+    const updateEn = await render(() => h(SettingsGeneral,{theme:"dark",onTheme:()=>{}}),runtimeClient);
+    assert.ok(updateEn.includes(mod.translate("en","update.available",{version:"0.1.0-dev.1"})));
+    language = "vi";
     for(const text of ["12.345 ngày", "20200", "AIGATE_DATA_DIR", "D:/raw/model-x", "v22.raw / node:sqlite"]) assert.ok(runtimeHtml.includes(text),text);
     const developerHtml = await render(() => h(SettingsDeveloper,{enabled:true,onChange:()=>{}}),runtimeClient);
     assert.ok(developerHtml.includes("12.345"));

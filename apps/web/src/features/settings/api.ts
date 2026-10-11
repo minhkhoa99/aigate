@@ -31,6 +31,15 @@ export interface RuntimeInfo {
 }
 export interface SettingsPreview { version: string; changes: { key: string; before: boolean | string | number; after: boolean | string | number }[]; settings: Partial<Settings> }
 export const useRuntimeInfo = () => useQuery({ queryKey: ["settings", "runtime"], queryFn: () => api<RuntimeInfo>("/api/settings/runtime"), refetchInterval: 30_000 });
+export interface UpdateCheck { at: number; latestVersion: string; hasUpdate: boolean; artifactBytes: number }
+export interface UpdateStatus { currentVersion: string; channel: "unconfigured" | "ready" | "invalid"; checking: boolean; lastCheck: UpdateCheck | null }
+const updateKey = ["settings", "update"] as const;
+export const useUpdateStatus = () => useQuery({ queryKey: updateKey, queryFn: () => api<UpdateStatus>("/api/settings/update") });
+export function useCheckUpdate() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: () => api<UpdateStatus>("/api/settings/update/check", { method: "POST" }),
+    onSuccess: status => client.setQueryData(updateKey, status) });
+}
 export type StartupReason = "WINDOWS_ONLY" | "APPDATA_UNAVAILABLE" | "STARTUP_FOLDER_MISSING" | "BUILD_REQUIRED" | "SECRET_KEY_OVERRIDE" | "STARTUP_CONFLICT";
 export interface StartupStatus { supported: boolean; enabled: boolean; reason: StartupReason | null }
 const startupKey = ["settings", "startup"] as const;
