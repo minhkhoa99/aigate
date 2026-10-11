@@ -28,6 +28,37 @@
   parityStatus: verified
   labels: []
 
+- id: settings.static-release-channel
+  group: Settings
+  feature: System lifecycle
+  subFeature: Operator publication to a local static release channel
+  trigger: Operator explicitly promotes a signed release into an existing channel directory
+  input: "SP49 manifest/archive, pinned public key, local channel directory"
+  output: "Immutable archive and fixed latest.manifest.json for same-directory HTTPS hosting"
+  businessRules:
+    - "AIGATE_EXTENSION: verify source and staged copy against a separately pinned Ed25519 key before publication"
+    - "AIGATE_EXTENSION: promote only a newer full-SemVer version; preserve prior archives and update the manifest last"
+    - "AIGATE_EXTENSION: reject symlinks and concurrent publication; no remote hosting or real key configuration is implicit"
+    - "IMPLEMENTATION_ACCIDENT: the reference's npm updater and forced process termination do not apply"
+  state:
+    reads: ["signed release files", "pinned public key", "existing channel manifest/archive"]
+    writes: ["operator-selected local channel archive", "latest.manifest.json"]
+    runtimeOnly: ["exclusive local publish lock"]
+  dependencies: [settings.release-foundation, settings.signed-update-check]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "operator retries after inspecting error", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Writes only inside the selected local channel directory"]
+  persistence: ["Immutable archives and latest.manifest.json"]
+  performanceConcerns: ["512 MiB artifact and 4 KiB manifest bounds; streamed digest; one writer"]
+  behavior: { streaming: true, cancellation: null, concurrency: "one local publisher" }
+  edgeCases: ["Tampered source", "Tampered existing channel", "Duplicate version", "Downgrade", "Symlink", "Lock", "Interrupted publication"]
+  evidence:
+    - { file: "aigate:docs/contracts/static-release-channel.md", line: 1, note: "SP52 native publication contract" }
+  newModule: settings
+  parityStatus: verified
+  labels: []
+
 - id: identity.machine-id-derivation
   group: Endpoint & API Key
   feature: Machine identity

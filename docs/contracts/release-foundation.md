@@ -24,6 +24,7 @@ publisher must distribute the public key and channel URL independently.
 
 SP49 performs no remote request or installation. No channel is configured by
 default. SP50 adds the signed availability check; SP51 adds a separate managed
-installation and staged switch described in `managed-update.md`. The 9router
+installation and staged switch described in `managed-update.md`. SP52 adds the
+operator-run local static channel publisher in `static-release-channel.md`. The 9router
 npm global updater is not reused because this project has no npm release
 channel and its process-kill behavior is outside this contract.
