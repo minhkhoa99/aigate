@@ -15,14 +15,14 @@ export function readSessionToken(request: FastifyRequest): string | undefined {
   return undefined;
 }
 
-function attributes(request: FastifyRequest, maxAgeSeconds: number): string {
+function attributes(request: FastifyRequest, maxAgeSeconds: number, publicHttps = false): string {
   // Secure only when this server terminates TLS itself; forwarded headers are not trusted.
-  const secure = request.protocol === "https" ? "; Secure" : "";
+  const secure = publicHttps || request.protocol === "https" ? "; Secure" : "";
   return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`;
 }
 
-export function setSessionCookie(request: FastifyRequest, reply: FastifyReply, token: string): void {
-  reply.header("set-cookie", `${SESSION_COOKIE}=${token}; ${attributes(request, SESSION_TTL_MS / 1000)}`);
+export function setSessionCookie(request: FastifyRequest, reply: FastifyReply, token: string, publicHttps = false): void {
+  reply.header("set-cookie", `${SESSION_COOKIE}=${token}; ${attributes(request, SESSION_TTL_MS / 1000, publicHttps)}`);
 }
 
 export function clearSessionCookie(request: FastifyRequest, reply: FastifyReply): void {

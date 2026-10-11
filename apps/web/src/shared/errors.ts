@@ -4,7 +4,8 @@ import { isMessageKey, translate, type Language, type MessageKey, type Params } 
 export type Problem = { code: string; message: string };
 // Only app-owned advice is translated. Raw provider/validation detail remains verbatim.
 const PASSTHROUGH = new Set(["NOT_FOUND", "CONFLICT", "PROVIDER_UNAVAILABLE", "PROVIDER_NOT_SUPPORTED", "ALREADY_CONNECTED",
-  "NO_ACTIVE_CONNECTION", "VOICE_PREVIEW_FAILED", "TUNNEL_SECURITY_REQUIRED", "TUNNEL_ROUTE_CONFLICT"]);
+  "NO_ACTIVE_CONNECTION", "VOICE_PREVIEW_FAILED", "TUNNEL_SECURITY_REQUIRED", "TUNNEL_ROUTE_CONFLICT", "OIDC_TEST_FAILED", "SAML_CONFIG_INVALID",
+  "OIDC_START_FAILED", "OIDC_LOGIN_FAILED", "SAML_START_FAILED", "SAML_LOGIN_FAILED"]);
 
 export function toProblem(error: unknown, language: Language = "en"): Problem {
   const t = (key: MessageKey, params?: Params) => translate(language, key, params);

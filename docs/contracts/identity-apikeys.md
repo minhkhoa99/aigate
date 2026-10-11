@@ -1,5 +1,8 @@
 # Identity and API keys contract (M1 SP6)
 
+This is the historical SP6 scope. Functional OIDC/SAML authentication added
+later is specified in `m2-oidc-saml-auth.md`.
+
 SP33 dashboard setup: `/gateway/endpoint` now selects one of the four
 implemented client protocol examples and renders its surrounding key controls
 in EN/VI. The create response's plaintext key stays only in the one-time

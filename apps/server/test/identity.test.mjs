@@ -22,7 +22,7 @@ test("a fresh install reports that setup is required and nobody is signed in", (
   session(async (call) => {
     const res = await call({ url: "/api/auth/status" });
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.json(), { setupRequired: true, authenticated: false, requireLogin: true });
+    assert.deepEqual(res.json(), { setupRequired: true, authenticated: false, requireLogin: true, authMode: "password", oidcConfigured: false, samlConfigured: false, oidcLoginLabel: "Sign in with OIDC" });
     assert.equal(res.headers["cache-control"], "no-store");
   }));
 
@@ -52,6 +52,26 @@ test("every /api route needs a session unless it is public", () =>
     assert.equal((await call({ url: "/api/settings", cookie, remoteAddress: REMOTE })).statusCode, 200, "a session works remotely");
     assert.equal((await call({ url: "/health" })).statusCode, 200);
     assert.equal((await call({ url: "/api/auth/status", cookie })).json().authenticated, true);
+  }));
+
+test("SSO settings expose only public fields and tests require a dashboard session", () =>
+  session(async (call) => {
+    const denied = await call({ method: "POST", url: "/api/auth/saml/test", body: { samlEntryPoint: "https://idp.example/sso", samlIssuer: "urn:test", samlCert: "bad" } });
+    assert.equal(denied.statusCode, 401);
+    const cookie = await setUp(call);
+    const saved = await call({ method: "PATCH", url: "/api/settings", cookie, body: {
+      authMode: "both", oidcIssuerUrl: "https://idp.example", oidcClientId: "client", oidcClientSecret: "super-secret",
+      samlEntryPoint: "https://idp.example/sso", samlIssuer: "urn:test", samlCert: "not-a-certificate",
+    } });
+    assert.equal(saved.statusCode, 200);
+    assert.equal(saved.json().oidcConfigured, true);
+    assert.equal(saved.json().samlConfigured, true);
+    assert.equal(Object.hasOwn(saved.json(), "oidcClientSecret"), false);
+    assert.equal(Object.hasOwn(saved.json(), "samlCert"), false);
+    const status = await call({ url: "/api/auth/status" });
+    assert.deepEqual(status.json(), { setupRequired: false, authenticated: false, requireLogin: true, authMode: "both", oidcConfigured: true, samlConfigured: true, oidcLoginLabel: "Sign in with OIDC" });
+    assert.equal((await call({ method: "POST", url: "/api/auth/saml/test", cookie, body: { samlEntryPoint: "https://idp.example/sso", samlIssuer: "urn:test", samlCert: "not-a-certificate" } })).statusCode, 400);
+    assert.equal((await call({ url: "/api/auth/saml/metadata" })).statusCode, 400, "metadata does not leak configuration errors as a public success");
   }));
 
 test("login checks the password and locks the client after five failures", () =>

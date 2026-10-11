@@ -31,8 +31,11 @@ export class AuthController {
   async status(@Req() request: FastifyRequest) {
     const hash = await this.identity.passwordHash();
     const authenticated = await this.auth.isAuthenticated(request);
-    const { requireLogin } = await this.settings.get();
-    return { setupRequired: hash === undefined, authenticated, requireLogin };
+    const settings = await this.settings.get();
+    return { setupRequired: hash === undefined, authenticated, requireLogin: settings.requireLogin,
+      authMode: settings.authMode, oidcConfigured: settings.oidcConfigured && (settings.authMode === "oidc" || settings.authMode === "both"),
+      samlConfigured: settings.samlConfigured && (settings.authMode === "saml" || settings.authMode === "both"),
+      oidcLoginLabel: settings.oidcLoginLabel || "Sign in with OIDC" };
   }
 
   @Public()

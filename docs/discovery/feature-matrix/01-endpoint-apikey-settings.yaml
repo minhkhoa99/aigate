@@ -792,8 +792,9 @@
     - { file: src/app/api/auth/oidc/callback/route.js, line: 75, note: "setDashboardAuthCookie with oidc/oidcSub/oidcEmail/oidcName claims" }
     - { file: src/lib/auth/oidc.js, line: 220, note: "jwtVerify against the IdP's live JWKS with issuer/audience/nonce all enforced as verify options" }
     - { file: src/lib/auth/oidc.js, line: 44, note: "isOidcConfigured — issuerUrl + clientId + clientSecret must all be present" }
+    - { file: "aigate:apps/server/test/sso.test.mjs", line: 16, note: "Synthetic IdP proves PKCE, signed token, session and one-use state" }
   newModule: identity
-  parityStatus: traced
+  parityStatus: verified
   labels: [REFERENCE_BEHAVIOR]
 
 - id: identity.oidc-test-probe
@@ -827,8 +828,9 @@
     - { file: src/app/api/auth/oidc/test/route.js, line: 9, note: "canAccessTestRoute — settings.requireLogin===false short-circuits to allowed" }
     - { file: src/app/api/auth/oidc/test/route.js, line: 41, note: "fetchOidcDiscovery(issuerUrl) — issuerUrl may come straight from the request body" }
     - { file: src/lib/auth/oidc.js, line: 167, note: "probeOidcClientSecret — live token-endpoint POST with an intentionally invalid code" }
+    - { file: "aigate:apps/server/test/sso.test.mjs", line: 83, note: "Protected fake transport covers invalid_client, invalid_grant and response bound" }
   newModule: identity
-  parityStatus: traced
+  parityStatus: verified
   labels: [REFERENCE_BEHAVIOR]
 
 - id: identity.saml-login-flow
@@ -867,8 +869,9 @@
     - { file: src/app/api/auth/saml/acs/route.js, line: 56, note: "setDashboardAuthCookie with saml/samlEmail/samlName claims" }
     - { file: src/lib/auth/saml.js, line: 100, note: "wantAssertionsSigned: true in the node-saml instance config" }
     - { file: src/lib/auth/saml.js, line: 159, note: "samlInstance.validatePostResponseAsync — the actual signature/condition verification" }
+    - { file: "aigate:apps/server/test/sso.test.mjs", line: 139, note: "Signed synthetic assertion, bounded identity, session, replay and tamper checks" }
   newModule: identity
-  parityStatus: traced
+  parityStatus: verified
   labels: [REFERENCE_BEHAVIOR]
 
 - id: identity.saml-replay-inresponseto-gap
@@ -939,8 +942,9 @@
   evidence:
     - { file: src/app/api/auth/saml/metadata/route.js, line: 8, note: "generateSamlMetadata(origin, settings) — no auth check inside the handler itself" }
     - { file: src/dashboardGuard.js, line: 31, note: "'/api/auth/saml' prefix listed in PUBLIC_API_PATHS, covering /metadata alongside /start and /acs" }
+    - { file: "aigate:apps/server/test/sso.test.mjs", line: 139, note: "Generated metadata includes configured public ACS origin" }
   newModule: identity
-  parityStatus: traced
+  parityStatus: verified
   labels: [REFERENCE_BEHAVIOR]
 
 - id: identity.saml-test-probe
@@ -972,8 +976,9 @@
   evidence:
     - { file: src/app/api/auth/saml/test/route.js, line: 9, note: "canAccessTestRoute — settings.requireLogin===false short-circuits to allowed" }
     - { file: src/app/api/auth/saml/test/route.js, line: 51, note: "formatX509Certificate(samlCert) — the only 'validation' performed on the certificate" }
+    - { file: "aigate:apps/server/src/modules/identity/infrastructure/sso.service.ts", line: 150, note: "Local SAML certificate-shape test; no IdP transport" }
   newModule: identity
-  parityStatus: traced
+  parityStatus: verified
   labels: [REFERENCE_BEHAVIOR]
 
 - id: settings.browser-locale-core

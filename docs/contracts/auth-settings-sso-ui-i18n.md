@@ -1,5 +1,8 @@
 # Auth settings OIDC/SAML EN/VI (SP46 / M3 U2)
 
+This document records the historical SP46 presentation-only slice. The later
+functional M2 implementation is specified in `m2-oidc-saml-auth.md`.
+
 SP46 localizes the existing visual-only OIDC and SAML panels in
 `/settings/auth`. The M2 OIDC/SAML backend remains deferred; these controls do
 not save, test, or authenticate anything in this slice.

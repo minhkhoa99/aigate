@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ChangeEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useLocale } from "./locale";
 
@@ -61,11 +61,11 @@ export function Field({ label, children, hint }: { label: string; children: Reac
   return <label className="field"><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>;
 }
 
-export function Input({ placeholder, type = "text", defaultValue, disabled, name, required, minLength, maxLength, autoComplete }: {
+export function Input({ placeholder, type = "text", defaultValue, value, onChange, disabled, name, required, minLength, maxLength, autoComplete }: {
   placeholder?: string; type?: string; defaultValue?: string; disabled?: boolean;
-  name?: string; required?: boolean; minLength?: number; maxLength?: number; autoComplete?: string;
+  value?: string; onChange?: (event: ChangeEvent<HTMLInputElement>) => void; name?: string; required?: boolean; minLength?: number; maxLength?: number; autoComplete?: string;
 }) {
-  return <input className="input" type={type} placeholder={placeholder} defaultValue={defaultValue} disabled={disabled}
+  return <input className="input" type={type} placeholder={placeholder} defaultValue={defaultValue} value={value} onChange={onChange} disabled={disabled}
     name={name} required={required} minLength={minLength} maxLength={maxLength} autoComplete={autoComplete} />;
 }
 

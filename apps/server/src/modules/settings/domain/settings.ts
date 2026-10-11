@@ -18,17 +18,30 @@ export interface Settings {
   pxpipeEnabled: boolean;
   pxpipeMinChars: number;
   pxpipeTimeoutMs: number;
+  authMode: "password" | "oidc" | "saml" | "both";
+  oidcIssuerUrl: string;
+  oidcClientId: string;
+  oidcScopes: string;
+  oidcLoginLabel: string;
+  oidcConfigured: boolean;
+  samlEntryPoint: string;
+  samlIssuer: string;
+  samlAttributeEmail: string;
+  samlAttributeName: string;
+  ssoPublicOrigin: string;
+  samlConfigured: boolean;
 }
 
-export type SettingsPatch = Partial<Settings>;
+export type SettingsPatch = Partial<Omit<Settings, "oidcConfigured" | "samlConfigured">> & { oidcClientSecret?: string; samlCert?: string };
 
 export const MAX_SETTINGS_DOCUMENT_BYTES = 64 * 1024;
 export interface SettingsDocument { format: "aigate-settings"; version: 1; settings: SettingsPatch }
 
 // Service URLs can carry query tokens; portable settings never include them.
 export function settingsDocument(settings: Settings): SettingsDocument {
-  const transferable: SettingsPatch = { ...settings };
-  delete transferable.headroomUrl;
+  const excluded = new Set(["headroomUrl", "authMode", "oidcIssuerUrl", "oidcClientId", "oidcScopes", "oidcLoginLabel", "oidcConfigured",
+    "samlEntryPoint", "samlIssuer", "samlAttributeEmail", "samlAttributeName", "ssoPublicOrigin", "samlConfigured"]);
+  const transferable = Object.fromEntries(Object.entries(settings).filter(([key]) => !excluded.has(key)));
   return { format: "aigate-settings", version: 1, settings: transferable };
 }
 
@@ -40,7 +53,7 @@ export function parseSettingsDocument(body: unknown): PatchResult {
   }
   const result = parseSettingsPatch(Reflect.get(body, "settings"));
   if (!result.ok) return result;
-  if (Object.hasOwn(result.patch, "headroomUrl")) return invalid("Service URLs are not transferable. Configure Headroom in Token Saver.");
+  if (Object.keys(result.patch).some(key => key === "headroomUrl" || key === "authMode" || key === "ssoPublicOrigin" || key.startsWith("oidc") || key.startsWith("saml"))) return invalid("Service URLs and authentication settings are not transferable. Configure them in the dashboard.");
   if (Object.keys(result.patch).length === 0) return invalid("Settings document must contain at least one transferable setting.");
   // Only fixed-count primitive settings reach serialization; nested invalid input cannot overflow its stack.
   if (new TextEncoder().encode(JSON.stringify(body)).byteLength > MAX_SETTINGS_DOCUMENT_BYTES) return invalid("Settings document must be at most 64 KiB.");
@@ -53,11 +66,13 @@ export type PatchResult =
 
 // Allowlist, not a blocklist: a key missing here cannot be written (CWE-915). The Record type
 // makes the compiler fail when a Settings key is added without deciding whether it is editable.
-const EDITABLE: Record<keyof Settings, true> = {
+const EDITABLE: Record<keyof SettingsPatch, true> = {
   requireLogin: true, requireApiKey: true, fallbackStrategy: true, comboStickyLimit: true,
   tokenSaverEnabled: true, rtkEnabled: true, headroomEnabled: true, headroomUrl: true, headroomCompressUserMessages: true, headroomTimeoutMs: true,
   cavemanEnabled: true, cavemanLevel: true, ponytailEnabled: true, ponytailLevel: true,
   pxpipeEnabled: true, pxpipeMinChars: true, pxpipeTimeoutMs: true,
+  authMode: true, oidcIssuerUrl: true, oidcClientId: true, oidcClientSecret: true, oidcScopes: true, oidcLoginLabel: true,
+  samlEntryPoint: true, samlIssuer: true, samlCert: true, samlAttributeEmail: true, samlAttributeName: true, ssoPublicOrigin: true,
 };
 const MAX_COMBO_STICKY_LIMIT = 1000;
 // Bound the echoed key list; the body itself is bounded by the HTTP body limit.
@@ -82,6 +97,11 @@ export function parseSettingsPatch(body: unknown): PatchResult {
     else if (key === "headroomTimeoutMs" && Number.isSafeInteger(value) && typeof value === "number" && value >= 250 && value <= 15000) patch.headroomTimeoutMs = value;
     else if (key === "pxpipeMinChars" && Number.isSafeInteger(value) && typeof value === "number" && value >= 1000 && value <= 1_000_000) patch.pxpipeMinChars = value;
     else if (key === "pxpipeTimeoutMs" && Number.isSafeInteger(value) && typeof value === "number" && value >= 1000 && value <= 60_000) patch.pxpipeTimeoutMs = value;
+    else if (key === "authMode" && (value === "password" || value === "oidc" || value === "saml" || value === "both")) patch.authMode = value;
+    else if ((key === "oidcIssuerUrl" || key === "samlEntryPoint") && typeof value === "string" && value.length <= 2048 && (!value || validSsoUrl(value, key === "samlEntryPoint"))) Object.assign(patch, { [key]: value.trim() });
+    else if (["oidcClientId", "oidcScopes", "oidcLoginLabel", "samlIssuer", "samlAttributeEmail", "samlAttributeName"].includes(key) && typeof value === "string" && value.length <= 256) Object.assign(patch, { [key]: value.trim() });
+    else if (key === "ssoPublicOrigin" && typeof value === "string" && value.length <= 2048 && (!value || validPublicOrigin(value))) patch.ssoPublicOrigin = value.trim().replace(/\/+$/, "");
+    else if ((key === "oidcClientSecret" || key === "samlCert") && typeof value === "string" && value.length <= 65536) { if (value.trim()) Object.assign(patch, { [key]: value }); }
     else rejected.push(key);
   }
   if (rejected.length > 0) {
@@ -97,4 +117,22 @@ function validHttpUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function validPublicOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    return (url.protocol === "https:" || (url.protocol === "http:" && loopback)) && url.username === "" && url.password === "" && url.hash === "" && url.search === "" && (url.pathname === "" || url.pathname === "/");
+  } catch {
+    return false;
+  }
+}
+
+function validSsoUrl(value: string, allowQuery: boolean): boolean {
+  try {
+    const url = new URL(value);
+    const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    return (url.protocol === "https:" || (url.protocol === "http:" && loopback)) && !url.username && !url.password && !url.hash && (allowQuery || !url.search);
+  } catch { return false; }
 }

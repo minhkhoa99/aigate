@@ -6,6 +6,10 @@ export interface AuthStatus {
   setupRequired: boolean;
   authenticated: boolean;
   requireLogin: boolean;
+  authMode: "password" | "oidc" | "saml" | "both";
+  oidcConfigured: boolean;
+  samlConfigured: boolean;
+  oidcLoginLabel: string;
 }
 
 export interface Settings {
@@ -16,6 +20,8 @@ export interface Settings {
   tokenSaverEnabled: boolean; rtkEnabled: boolean; headroomEnabled: boolean; headroomUrl: string;
   headroomCompressUserMessages: boolean; headroomTimeoutMs: number; cavemanEnabled: boolean; cavemanLevel: "lite" | "full" | "ultra";
   ponytailEnabled: boolean; ponytailLevel: "lite" | "full" | "ultra"; pxpipeEnabled: boolean; pxpipeMinChars: number; pxpipeTimeoutMs: number;
+  authMode: "password" | "oidc" | "saml" | "both"; oidcIssuerUrl: string; oidcClientId: string; oidcScopes: string; oidcLoginLabel: string;
+  oidcConfigured: boolean; samlEntryPoint: string; samlIssuer: string; samlAttributeEmail: string; samlAttributeName: string; samlConfigured: boolean; ssoPublicOrigin: string;
 }
 
 export interface RuntimeInfo {
@@ -65,6 +71,9 @@ function useSessionMutation(path: string) {
 export const useSetup = () => useSessionMutation("/api/auth/setup");
 export const useLogin = () => useSessionMutation("/api/auth/login");
 export const useChangePassword = () => useSessionMutation("/api/auth/password");
+export interface OidcTestResult { ok: boolean; discoveryOk: boolean; clientSecretTested: boolean; clientSecretValid: boolean | null }
+export const useTestOidc = () => useMutation({ mutationFn: (body: Record<string, unknown>) => api<OidcTestResult>("/api/auth/oidc/test", { method: "POST", body }) });
+export const useTestSaml = () => useMutation({ mutationFn: (body: Record<string, unknown>) => api<Record<string, unknown>>("/api/auth/saml/test", { method: "POST", body }) });
 
 export function useLogout() {
   const client = useQueryClient();

@@ -7,12 +7,15 @@ import { DashboardAuth } from "./infrastructure/dashboard-auth.js";
 import { DashboardAuthGuard } from "./infrastructure/dashboard-auth.guard.js";
 import { IdentityBootstrap } from "./infrastructure/identity.bootstrap.js";
 import { IdentityRepository } from "./infrastructure/identity.repo.js";
+import { SsoController } from "./infrastructure/sso.controller.js";
+import { SsoService } from "./infrastructure/sso.service.js";
 
 @Module({
   imports: [SettingsModule],
-  controllers: [AuthController],
+  controllers: [AuthController, SsoController],
   providers: [
     IdentityRepository,
+    SsoService,
     DashboardAuth,
     IdentityBootstrap,
     // A factory, so every application instance gets its own lockout state.
