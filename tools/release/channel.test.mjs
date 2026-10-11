@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
-import { publishRelease } from "./channel.mjs";
+import { promisify } from "node:util";
+import { publishRelease, rollbackChannel } from "./channel.mjs";
 import { verifyRelease } from "./release.mjs";
+
+const run = promisify(execFile);
 
 async function fixture(root, version, privateKey) {
   const folder = join(root, version);
@@ -104,5 +108,84 @@ test("static channel publishes verified immutable releases and preserves last go
     }
     if (symlinkCreated) await assert.rejects(publishRelease(bad.manifest, key, channel), /not a regular file/);
     assert.deepEqual(await readFile(join(channel, "latest.manifest.json")), stable);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("channel rollback requires an older signed manifest and explicit apply", async () => {
+  const root = await mkdtemp(resolve(".tmp-sp54-test-"));
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const other = generateKeyPairSync("ed25519");
+  const key = join(root, "public.pem"), wrongKey = join(root, "wrong.pem"), channel = join(root, "channel");
+  await writeFile(key, publicKey.export({ format: "pem", type: "spki" }));
+  await writeFile(wrongKey, other.publicKey.export({ format: "pem", type: "spki" }));
+  await mkdir(channel);
+  try {
+    const first = await fixture(root, "1.0.0", privateKey);
+    const second = await fixture(root, "1.1.0", privateKey);
+    const newer = await fixture(root, "2.0.0", privateKey);
+    await publishRelease(first.manifest, key, channel);
+    await publishRelease(second.manifest, key, channel);
+    const latest = join(channel, "latest.manifest.json");
+    const before = await readFile(latest);
+    const preview = await run(process.execPath, [resolve("tools/release/channel.mjs"), "rollback", first.manifest, key, channel]);
+    assert.deepEqual(JSON.parse(preview.stdout), { currentVersion: "1.1.0", targetVersion: "1.0.0", artifactBytes: Buffer.byteLength("synthetic release 1.0.0"), applied: false });
+    assert.deepEqual(await readFile(latest), before);
+    assert.deepEqual((await readdir(channel)).sort(), [first.artifact, second.artifact, "latest.manifest.json"].sort());
+    await assert.rejects(run(process.execPath, [resolve("tools/release/channel.mjs"), "rollback", first.manifest, key, channel, "--wrong"]), /Usage:/);
+
+    await writeFile(join(channel, ".publish.lock"), "busy");
+    await assert.rejects(rollbackChannel(first.manifest, key, channel), /EEXIST/);
+    await rm(join(channel, ".publish.lock"));
+    await assert.rejects(rollbackChannel(first.manifest, wrongKey, channel), /signature/);
+    const oversizedKey = join(root, "oversized.pem");
+    await writeFile(oversizedKey, "x".repeat(4097));
+    await assert.rejects(rollbackChannel(first.manifest, oversizedKey, channel), /no larger than 4 KiB/);
+    await assert.rejects(rollbackChannel(second.manifest, key, channel), /older/);
+    await writeFile(join(channel, newer.artifact), await readFile(join(root, "2.0.0", newer.artifact)));
+    await assert.rejects(rollbackChannel(newer.manifest, key, channel), /older/);
+    await rm(join(channel, newer.artifact));
+
+    const oldArchive = await readFile(join(channel, first.artifact));
+    await writeFile(join(channel, first.artifact), "tampered");
+    await assert.rejects(rollbackChannel(first.manifest, key, channel, true), /digest/);
+    assert.deepEqual(await readFile(latest), before);
+    await writeFile(join(channel, first.artifact), oldArchive);
+    await rm(join(channel, first.artifact));
+    await assert.rejects(rollbackChannel(first.manifest, key, channel), /ENOENT/);
+    await mkdir(join(channel, first.artifact));
+    await assert.rejects(rollbackChannel(first.manifest, key, channel), /not a regular file/);
+    await rm(join(channel, first.artifact), { recursive: true });
+    await writeFile(join(channel, first.artifact), oldArchive);
+
+    const applied = await run(process.execPath, [resolve("tools/release/channel.mjs"), "rollback", first.manifest, key, channel, "--apply"]);
+    assert.equal(JSON.parse(applied.stdout).applied, true);
+    assert.equal((await verifyRelease(latest, key)).version, "1.0.0");
+    assert.equal((await readFile(join(channel, second.artifact))).toString(), "synthetic release 1.1.0");
+    assert.deepEqual((await readdir(channel)).sort(), [first.artifact, second.artifact, "latest.manifest.json"].sort());
+
+    const server = createServer(async (request, reply) => {
+      try {
+        const name = request.url === "/latest.manifest.json" ? "latest.manifest.json" :
+          request.url === `/${first.artifact}` ? first.artifact : null;
+        if (!name) { reply.writeHead(404).end(); return; }
+        reply.writeHead(200).end(await readFile(join(channel, name)));
+      } catch (error) { reply.writeHead(500).end(String(error)); }
+    });
+    try {
+      await new Promise((resolveListen, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolveListen); });
+      const base = `http://127.0.0.1:${server.address().port}`;
+      const manifest = await (await fetch(`${base}/latest.manifest.json`)).json();
+      const archive = Buffer.from(await (await fetch(`${base}/${manifest.artifact}`)).arrayBuffer());
+      assert.equal(manifest.version, "1.0.0");
+      assert.equal(createHash("sha256").update(archive).digest("hex"), manifest.sha256);
+    } finally { await new Promise(resolveClose => server.close(resolveClose)); }
+
+    await writeFile(latest, await readFile(second.manifest));
+    await writeFile(join(channel, second.artifact), "damaged current archive");
+    assert.equal((await rollbackChannel(first.manifest, key, channel)).targetVersion, "1.0.0");
+    assert.equal((await rollbackChannel(first.manifest, key, channel, true)).applied, true);
+    assert.equal((await verifyRelease(latest, key)).version, "1.0.0");
+    await writeFile(latest, "invalid current manifest");
+    await assert.rejects(rollbackChannel(first.manifest, key, channel), /JSON|manifest/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

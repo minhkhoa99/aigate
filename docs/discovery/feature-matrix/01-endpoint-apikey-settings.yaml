@@ -1602,3 +1602,34 @@
   newModule: settings
   parityStatus: verified
   labels: []
+
+- id: settings.static-channel-rollback
+  group: Settings
+  feature: System lifecycle
+  subFeature: Explicit rollback of a signed static release channel
+  trigger: Operator previews or applies an older signed manifest
+  input: "Prior signed manifest, pinned public key, existing local channel, optional --apply"
+  output: "Current/target preview or atomic replacement of latest.manifest.json"
+  businessRules:
+    - "AIGATE_EXTENSION: verify current manifest signature and target manifest/archive with one pinned Ed25519 key; permit recovery from a damaged current archive"
+    - "AIGATE_EXTENSION: target must be strictly older by full SemVer; explicit --apply updates only the fixed manifest under publish lock"
+    - "AIGATE_EXTENSION: keep immutable archives, reject symlinks, wrong key, tamper, missing archive and concurrent publication"
+    - "IMPLEMENTATION_ACCIDENT: npm global updater behavior does not define static channel rollback"
+  state:
+    reads: ["current channel manifest/archive", "prior signed manifest", "target channel archive"]
+    writes: ["latest.manifest.json only on --apply"]
+    runtimeOnly: ["exclusive publish lock", "temporary signed manifest during apply"]
+  dependencies: [settings.static-release-channel]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "operator can retry after inspecting refusal", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Explicit local channel manifest replacement"]
+  persistence: ["Fixed latest.manifest.json points to retained earlier archive"]
+  performanceConcerns: ["4 KiB manifest and 512 MiB streamed artifact bounds; one writer"]
+  behavior: { streaming: true, cancellation: null, concurrency: "one local publisher or rollback" }
+  edgeCases: ["Bad current manifest", "Damaged current archive", "Wrong key", "Missing/tampered target archive", "Same/newer version", "Busy lock", "Symlink", "Interrupted apply"]
+  evidence:
+    - { file: "aigate:docs/contracts/static-channel-rollback.md", line: 1, note: "SP54 native rollback contract" }
+  newModule: settings
+  parityStatus: verified
+  labels: []

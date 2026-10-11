@@ -18,3 +18,6 @@ symlinked channel files/directories and concurrent writers with an exclusive
 `.publish.lock`; a stale lock after a crash requires operator inspection.
 Failed publication leaves the last manifest intact. No dashboard API, UI
 mutation, vendor call, process restart or user-data access is involved.
+
+SP54 adds explicit rollback of the fixed channel manifest using a retained
+older signed manifest; see `static-channel-rollback.md`.

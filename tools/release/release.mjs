@@ -1,6 +1,6 @@
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { dirname, join, resolve } from "node:path";
@@ -76,21 +76,31 @@ export async function pack(outputDir, privateKeyPath) {
   }
 }
 
-export async function verifyRelease(manifestPath, publicKeyPath) {
-  const info = await stat(manifestPath);
-  if (info.size > 4096) throw new Error("Release manifest exceeds 4 KiB.");
+export async function verifyManifest(manifestPath, publicKeyPath) {
+  const info = await lstat(manifestPath);
+  if (!info.isFile() || info.isSymbolicLink() || info.size > 4096) throw new Error("Release manifest must be a regular file no larger than 4 KiB.");
   const value = JSON.parse(await readFile(manifestPath, "utf8"));
   if (!value || typeof value !== "object" || Object.keys(value).sort().join(",") !== "artifact,bytes,format,sha256,signature,version" ||
       value.format !== "aigate-release" || !validVersion(value.version) ||
       value.artifact !== `aigate-${value.version}.tar.gz` || !Number.isSafeInteger(value.bytes) || value.bytes < 1 || value.bytes > MAX_BYTES ||
       typeof value.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.sha256) ||
       typeof value.signature !== "string" || !/^[A-Za-z0-9_-]{86}$/.test(value.signature)) throw new Error("Invalid release manifest.");
+  const keyInfo = await lstat(publicKeyPath);
+  if (!keyInfo.isFile() || keyInfo.isSymbolicLink() || keyInfo.size > 4096) throw new Error("Release public key must be a regular file no larger than 4 KiB.");
   const key = createPublicKey(await readFile(publicKeyPath));
   if (key.asymmetricKeyType !== "ed25519") throw new Error("An Ed25519 public key is required.");
   const unsigned = payload(value.version, value.artifact, value.bytes, value.sha256);
   if (!verify(null, Buffer.from(JSON.stringify(unsigned)), key, Buffer.from(value.signature, "base64url"))) throw new Error("Release signature is invalid.");
-  const actual = await digest(join(dirname(manifestPath), value.artifact));
-  if (actual.bytes !== value.bytes || actual.sha256 !== value.sha256) throw new Error("Release artifact digest is invalid.");
+  return unsigned;
+}
+
+export async function verifyRelease(manifestPath, publicKeyPath, artifactDirectory = dirname(manifestPath)) {
+  const unsigned = await verifyManifest(manifestPath, publicKeyPath);
+  const archive = join(artifactDirectory, unsigned.artifact);
+  const archiveInfo = await lstat(archive);
+  if (!archiveInfo.isFile() || archiveInfo.isSymbolicLink()) throw new Error("Release archive is not a regular file.");
+  const actual = await digest(archive);
+  if (actual.bytes !== unsigned.bytes || actual.sha256 !== unsigned.sha256) throw new Error("Release artifact digest is invalid.");
   return unsigned;
 }
 

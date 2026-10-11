@@ -1,7 +1,9 @@
+import { randomBytes } from "node:crypto";
+import { constants } from "node:fs";
 import { copyFile, link, lstat, mkdtemp, open, rename, rm, rmdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { verifyRelease } from "./release.mjs";
+import { verifyManifest, verifyRelease } from "./release.mjs";
 
 const LATEST = "latest.manifest.json";
 
@@ -91,13 +93,42 @@ export async function publishRelease(manifestPath, publicKeyPath, channelDir) {
   }
 }
 
+export async function rollbackChannel(manifestPath, publicKeyPath, channelDir, apply = false) {
+  const manifest = resolve(manifestPath), key = resolve(publicKeyPath), channel = resolve(channelDir);
+  const info = await lstat(channel);
+  if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Channel must be an existing regular directory.");
+  const lockPath = join(channel, ".publish.lock");
+  const lock = await open(lockPath, "wx");
+  let temporary;
+  try {
+    const latest = join(channel, LATEST);
+    const current = await verifyManifest(latest, key);
+    const target = await verifyRelease(manifest, key, channel);
+    if (compareVersions(target.version, current.version) >= 0) throw new Error("Channel rollback target must be older than the current release.");
+    const result = { currentVersion: current.version, targetVersion: target.version, artifactBytes: target.bytes, applied: apply };
+    if (!apply) return result;
+    temporary = join(channel, `.rollback-${randomBytes(8).toString("hex")}.tmp`);
+    await copyFile(manifest, temporary, constants.COPYFILE_EXCL);
+    const staged = await verifyRelease(temporary, key, channel);
+    if (staged.version !== target.version || staged.sha256 !== target.sha256) throw new Error("Rollback manifest changed during staging.");
+    await rename(temporary, latest);
+    return result;
+  } finally {
+    try { if (temporary) await rm(temporary, { force: true }); }
+    finally { await lock.close(); await rm(lockPath, { force: true }); }
+  }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [, , manifest, key, channel] = process.argv;
-  if (!manifest || !key || !channel || process.argv.length !== 5) {
-    console.error("Usage: channel.mjs <signed-manifest> <public-key.pem> <existing-channel-dir>");
+  const rollback = process.argv[2] === "rollback";
+  const args = process.argv.slice(rollback ? 3 : 2);
+  const [manifest, key, channel, flag] = args;
+  const invalid = rollback ? args.length < 3 || args.length > 4 || flag !== undefined && flag !== "--apply" : args.length !== 3;
+  if (!manifest || !key || !channel || invalid) {
+    console.error("Usage: channel.mjs <signed-manifest> <public-key.pem> <existing-channel-dir> | rollback <prior-signed-manifest> <public-key.pem> <existing-channel-dir> [--apply]");
     process.exitCode = 2;
   } else {
-    try { console.log(JSON.stringify(await publishRelease(manifest, key, channel))); }
+    try { console.log(JSON.stringify(rollback ? await rollbackChannel(manifest, key, channel, flag === "--apply") : await publishRelease(manifest, key, channel))); }
     catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; }
   }
 }

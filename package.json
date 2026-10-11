@@ -11,6 +11,7 @@
     "release:pack": "node tools/release/release.mjs pack",
     "release:verify": "node tools/release/release.mjs verify",
     "release:publish": "node tools/release/channel.mjs",
+    "release:channel-rollback": "node tools/release/channel.mjs rollback",
     "release:prune": "node tools/release/prune.mjs",
     "release:install": "node tools/release/managed.mjs install",
     "start": "pnpm --filter @aigate/server start",
