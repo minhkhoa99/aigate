@@ -1509,3 +1509,34 @@
   newModule: settings
   parityStatus: verified
   labels: []
+
+- id: settings.managed-update
+  group: Settings
+  feature: System lifecycle
+  subFeature: Verified managed release staging and rollback
+  trigger: Operator installs a signed release or explicitly stages/rolls back from General
+  input: "Pinned manifest/key, signed archive, fresh dashboard password, managed root"
+  output: "Immutable installed release and pending switch or prior-release rollback"
+  businessRules:
+    - "AIGATE_EXTENSION: a new managed root and stable launcher own version selection; source checkouts are not overwritten"
+    - "AIGATE_EXTENSION: only fixed-channel signed metadata and same-directory archive are trusted; exact bytes and SHA-256 are checked before extraction"
+    - "AIGATE_EXTENSION: activation waits for readiness; early failure restores the prior release; user data remains outside the release root"
+    - "IMPLEMENTATION_ACCIDENT: the reference's npm-global probe and forced process kill are not used"
+  state:
+    reads: ["pinned release channel", "managed state", "current dashboard password"]
+    writes: ["managed release directory", "pending/previous version state"]
+    runtimeOnly: ["one in-flight stage"]
+  dependencies: [settings.release-foundation, settings.signed-update-check]
+  providerInteraction: "Fixed release channel only; no AI vendor call"
+  fallback: { hasFallback: true, retry: "manual", timeout: "bounded download/install", quota: null }
+  errorCases: []
+  sideEffects: ["Creates managed release files", "Schedules a version switch"]
+  persistence: ["Managed root state.json and immutable releases"]
+  performanceConcerns: ["512 MiB archive cap, bounded extraction entries and one stage at a time"]
+  behavior: { streaming: true, cancellation: "client abort and deadline", concurrency: "one stage" }
+  edgeCases: ["Startup failure fallback", "Manual rollback", "Startup registration", "No release channel"]
+  evidence:
+    - { file: "aigate:docs/contracts/managed-update.md", line: 1, note: "SP51 native managed update contract" }
+  newModule: settings
+  parityStatus: verified
+  labels: []

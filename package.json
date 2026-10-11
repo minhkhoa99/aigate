@@ -10,6 +10,7 @@
     "build": "pnpm --filter @aigate/web build && pnpm --filter @aigate/server build",
     "release:pack": "node tools/release/release.mjs pack",
     "release:verify": "node tools/release/release.mjs verify",
+    "release:install": "node tools/release/managed.mjs install",
     "start": "pnpm --filter @aigate/server start",
     "web": "pnpm --filter @aigate/web dev",
     "web:build": "pnpm --filter @aigate/web build",

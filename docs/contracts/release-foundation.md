@@ -8,7 +8,8 @@ metadata); this is a prerelease until a release is published. Authenticated
 `pnpm release:pack <new-output-dir> <private-key.pem>` requires a prior `pnpm build`
 and creates `aigate-<version>.tar.gz` plus `aigate-<version>.manifest.json` in
 a new output directory. It refuses to replace an existing path. The package contains only built app files, database
-migrations, package manifests, `pnpm-workspace.yaml` and `pnpm-lock.yaml`.
+migrations, package manifests, `pnpm-workspace.yaml`, `pnpm-lock.yaml` and the
+three executable managed-release tools under `tools/release`.
 It excludes `node_modules`, source, tests, data, `.env` and signing keys. A
 recipient installs production dependencies from the frozen lockfile before
 launching `node apps/server/dist/main.js`. Node >=22 and pnpm are required.
@@ -22,6 +23,7 @@ The manifest does not carry a public key or arbitrary download URL. A release
 publisher must distribute the public key and channel URL independently.
 
 SP49 performs no remote request or installation. No channel is configured by
-default; automatic update and recovery belong to a later SP. The 9router npm
-global updater is intentionally not reused because this project has no npm
-release channel and its process-kill behavior is outside this contract.
+default. SP50 adds the signed availability check; SP51 adds a separate managed
+installation and staged switch described in `managed-update.md`. The 9router
+npm global updater is not reused because this project has no npm release
+channel and its process-kill behavior is outside this contract.

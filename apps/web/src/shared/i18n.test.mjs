@@ -138,10 +138,16 @@ test("real shared UI renders the saved locale and treats supplied copy as litera
       writer:{queued:12345,dropped:2,failed:0},
     });
     runtimeClient.setQueryData(["settings","update"],{currentVersion:"0.1.0-dev.0",channel:"ready",checking:false,
-      lastCheck:{at:0,latestVersion:"0.1.0-dev.1",hasUpdate:true,artifactBytes:1234}});
+      lastCheck:{at:0,latestVersion:"0.1.0-dev.1",hasUpdate:true,artifactBytes:1234},
+      installation:"managed",activeVersion:"0.1.0-dev.0",pendingVersion:null,rollbackVersion:"0.0.9"});
     const runtimeHtml = await render(() => h(SettingsGeneral,{theme:"dark",onTheme:()=>{}}),runtimeClient);
     assert.ok(runtimeHtml.includes(mod.translate("vi","update.available",{version:"0.1.0-dev.1"})));
     assert.ok(runtimeHtml.includes(mod.translate("vi","update.check")));
+    assert.ok(runtimeHtml.includes(mod.translate("vi","update.prepare")));
+    assert.ok(runtimeHtml.includes(mod.translate("vi","update.rollback",{version:"0.0.9"})));
+    runtimeClient.setQueryData(["settings","update"],{...runtimeClient.getQueryData(["settings","update"]),pendingVersion:"0.1.0-dev.1"});
+    const pendingUpdate = await render(() => h(SettingsGeneral,{theme:"dark",onTheme:()=>{}}),runtimeClient);
+    assert.ok(pendingUpdate.includes(mod.translate("vi","update.pending",{version:"0.1.0-dev.1"})));
     language = "en";
     const updateEn = await render(() => h(SettingsGeneral,{theme:"dark",onTheme:()=>{}}),runtimeClient);
     assert.ok(updateEn.includes(mod.translate("en","update.available",{version:"0.1.0-dev.1"})));

@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import fastifyStatic from "@fastify/static";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
@@ -13,6 +13,7 @@ import { registerV1Routes } from "./modules/routing/infrastructure/v1-routes.js"
 import { registerSimulationBoundary } from "./modules/routing/infrastructure/routing-simulator.controller.js";
 import { registerSamlBoundary } from "./modules/identity/infrastructure/sso.controller.js";
 import { applyPendingRestore } from "./modules/settings/infrastructure/installation-backup.js";
+import { APP_VERSION } from "./modules/settings/infrastructure/app-version.js";
 import type { StartupConfig } from "./modules/settings/infrastructure/windows-startup.js";
 import type { UpdateConfig } from "./modules/settings/infrastructure/signed-update.js";
 import { assertTimeZone } from "./modules/usage/domain/usage.js";
@@ -82,9 +83,13 @@ export async function createServer({
     database = await openDatabase({ file: databaseFile });
     // bodyParser:false drops the urlencoded parser Nest adds, so a cross-site HTML form cannot produce a
     // body these handlers accept; Fastify's own JSON parser (prototype-poisoning safe) stays.
+    const managedRoot = process.env.AIGATE_MANAGED_ROOT && process.env.AIGATE_MANAGED_VERSION === APP_VERSION &&
+      resolve(import.meta.dirname, "main.js") === resolve(process.env.AIGATE_MANAGED_ROOT, "releases", APP_VERSION, "apps/server/dist/main.js")
+      ? process.env.AIGATE_MANAGED_ROOT : undefined;
     const startup = startupConfig ?? { platform: process.platform, appData: process.env.APPDATA, nodePath: process.execPath,
-      serverEntry: join(import.meta.dirname, "main.js"), webIndex: webDist ? join(webDist, "index.html") : "", secretKeyOverride: Boolean(secretKey) };
-    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { databaseFile, dataDir, key, envKey: Boolean(secretKey) }, startup, updateConfig ?? { manifestUrl: process.env.AIGATE_UPDATE_MANIFEST_URL, publicKeyFile: process.env.AIGATE_UPDATE_PUBLIC_KEY_FILE }, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, dataDir, { timezone: usageTimezone, retentionDays: usageRetentionDays, flushIntervalMs: usageFlushIntervalMs }, transport), new FastifyAdapter(), { bodyParser: false });
+      serverEntry: managedRoot ? join(managedRoot, "launcher.mjs") : join(import.meta.dirname, "main.js"),
+      webIndex: webDist ? join(webDist, "index.html") : "", secretKeyOverride: Boolean(secretKey) };
+    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { databaseFile, dataDir, key, envKey: Boolean(secretKey) }, startup, updateConfig ?? { manifestUrl: process.env.AIGATE_UPDATE_MANIFEST_URL, publicKeyFile: process.env.AIGATE_UPDATE_PUBLIC_KEY_FILE, managedRoot }, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, dataDir, { timezone: usageTimezone, retentionDays: usageRetentionDays, flushIntervalMs: usageFlushIntervalMs }, transport), new FastifyAdapter(), { bodyParser: false });
   } catch (error) {
     await database?.close();
     await restore?.rollback();

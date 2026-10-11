@@ -2,7 +2,7 @@
 import "./env.js";
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { createServer } from "./server.js";
 
 const DEFAULT_PORT = 20200;
@@ -21,6 +21,15 @@ const host = process.env.HOST ?? "127.0.0.1";
 const port = readPort(process.env.PORT);
 // Owner-only: the database will hold provider credentials.
 const dataDir = process.env.AIGATE_DATA_DIR ?? join(homedir(), ".aigate");
+if (process.env.AIGATE_MANAGED_ROOT) {
+  const inside = (parent: string, child: string) => {
+    const path = relative(resolve(parent), resolve(child));
+    return !path || path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path);
+  };
+  if (inside(process.env.AIGATE_MANAGED_ROOT, dataDir) || inside(dataDir, process.env.AIGATE_MANAGED_ROOT)) {
+    throw new RangeError("AIGATE_DATA_DIR and the managed release root must be separate.");
+  }
+}
 mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const app = await createServer({
   databaseFile: join(dataDir, "aigate.db"),
@@ -32,3 +41,4 @@ const app = await createServer({
   webDist: resolve(import.meta.dirname, "../../web/dist"),
 });
 await app.listen(port, host);
+if (process.send) process.send("aigate-ready");
