@@ -81,7 +81,7 @@ test("localized errors keep codes, numeric context and raw diagnostics", () => {
   assert.equal(toProblem(new ApiError(400,"PROVIDER_NOT_SUPPORTED","",{message:raw}),"vi").message,raw);
   assert.ok(toProblem(new ApiError(502,"VOICES_FETCH_FAILED","",{message:raw}),"vi").message.includes(raw));
   assert.equal(toProblem(new ApiError(409,"SETTINGS_CHANGED",""),"vi").code,"SETTINGS_CHANGED");
-  for (const code of ["BACKUP_INVALID", "BACKUP_TOO_LARGE", "BACKUP_CHANGED", "BACKUP_PENDING", "BACKUP_KEY_CONFLICT"]) {
+  for (const code of ["BACKUP_INVALID", "BACKUP_TOO_LARGE", "BACKUP_CHANGED", "BACKUP_PENDING", "BACKUP_KEY_CONFLICT", "STARTUP_INVALID_REQUEST", "STARTUP_UNSUPPORTED", "STARTUP_CONFLICT", "STARTUP_IO_ERROR"]) {
     const localized = toProblem(new ApiError(409, code, ""), "vi");
     assert.equal(localized.code, code);
     assert.notEqual(localized.message, toProblem(new ApiError(409, code, ""), "en").message);

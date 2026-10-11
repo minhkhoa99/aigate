@@ -31,6 +31,15 @@ export interface RuntimeInfo {
 }
 export interface SettingsPreview { version: string; changes: { key: string; before: boolean | string | number; after: boolean | string | number }[]; settings: Partial<Settings> }
 export const useRuntimeInfo = () => useQuery({ queryKey: ["settings", "runtime"], queryFn: () => api<RuntimeInfo>("/api/settings/runtime"), refetchInterval: 30_000 });
+export type StartupReason = "WINDOWS_ONLY" | "APPDATA_UNAVAILABLE" | "STARTUP_FOLDER_MISSING" | "BUILD_REQUIRED" | "SECRET_KEY_OVERRIDE" | "STARTUP_CONFLICT";
+export interface StartupStatus { supported: boolean; enabled: boolean; reason: StartupReason | null }
+const startupKey = ["settings", "startup"] as const;
+export const useStartupStatus = () => useQuery({ queryKey: startupKey, queryFn: () => api<StartupStatus>("/api/settings/startup") });
+export function useSetStartup() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (body: { enabled: boolean; password: string }) => api<StartupStatus>("/api/settings/startup", { method: "POST", body }),
+    onSuccess: status => client.setQueryData(startupKey, status), onError: () => client.invalidateQueries({ queryKey: startupKey }) });
+}
 
 export function useSettingsImport() {
   const client = useQueryClient();

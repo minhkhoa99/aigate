@@ -13,6 +13,7 @@ import { registerV1Routes } from "./modules/routing/infrastructure/v1-routes.js"
 import { registerSimulationBoundary } from "./modules/routing/infrastructure/routing-simulator.controller.js";
 import { registerSamlBoundary } from "./modules/identity/infrastructure/sso.controller.js";
 import { applyPendingRestore } from "./modules/settings/infrastructure/installation-backup.js";
+import type { StartupConfig } from "./modules/settings/infrastructure/windows-startup.js";
 import { assertTimeZone } from "./modules/usage/domain/usage.js";
 import { DEFAULT_RETENTION_DAYS } from "./modules/usage/infrastructure/usage-recorder.js";
 import { AesGcmCipher, loadSecretKey } from "./secret-cipher.js";
@@ -48,11 +49,13 @@ export interface ServerOptions {
   usageRetentionDays?: number;
   // Tests only: how often queued usage events are written (1 s).
   usageFlushIntervalMs?: number;
+  // Tests only: an isolated synthetic Startup folder and built entry paths.
+  startupConfig?: StartupConfig;
 }
 
 export async function createServer({
   databaseFile, dataDir = dirname(databaseFile), webDist, secretKey, transport, streamIdleTimeoutMs = DEFAULT_STREAM_IDLE_TIMEOUT_MS, refreshRetryDelayMs = DEFAULT_REFRESH_RETRY_DELAY_MS, streamRetryDelayMs = STREAM_RETRY_DELAY_MS,
-  usageTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone, usageRetentionDays = DEFAULT_RETENTION_DAYS, usageFlushIntervalMs = 1_000,
+  usageTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone, usageRetentionDays = DEFAULT_RETENTION_DAYS, usageFlushIntervalMs = 1_000, startupConfig,
 }: ServerOptions): Promise<NestFastifyApplication> {
   if (!Number.isInteger(streamIdleTimeoutMs) || streamIdleTimeoutMs < 1_000 || streamIdleTimeoutMs > 600_000) {
     throw new RangeError("AIGATE_STREAM_IDLE_TIMEOUT_MS must be an integer from 1000 to 600000");
@@ -76,7 +79,9 @@ export async function createServer({
     database = await openDatabase({ file: databaseFile });
     // bodyParser:false drops the urlencoded parser Nest adds, so a cross-site HTML form cannot produce a
     // body these handlers accept; Fastify's own JSON parser (prototype-poisoning safe) stays.
-    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { databaseFile, dataDir, key, envKey: Boolean(secretKey) }, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, dataDir, { timezone: usageTimezone, retentionDays: usageRetentionDays, flushIntervalMs: usageFlushIntervalMs }, transport), new FastifyAdapter(), { bodyParser: false });
+    const startup = startupConfig ?? { platform: process.platform, appData: process.env.APPDATA, nodePath: process.execPath,
+      serverEntry: join(import.meta.dirname, "main.js"), webIndex: webDist ? join(webDist, "index.html") : "", secretKeyOverride: Boolean(secretKey) };
+    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { databaseFile, dataDir, key, envKey: Boolean(secretKey) }, startup, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, dataDir, { timezone: usageTimezone, retentionDays: usageRetentionDays, flushIntervalMs: usageFlushIntervalMs }, transport), new FastifyAdapter(), { bodyParser: false });
   } catch (error) {
     await database?.close();
     await restore?.rollback();

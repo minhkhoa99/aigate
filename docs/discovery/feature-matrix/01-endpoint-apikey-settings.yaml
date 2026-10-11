@@ -1048,6 +1048,39 @@
   parityStatus: verified
   labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
 
+- id: settings.windows-signin-startup
+  group: Settings
+  feature: Windows sign-in startup
+  subFeature: SP48 current-user AIGate startup registration
+  trigger: Owner enables or disables startup from General Settings
+  input: Desired enabled state and fresh dashboard password
+  output: Current registration state or a stable refusal code
+  businessRules:
+    - "AIGATE_EXTENSION: an explicit owner action registers this built installation for current-user Windows sign-in only"
+    - "AIGATE_EXTENSION: dashboard authorization and a fresh password protect either OS mutation; Local Mode is loopback-only and still requires the password"
+    - "AIGATE_EXTENSION: a foreign or modified Startup entry is never overwritten or deleted; the generated script contains paths but no credentials"
+    - "IMPLEMENTATION_BOUNDARY: installed package updates, other operating systems, process supervision and shell-only environment overrides are outside this registration"
+  state: { reads: ["current-user Windows Startup folder", "built server and web entry presence"], writes: ["one owned Startup script on explicit apply"], runtimeOnly: [] }
+  dependencies: ["identity.session-cookie-lifecycle", "settings.runtime-inspection"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "UNAUTHENTICATED session or INVALID_CREDENTIALS password", partial: false }
+    - { code: INVALID_REQUEST, when: "STARTUP_UNSUPPORTED platform/build/key override or STARTUP_INVALID_REQUEST malformed body", partial: false }
+    - { code: INVALID_REQUEST, when: "STARTUP_CONFLICT foreign entry or STARTUP_IO_ERROR filesystem failure", partial: false }
+  sideEffects: ["enabled registration launches the built server at next Windows sign-in; disable removes only the exact owned entry"]
+  persistence: ["current-user Windows Startup folder script"]
+  performanceConcerns: ["one bounded 4 KiB file; no polling, process scan or network call"]
+  behavior: { streaming: false, cancellation: null, concurrency: "exclusive file create; foreign target never replaced" }
+  edgeCases: ["foreign file", "changed owned file", "missing APPDATA", "missing build", "AIGATE_SECRET_KEY override", "repeated enable/disable"]
+  evidence:
+    - { file: "aigate:docs/contracts/windows-startup.md", line: 1, note: "SP48 native-only contract" }
+    - { file: "aigate:apps/server/test/windows-startup.test.mjs", line: 1, note: "Synthetic folder and Windows script execution checks" }
+    - { file: "aigate:apps/web/src/features/settings/windows-startup.tsx", line: 1, note: "General Settings startup UI" }
+  newModule: settings
+  parityStatus: verified
+  labels: [IMPLEMENTATION_ACCIDENT]
+
 - id: settings.installation-backup-restore
   group: Settings
   feature: Installation backup
