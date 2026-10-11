@@ -74,3 +74,4 @@
 .endpoint-examples button { font-size:10px; color:var(--muted); border:1px solid var(--line); border-radius:3px; padding:4px 8px; background:var(--surface-2); cursor:pointer; }
 .endpoint-examples button.active { color:var(--accent); border-color:var(--accent); background:var(--surface-3); }
 .endpoint-examples button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.button-row { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
