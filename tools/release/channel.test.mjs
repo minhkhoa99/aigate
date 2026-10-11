@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
-import { pruneChannel, publishRelease, rollbackChannel } from "./channel.mjs";
+import { pruneChannel, publishRelease, restoreChannel, rollbackChannel } from "./channel.mjs";
 import { verifyRelease } from "./release.mjs";
 
 const run = promisify(execFile);
@@ -53,7 +53,7 @@ test("static channel publishes verified immutable releases and preserves last go
     assert.deepEqual(await readFile(join(channel, ".publish.lock")), Buffer.from("held"));
     await rm(join(channel, ".publish.lock"));
 
-    const secondResult = await publishRelease(second.manifest, key, channel);
+    const secondResult = JSON.parse((await run(process.execPath, [resolve("tools/release/channel.mjs"), second.manifest, key, channel])).stdout);
     assert.equal(secondResult.version, "0.1.0-dev.2");
     assert.equal((await verifyRelease(join(channel, "latest.manifest.json"), key)).version, "0.1.0-dev.2");
     assert.equal((await readFile(join(channel, first.artifact))).toString(), "synthetic release 0.1.0-dev.1");
@@ -258,5 +258,73 @@ test("channel cleanup previews and removes only a verified unreferenced archive"
     assert.equal((await pruneChannel(third.manifest, key, channel, true)).targetVersion, "1.2.0");
     assert.equal((await verifyRelease(latest, key)).version, "1.1.0");
     assert.deepEqual((await readdir(channel)).sort(), [second.artifact, "latest.manifest.json"].sort());
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("channel restore stages a signed missing archive without changing latest", async () => {
+  const root = await mkdtemp(resolve(".tmp-sp56-test-"));
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const other = generateKeyPairSync("ed25519");
+  const key = join(root, "public.pem"), wrongKey = join(root, "wrong.pem"), channel = join(root, "channel");
+  await writeFile(key, publicKey.export({ format: "pem", type: "spki" }));
+  await writeFile(wrongKey, other.publicKey.export({ format: "pem", type: "spki" }));
+  await mkdir(channel);
+  try {
+    const first = await fixture(root, "1.0.0", privateKey);
+    const second = await fixture(root, "1.1.0", privateKey);
+    await publishRelease(first.manifest, key, channel);
+    await publishRelease(second.manifest, key, channel);
+    const latest = join(channel, "latest.manifest.json"), archived = join(channel, first.artifact);
+    const current = await readFile(latest);
+    await assert.rejects(restoreChannel(first.manifest, key, channel, true), /already exists/);
+    await pruneChannel(first.manifest, key, channel, true);
+    const preview = await run(process.execPath, [resolve("tools/release/channel.mjs"), "restore", first.manifest, key, channel]);
+    assert.deepEqual(JSON.parse(preview.stdout), { currentVersion: "1.1.0", targetVersion: "1.0.0", artifact: first.artifact, artifactBytes: Buffer.byteLength("synthetic release 1.0.0"), applied: false });
+    assert.deepEqual((await readdir(channel)).sort(), [second.artifact, "latest.manifest.json"].sort());
+    await assert.rejects(run(process.execPath, [resolve("tools/release/channel.mjs"), "restore", first.manifest, key, channel, "--wrong"]), /Usage:/);
+    await assert.rejects(restoreChannel(first.manifest, wrongKey, channel, true), /signature/);
+    await writeFile(join(channel, ".publish.lock"), "busy");
+    await assert.rejects(restoreChannel(first.manifest, key, channel, true), /EEXIST/);
+    await rm(join(channel, ".publish.lock"));
+    const sourceArchive = join(root, "1.0.0", first.artifact);
+    const bytes = await readFile(sourceArchive);
+    await writeFile(sourceArchive, "tampered source");
+    await assert.rejects(restoreChannel(first.manifest, key, channel, true), /digest/);
+    await rm(sourceArchive);
+    await assert.rejects(restoreChannel(first.manifest, key, channel, true), /ENOENT/);
+    await writeFile(sourceArchive, bytes);
+    const signedManifest = await readFile(first.manifest);
+    await writeFile(first.manifest, "invalid source manifest");
+    await assert.rejects(restoreChannel(first.manifest, key, channel, true), /JSON|manifest/);
+    await writeFile(first.manifest, signedManifest);
+    await writeFile(archived, "damaged existing archive");
+    await assert.rejects(restoreChannel(first.manifest, key, channel, true), /already exists/);
+    await rm(archived);
+    await mkdir(archived);
+    await assert.rejects(restoreChannel(first.manifest, key, channel, true), /not a regular file/);
+    await rm(archived, { recursive: true });
+    let linked = false;
+    try { await symlink(sourceArchive, archived); linked = true; }
+    catch (error) { if (error.code !== "EPERM" || process.platform !== "win32") throw error; }
+    if (linked) {
+      await assert.rejects(restoreChannel(first.manifest, key, channel, true), /not a regular file/);
+      await rm(archived);
+    }
+    await writeFile(latest, "invalid current manifest");
+    await assert.rejects(restoreChannel(first.manifest, key, channel, true), /JSON|manifest/);
+    await writeFile(latest, current);
+
+    const applied = await run(process.execPath, [resolve("tools/release/channel.mjs"), "restore", first.manifest, key, channel, "--apply"]);
+    assert.equal(JSON.parse(applied.stdout).applied, true);
+    assert.equal((await verifyRelease(first.manifest, key, channel)).version, "1.0.0");
+    assert.deepEqual(await readFile(latest), current);
+    assert.deepEqual((await readdir(channel)).sort(), [first.artifact, second.artifact, "latest.manifest.json"].sort());
+    await assert.rejects(restoreChannel(first.manifest, key, channel, true), /already exists/);
+    await rollbackChannel(first.manifest, key, channel, true);
+    await rm(archived);
+    assert.equal((await restoreChannel(first.manifest, key, channel, true)).currentVersion, "1.0.0");
+    assert.equal((await verifyRelease(latest, key)).version, "1.0.0");
+    assert.equal((await readFile(join(channel, second.artifact))).toString(), "synthetic release 1.1.0");
+    assert.deepEqual((await readdir(channel)).sort(), [first.artifact, second.artifact, "latest.manifest.json"].sort());
   } finally { await rm(root, { recursive: true, force: true }); }
 });

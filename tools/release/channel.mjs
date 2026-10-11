@@ -136,17 +136,50 @@ export async function pruneChannel(manifestPath, publicKeyPath, channelDir, appl
   } finally { try { await lock.close(); } finally { await rm(lockPath, { force: true }); } }
 }
 
+export async function restoreChannel(manifestPath, publicKeyPath, channelDir, apply = false) {
+  const manifest = resolve(manifestPath), key = resolve(publicKeyPath), channel = resolve(channelDir);
+  const info = await lstat(channel);
+  if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Channel must be an existing regular directory.");
+  const lockPath = join(channel, ".publish.lock");
+  const lock = await open(lockPath, "wx");
+  let stage, stagedArchive;
+  try {
+    const current = await verifyManifest(join(channel, LATEST), key);
+    const source = await verifyRelease(manifest, key);
+    const artifact = join(channel, source.artifact);
+    if (dirname(artifact) !== channel) throw new Error("Archive path escaped channel directory.");
+    if (await regularOrMissing(artifact)) throw new Error("Release archive already exists in channel.");
+    const result = { currentVersion: current.version, targetVersion: source.version, artifact: source.artifact, artifactBytes: source.bytes, applied: apply };
+    if (!apply) return result;
+    stage = await mkdtemp(join(channel, ".restore-"));
+    if (dirname(stage) !== channel) throw new Error("Restore stage escaped channel directory.");
+    stagedArchive = join(stage, source.artifact);
+    await copyFile(join(dirname(manifest), source.artifact), stagedArchive);
+    const staged = await verifyRelease(manifest, key, stage);
+    if (staged.version !== source.version || staged.sha256 !== source.sha256) throw new Error("Restore manifest changed during staging.");
+    await link(stagedArchive, artifact);
+    return result;
+  } finally {
+    try {
+      if (stage) {
+        if (stagedArchive) await rm(stagedArchive, { force: true });
+        await rmdir(stage);
+      }
+    } finally { try { await lock.close(); } finally { await rm(lockPath, { force: true }); } }
+  }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const rollback = process.argv[2] === "rollback";
-  const prune = process.argv[2] === "prune";
-  const args = process.argv.slice(rollback || prune ? 3 : 2);
+  const command = process.argv[2];
+  const operation = command === "rollback" ? rollbackChannel : command === "prune" ? pruneChannel : command === "restore" ? restoreChannel : publishRelease;
+  const args = process.argv.slice(operation === publishRelease ? 2 : 3);
   const [manifest, key, channel, flag] = args;
-  const invalid = rollback || prune ? args.length < 3 || args.length > 4 || flag !== undefined && flag !== "--apply" : args.length !== 3;
+  const invalid = operation === publishRelease ? args.length !== 3 : args.length < 3 || args.length > 4 || flag !== undefined && flag !== "--apply";
   if (!manifest || !key || !channel || invalid) {
-    console.error("Usage: channel.mjs <signed-manifest> <public-key.pem> <existing-channel-dir> | rollback <prior-signed-manifest> <public-key.pem> <existing-channel-dir> [--apply] | prune <signed-manifest> <public-key.pem> <existing-channel-dir> [--apply]");
+    console.error("Usage: channel.mjs <signed-manifest> <public-key.pem> <existing-channel-dir> | rollback|prune|restore <signed-manifest> <public-key.pem> <existing-channel-dir> [--apply]");
     process.exitCode = 2;
   } else {
-    try { console.log(JSON.stringify(rollback ? await rollbackChannel(manifest, key, channel, flag === "--apply") : prune ? await pruneChannel(manifest, key, channel, flag === "--apply") : await publishRelease(manifest, key, channel))); }
+    try { console.log(JSON.stringify(await operation(manifest, key, channel, flag === "--apply"))); }
     catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; }
   }
 }

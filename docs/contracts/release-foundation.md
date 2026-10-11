@@ -33,3 +33,5 @@ SP54 provides an explicit local rollback of that static channel; see
 `static-channel-rollback.md`.
 SP55 provides explicit local cleanup of an unreferenced channel archive; see
 `static-channel-prune.md`.
+SP56 restores a missing signed channel archive without changing the fixed
+manifest; see `static-channel-restore.md`.

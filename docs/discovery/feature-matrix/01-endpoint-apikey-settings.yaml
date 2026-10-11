@@ -1664,3 +1664,34 @@
   newModule: settings
   parityStatus: verified
   labels: []
+
+- id: settings.static-channel-restore
+  group: Settings
+  feature: System lifecycle
+  subFeature: Explicit restore of one missing signed static channel archive
+  trigger: Operator previews or applies restore from a retained signed release
+  input: "Signed manifest and same-directory archive, pinned public key, existing local channel, optional --apply"
+  output: "Current/target preview or atomic creation of the missing archive"
+  businessRules:
+    - "AIGATE_EXTENSION: verify current manifest signature and source manifest/archive with one pinned Ed25519 key"
+    - "AIGATE_EXTENSION: allow restoration of a missing current or unreferenced archive without changing latest.manifest.json"
+    - "AIGATE_EXTENSION: reject any existing target path; verify a staged copy before exclusive link under the publish lock"
+    - "IMPLEMENTATION_ACCIDENT: npm global updater does not define signed static channel archive restore"
+  state:
+    reads: ["current channel manifest", "source signed manifest/archive", "target path"]
+    writes: ["missing signed channel archive only on --apply"]
+    runtimeOnly: ["exclusive publish lock", "temporary staged archive"]
+  dependencies: [settings.static-release-channel, settings.static-channel-prune]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "operator can inspect refusal and retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Explicit local archive creation"]
+  persistence: ["Fixed latest.manifest.json unchanged"]
+  performanceConcerns: ["4 KiB manifests, 512 MiB streamed archive, one writer and one staged copy"]
+  behavior: { streaming: true, cancellation: null, concurrency: "one local publisher, rollback, cleanup or restore" }
+  edgeCases: ["Missing current archive", "Wrong key", "Tampered/missing source", "Existing target", "Invalid current manifest", "Busy lock", "Interrupted stage", "Symlink"]
+  evidence:
+    - { file: "aigate:docs/contracts/static-channel-restore.md", line: 1, note: "SP56 native restore contract" }
+  newModule: settings
+  parityStatus: verified
+  labels: []

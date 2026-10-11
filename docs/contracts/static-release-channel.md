@@ -23,3 +23,5 @@ SP54 adds explicit rollback of the fixed channel manifest using a retained
 older signed manifest; see `static-channel-rollback.md`.
 SP55 adds explicit cleanup of one archive no longer referenced by that
 manifest; see `static-channel-prune.md`.
+SP56 restores a missing archive from a retained signed release without
+changing the fixed manifest; see `static-channel-restore.md`.

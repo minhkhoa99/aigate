@@ -20,3 +20,5 @@ application data. Removing an archive makes a retained manifest for it unusable
 for SP54 rollback until a valid archive is restored; operators must check
 hosting/download needs before applying. A concurrently served download may
 fail if its host reads the removed file after deletion.
+SP56 provides a signed, no-overwrite restore command for a missing archive;
+see `static-channel-restore.md`.

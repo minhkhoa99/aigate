@@ -21,3 +21,5 @@ Clients already running a newer version will see no update to the older
 channel version; their SP51 managed rollback remains a separate local action.
 SP55 can explicitly remove an unreferenced archive. An operator must retain
 the target archive in the channel to use this rollback command.
+SP56 can restore a missing target archive from its retained signed release
+before rollback; see `static-channel-restore.md`.
