@@ -13,7 +13,7 @@ const MAX_FILES = 10_000;
 const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 const validVersion = value => typeof value === "string" && value.length <= 128 && VERSION.test(value) &&
   !VERSION.exec(value)[4]?.split(".").some(part => /^\d+$/.test(part) && part.length > 1 && part.startsWith("0"));
-const files = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "apps/server/package.json", "packages/database/package.json", "packages/engine/package.json", "tools/release/launcher.mjs", "tools/release/managed.mjs", "tools/release/release.mjs"];
+const files = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "apps/server/package.json", "packages/database/package.json", "packages/engine/package.json", "tools/release/launcher.mjs", "tools/release/managed.mjs", "tools/release/release.mjs", "tools/release/prune.mjs"];
 const directories = ["apps/server/dist", "apps/web/dist", "packages/database/dist", "packages/database/drizzle", "packages/engine/dist"];
 
 async function inspect(path, count = { files: 0, bytes: 0 }) {

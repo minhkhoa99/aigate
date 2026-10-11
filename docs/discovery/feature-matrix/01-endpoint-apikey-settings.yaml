@@ -1571,3 +1571,34 @@
   newModule: settings
   parityStatus: verified
   labels: []
+
+- id: settings.managed-release-prune
+  group: Settings
+  feature: System lifecycle
+  subFeature: Explicit cleanup of unreferenced managed releases
+  trigger: Operator lists releases or selects one version for cleanup
+  input: "Existing managed root, exact version and explicit --apply for deletion"
+  output: "Protected/candidate release list or removal of one unreferenced release"
+  businessRules:
+    - "AIGATE_EXTENSION: current, previous and pending releases are always protected"
+    - "AIGATE_EXTENSION: re-read state under the existing managed update lock before explicit one-version deletion"
+    - "AIGATE_EXTENSION: limit directory scan, validate direct release markers and reject symlinks or path escapes; never touch application data"
+    - "IMPLEMENTATION_ACCIDENT: the reference npm global overwrite/kill behavior does not define managed retention"
+  state:
+    reads: ["managed state", "release directory names and package markers"]
+    writes: ["one unreferenced managed release directory, only on --apply"]
+    runtimeOnly: ["exclusive managed update lock"]
+  dependencies: [settings.managed-update]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: "operator inspection and explicit retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Explicit removal of exactly one unreferenced release directory"]
+  persistence: ["Managed root releases; state.json unchanged"]
+  performanceConcerns: ["At most 256 direct entries, one recursive deletion under lock"]
+  behavior: { streaming: false, cancellation: null, concurrency: "one managed operation" }
+  edgeCases: ["Protected release", "Pending switch", "Concurrent stage", "Invalid marker", "Symlink", "Too many entries", "Partial deletion"]
+  evidence:
+    - { file: "aigate:docs/contracts/managed-release-prune.md", line: 1, note: "SP53 native cleanup contract" }
+  newModule: settings
+  parityStatus: verified
+  labels: []

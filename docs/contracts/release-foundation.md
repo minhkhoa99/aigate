@@ -9,7 +9,8 @@ metadata); this is a prerelease until a release is published. Authenticated
 and creates `aigate-<version>.tar.gz` plus `aigate-<version>.manifest.json` in
 a new output directory. It refuses to replace an existing path. The package contains only built app files, database
 migrations, package manifests, `pnpm-workspace.yaml`, `pnpm-lock.yaml` and the
-three executable managed-release tools under `tools/release`.
+four executable managed-release tools under `tools/release`, including the
+explicit SP53 cleanup CLI.
 It excludes `node_modules`, source, tests, data, `.env` and signing keys. A
 recipient installs production dependencies from the frozen lockfile before
 launching `node apps/server/dist/main.js`. Node >=22 and pnpm are required.

@@ -53,3 +53,7 @@ capped at its signed length and 512 MiB, with a 120 s transport timeout and
 300 s overall stage deadline; dependency installation is capped at 180 s.
 The browser waits at most 310 s for the stage response. Only one stage or
 rollback can write managed state at a time.
+
+SP53 adds an explicit operator cleanup command for old unreferenced managed
+releases; see `managed-release-prune.md`. It does not change staging, activation
+or the retained current/previous/pending versions.

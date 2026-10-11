@@ -15,7 +15,7 @@ const missing = (error: unknown) => typeof error === "object" && error !== null 
 const object = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const allowed = (name: string) => ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
   "apps/server/package.json", "packages/database/package.json", "packages/engine/package.json",
-  "tools/release/launcher.mjs", "tools/release/managed.mjs", "tools/release/release.mjs"].includes(name) ||
+  "tools/release/launcher.mjs", "tools/release/managed.mjs", "tools/release/release.mjs", "tools/release/prune.mjs"].includes(name) ||
   ["apps/server/dist/", "apps/web/dist/", "packages/database/dist/", "packages/database/drizzle/", "packages/engine/dist/"]
     .some(prefix => name.startsWith(prefix));
 

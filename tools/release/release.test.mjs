@@ -32,6 +32,7 @@ test("release package is explicit, signed and rejects tampering", async () => {
     assert.match(stdout, /apps\/server\/dist\/main\.js/);
     assert.match(stdout, /apps\/web\/dist\/index\.html/);
     assert.match(stdout, /packages\/database\/drizzle\/meta\/\_journal\.json/);
+    assert.match(stdout, /tools\/release\/prune\.mjs/);
     assert.doesNotMatch(stdout, /node_modules|\.env|secret\.key|aigate\.db|\/test\//);
     const extracted = join(temp, "extracted");
     await mkdir(extracted);
