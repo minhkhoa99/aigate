@@ -10,6 +10,8 @@ export interface SyncClient {
   close(): void;
   // In-memory clients write their image to disk; file-backed clients do not need this.
   persist?(): void;
+  // sql.js has no filesystem for VACUUM INTO; its native export is a consistent image.
+  snapshot?(): Uint8Array;
 }
 
 const FILE_PRAGMAS = ["PRAGMA journal_mode = WAL", "PRAGMA busy_timeout = 5000", "PRAGMA foreign_keys = ON"];
@@ -119,7 +121,7 @@ async function openSqlJs(file: string): Promise<SyncClient> {
     enableForeignKeys();
   };
   enableForeignKeys();
-  return { driver: "sql-js", exec, close: () => client.close(), persist };
+  return { driver: "sql-js", exec, close: () => client.close(), persist, snapshot: () => { const image = client.export(); enableForeignKeys(); return image; } };
 }
 
 export const openers: Record<DriverName, (file: string) => Promise<SyncClient>> = {

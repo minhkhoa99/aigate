@@ -1048,6 +1048,47 @@
   parityStatus: verified
   labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
 
+- id: settings.installation-backup-restore
+  group: Settings
+  feature: Installation backup
+  subFeature: SP47 encrypted full persistent-state backup, reviewed restore on restart
+  trigger: Authenticated dashboard owner exports or reviews and stages a restore from General settings
+  input: Fresh dashboard password, backup passphrase, or a bounded encrypted backup document
+  output: Encrypted versioned archive; redacted preview; staged restore requiring restart
+  businessRules:
+    - "REFERENCE_BEHAVIOR: owner can export and restore settings, connections, API keys and routing state as one installation"
+    - "REFERENCE_BEHAVIOR: sensitive backup actions require a fresh password in addition to a valid dashboard session"
+    - "SUSPECTED_BUG: plaintext credential export and partial-payload table wipe are rejected; AIGate encrypts the complete snapshot and validates it before staging"
+    - "IMPLEMENTATION_BOUNDARY: database snapshot, secret key, MCP registry and local MITM certificate material are included; OS trust, hosts entries, installed PXPIPE binaries and external CLI configuration are outside AIGate's data directory contract"
+    - "AIGATE_EXTENSION: restore never replaces a live database; it stages a verified image, checks a reviewed fingerprint, and applies before the next database open with rollback files"
+  state: { reads: ["all persistent AIGate database rows", "secret key", "bounded owned data files"], writes: ["restore staging directory", "owned data files only at next boot"], runtimeOnly: [] }
+  dependencies: ["settings.database-export-import", "identity.session-cookie-lifecycle"]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases:
+    - { code: AUTH_ERROR, when: "UNAUTHENTICATED session or INVALID_CREDENTIALS fresh password", partial: false }
+    - { code: INVALID_REQUEST, when: "BACKUP_INVALID malformed, altered or incompatible archive or wrong passphrase", partial: false }
+    - { code: INVALID_REQUEST, when: "BACKUP_TOO_LARGE database/archive bound", partial: false }
+    - { code: INVALID_REQUEST, when: "BACKUP_CHANGED stale review or BACKUP_PENDING staged restore", partial: false }
+    - { code: INVALID_REQUEST, when: "BACKUP_KEY_CONFLICT environment key mismatch", partial: false }
+  sideEffects: ["successful apply stages owned files; actual replacement occurs before the next server boot"]
+  persistence: ["versioned encrypted archive", "staged restore and rollback copies until boot completes"]
+  performanceConcerns: ["64 MiB database-image cap and a fixed small allowlist of owned files; no unbounded row scan in JavaScript"]
+  behavior: { streaming: false, cancellation: null, concurrency: "one restore staging operation per installation" }
+  edgeCases: ["wrong passphrase", "tampered archive", "newer-schema backup", "restore interrupted between file replacements", "AIGATE_SECRET_KEY override", "WAL sidecars"]
+  evidence:
+    - { file: "aigate:docs/contracts/installation-backup.md", line: 1, note: "SP47 contract and deviations" }
+    - { file: "aigate:apps/server/test/installation-backup.test.mjs", line: 1, note: "Synthetic export, review, restore and rollback checks" }
+    - { file: "aigate:apps/web/src/features/settings/installation-backup.tsx", line: 1, note: "General Settings reviewed restore UI" }
+    - { file: src/app/api/settings/database/route.js, line: 19, note: "Reference full database export intent" }
+  newModule: settings
+  parityStatus: verified
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG, IMPLEMENTATION_ACCIDENT]
+  suspicion:
+    expected: "A backup should protect credentials and reject missing or malformed table data before replacing an installation."
+    actual: "The reference exports credentials as plaintext JSON and a partial payload can wipe tables omitted from the import."
+    impact: "A copied export discloses provider credentials and an incomplete import can silently erase unrelated installation data."
+
 - id: settings.database-export-import
   group: Settings
   feature: Settings

@@ -107,7 +107,9 @@ toggle, shows actual usage retention/writer status, and downloads the same runti
 metadata instead of a fake seven-day diagnostic archive. Retention, port and data
 directory are startup settings; the UI identifies their environment variables
 and restart requirement. Whole-dashboard i18n, automatic updates, OS startup registration
-and complete installation backup remain separate features.
+and complete installation backup remain separate features. SP47's encrypted
+installation backup and reviewed restart restore are documented in
+`docs/contracts/installation-backup.md`; this 16-field portable transfer is unchanged.
 
 `SETTINGS_CHANGED` reaches `shared/errors.ts` with a precise re-preview instruction;
 other errors reuse the existing validation, session and transport mappings.

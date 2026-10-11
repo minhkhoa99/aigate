@@ -1,9 +1,9 @@
 // One behavior suite for every SQLite driver this runtime can load (SPIKE-1 checks).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { eq, sql, sum } from "drizzle-orm";
 import { openDatabase } from "../dist/index.js";
@@ -34,6 +34,14 @@ for (const driver of drivers) {
       const [row] = await db.insert(accounts).values({ id: "a1", name: "one", meta: { tier: "pro" }, updatedAt: 1 }).returning();
       assert.deepEqual(row, { id: "a1", name: "one", active: true, meta: { tier: "pro" }, updatedAt: 1 });
       assert.deepEqual((await db.select().from(accounts).where(eq(accounts.id, "a1")))[0], row);
+      const image = await handle.snapshot(1024 * 1024);
+      assert.equal(image.subarray(0, 16).toString("binary"), "SQLite format 3\0");
+      await assert.rejects(handle.snapshot(1), RangeError);
+      const snapshotFile = join(dirname(file), "snapshot.db");
+      writeFileSync(snapshotFile, image);
+      const copy = await openDatabase({ file: snapshotFile, migrationsFolder, driver: "node-sqlite" });
+      try { assert.equal((await copy.db.select({ name: accounts.name }).from(accounts))[0].name, "one"); }
+      finally { await copy.close(); }
       assert.equal(await db.select().from(accounts).where(eq(accounts.id, "missing")).get(), undefined, "get with no match");
 
       await db.update(accounts).set({ active: false }).where(eq(accounts.id, "a1"));

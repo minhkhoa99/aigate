@@ -4,8 +4,8 @@
     "hash": "6c94eacd93dfe3aa49f9fe1ceab01522"
   },
   "D:\\aigate\\apps\\server\\src\\app.module.ts": {
-    "mtime": 1791387171.210457,
-    "hash": "39531e38c6c970dc87721b94c5367d31"
+    "mtime": 1791699763.0423708,
+    "hash": "f5da9d9b152e2bdfd9ad6aff18eb6a75"
   },
   "D:\\aigate\\apps\\server\\src\\database.provider.ts": {
     "mtime": 1791387171.2122278,
@@ -24,8 +24,8 @@
     "hash": "7b585b3ae2811fa301289ed3b21e3bac"
   },
   "D:\\aigate\\apps\\server\\src\\server.ts": {
-    "mtime": 1791624062.1388464,
-    "hash": "329eb7c94f6dc93573d33914fbb38354"
+    "mtime": 1791700491.2131715,
+    "hash": "1a970f31529b00fff1951a173b50f5c8"
   },
   "D:\\aigate\\apps\\server\\src\\modules\\apikeys\\apikeys.module.ts": {
     "mtime": 1791387171.2153313,
@@ -235,6 +235,10 @@
     "mtime": 1791387171.2534168,
     "hash": "f489981f5a1bee07580d14af5522397d"
   },
+  "D:\\aigate\\apps\\server\\src\\modules\\settings\\installation-backup.module.ts": {
+    "mtime": 1791699763.0413692,
+    "hash": "d50a6374d79af1d4429e27087d5ccb39"
+  },
   "D:\\aigate\\apps\\server\\src\\modules\\settings\\settings.module.ts": {
     "mtime": 1791387171.258142,
     "hash": "f934d3d489db4c5b793fc8d23e578511"
@@ -242,6 +246,14 @@
   "D:\\aigate\\apps\\server\\src\\modules\\settings\\domain\\settings.ts": {
     "mtime": 1791697142.3818011,
     "hash": "1225afd6d4655e918cb72408e2b9bd8e"
+  },
+  "D:\\aigate\\apps\\server\\src\\modules\\settings\\infrastructure\\installation-backup.controller.ts": {
+    "mtime": 1791700069.0039632,
+    "hash": "ed11d0c9f7cc25e7c336fcc062207994"
+  },
+  "D:\\aigate\\apps\\server\\src\\modules\\settings\\infrastructure\\installation-backup.ts": {
+    "mtime": 1791700621.5636077,
+    "hash": "ef37878d35a7e47b099db1ccf9713bd7"
   },
   "D:\\aigate\\apps\\server\\src\\modules\\settings\\infrastructure\\runtime.controller.ts": {
     "mtime": 1791387171.2561216,
@@ -571,6 +583,10 @@
     "mtime": 1791628252.5490625,
     "hash": "8482190bb698804c7d29c2a387a18381"
   },
+  "D:\\aigate\\apps\\server\\test\\installation-backup.test.mjs": {
+    "mtime": 1791700468.8121953,
+    "hash": "070fe32ba362c2afeea203057cd80734"
+  },
   "D:\\aigate\\apps\\server\\test\\lane-helpers.mjs": {
     "mtime": 1791387171.3160138,
     "hash": "61946336f19f4e8bbe1fade67e067f6c"
@@ -640,8 +656,8 @@
     "hash": "720d140ae1b838557c825724bcf62812"
   },
   "D:\\aigate\\apps\\server\\test\\sso.test.mjs": {
-    "mtime": 1791697577.3295455,
-    "hash": "2e598d50c2aba8b78923c8b369277a78"
+    "mtime": 1791697797.8980474,
+    "hash": "560f75bfa2b7f7d01365307e6737d256"
   },
   "D:\\aigate\\apps\\server\\test\\stream-only.test.mjs": {
     "mtime": 1791387171.326823,
@@ -840,8 +856,12 @@
     "hash": "e49414a118f214fd6faae2f2a52bd6f4"
   },
   "D:\\aigate\\apps\\web\\src\\features\\settings\\general.tsx": {
-    "mtime": 1791392830.726337,
-    "hash": "124800113cfdc15ddbf449785ed93309"
+    "mtime": 1791700018.6154106,
+    "hash": "b1a0ae0434f6f560d62cc296c9fdab3f"
+  },
+  "D:\\aigate\\apps\\web\\src\\features\\settings\\installation-backup.tsx": {
+    "mtime": 1791700257.58114,
+    "hash": "8f8fec9d3a83a311aa64dae619722c8d"
   },
   "D:\\aigate\\apps\\web\\src\\features\\settings\\screens.tsx": {
     "mtime": 1791697686.651726,
@@ -892,8 +912,8 @@
     "hash": "bd16a62b2b16810c2473bc3719495bc4"
   },
   "D:\\aigate\\apps\\web\\src\\shared\\i18n.test.mjs": {
-    "mtime": 1791392830.7284968,
-    "hash": "5467eaffdb4d63e770c12c931adc818b"
+    "mtime": 1791700119.5746143,
+    "hash": "00493fb4c5583d53643a1a091addface"
   },
   "D:\\aigate\\apps\\web\\src\\shared\\i18n.ts": {
     "mtime": 1791392830.7290099,
@@ -1044,12 +1064,12 @@
     "hash": "8de036d2a0736ed70124ec28413ec2ee"
   },
   "D:\\aigate\\packages\\database\\src\\clients.ts": {
-    "mtime": 1791387171.7260382,
-    "hash": "044fd271db61669cdb5bd30c12c406d6"
+    "mtime": 1791699668.6884322,
+    "hash": "9a1d48a8ca0820afaa5785afc7bb41cc"
   },
   "D:\\aigate\\packages\\database\\src\\database.ts": {
-    "mtime": 1791387171.726549,
-    "hash": "7f7ebe264d73de0609eb6c6f88a03002"
+    "mtime": 1791699668.6884322,
+    "hash": "630a7b5f123940aae325581e5ae0705e"
   },
   "D:\\aigate\\packages\\database\\src\\index.ts": {
     "mtime": 1791387171.7270775,
@@ -1088,8 +1108,8 @@
     "hash": "a97f740d10953f176c0d8bee6c0fc6e3"
   },
   "D:\\aigate\\packages\\database\\test\\conformance.test.mjs": {
-    "mtime": 1791387171.7333388,
-    "hash": "423a82a18a3dc4e502c129b4f8433147"
+    "mtime": 1791700119.5586886,
+    "hash": "f35bb5c3d05c13aa75ebb15bdc69d803"
   },
   "D:\\aigate\\packages\\database\\test\\fixture\\schema.ts": {
     "mtime": 1791387171.7365272,
@@ -1556,11 +1576,11 @@
     "hash": "015898deb9f7c1bf8c34e21052d764d3"
   },
   "D:\\aigate\\docs\\PROGRESS_HANDOFF.md": {
-    "mtime": 1791626239.7003646,
-    "hash": "e2b9967a3fefa09f41cf9d0179a2bd84"
+    "mtime": 1791700561.21206,
+    "hash": "49424a3380f94e84739244f613437d24"
   },
   "D:\\aigate\\docs\\PROJECT_MAP.md": {
-    "mtime": 1791626277.5791488,
+    "mtime": 1791700604.82122,
     "hash": "5cab4112e6edae1f745b1685160b1731"
   },
   "D:\\aigate\\docs\\contracts\\auth-settings-sso-ui-i18n.md": {
@@ -1622,6 +1642,10 @@
   "D:\\aigate\\docs\\contracts\\identity-apikeys.md": {
     "mtime": 1791697745.4504848,
     "hash": "4efa486a449a4bf536841b2e649c6993"
+  },
+  "D:\\aigate\\docs\\contracts\\installation-backup.md": {
+    "mtime": 1791700540.5257642,
+    "hash": "e23e5d29585028e0e0c5c5ea4791f978"
   },
   "D:\\aigate\\docs\\contracts\\integrations-skills-mcp-ui-i18n.md": {
     "mtime": 1791596681.0217657,
@@ -1752,8 +1776,8 @@
     "hash": "b9fd1a7e6aa1854b357ccd90a03abf5e"
   },
   "D:\\aigate\\docs\\contracts\\settings.md": {
-    "mtime": 1791392830.7351544,
-    "hash": "6825d85907a3dde5223d53250abde989"
+    "mtime": 1791700540.5269852,
+    "hash": "b37b4caa333043cbcbf1a68910f005e2"
   },
   "D:\\aigate\\docs\\contracts\\speech.md": {
     "mtime": 1791535122.3905063,
@@ -1780,8 +1804,8 @@
     "hash": "d965df98a5658322e0f4d10e2c41484d"
   },
   "D:\\aigate\\docs\\design\\API_UI_MAP.md": {
-    "mtime": 1791626161.1862004,
-    "hash": "9ceaf1f122ddc40c472bbdaf4e9adeff"
+    "mtime": 1791700540.5269852,
+    "hash": "2ebe0b0bd4545d81b7ea634ce1ff2736"
   },
   "D:\\aigate\\docs\\design\\DESIGN.md": {
     "mtime": 1791387171.4261718,
@@ -1920,8 +1944,8 @@
     "hash": "188e8bfbc33a2ff9705f2e5aaabfeef0"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\01-endpoint-apikey-settings.yaml": {
-    "mtime": 1791697735.784011,
-    "hash": "6e66b03bb6e162de41ce10a50382204e"
+    "mtime": 1791700549.0935917,
+    "hash": "57aeea1773ff69b2d854d09a1fa374f7"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\02-providers-auth.yaml": {
     "mtime": 1791614377.0228686,
@@ -2036,8 +2060,8 @@
     "hash": "59fbb0635019d98224fd1a15f15e26e0"
   },
   "D:\\aigate\\docs\\superpowers\\plans\\2026-10-10-m2-oidc-saml-auth.md": {
-    "mtime": 1791623370.704825,
-    "hash": "b6445848c09524e904ea804a0a159bd8"
+    "mtime": 1791697816.9514995,
+    "hash": "2ac5fc48a065928515e8605fd19afd8d"
   },
   "D:\\aigate\\docs\\superpowers\\plans\\2026-10-10-sp42-integrations-skills-mcp-ui-i18n.md": {
     "mtime": 1791597653.2958934,
@@ -2058,6 +2082,10 @@
   "D:\\aigate\\docs\\superpowers\\plans\\2026-10-10-sp46-auth-settings-sso-i18n.md": {
     "mtime": 1791618668.5423815,
     "hash": "f7e21352e2944e05bf4ed7bb77758e16"
+  },
+  "D:\\aigate\\docs\\superpowers\\plans\\2026-10-11-sp47-installation-backup.md": {
+    "mtime": 1791700540.5281718,
+    "hash": "9b73475bb7b6c840184a1830a0fac885"
   },
   "D:\\aigate\\docs\\superpowers\\skill-tests\\2026-09-25-porting-behavior-not-code-green.md": {
     "mtime": 1791387171.539554,

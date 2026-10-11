@@ -12,6 +12,7 @@ import { SpeechLane } from "./modules/routing/infrastructure/speech-lane.js";
 import { registerV1Routes } from "./modules/routing/infrastructure/v1-routes.js";
 import { registerSimulationBoundary } from "./modules/routing/infrastructure/routing-simulator.controller.js";
 import { registerSamlBoundary } from "./modules/identity/infrastructure/sso.controller.js";
+import { applyPendingRestore } from "./modules/settings/infrastructure/installation-backup.js";
 import { assertTimeZone } from "./modules/usage/domain/usage.js";
 import { DEFAULT_RETENTION_DAYS } from "./modules/usage/infrastructure/usage-recorder.js";
 import { AesGcmCipher, loadSecretKey } from "./secret-cipher.js";
@@ -64,29 +65,44 @@ export async function createServer({
   } catch {
     throw new RangeError(`AIGATE_USAGE_TIMEZONE "${usageTimezone}" is not an IANA time zone such as Asia/Ho_Chi_Minh`);
   }
-  // Loaded before the database opens: a bad key stops startup before anything else happens.
-  const cipher = new AesGcmCipher(loadSecretKey(secretKey, join(dirname(databaseFile), "secret.key")));
-  const database = await openDatabase({ file: databaseFile });
+  // A reviewed restore applies only before SQLite and the secret cipher are opened.
+  const restore = await applyPendingRestore(dataDir, databaseFile, secretKey);
+  let database: Awaited<ReturnType<typeof openDatabase>> | undefined;
   let app: NestFastifyApplication;
   try {
+    // Loaded before the database opens: a bad key stops startup before anything else happens.
+    const key = loadSecretKey(secretKey, join(dirname(databaseFile), "secret.key"));
+    const cipher = new AesGcmCipher(key);
+    database = await openDatabase({ file: databaseFile });
     // bodyParser:false drops the urlencoded parser Nest adds, so a cross-site HTML form cannot produce a
     // body these handlers accept; Fastify's own JSON parser (prototype-poisoning safe) stays.
-    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, dataDir, { timezone: usageTimezone, retentionDays: usageRetentionDays, flushIntervalMs: usageFlushIntervalMs }, transport), new FastifyAdapter(), { bodyParser: false });
+    app = await NestFactory.create<NestFastifyApplication>(AppModule.with(database, cipher, { databaseFile, dataDir, key, envKey: Boolean(secretKey) }, { streamIdleTimeoutMs, refreshRetryDelayMs, streamRetryDelayMs }, dataDir, { timezone: usageTimezone, retentionDays: usageRetentionDays, flushIntervalMs: usageFlushIntervalMs }, transport), new FastifyAdapter(), { bodyParser: false });
   } catch (error) {
-    await database.close();
+    await database?.close();
+    await restore?.rollback();
     throw error;
   }
   app.enableShutdownHooks();
   const fastify = app.getHttpAdapter().getInstance();
-  registerSimulationBoundary(fastify);
-  registerSamlBoundary(fastify);
-  // STT needs the original multipart bytes (including its boundary) for the upstream OpenAI-compatible endpoint.
-  fastify.addContentTypeParser(/^multipart\/form-data/i, { parseAs: "buffer" }, (_request, body, done) => done(null, body));
-  registerV1Routes(fastify, app.get(ChatLane), app.get(SpeechLane));
+  try {
+    registerSimulationBoundary(fastify);
+    registerSamlBoundary(fastify);
+    fastify.addHook("onRoute", route => { if (route.url === "/api/settings/backup/preview" || route.url === "/api/settings/backup/apply") route.bodyLimit = 180 * 1024 * 1024; });
+    // STT needs the original multipart bytes (including its boundary) for the upstream OpenAI-compatible endpoint.
+    fastify.addContentTypeParser(/^multipart\/form-data/i, { parseAs: "buffer" }, (_request, body, done) => done(null, body));
+    registerV1Routes(fastify, app.get(ChatLane), app.get(SpeechLane));
 
-  if (webDist && existsSync(join(webDist, "index.html"))) {
-    await fastify.register(fastifyStatic, { root: webDist, wildcard: false });
-    fastify.get("/*", (request, reply) => (isSpaRoute(request.url) ? reply.sendFile("index.html") : reply.callNotFound()));
+    if (webDist && existsSync(join(webDist, "index.html"))) {
+      await fastify.register(fastifyStatic, { root: webDist, wildcard: false });
+      fastify.get("/*", (request, reply) => (isSpaRoute(request.url) ? reply.sendFile("index.html") : reply.callNotFound()));
+    }
+    await app.init();
+    await fastify.ready();
+    await restore?.finalize();
+  } catch (error) {
+    try { await app.close(); } catch { await database?.close().catch(() => undefined); }
+    await restore?.rollback();
+    throw error;
   }
   return app;
 }

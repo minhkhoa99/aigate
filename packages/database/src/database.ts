@@ -1,4 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { drizzle, type AsyncBatchRemoteCallback, type AsyncRemoteCallback, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
 import { migrate } from "drizzle-orm/sqlite-proxy/migrator";
@@ -10,6 +13,7 @@ export type Database = SqliteRemoteDatabase<Record<string, never>>;
 export interface DatabaseHandle {
   readonly db: Database;
   readonly driver: DriverName;
+  snapshot(maxBytes: number): Promise<Buffer>;
   close(): Promise<void>;
 }
 
@@ -111,6 +115,29 @@ export async function openDatabase(options: OpenOptions): Promise<DatabaseHandle
   return {
     db,
     driver: client.driver,
+    snapshot: async (maxBytes) => {
+      if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new RangeError("snapshot byte limit must be positive");
+      const directory = await mkdtemp(join(tmpdir(), "aigate-snapshot-"));
+      const file = join(directory, "aigate.db");
+      try {
+        const inMemory = await serialize(() => {
+          const count = client.exec("PRAGMA page_count", [], "get");
+          const size = client.exec("PRAGMA page_size", [], "get");
+          const pages = Array.isArray(count) ? count[0] : undefined;
+          const bytes = Array.isArray(size) ? size[0] : undefined;
+          if (typeof pages !== "number" || typeof bytes !== "number" || pages * bytes > maxBytes) throw new RangeError("Database exceeds the backup limit");
+          if (client.snapshot) return client.snapshot();
+          client.exec("VACUUM INTO ?", [file], "run");
+          return undefined;
+        });
+        if (inMemory) {
+          if (inMemory.byteLength > maxBytes) throw new RangeError("Database exceeds the backup limit");
+          return Buffer.from(inMemory);
+        }
+        if ((await stat(file)).size > maxBytes) throw new RangeError("Database exceeds the backup limit");
+        return await readFile(file);
+      } finally { await rm(directory, { recursive: true, force: true }); }
+    },
     close: () =>
       serialize(() => {
         clearTimeout(persistTimer);

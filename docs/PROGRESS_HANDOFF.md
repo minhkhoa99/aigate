@@ -1,6 +1,6 @@
 # AIGate progress handoff
 
-Updated: 2026-10-10. Read this before continuing the project plan.
+Updated: 2026-10-11. Read this before continuing the project plan.
 
 ## Task board
 
@@ -75,7 +75,8 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | SP44 / M3 U10 remaining CLI adapter details EN/VI | Done, UI wired; targeted native/browser acceptance passed | `docs/contracts/cli-secondary-ui-i18n.md`, latest SP44 section |
 | SP45 / M3 U4 Providers, AuthFlow and Connections EN/VI | Done, UI wired; targeted native/browser acceptance passed | `docs/contracts/providers-authflow-connections-ui-i18n.md`, latest SP45 section |
 | SP46 / M3 U2 Auth settings OIDC/SAML EN/VI | Done, UI wired; targeted native/browser acceptance passed | `docs/contracts/auth-settings-sso-ui-i18n.md`, `docs/contracts/m2-oidc-saml-auth.md` |
-| M2 OIDC/SAML dashboard authentication | Verified with synthetic IdP/ACS and isolated Edge acceptance; local checkpoint pending | `docs/contracts/m2-oidc-saml-auth.md` |
+| M2 OIDC/SAML dashboard authentication | Verified with synthetic IdP/ACS and isolated Edge acceptance; committed in `d5ba9d8` | `docs/contracts/m2-oidc-saml-auth.md` |
+| SP47 / M3 U2 encrypted installation backup and reviewed restore | Verified with synthetic native/browser acceptance; local checkpoint in this slice | `docs/contracts/installation-backup.md`, SP47 section below |
 
 ## Completed and verified
 
@@ -1169,3 +1170,11 @@ Checks and status:
 - **Focused native acceptance.** `sso.test.mjs`, `identity.test.mjs`, `settings.test.mjs` pass 21/21 using a fake OIDC transport and signed synthetic SAML assertion. They cover PKCE, issuer/audience/nonce/JWKS, session/replay/tamper/expiry, protected test APIs, client probe results, 64 KiB OIDC and 256 KiB ACS bounds, settings secrecy and URL validation. Database migration conformance passes 6/6; focused web locale/error checks pass 10/10. The full repository test suite was not rerun after the migration fix.
 - **Isolated browser acceptance.** Edge against a same-origin synthetic fixture covered EN→VI mounted draft retention with no extra fetch, rejected-client warning, saved public origin and secret clearing, SAML ACS URL, allowlisted login failure, and 390px layout without overflow. The fixture made six local requests, one settings PATCH and one OIDC test, with zero IdP starts; it was removed. No real IdP/credential was used, so an operator-specific IdP interoperability check remains a deployment step.
 - **Static/graph gates.** `pnpm build` and `pnpm lint` pass (660 modules/2377 dependencies); discovery validates 379 entries. Installed AST-only `graphify update . --no-cluster` refreshed 487 files to 11,313 nodes/25,245 edges; token cost zero, graph remains merge-derived and tracked HTML retained. `docs/PROJECT_MAP.md` remains 135 lines. Staged/unstaged diff checks pass. The five OIDC/SAML reference entries in the Feature Matrix are verified; the reference replay bug stays traced and is deliberately rejected by AIGate.
+
+### SP47 encrypted installation backup and reviewed restore (2026-10-11)
+
+- **Scope.** From local base `2ff54d3`, SP47 adds a complete encrypted snapshot of AIGate's database, matching secret key, MCP registry and fixed MITM certificate/key files. The SP27 16-field portable settings transfer remains separate. OS trust, hosts changes, external CLI files and installed binaries are outside the owned-data backup.
+- **Backend.** `DatabaseHandle.snapshot` serializes a bounded SQLite snapshot across all three supported drivers. Session plus fresh password protect export/preview/apply even with local login bypass. A versioned scrypt/AES-GCM archive is checked against an exact local migration history, SQLite integrity and a stale-state fingerprint. Apply stages owner-only files; next boot replaces them before loading the key/DB, then finalizes after app initialization. Failed/interrupted replacement restores prior files. Restored sessions are revoked. A conflicting `AIGATE_SECRET_KEY` is rejected.
+- **UI.** General Settings exposes EN/VI export, file selection, redacted preview, typed RESTORE, errors and restart state. It warns that staged plaintext is in the protected local data directory and changes made before restart will be replaced.
+- **Acceptance.** Database conformance 6/6; scoped backup/settings/identity/SSO backend checks 23/23; shared web i18n 8/8; app/bootstrap plus backup checks 5/5. Isolated Edge fixture exercised export, preview, EN→VI, typed confirmation and apply on 390px without overflow, using five fake same-origin API calls. All data and credentials were synthetic; no vendor or user data was used.
+- **Static/graph gates.** Full build passes with the existing Vite chunk-size advisory; lint passes (669 modules/2434 dependencies), discovery validates 380 entries, and staged/unstaged diff checks pass. Installed AST-only `graphify update . --no-cluster` refreshed 494 files to 11,381 nodes/25,434 edges; the graph remains merge-derived, semantic extraction was not run, and existing graph HTML was retained. `docs/PROJECT_MAP.md` remains 135 lines. The local checkpoint includes this verified slice; no push.
