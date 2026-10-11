@@ -1,5 +1,6 @@
 {
   "name": "@aigate/server",
+  "version": "0.1.0-dev.0",
   "private": true,
   "type": "module",
   "scripts": {

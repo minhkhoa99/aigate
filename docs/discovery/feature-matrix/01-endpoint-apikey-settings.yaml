@@ -1449,3 +1449,33 @@
   newModule: apikeys
   parityStatus: verified
   labels: []
+
+- id: settings.release-foundation
+  group: Settings
+  feature: System lifecycle
+  subFeature: Signed versioned release package and installed-version display
+  trigger: Operator packages a built release, or opens General Settings
+  input: "Built outputs, server package version, operator-owned Ed25519 key"
+  output: "Signed manifest plus relocatable built tarball; authenticated runtime appVersion"
+  businessRules:
+    - "AIGATE_EXTENSION: the version is read from the server package; no release channel or remote lookup exists by default"
+    - "AIGATE_EXTENSION: package only explicit built files, migrations and frozen workspace manifests, never user data, environment, source, tests or node_modules"
+    - "AIGATE_EXTENSION: the manifest signature covers canonical metadata; a separately pinned Ed25519 public key and artifact SHA-256 are both required for verification"
+  state:
+    reads: ["server package version", "built outputs", "operator signing key"]
+    writes: ["operator-selected release output directory"]
+    runtimeOnly: []
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Creates a local release artifact only when explicitly invoked"]
+  persistence: []
+  performanceConcerns: ["Fixed file allowlist and bounded artifact size; streaming hash verification"]
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: ["Missing build", "Wrong signing key", "Tampered manifest or archive", "Relocated Windows package"]
+  evidence:
+    - { file: "aigate:docs/contracts/release-foundation.md", line: 1, note: "SP49 native release contract" }
+  newModule: settings
+  parityStatus: verified
+  labels: []

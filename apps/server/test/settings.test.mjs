@@ -103,6 +103,7 @@ test("portable settings: safe export, preview, validation, merge and atomic stal
       ].sort(), "only the 16 transferable keys are exported");
       assert.ok(!exported.body.includes("headroomUrl") && !exported.body.includes("do-not-export"));
       const runtime = (await dash({ url: "/api/settings/runtime" })).json();
+      assert.equal(runtime.appVersion, "0.1.0-dev.0");
       assert.deepEqual([runtime.usageTimezone, runtime.usageRetentionDays, runtime.dailyRetentionDays, runtime.port], ["UTC", 31, 400, null]);
       assert.ok(!JSON.stringify(runtime).includes("do-not-export"));
 

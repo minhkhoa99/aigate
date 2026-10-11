@@ -126,6 +126,7 @@
   "settings.dailyRetention": "Lưu tổng hợp theo ngày",
   "settings.idleTimeout": "Thời gian chờ stream · AIGATE_STREAM_IDLE_TIMEOUT_MS",
   "settings.runtimeDb": "Runtime / cơ sở dữ liệu",
+  "settings.appVersion": "Phiên bản AIGate",
   "settings.uptime": "Thời gian hoạt động",
   "settings.notListening": "Chưa lắng nghe",
   "settings.downloadRuntime": "Tải thông tin runtime",

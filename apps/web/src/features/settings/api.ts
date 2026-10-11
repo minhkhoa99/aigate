@@ -25,7 +25,7 @@ export interface Settings {
 }
 
 export interface RuntimeInfo {
-  at: number; bindAddress: string | null; port: number | null; dataDir: string; nodeVersion: string; databaseDriver: string;
+  at: number; bindAddress: string | null; port: number | null; dataDir: string; appVersion: string; nodeVersion: string; databaseDriver: string;
   uptimeSeconds: number; streamIdleTimeoutMs: number; usageTimezone: string; usageRetentionDays: number; dailyRetentionDays: number;
   writer: { queued: number; dropped: number; failed: number };
 }

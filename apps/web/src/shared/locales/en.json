@@ -126,6 +126,7 @@
   "settings.dailyRetention": "Daily totals retention",
   "settings.idleTimeout": "Stream idle timeout · AIGATE_STREAM_IDLE_TIMEOUT_MS",
   "settings.runtimeDb": "Runtime / database",
+  "settings.appVersion": "AIGate version",
   "settings.uptime": "Uptime",
   "settings.notListening": "Not listening",
   "settings.downloadRuntime": "Download runtime info",

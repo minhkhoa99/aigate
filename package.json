@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "pnpm --filter @aigate/server --filter @aigate/web --parallel dev",
     "build": "pnpm --filter @aigate/web build && pnpm --filter @aigate/server build",
+    "release:pack": "node tools/release/release.mjs pack",
+    "release:verify": "node tools/release/release.mjs verify",
     "start": "pnpm --filter @aigate/server start",
     "web": "pnpm --filter @aigate/web dev",
     "web:build": "pnpm --filter @aigate/web build",

@@ -75,6 +75,7 @@ export function SettingsGeneral({ theme, onTheme }: { theme: string; onTheme: (t
             [t("settings.dataDir"), <code>{data.dataDir}</code>], [t("settings.timezone"), data.usageTimezone],
             [t("settings.retention"), t("settings.days", { count: f.number(data.usageRetentionDays) })], [t("settings.dailyRetention"), t("settings.days", { count: f.number(data.dailyRetentionDays) })],
             [t("settings.idleTimeout"), t("settings.seconds", { count: f.number(data.streamIdleTimeoutMs / 1000) })],
+            [t("settings.appVersion"), <code>{data.appVersion}</code>],
             [t("settings.runtimeDb"), `${data.nodeVersion} / ${data.databaseDriver}`], [t("settings.uptime"), t("settings.minutes", { count: f.number(Math.floor(data.uptimeSeconds / 60)) })],
           ]} />
           <Button onClick={() => { void download("runtime"); }} disabled={downloading}>{t("settings.downloadRuntime")}</Button>

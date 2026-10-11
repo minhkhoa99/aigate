@@ -77,7 +77,7 @@ new resource.
 
 | Method | Path | Behavior |
 |---|---|---|
-| GET | `/api/settings/runtime` | Actual listener address/port (null before listen), data directory, Node version, SQLite driver, uptime, stream idle timeout, usage timezone/retention, daily retention, and writer counters. No environment dump or credentials. |
+| GET | `/api/settings/runtime` | Actual listener address/port (null before listen), data directory, installed AIGate package version (SP49), Node version, SQLite driver, uptime, stream idle timeout, usage timezone/retention, daily retention, and writer counters. No environment dump or credentials. |
 | GET | `/api/settings/export` | Download `aigate-settings.json`: `{ format: "aigate-settings", version: 1, settings: { ... } }`, containing only transferable typed settings, excluding service URLs. |
 | POST | `/api/settings/import/preview` | Validate the document; return `{ version, changes: [{ key, before, after }], settings }`. `version` is an opaque SHA-256 fingerprint of current settings. No writes. |
 | POST | `/api/settings/import` | `{ document, expectedVersion }`: revalidate, compare the reviewed version, and atomically merge the document's provided keys. Return the full current settings. Missing keys are preserved. |
