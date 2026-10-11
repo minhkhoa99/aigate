@@ -21,3 +21,5 @@ mutation, vendor call, process restart or user-data access is involved.
 
 SP54 adds explicit rollback of the fixed channel manifest using a retained
 older signed manifest; see `static-channel-rollback.md`.
+SP55 adds explicit cleanup of one archive no longer referenced by that
+manifest; see `static-channel-prune.md`.

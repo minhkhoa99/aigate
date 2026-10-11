@@ -31,3 +31,5 @@ npm global updater is not reused because this project has no npm release
 channel and its process-kill behavior is outside this contract.
 SP54 provides an explicit local rollback of that static channel; see
 `static-channel-rollback.md`.
+SP55 provides explicit local cleanup of an unreferenced channel archive; see
+`static-channel-prune.md`.

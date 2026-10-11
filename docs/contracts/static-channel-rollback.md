@@ -19,3 +19,5 @@ removes only the lock file. This is an operator action; there is no dashboard
 mutation, automatic rollback, hosting or real release key in SP54.
 Clients already running a newer version will see no update to the older
 channel version; their SP51 managed rollback remains a separate local action.
+SP55 can explicitly remove an unreferenced archive. An operator must retain
+the target archive in the channel to use this rollback command.

@@ -1633,3 +1633,34 @@
   newModule: settings
   parityStatus: verified
   labels: []
+
+- id: settings.static-channel-prune
+  group: Settings
+  feature: System lifecycle
+  subFeature: Explicit cleanup of one signed static channel archive
+  trigger: Operator previews or applies removal of a retained archive
+  input: "Retained signed manifest, pinned public key, existing local channel, optional --apply"
+  output: "Current/target preview or removal of exactly the selected archive"
+  businessRules:
+    - "AIGATE_EXTENSION: verify current and target signed manifests and channel archives with one pinned Ed25519 key"
+    - "AIGATE_EXTENSION: protect the current archive; require explicit --apply under the publish lock and reverify before removal"
+    - "AIGATE_EXTENSION: remove only the signed target basename; reject missing, tampered or symlinked files and busy writers"
+    - "IMPLEMENTATION_ACCIDENT: npm global updater does not define signed static channel archive cleanup"
+  state:
+    reads: ["current channel manifest/archive", "retained signed target manifest", "target channel archive"]
+    writes: ["selected non-current channel archive only on --apply"]
+    runtimeOnly: ["exclusive publish lock"]
+  dependencies: [settings.static-release-channel, settings.static-channel-rollback]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "operator can retry after inspecting refusal", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Explicit local archive removal"]
+  persistence: ["Current latest.manifest.json and archive unchanged"]
+  performanceConcerns: ["Two 4 KiB manifests and streamed 512 MiB archive bounds; no directory scan"]
+  behavior: { streaming: true, cancellation: null, concurrency: "one local publisher, rollback or cleanup" }
+  edgeCases: ["Current archive", "Wrong key", "Missing/tampered target archive", "Invalid current channel", "Busy lock", "Symlink"]
+  evidence:
+    - { file: "aigate:docs/contracts/static-channel-prune.md", line: 1, note: "SP55 native cleanup contract" }
+  newModule: settings
+  parityStatus: verified
+  labels: []

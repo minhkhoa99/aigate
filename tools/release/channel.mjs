@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { constants } from "node:fs";
-import { copyFile, link, lstat, mkdtemp, open, rename, rm, rmdir } from "node:fs/promises";
+import { copyFile, link, lstat, mkdtemp, open, rename, rm, rmdir, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { verifyManifest, verifyRelease } from "./release.mjs";
@@ -119,16 +119,34 @@ export async function rollbackChannel(manifestPath, publicKeyPath, channelDir, a
   }
 }
 
+export async function pruneChannel(manifestPath, publicKeyPath, channelDir, apply = false) {
+  const manifest = resolve(manifestPath), key = resolve(publicKeyPath), channel = resolve(channelDir);
+  const info = await lstat(channel);
+  if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Channel must be an existing regular directory.");
+  const lockPath = join(channel, ".publish.lock");
+  const lock = await open(lockPath, "wx");
+  try {
+    const current = await verifyRelease(join(channel, LATEST), key);
+    const target = await verifyRelease(manifest, key, channel);
+    if (target.version === current.version) throw new Error("Current channel archive is protected.");
+    const artifact = join(channel, target.artifact);
+    if (dirname(artifact) !== channel) throw new Error("Archive path escaped channel directory.");
+    if (apply) await unlink(artifact);
+    return { currentVersion: current.version, targetVersion: target.version, artifact: target.artifact, artifactBytes: target.bytes, applied: apply };
+  } finally { try { await lock.close(); } finally { await rm(lockPath, { force: true }); } }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const rollback = process.argv[2] === "rollback";
-  const args = process.argv.slice(rollback ? 3 : 2);
+  const prune = process.argv[2] === "prune";
+  const args = process.argv.slice(rollback || prune ? 3 : 2);
   const [manifest, key, channel, flag] = args;
-  const invalid = rollback ? args.length < 3 || args.length > 4 || flag !== undefined && flag !== "--apply" : args.length !== 3;
+  const invalid = rollback || prune ? args.length < 3 || args.length > 4 || flag !== undefined && flag !== "--apply" : args.length !== 3;
   if (!manifest || !key || !channel || invalid) {
-    console.error("Usage: channel.mjs <signed-manifest> <public-key.pem> <existing-channel-dir> | rollback <prior-signed-manifest> <public-key.pem> <existing-channel-dir> [--apply]");
+    console.error("Usage: channel.mjs <signed-manifest> <public-key.pem> <existing-channel-dir> | rollback <prior-signed-manifest> <public-key.pem> <existing-channel-dir> [--apply] | prune <signed-manifest> <public-key.pem> <existing-channel-dir> [--apply]");
     process.exitCode = 2;
   } else {
-    try { console.log(JSON.stringify(rollback ? await rollbackChannel(manifest, key, channel, flag === "--apply") : await publishRelease(manifest, key, channel))); }
+    try { console.log(JSON.stringify(rollback ? await rollbackChannel(manifest, key, channel, flag === "--apply") : prune ? await pruneChannel(manifest, key, channel, flag === "--apply") : await publishRelease(manifest, key, channel))); }
     catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; }
   }
 }

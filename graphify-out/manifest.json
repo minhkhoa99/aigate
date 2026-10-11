@@ -1604,12 +1604,12 @@
     "hash": "4d090f5fa7e890f878973a96545e8f07"
   },
   "D:\\aigate\\tools\\release\\channel.mjs": {
-    "mtime": 1791736315.189549,
-    "hash": "b9d06e38c70283469eceff72ead1e26d"
+    "mtime": 1791737016.6724925,
+    "hash": "5563be0dab356af55e047b276c931f70"
   },
   "D:\\aigate\\tools\\release\\channel.test.mjs": {
-    "mtime": 1791736321.272575,
-    "hash": "3e406ed3941c124fa285c312633b782a"
+    "mtime": 1791737016.6724925,
+    "hash": "1e6657d8da71826edaa0eed246594e09"
   },
   "D:\\aigate\\tools\\release\\launcher.mjs": {
     "mtime": 1791734507.34787,
@@ -1660,11 +1660,11 @@
     "hash": "015898deb9f7c1bf8c34e21052d764d3"
   },
   "D:\\aigate\\docs\\PROGRESS_HANDOFF.md": {
-    "mtime": 1791736332.9211743,
-    "hash": "ee54e460fec26bf85c44e2cd139670d0"
+    "mtime": 1791736424.982771,
+    "hash": "482bbe1f40adaec06a0a72d94ddeca2d"
   },
   "D:\\aigate\\docs\\PROJECT_MAP.md": {
-    "mtime": 1791735831.9583478,
+    "mtime": 1791736406.4559803,
     "hash": "5cab4112e6edae1f745b1685160b1731"
   },
   "D:\\aigate\\docs\\contracts\\auth-settings-sso-ui-i18n.md": {
@@ -1883,6 +1883,10 @@
     "mtime": 1791535122.3905063,
     "hash": "a9956fbe77631696cbe87d8c21a0c9fb"
   },
+  "D:\\aigate\\docs\\contracts\\static-channel-prune.md": {
+    "mtime": 1791736949.7035067,
+    "hash": "321f8923856145e374ef3fc239e34515"
+  },
   "D:\\aigate\\docs\\contracts\\static-channel-rollback.md": {
     "mtime": 1791736393.1140552,
     "hash": "5aa6bb5a610e29849871c930155e982a"
@@ -2056,8 +2060,8 @@
     "hash": "188e8bfbc33a2ff9705f2e5aaabfeef0"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\01-endpoint-apikey-settings.yaml": {
-    "mtime": 1791736303.671044,
-    "hash": "5cd91dd147d4ac82bfda93b4b0d8fc28"
+    "mtime": 1791736933.2843094,
+    "hash": "cdf61a25fbd6a8ab94beba2fd94eef24"
   },
   "D:\\aigate\\docs\\discovery\\feature-matrix\\02-providers-auth.yaml": {
     "mtime": 1791614377.0228686,
@@ -2224,8 +2228,12 @@
     "hash": "a9a9994b59415a445d706211c4ae8ac7"
   },
   "D:\\aigate\\docs\\superpowers\\plans\\2026-10-11-sp54-channel-rollback.md": {
-    "mtime": 1791736303.663593,
-    "hash": "a315e0ec63dd23cb7f51609bccd9681f"
+    "mtime": 1791736416.7590556,
+    "hash": "444b464281105a7823ad9121500c4f9a"
+  },
+  "D:\\aigate\\docs\\superpowers\\plans\\2026-10-11-sp55-channel-prune.md": {
+    "mtime": 1791736933.280581,
+    "hash": "63ee8dff09941e401edb013d2825f9cd"
   },
   "D:\\aigate\\docs\\superpowers\\skill-tests\\2026-09-25-porting-behavior-not-code-green.md": {
     "mtime": 1791387171.539554,
