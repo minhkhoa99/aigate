@@ -122,7 +122,8 @@ test("real shared UI renders the saved locale and treats supplied copy as litera
       await router.load();
       return renderToStaticMarkup(h(LocaleProvider,null,h(QueryClientProvider,{client},h(ToastProvider,null,h(RouterProvider,{router})))));
     };
-    const { SettingsGeneral, SettingsAuth, SettingsDeveloper, Login, Onboarding } = await server.ssrLoadModule("/src/features/settings/screens.tsx");
+    const { SettingsGeneral } = await server.ssrLoadModule("/src/features/settings/general.tsx");
+    const { SettingsAuth, SettingsDeveloper, Login, Onboarding } = await server.ssrLoadModule("/src/features/settings/screens.tsx");
     const general = await render(() => h(SettingsGeneral,{theme:"dark",onTheme:()=>{}}));
     assert.ok(general.includes("Cài đặt chung"), "General owned heading must be Vietnamese");
     assert.ok((await render(SettingsAuth)).includes("Xác thực &amp; truy cập"));

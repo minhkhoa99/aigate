@@ -1695,3 +1695,34 @@
   newModule: settings
   parityStatus: verified
   labels: []
+
+- id: settings.browser-route-loading
+  group: Settings
+  feature: Browser shell performance
+  subFeature: Lazy feature screen modules by route
+  trigger: Initial browser load or navigation to a feature route
+  input: "Current route, query parameters, locale and Developer mode"
+  output: "Same screen after a bounded module load, localized loading state or reloadable error"
+  businessRules:
+    - "AIGATE_EXTENSION: keep shell/auth/locale eager and load feature screen modules on route entry"
+    - "AIGATE_EXTENSION: preserve route/query, Developer gate, preview state and mounted EN/VI state without refetch or replay"
+    - "AIGATE_EXTENSION: show localized loading skeleton and visible UI_LOAD_FAILED with Reload on chunk/render failure"
+    - "IMPLEMENTATION_ACCIDENT: eager import of every visual handoff screen is not a required runtime behavior"
+  state:
+    reads: ["route path/search", "browser locale", "Developer mode"]
+    writes: []
+    runtimeOnly: ["browser module cache", "route loading/error boundary"]
+  dependencies: [settings.browser-locale-core]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "Reload current page after module failure", timeout: null, quota: null }
+  errorCases: [] # UI_LOAD_FAILED is a browser render state, not a server error.
+  sideEffects: ["Browser fetch of same-origin built JS chunks on route entry"]
+  persistence: []
+  performanceConcerns: ["Initial JS falls below prior 835.25 kB bundle; one chunk load per visited module, browser cache thereafter"]
+  behavior: { streaming: false, cancellation: null, concurrency: "Vite/browser module loader deduplicates shared route imports" }
+  edgeCases: ["Login before auth gate", "Deep-link detail", "Developer Console gated", "Chunk failure", "EN/VI switch during or after load", "Preview route"]
+  evidence:
+    - { file: "aigate:docs/contracts/browser-route-loading.md", line: 1, note: "SP57 browser route loading contract" }
+  newModule: settings
+  parityStatus: verified
+  labels: []

@@ -1,6 +1,6 @@
 # AIGate progress handoff
 
-Updated: 2026-10-11. Read this before continuing the project plan.
+Updated: 2026-10-12. Read this before continuing the project plan.
 
 ## Task board
 
@@ -86,6 +86,7 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | SP54 / M3 U2 static channel rollback | Verified with synthetic CLI and local HTTP acceptance; local checkpoint in this slice | `docs/contracts/static-channel-rollback.md`, SP54 section below |
 | SP55 / M3 U2 static channel archive cleanup | Verified with synthetic CLI acceptance; local checkpoint in this slice | `docs/contracts/static-channel-prune.md`, SP55 section below |
 | SP56 / M3 U2 static channel archive restore | Verified with synthetic CLI acceptance; local checkpoint in this slice | `docs/contracts/static-channel-restore.md`, SP56 section below |
+| SP57 / M3 U2 browser route loading | Verified with isolated Edge acceptance; local checkpoint in this slice | `docs/contracts/browser-route-loading.md`, SP57 section below |
 
 ## Completed and verified
 
@@ -1248,3 +1249,9 @@ Checks and status:
 - **Scope.** Started from clean `b84d0e3`. SP55 can remove an archive needed by SP54 rollback, while SP52 publish cannot recreate the same version. `pnpm release:channel-restore <signed-manifest> <public-key.pem> <channel-dir> [--apply]` previews or restores exactly one missing archive from the retained signed release. It holds the SP52 `.publish.lock`, verifies the current manifest signature and source manifest/archive with the same pinned Ed25519 key, then stages and re-verifies a copy before an exclusive hard link creates the channel archive. It never replaces an existing target, changes `latest.manifest.json`, touches managed installs or user data, or contacts a host. A missing current archive is recoverable; a damaged existing archive requires operator inspection outside this command.
 - **Acceptance.** Synthetic channel tests pass 4/4 with publication, rollback and prune regressions; CLI preview/apply, absent source/tamper/wrong key, busy lock, existing healthy/damaged/non-regular target, invalid current manifest, rollback after restoring an older archive, and restoration of the missing current archive. The Windows symlink fixture may be skipped if the OS returns `EPERM`; `lstat` refusal is implemented. SP49 signed package regression passes 1/1 after full build. No browser/API flow changed and no real channel, key, vendor, credential or user data was used.
 - **Static/graph gates.** Full build passes with the existing Vite chunk advisory; lint passes (689 modules/2540 dependencies), discovery validates 389 entries, and staged/unstaged diff checks pass. Installed `graphify update . --no-cluster` refreshed AST only: 533 files, 11,663 nodes/25,960 edges, zero semantic tokens. Graph remains merge-derived; tracked HTML retained above its 5,000-node visualization limit, project map 135 lines. Matrix `settings.static-channel-restore` is verified. No dependency, semantic extraction or remote push. Local checkpoint only.
+
+### SP57 browser route loading (2026-10-12)
+
+- **Scope.** Started from clean `5632ab3`. M3 spec §10.6 calls for route code splitting; the prior production web entry was 835.25 kB and eagerly included every feature screen. `ScreenView` now uses module-scope lazy imports, the existing localized loading skeleton, and a route-keyed error boundary with `UI_LOAD_FAILED` and Reload. Login no longer pulls General through the settings barrel. Existing paths/search, auth gate, Developer gate, preview and mounted EN/VI state remain intact. No HTTP API, dependency, storage or user data changed.
+- **Browser acceptance.** Isolated Edge against a same-origin synthetic fixture confirmed login skipped unrelated screen chunks; overview, request-detail deep link and Developer gate worked. A blocked General chunk produced the error state and a different route recovered; a delayed Media chunk showed loading before its synthetic read error. EN→VI on mounted General changed the heading without another API read. At 390 px, General and the Media error page had no horizontal overflow. The browser, fixture server and task-owned profile were removed; no vendor or credential was used.
+- **Native/build gates.** Focused i18n/error checks pass 16/16. Full web/server build passes; web entry is 606.55 kB minified (185.06 kB gzip), 228.70 kB or 27.4% below the previous entry. Feature chunks are 1.90–37.57 kB. Vite's >500 kB entry advisory remains. Lint passes (714 modules/2616 dependencies); discovery validates 390 entries. AST-only `graphify update . --no-cluster` processed 535 files and produced 11,717 nodes/26,015 edges with no semantic extraction; graph remains merge-derived. The tracked HTML was retained above its visualization limit and the project map remains 135 lines. Matrix `settings.browser-route-loading` is verified; local checkpoint only, no push.

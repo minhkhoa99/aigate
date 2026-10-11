@@ -19,8 +19,6 @@ const SSO_REDIRECT_ERRORS = {
 function authMode(value: string): "password" | "oidc" | "saml" | "both" {
   return value === "oidc" || value === "saml" || value === "both" ? value : "password";
 }
-export { SettingsGeneral } from "./general";
-
 function formValue(event: FormEvent<HTMLFormElement>, name: string): string {
   const value = new FormData(event.currentTarget).get(name);
   return typeof value === "string" ? value : "";
