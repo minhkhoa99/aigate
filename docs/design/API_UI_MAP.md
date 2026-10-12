@@ -77,6 +77,7 @@ If an SP adds no HTTP API (for example `packages/engine`), write "no UI" in its 
 | No new HTTP API: client setup selection (SP33) | `contracts/endpoint-setup.md`, `contracts/i18n.md` | `/gateway/endpoint` → `EndpointKeys` | Fixed `endpointSetup` variants, existing key/settings/connection hooks | Verified: OpenAI Chat, Anthropic Messages, Responses/Codex and Gemini show route-matched URL/curl and POSIX setup where applicable. Protocol/locale switching is local and does not fetch or replay key mutations; EN/VI, read-error/Retry, one-time key and mobile acceptance pass. |
 
 | No new HTTP API: Requests table windowing (SP58) | `contracts/request-list-windowing.md` | `/traffic/requests` → `RequestTable` | Existing `useRequests` cursor pages | The 100-row fetch and 500-row cap remain; the scrollable table mounts only a viewport window plus overscan, keeps detail links/EN/VI/error states, and resets its scroll position when URL filters change. |
+| No new HTTP API: Developer Console windowing (SP59) | `contracts/console-windowing.md` | `/traffic/console` → `ConsoleLines` | Existing `useConsoleLogs` GET/SSE/Clear | The 200-event ring, filters and explicit Clear remain; the focused 400 px log region mounts at most 26 one-line rows, keeps complete messages accessible by horizontal scroll, and announces only new visible events outside the virtualized content. |
 
 ## Waiting for backend
 

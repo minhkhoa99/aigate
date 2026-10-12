@@ -27,6 +27,34 @@
   parityStatus: verified
   labels: []
 
+- id: console.windowed-dashboard
+  group: Console Log
+  feature: AIGate Console dashboard
+  subFeature: Bounded DOM and keyboard scroll for the 200-event log
+  trigger: Open or scroll /traffic/console, receive an event, filter, Clear or change locale
+  input: Existing 200-event metadata ring, active filters and scroll position
+  output: Complete one-line messages in a stable vertical/horizontal scroll region
+  businessRules:
+    - "AIGATE_EXTENSION: mount only the visible 26 px event rows plus five overscan rows above and below inside a 400 px scrollport"
+    - "AIGATE_EXTENSION: keep complete messages accessible by horizontal scroll, stable scroll extent, keyboard focus and separate announcement only for a new visible event"
+    - "AIGATE_EXTENSION: filters and Clear reset scroll; live append, Pause/Resume and EN/VI preserve scroll and existing GET/SSE/Clear behavior"
+    - "IMPLEMENTATION_ACCIDENT: eagerly mounting all 200 rows and wrapping messages are presentation details"
+  state: { reads: [existing_metadata_log_cache, mounted_filters, browser_scroll], writes: [], runtimeOnly: [console_scroll_position] }
+  dependencies: [console.dashboard-browser-i18n]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: "Existing explicit read Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["At most 200 retained events and about 26 mounted rows; no extra network call"]
+  behavior: { streaming: true, cancellation: "Existing EventSource cleanup", concurrency: "Existing single mounted stream" }
+  edgeCases: [empty result, longest line leaves window, filter reset, Clear, ring rollover, locale switch, narrow viewport]
+  evidence:
+    - { file: "aigate:docs/contracts/console-windowing.md", line: 1, note: "SP59 Console windowing contract" }
+  newModule: tooling
+  parityStatus: verified
+  labels: [IMPLEMENTATION_ACCIDENT]
+
 - id: console.ring-buffer-capacity
   group: Console Log
   feature: Console log capture
