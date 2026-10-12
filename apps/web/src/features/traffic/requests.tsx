@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Button, CopyField, Dot, Metric, PageHeading, Panel, Pill, StateBlock, Table, Warning } from "../../shared/ui";
+import { Button, CopyField, Dot, Metric, PageHeading, Panel, Pill, StateBlock, Warning } from "../../shared/ui";
 import { toProblem } from "../../shared/errors";
 import { useLocale } from "../../shared/locale";
 import { createFormatters } from "../../shared/i18n";
 import { MAX_REQUEST_ROWS, useRequestDetail, useRequestFilters, useRequests, type RequestFilters, type UsageStatus } from "./api";
 import { formatCost, formatTokens } from "./usage-format";
+import { RequestTable } from "./request-table";
 
 // docs/contracts/requests-ui-i18n.md: keep SP24b URL filters, cursor pages and metadata literal.
 const TONE: Record<UsageStatus, "healthy" | "danger" | "warning"> = { success: "healthy", error: "danger", aborted: "warning" };
@@ -19,12 +20,6 @@ function readFilters(): RequestFilters {
 export function Requests() {
   const { language, t } = useLocale();
   const f = createFormatters(language);
-  const locale = language === "vi" ? "vi-VN" : "en-US";
-  const tokens = (value: number) => formatTokens(value, locale);
-  const money = (value: number) => formatCost(value, locale);
-  const ms = (value: number | null) => value === null ? "—" : `${f.number(value)} ms`;
-  const statusPill = (status: UsageStatus, code: string | null) =>
-    <Pill tone={TONE[status]}>{t(`requests.status.${status}`)}{code ? ` · ${code}` : ""}</Pill>;
   const [filters, setFilters] = useState<RequestFilters>(readFilters);
   const requests = useRequests(filters);
   const options = useRequestFilters();
@@ -41,8 +36,6 @@ export function Requests() {
   };
   const models = (options.data?.models ?? []).filter((row) => !filters.provider || row.provider === filters.provider);
   const capped = rows.length >= MAX_REQUEST_ROWS && requests.data?.pages.at(-1)?.nextCursor;
-  const rowCost = (cost: number | null, unpriced: number) => cost === null
-    ? <span className="muted">{unpriced > 0 ? t("requests.unpriced") : "—"}</span> : money(cost);
 
   return <>
     <PageHeading eyebrow={t("requests.eyebrow")} title={t("requests.title")} description={t("requests.description")} />
@@ -67,14 +60,7 @@ export function Requests() {
         : requests.isPending ? <StateBlock state="loading" />
         : <>
           {listProblem && <Warning tone="danger"><code>{listProblem.code}</code> · {listProblem.message} <Button onClick={() => void (requests.isFetchNextPageError ? requests.fetchNextPage() : requests.refetch())}>{t("common.retry")}</Button></Warning>}
-          <Table columns={[t("requests.time"), t("requests.model"), t("requests.provider"), t("requests.account"), t("requests.statusLabel"), t("requests.attempts"), "TTFT", t("requests.latency"), t("requests.tokens"), t("requests.cost")]}
-            empty={Object.keys(filters).length ? t("requests.emptyFiltered") : t("requests.empty")}
-            rows={rows.map((row) => [
-              <a className="table-link mono" href={`/traffic/requests/detail?id=${encodeURIComponent(row.id)}`}>{f.dateTime(row.at)}</a>,
-              <code>{row.requestedModel ?? "—"}</code>, row.providerName ?? "—", row.connectionName ?? <span className="muted">{t("requests.none")}</span>, statusPill(row.status, row.errorCode),
-              row.attempts > 1 ? <Pill tone="warning">{f.number(row.attempts)}</Pill> : f.number(row.attempts), ms(row.ttftMs), ms(row.latencyMs),
-              `${tokens(row.inputTokens)} → ${tokens(row.outputTokens)}`, rowCost(row.cost, row.unpriced),
-            ])} />
+          <RequestTable key={JSON.stringify(filters)} rows={rows} empty={Object.keys(filters).length ? t("requests.emptyFiltered") : t("requests.empty")} />
         </>}
       {(requests.hasNextPage || capped) && !requests.isFetchNextPageError && <div className="requests-more">
         {capped ? <span className="muted">{t("requests.capped", { count: f.number(MAX_REQUEST_ROWS) })}</span>

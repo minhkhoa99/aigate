@@ -212,6 +212,34 @@
   parityStatus: verified
   labels: []
 
+- id: requests.table-windowing
+  group: Usage
+  feature: Request history
+  subFeature: Bounded DOM rows in the loaded Requests table
+  trigger: Open or scroll /traffic/requests, load another cursor page, or change a filter
+  input: Existing request pages (100 rows each, at most 500), filter state, browser scroll
+  output: Same localized metadata and detail links in a scrollable semantic table
+  businessRules:
+    - "AIGATE_EXTENSION: mount only the 468 px scrollport's 36 px rows plus five overscan rows on each side; spacer rows retain the scroll extent and stable columns"
+    - "AIGATE_EXTENSION: preserve 100-row cursor pages, 500-row cap, URL filters, error/Retry, Load more and raw metadata; filter changes reset table scroll"
+    - "AIGATE_EXTENSION: loading a page or switching EN/VI keeps scroll position; all loaded rows remain reachable with vertical/horizontal scrolling and keyboard"
+    - "IMPLEMENTATION_ACCIDENT: mapping every loaded request to React table cells is not a user-visible contract"
+  state: { reads: [existing_request_pages, mounted_filters, browser_scroll], writes: [], runtimeOnly: [table_scroll_position] }
+  dependencies: [requests.dashboard-browser-i18n]
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: "Existing explicit Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: [existing URL filters only]
+  performanceConcerns: ["At most 500 loaded rows and 23 mounted data rows at a time; no extra network call"]
+  behavior: { streaming: false, cancellation: null, concurrency: "Existing one cursor fetch on explicit Load more" }
+  edgeCases: [empty result, short result, bottom of five pages, filter reset, locale switch, narrow viewport]
+  evidence:
+    - { file: "aigate:docs/contracts/request-list-windowing.md", line: 1, note: "SP58 bounded Requests table contract" }
+  newModule: usage
+  parityStatus: verified
+  labels: [IMPLEMENTATION_ACCIDENT]
+
 - id: usage.write-not-synchronous
   group: Usage
   feature: Per-request usage capture

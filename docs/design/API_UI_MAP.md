@@ -76,6 +76,8 @@ If an SP adds no HTTP API (for example `packages/engine`), write "no UI" in its 
 | Browser presentation (SP28; SP46 Auth OIDC/SAML extension) | `contracts/i18n.md`, `contracts/auth-settings-sso-ui-i18n.md` | Shell/navigation; `/login`, `/welcome`, `/callback`; `/settings/general`, `/settings/auth`, `/settings/developer`; `/` and shared owned defaults | `shared/locale.tsx`, `shared/i18n.ts`; General EN/VI selector | Verified: core native/browser acceptance passes; owned copy localizes while protocol names, URLs and diagnostics stay literal. Functional SSO wiring is listed above. |
 | No new HTTP API: client setup selection (SP33) | `contracts/endpoint-setup.md`, `contracts/i18n.md` | `/gateway/endpoint` → `EndpointKeys` | Fixed `endpointSetup` variants, existing key/settings/connection hooks | Verified: OpenAI Chat, Anthropic Messages, Responses/Codex and Gemini show route-matched URL/curl and POSIX setup where applicable. Protocol/locale switching is local and does not fetch or replay key mutations; EN/VI, read-error/Retry, one-time key and mobile acceptance pass. |
 
+| No new HTTP API: Requests table windowing (SP58) | `contracts/request-list-windowing.md` | `/traffic/requests` → `RequestTable` | Existing `useRequests` cursor pages | The 100-row fetch and 500-row cap remain; the scrollable table mounts only a viewport window plus overscan, keeps detail links/EN/VI/error states, and resets its scroll position when URL filters change. |
+
 ## Waiting for backend
 
 Each screen keeps its fixture data until the SP in the second column lands. When it does, move the row to "Wired".
