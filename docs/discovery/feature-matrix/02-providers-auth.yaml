@@ -40,6 +40,34 @@
   parityStatus: verified
   labels: []
 
+- id: providers.catalog-card-windowing
+  group: Providers
+  feature: Provider catalog
+  subFeature: Bounded built-in API Key card rendering on expansion and search
+  trigger: Browse, search, or expand the API Key section of /providers
+  input: Existing catalog and connection reads, search text, viewport width and scroll position
+  output: Same category counts, card content/status/detail links and Show all/Show fewer behavior with bounded mounted API Key cards
+  businessRules:
+    - "REFERENCE_BEHAVIOR: retain OAuth, Free, API Key, Web account and Other group order; local name/ID search, counts, status pills, reason titles and detail links"
+    - "REFERENCE_BEHAVIOR: the unsearched API Key group starts with 20 cards and Show all/Show fewer controls its expansion"
+    - "AIGATE_EXTENSION: above 20 API Key matches, mount only visible responsive grid rows plus two rows of overscan inside a keyboard-scrollable region; search resets it and locale/connection updates preserve it"
+    - "IMPLEMENTATION_ACCIDENT: the prior grid mounted every expanded card"
+  state: { reads: ["existing catalog and connection query cache", "search text", "viewport and grid scroll"], writes: ["search and Show all UI state", "grid scroll position"], runtimeOnly: ["visible card window"] }
+  dependencies: []
+  providerInteraction: "None added; existing catalog and connection reads only"
+  fallback: { hasFallback: false, retry: "existing catalog Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["At most visible API Key rows plus two-row overscan are mounted; existing small groups remain direct"]
+  behavior: { streaming: false, cancellation: "remove resize listener on unmount", concurrency: "no new requests" }
+  edgeCases: ["top and bottom window", "4/3/2/1-column width", "search changes", "mounted EN/VI", "connection status update", "keyboard scrolling"]
+  evidence:
+    - { file: "aigate:docs/contracts/provider-catalog-windowing.md", line: 1, note: "SP60 rendering and behavior boundary" }
+  newModule: catalog
+  parityStatus: verified
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
+
 - id: catalog.registry-build
   group: Providers
   feature: Provider catalog

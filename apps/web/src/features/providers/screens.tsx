@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button, ConfirmDialog, Field, Input, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
@@ -8,8 +8,9 @@ import { CustomProviderDetail, CustomProviderForm, CustomProviders } from "./cus
 import { ProviderModels } from "./models";
 import {
   useConnections, useCreateConnection, useDeleteConnection, useProvider, useProviderNodes, useProviders, useSetThinking, useTestConnection, useUpdateConnection, type Connection,
-  type ConnectionField, type ProviderDetailView, type ThinkingLevel,
+  type ConnectionField, type ProviderDetailView, type ProviderSummary, type ThinkingLevel,
 } from "./api";
+import { CATALOG_CARD_STEP, catalogWindow } from "./catalog-window";
 import { testNotice, needsAttention, statusPill, STATUS_KEYS } from "./test-result";
 import { SignIn } from "./sign-in";
 import { useProxyPools } from "../network/api";
@@ -29,6 +30,24 @@ const GROUPS: readonly Group[] = [
 ];
 const OTHER: Group = { id: "other", titleKey: "providers.otherTitle", detailKey: "providers.otherDetail", categories: [] };
 const groupOf = (category: string) => GROUPS.find((g) => g.categories.includes(category)) ?? OTHER;
+
+const catalogColumns = () => window.innerWidth <= 420 ? 1 : window.innerWidth <= 740 ? 2 : window.innerWidth <= 1100 ? 3 : 4;
+
+function WindowedCatalogGrid({ members, label, card }: { members: ProviderSummary[]; label: string; card: (provider: ProviderSummary) => ReactNode }) {
+  const [columns, setColumns] = useState(() => typeof window === "undefined" ? 4 : catalogColumns());
+  const [scrollTop, setScrollTop] = useState(0);
+  useEffect(() => {
+    const resize = () => setColumns(catalogColumns());
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
+  const { start, end, rows } = catalogWindow(members.length, columns, scrollTop);
+  return <div className="catalog-window" role="region" tabIndex={0} aria-label={label} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}>
+    <div className="catalog-grid" style={{ paddingTop: start * CATALOG_CARD_STEP, paddingBottom: (rows - end) * CATALOG_CARD_STEP }}>
+      {members.slice(start * columns, end * columns).map(card)}
+    </div>
+  </div>;
+}
 
 export function LlmProviders() {
   const { t } = useLocale();
@@ -51,8 +70,9 @@ export function LlmProviders() {
         const members = matches.filter((p) => groupOf(p.category) === group);
         if (!members.length) return null;
         const visible = group.id === "apikey" && !query && !showAllKeys ? members.slice(0, 20) : members;
+        const card = (p: ProviderSummary) => <a className="catalog-card" href={`/providers/detail?provider=${encodeURIComponent(p.id)}`} key={p.id} title={p.reason ?? undefined}><span className="catalog-glyph" aria-hidden="true">{p.name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{p.name}</strong><small>{p.modelCount} {t(p.modelCount === 1 ? "providers.modelsOne" : "providers.modelsMany")}</small>{!p.connectable ? <Pill>{t("providers.comingLater")}</Pill> : p.authKinds.includes("none") ? <Pill tone="info">{t("providers.publicAccess")}</Pill> : connected.has(p.id) && <Pill tone="healthy">{t("providers.connected")}</Pill>}</span></a>;
         return <section className="catalog-section" key={group.id} aria-labelledby={`${group.id}-heading`}><div className="catalog-section-head"><div><h2 id={`${group.id}-heading`}>{t(group.titleKey)} <span className="muted mono">{members.length}</span></h2><p>{t(group.detailKey)}</p></div></div>
-          <div className="catalog-grid">{visible.map((p) => <a className="catalog-card" href={`/providers/detail?provider=${encodeURIComponent(p.id)}`} key={p.id} title={p.reason ?? undefined}><span className="catalog-glyph" aria-hidden="true">{p.name.slice(0, 1)}</span><span className="catalog-card-copy"><strong>{p.name}</strong><small>{p.modelCount} {t(p.modelCount === 1 ? "providers.modelsOne" : "providers.modelsMany")}</small>{!p.connectable ? <Pill>{t("providers.comingLater")}</Pill> : p.authKinds.includes("none") ? <Pill tone="info">{t("providers.publicAccess")}</Pill> : connected.has(p.id) && <Pill tone="healthy">{t("providers.connected")}</Pill>}</span></a>)}</div>
+          {group.id === "apikey" && visible.length > 20 ? <WindowedCatalogGrid key={query} members={visible} label={t(group.titleKey)} card={card} /> : <div className="catalog-grid">{visible.map(card)}</div>}
           {group.id === "apikey" && !query && members.length > 20 && <button className="catalog-more" type="button" onClick={() => setShowAllKeys(!showAllKeys)}>{showAllKeys ? t("providers.showFewer") : t("providers.showAll", { count: members.length })}</button>}
         </section>;
       })}
