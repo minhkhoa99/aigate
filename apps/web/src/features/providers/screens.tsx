@@ -12,7 +12,7 @@ import {
   type ConnectionField, type ProviderDetailView, type ProviderSummary, type ThinkingLevel,
 } from "./api";
 import { CATALOG_CARD_STEP, catalogWindow } from "./catalog-window";
-import { connectionPage } from "./connections-page";
+import { listPage } from "../../shared/list-page";
 import { testNotice, needsAttention, statusPill, STATUS_KEYS } from "./test-result";
 import { SignIn } from "./sign-in";
 import { useProxyPools } from "../network/api";
@@ -284,7 +284,7 @@ export function Connections() {
   const runTest = (id: string) => testConnection.mutate(id, { onSuccess: (view) => showToast(testNotice(view)), onError: fail });
   const testing = (id: string) => testConnection.isPending && testConnection.variables === id;
   const rows = (connections.data ?? []).filter((c) => tab === "all" || needsAttention(c));
-  const { pages, page: currentPage, start, end } = connectionPage(rows.length, page);
+  const { pages, page: currentPage, start, end } = listPage(rows.length, page);
   useEffect(() => { if (page !== currentPage) setPage(currentPage); }, [page, currentPage]);
   const providerCounts = new Map<string, number>();
   for (const connection of connections.data ?? []) providerCounts.set(connection.provider, (providerCounts.get(connection.provider) ?? 0) + 1);
@@ -313,10 +313,10 @@ export function Connections() {
                 <Button variant="ghost" disabled={update.isPending} onClick={() => update.mutate({ id: c.id, isActive: !c.isActive }, { onError: fail })}>{c.isActive ? t("providers.disable") : t("providers.enable")}</Button>
                 <Button variant="ghost" onClick={() => setRemoving(c)}>{t("providers.delete")}</Button></>,
             ];
-          })} />{pages > 1 && <div className="connections-pages">
-            <Button disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>{t("providers.previousPage")}</Button>
-            <span aria-live="polite">{t("providers.pageOf", { page: currentPage + 1, total: pages })}</span>
-            <Button disabled={currentPage === pages - 1} onClick={() => setPage(currentPage + 1)}>{t("providers.nextPage")}</Button>
+          })} />{pages > 1 && <div className="list-pages">
+            <Button disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>{t("common.previousPage")}</Button>
+            <span aria-live="polite">{t("common.pageOf", { page: currentPage + 1, total: pages })}</span>
+            <Button disabled={currentPage === pages - 1} onClick={() => setPage(currentPage + 1)}>{t("common.nextPage")}</Button>
           </div>}</>}
     </Panel>
     {adding && <AddConnection requested={requested} onClose={() => setAdding(false)} onCreated={(view) => { setAdding(false); runTest(view.id); }} onSignedIn={() => setAdding(false)} />}

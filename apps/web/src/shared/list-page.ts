@@ -1,6 +1,6 @@
 const PAGE_SIZE = 25;
 
-export function connectionPage(count: number, requested: number) {
+export function listPage(count: number, requested: number) {
   const pages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const page = Math.max(0, Math.min(requested, pages - 1));
   const start = page * PAGE_SIZE;

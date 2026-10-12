@@ -104,7 +104,7 @@ All of these reach the voice browser through `apps/web/src/shared/errors.ts`.
 
 `/providers/media` TTS (`features/providers/voice-browser.tsx`):
 - Provider and model pickers.
-- Language, region, gender, and text filters. At most 200 rows are shown, with a note to refine the filters.
+- Language, region, gender, and text filters. SP65 shows 25 rows per page after filtering and makes every returned voice reachable; changing a filter resets the page.
 - Listen, enabled when the provider has a TTS route and an active connection. Installed browser voices play locally.
 - Copy for the model string.
 - A "Connect <provider> to load its voices" state linking to Connections.

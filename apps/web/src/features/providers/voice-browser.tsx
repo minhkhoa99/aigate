@@ -3,12 +3,11 @@ import { Button, Field, Panel, StateBlock, Table } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
 import { useLocale } from "../../shared/locale";
+import { listPage } from "../../shared/list-page";
 import type { Language, MessageKey } from "../../shared/i18n";
 import { previewTtsVoice, useProvider, useTtsVoices, type Connection, type ProviderSummary, type TtsVoice } from "./api";
 
 const sample = "Hello, this is an AIGate voice preview.";
-// Account catalogs can hold thousands of voices; the filters narrow them.
-const MAX_ROWS = 200;
 const genderKeys: Record<string, MessageKey> = { male: "voice.gender.male", female: "voice.gender.female", neutral: "voice.gender.neutral" };
 const localeParts = (locale: string) => {
   try { const parsed = new Intl.Locale(locale.replace("_", "-")); return { language: parsed.language, region: parsed.region ?? "" }; }
@@ -30,6 +29,7 @@ export function VoiceBrowser({ providers, connections, initialProvider = "openai
   const [region, setRegion] = useState("");
   const [gender, setGender] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
   const [localVoices, setLocalVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [previewing, setPreviewing] = useState("");
   const [audioUrl, setAudioUrl] = useState("");
@@ -50,13 +50,15 @@ export function VoiceBrowser({ providers, connections, initialProvider = "openai
   const languages = [...new Set(voices.map((voice) => localeParts(voice.locale).language).filter(Boolean))].sort();
   const regions = [...new Set(voices.map((voice) => localeParts(voice.locale).region).filter(Boolean))].sort();
   const genders = [...new Set(voices.map((voice) => voice.gender.toLowerCase()).filter(Boolean))].sort();
+  const needle = search.trim().toLowerCase();
   const filtered = voices.filter((voice) => {
     const locale = localeParts(voice.locale);
-    const needle = search.trim().toLowerCase();
     return (!language || locale.language === language) && (!region || locale.region === region) && (!gender || voice.gender.toLowerCase() === gender)
       && (!needle || voice.name.toLowerCase().includes(needle) || voice.id.toLowerCase().includes(needle));
   });
-  const shown = filtered.slice(0, MAX_ROWS);
+  const { pages, page: currentPage, start, end } = listPage(filtered.length, page);
+  const shown = filtered.slice(start, end);
+  useEffect(() => { if (page !== currentPage) setPage(currentPage); }, [page, currentPage]);
 
   useEffect(() => {
     if (!window.speechSynthesis) return;
@@ -68,7 +70,7 @@ export function VoiceBrowser({ providers, connections, initialProvider = "openai
   useEffect(() => () => previewAbort.current?.abort(), []);
   useEffect(() => () => { if (audioUrl) URL.revokeObjectURL(audioUrl); }, [audioUrl]);
 
-  const reset = () => { previewAbort.current?.abort(); setPreviewing(""); setLanguage(""); setRegion(""); setGender(""); setSearch(""); setAudioUrl(""); window.speechSynthesis?.cancel(); };
+  const reset = () => { previewAbort.current?.abort(); setPreviewing(""); setLanguage(""); setRegion(""); setGender(""); setSearch(""); setPage(0); setAudioUrl(""); window.speechSynthesis?.cancel(); };
   // The string /v1/audio/speech takes as its model: provider/model/voice.
   const copyModel = (voice: TtsVoice) => navigator.clipboard.writeText(`${providerId}/${model}/${voice.id}`).then(
     () => showToast({ tone: "success", localized: { key: "voice.copied", params: { model: `${providerId}/${model}/${voice.id}` } } }),
@@ -100,21 +102,26 @@ export function VoiceBrowser({ providers, connections, initialProvider = "openai
     <div className="voice-filters">
       <Field label={t("voice.provider")}><select className="input" value={providerId} onChange={(event) => { setChosenProvider(event.target.value); setChosenModel(""); reset(); }}>{providers.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></Field>
       <Field label={t("voice.model")}><select className="input" value={model} disabled={models.length === 0} onChange={(event) => { setChosenModel(event.target.value); reset(); }}>{models.length ? models.map((item) => <option value={item.id} key={item.id}>{item.name}</option>) : <option value="">{t("voice.providerDefault")}</option>}</select></Field>
-      <Field label={t("voice.language")}><select className="input" value={language} onChange={(event) => setLanguage(event.target.value)}><option value="">{t("voice.allLanguages")}</option>{languages.map((code) => <option key={code} value={code}>{display("language", code, appLanguage)}</option>)}</select></Field>
-      <Field label={t("voice.region")}><select className="input" value={region} onChange={(event) => setRegion(event.target.value)}><option value="">{t("voice.allRegions")}</option>{regions.map((code) => <option key={code} value={code}>{display("region", code, appLanguage)}</option>)}</select></Field>
-      <Field label={t("voice.search")}><input className="input" type="search" value={search} placeholder={t("voice.searchPlaceholder")} onChange={(event) => setSearch(event.target.value)} /></Field>
-      <Field label={t("voice.gender")}><select className="input" value={gender} onChange={(event) => setGender(event.target.value)}><option value="">{t("voice.allGenders")}</option>{genders.map((value) => <option key={value} value={value}>{genderLabel(value)}</option>)}</select></Field>
+      <Field label={t("voice.language")}><select className="input" value={language} onChange={(event) => { setLanguage(event.target.value); setPage(0); }}><option value="">{t("voice.allLanguages")}</option>{languages.map((code) => <option key={code} value={code}>{display("language", code, appLanguage)}</option>)}</select></Field>
+      <Field label={t("voice.region")}><select className="input" value={region} onChange={(event) => { setRegion(event.target.value); setPage(0); }}><option value="">{t("voice.allRegions")}</option>{regions.map((code) => <option key={code} value={code}>{display("region", code, appLanguage)}</option>)}</select></Field>
+      <Field label={t("voice.search")}><input className="input" type="search" value={search} placeholder={t("voice.searchPlaceholder")} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></Field>
+      <Field label={t("voice.gender")}><select className="input" value={gender} onChange={(event) => { setGender(event.target.value); setPage(0); }}><option value="">{t("voice.allGenders")}</option>{genders.map((value) => <option key={value} value={value}>{genderLabel(value)}</option>)}</select></Field>
     </div>
     {voicesProblem?.code === "NO_ACTIVE_CONNECTION" ? <div className="state-block"><code>{voicesProblem.code}</code><strong>{t("voice.connectToLoad", { provider: provider?.name ?? providerId })}</strong><p>{voicesProblem.message}</p><a className="button button-primary" href={`/providers/connections?provider=${encodeURIComponent(providerId)}`}>{t("media.addConnection")}</a></div>
       : voicesProblem && !isLocal ? <div className="state-block error"><code>{voicesProblem.code}</code><strong>{t("voice.loadFailed")}</strong><p>{voicesProblem.message}</p><Button onClick={() => void voicesQuery.refetch()}>{t("common.retry")}</Button></div>
       : detail.isError ? <StateBlock state="error" code={toProblem(detail.error, appLanguage).code} action={<Button onClick={() => void detail.refetch()}>{t("common.retry")}</Button>} />
       : detail.isPending || (!isLocal && voicesQuery.isPending) ? <StateBlock state="loading" />
         : voices.length === 0 ? <div className="state-block"><strong>{t("voice.none")}</strong><p>{isLocal ? t("voice.noneLocal") : t("voice.noneProvider")}</p></div>
-          : <><p className="muted voice-note">{t("voice.count", { filtered: filtered.length, total: voices.length })} {filtered.length > MAX_ROWS && t("voice.truncated", { limit: MAX_ROWS })} {!canPreview && (!routable ? t("voice.noRoute") : t("voice.connectToPlay"))}</p>
+          : <><p className="muted voice-note">{t("voice.count", { filtered: filtered.length, total: voices.length })} {!canPreview && (!routable ? t("voice.noRoute") : t("voice.connectToPlay"))}</p>
             <Table columns={[t("voice.voice"), t("voice.languageRegion"), t("voice.gender"), t("voice.preview")]} rows={shown.map((voice) => {
               const parts = localeParts(voice.locale);
               return [<><strong>{voice.name}</strong><small className="muted voice-id">{voice.id}</small></>, parts.language ? `${display("language", parts.language, appLanguage)}${parts.region ? ` · ${display("region", parts.region, appLanguage)}` : ""}` : t("voice.notSpecified"), genderLabel(voice.gender), <span className="voice-actions"><button className="button button-ghost" aria-label={t("voice.listenTo", { name: voice.name })} disabled={!canPreview || Boolean(previewing)} onClick={() => void preview(voice)}>{previewing === voice.id ? t("voice.generating") : t("voice.listen")}</button>{routable && !isLocal && <button className="button button-ghost" aria-label={t("voice.copyModel", { name: voice.name })} onClick={() => void copyModel(voice)}>{t("voice.copy")}</button>}</span>];
             })} empty={t("voice.emptyFilter")} />
+            {pages > 1 && <div className="list-pages">
+              <Button disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>{t("common.previousPage")}</Button>
+              <span aria-live="polite">{t("common.pageOf", { page: currentPage + 1, total: pages })}</span>
+              <Button disabled={currentPage === pages - 1} onClick={() => setPage(currentPage + 1)}>{t("common.nextPage")}</Button>
+            </div>}
             {audioUrl && <audio className="voice-player" src={audioUrl} controls autoPlay aria-label={t("voice.player")} />}
           </>}
   </Panel>;

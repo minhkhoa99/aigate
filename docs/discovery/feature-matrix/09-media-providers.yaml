@@ -329,7 +329,7 @@
     - "REFERENCE_BEHAVIOR: Region and language names are rendered with Intl.DisplayNames, with raw codes as fallback."
     - "REFERENCE_BEHAVIOR: A preview uses the selected provider, model, voice and a short input, and displays returned audio. AIGate previews through the same synthesis path as /v1/audio/speech for every provider with a TTS route and an active saved connection; installed browser voices play locally."
     - "IMPLEMENTATION_ACCIDENT: The old UI passes an API key through its client example path; AIGate's dashboard preview reads an already-saved connection on the server."
-    - "REFERENCE_BEHAVIOR: voice pickers for elevenlabs, inworld and minimax load the account's own voices; the language filter groups them. AIGate adds a text search, shows at most 200 matching rows, and copies the ready <provider>/<model>/<voice> model string."
+    - "REFERENCE_BEHAVIOR: voice pickers for elevenlabs, inworld and minimax load the account's own voices; the language filter groups them. AIGate adds text search, shows 25 matching rows per page, and copies the ready <provider>/<model>/<voice> model string."
   state: { reads: ["catalog TTS models", "active connection for remote preview and account voices", "browser speechSynthesis voices for local preview"], writes: [], runtimeOnly: ["temporary audio object URL"] }
   dependencies: ["media.tts-voice-listing", "media.tts-lane"]
   providerInteraction: "AIGate preview runs the provider's TTS request for a validated model/voice; local browser voices use speechSynthesis."
@@ -351,6 +351,34 @@
     - { file: "src/app/(dashboard)/dashboard/media-providers/[kind]/[id]/components/TtsExampleCard.js", line: 208, note: "run example with selected model and voice; returned binary audio becomes an object URL" }
   newModule: media
   parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
+
+- id: media.tts-voice-list-paging
+  group: Media Providers
+  feature: Text To Speech
+  subFeature: Bounded Voice Browser table with access to every loaded voice
+  trigger: Browse or filter voices on the TTS dashboard
+  input: Existing voice list, provider/model selection, local filters, page and browser locale
+  output: At most 25 voice rows per page with localized Previous/Next controls
+  businessRules:
+    - "REFERENCE_BEHAVIOR: preserve voice names/IDs, language/region/gender and text filtering, Listen and Copy actions"
+    - "AIGATE_EXTENSION: filter before paging so every voice in the server's bounded result is reachable; reset page on provider/model/filter change and clamp after a shorter result"
+    - "AIGATE_EXTENSION: mounted EN/VI preserves page, filters, preview state and audio; names, IDs and model strings remain literal"
+    - "IMPLEMENTATION_ACCIDENT: the prior client mounted the first 200 filtered rows and hid later matches behind further filtering"
+  state: { reads: ["existing provider voice query cache", "browser speechSynthesis voices", "local filter and page"], writes: ["local filter and page"], runtimeOnly: ["visible voice page", "existing preview audio URL"] }
+  dependencies: ["media.tts-dashboard-browser"]
+  providerInteraction: "None added; existing voice-list read and explicit preview retain their limits"
+  fallback: { hasFallback: false, retry: "existing voice-list Retry", timeout: "existing 20 s preview client deadline", quota: null }
+  errorCases: []
+  sideEffects: ["Only the existing explicit remote preview may consume provider credit"]
+  persistence: []
+  performanceConcerns: ["At most 25 rows mounted from the server's 2,000-voice bound; filtering remains local"]
+  behavior: { streaming: false, cancellation: "existing preview abort on replacement/unmount", concurrency: "existing one-preview guard" }
+  edgeCases: ["empty filter", "last page", "shorter voice result", "provider/model/filter reset", "mounted EN/VI", "390px width"]
+  evidence:
+    - { file: "aigate:docs/contracts/voice-list-paging.md", line: 1, note: "SP65 paging and preview boundary" }
+  newModule: media
+  parityStatus: verified
   labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
 
 - id: media.tts-openrouter-audio-chunks
