@@ -7,6 +7,7 @@
   "shell.screenLoadHint": "Reload the page to request its screen files again.",
   "shell.reloadPage": "Reload page",
   "settings.language": "Language",
+  "settings.languageLoadFailed": "Could not load Vietnamese. Reload the page and try again.",
   "settings.languageHint": "Applies immediately in this browser; not included in server settings exports.",
   "settings.languageScope": "Core, Media Providers, Endpoint & Keys, Routing editors, Token Saver, Quota, Usage/Pricing, Requests, Console, Network, Integrations Skills/MCP, CLI Tools discovery and Claude/Codex/OpenCode/Cline support English and Vietnamese. Other feature pages and server diagnostics may remain in English. Operating-system startup integration is a separate feature.",
   "nav.overview": "Overview",

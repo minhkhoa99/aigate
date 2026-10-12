@@ -1,5 +1,9 @@
 import en from "./locales/en.json" with { type: "json" };
-import vi from "./locales/vi.json" with { type: "json" };
+
+let vi: typeof en | null = null;
+export async function loadVietnamese() {
+  vi ??= (await import("./locales/vi.ts")).default;
+}
 
 export type Language = "en" | "vi";
 export type MessageKey = keyof typeof en;
@@ -22,7 +26,7 @@ export function lookupMessage(language: Language, key: string, catalogs: Readonl
   return Object.hasOwn(catalogs.en, key) ? catalogs.en[key] : key;
 }
 export function translate(language: Language, key: MessageKey, params?: Params): string {
-  return interpolate(lookupMessage(language, key, { en, vi }), params);
+  return interpolate(lookupMessage(language, key, { en, vi: vi ?? en }), params);
 }
 
 export function createFormatters(language: Language, timeZone?: string) {

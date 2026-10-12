@@ -84,7 +84,13 @@ export function SettingsGeneral({ theme, onTheme }: { theme: string; onTheme: (t
         </div>}
     </Panel><Panel title={t("settings.presentation")}>
       <div className="stack"><Field label={t("settings.theme")} hint={t("settings.browserHint")}><select className="input" value={theme} onChange={(event) => onTheme(event.target.value)}><option value="dark">{t("settings.dark")}</option><option value="light">{t("settings.light")}</option></select></Field>
-        <Field label={t("settings.language")} hint={t("settings.languageHint")}><select className="input" value={language} onChange={event => setLanguage(normalizeLanguage(event.target.value))}><option value="en">English</option><option value="vi">Tiếng Việt</option></select></Field>
+        <Field label={t("settings.language")} hint={t("settings.languageHint")}><select className="input" value={language} onChange={event => {
+          const select = event.currentTarget;
+          void setLanguage(normalizeLanguage(select.value)).catch(() => {
+            select.value = language;
+            showToast({ tone: "error", localized: { key: "settings.languageLoadFailed" } });
+          });
+        }}><option value="en">English</option><option value="vi">Tiếng Việt</option></select></Field>
         <p className="muted">{t("settings.languageScope")}</p>
         <Link to="/settings/auth" className="button">{t("settings.authLink")}</Link><Link to="/gateway/routing" className="button">{t("settings.routingLink")}</Link>
         <Link to="/gateway/token-saver" className="button">{t("settings.tokenSaverLink")}</Link><Link to="/network/proxy-pools" className="button">{t("settings.proxyLink")}</Link>

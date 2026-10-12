@@ -7,6 +7,7 @@
   "shell.screenLoadHint": "Tải lại trang để lấy lại các tệp của màn hình.",
   "shell.reloadPage": "Tải lại trang",
   "settings.language": "Ngôn ngữ",
+  "settings.languageLoadFailed": "Không tải được tiếng Việt. Tải lại trang rồi thử lại.",
   "settings.languageHint": "Áp dụng ngay trong trình duyệt này; không nằm trong file xuất cấu hình server.",
   "settings.languageScope": "Giao diện chính, Nhà cung cấp media, Endpoint & Keys, bộ sửa Routing, Token Saver, Quota, Usage/Pricing, Requests, Console, Network, Integrations Skills/MCP, danh sách CLI Tools và Claude/Codex/OpenCode/Cline hỗ trợ tiếng Anh và tiếng Việt. Các trang khác và chẩn đoán máy chủ có thể vẫn dùng tiếng Anh. Tích hợp khởi động hệ điều hành là tính năng riêng.",
   "nav.overview": "Tổng quan",

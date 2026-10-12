@@ -7,6 +7,7 @@ import { Shell } from "./app/shell";
 import { ToastProvider } from "./shared/toast";
 import { LocaleProvider } from "./shared/locale";
 import { ApiError } from "./shared/api";
+import { LANGUAGE_KEY, loadVietnamese, readLanguage } from "./shared/i18n";
 import "./styles.css";
 
 const rootRoute = createRootRoute({ component: Shell });
@@ -17,6 +18,17 @@ declare module "@tanstack/react-router" { interface Register { router: typeof ro
 // Client errors (4xx) will not succeed on retry; only transient failures get one more attempt.
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 1 } } });
 
-createRoot(document.getElementById("root")!).render(<React.StrictMode><LocaleProvider><QueryClientProvider client={queryClient}><ToastProvider>
+const root = document.getElementById("root")!;
+const start = () => createRoot(root).render(<React.StrictMode><LocaleProvider><QueryClientProvider client={queryClient}><ToastProvider>
   <RouterProvider router={router} />
 </ToastProvider></QueryClientProvider></LocaleProvider></React.StrictMode>);
+if (readLanguage(() => localStorage.getItem(LANGUAGE_KEY)) === "vi") {
+  void loadVietnamese().then(start, () => {
+    const message = document.createElement("p");
+    message.textContent = "Could not load language / Không tải được ngôn ngữ.";
+    const retry = document.createElement("button");
+    retry.textContent = "Retry / Thử lại";
+    retry.onclick = () => location.reload();
+    root.replaceChildren(message, retry);
+  });
+} else start();

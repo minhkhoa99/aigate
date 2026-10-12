@@ -7,6 +7,8 @@ import { ApiError } from "./api.ts";
 import { toProblem } from "./errors.ts";
 
 const mod = await import("./i18n.ts");
+assert.equal(mod.translate("vi", "common.retry"), "Retry");
+await mod.loadVietnamese();
 test("locale catalogs preserve keys and placeholder counts", async () => {
   assert.ok(mod);
   const en = JSON.parse(await readFile(new URL("./locales/en.json", import.meta.url), "utf8"));
@@ -108,6 +110,7 @@ test("real shared UI renders the saved locale and treats supplied copy as litera
   let language = "vi";
   try {
     Object.defineProperty(globalThis,"localStorage",{configurable:true,value:{getItem:()=>language}});
+    await (await server.ssrLoadModule("/src/shared/i18n.ts")).loadVietnamese();
     const { LocaleProvider } = await server.ssrLoadModule("/src/shared/locale.tsx");
     const { StateBlock, CopyField } = await server.ssrLoadModule("/src/shared/ui.tsx");
     const html = renderToStaticMarkup(h(LocaleProvider,null,h(StateBlock,{state:"loading"}),h(CopyField,{value:"<raw>&model/x"})));

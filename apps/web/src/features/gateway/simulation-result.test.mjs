@@ -23,6 +23,7 @@ test("actual result rendering localizes owned copy but not identifiers or unknow
     server: { middlewareMode: true, watch: null, hmr: false }, esbuild: { jsx: "automatic" }, optimizeDeps: { noDiscovery: true, include: [] } });
   const old = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   try {
+    await (await server.ssrLoadModule("/src/shared/i18n.ts")).loadVietnamese();
     const { LocaleProvider } = await server.ssrLoadModule("/src/shared/locale.tsx");
     const { SimulationResultView } = await server.ssrLoadModule("/src/features/gateway/routing-simulator.tsx");
     for (const language of ["en", "vi"]) {

@@ -1753,3 +1753,30 @@
   newModule: settings
   parityStatus: verified
   labels: [IMPLEMENTATION_ACCIDENT]
+
+- id: settings.browser-locale-loading
+  group: Settings
+  feature: Browser shell performance
+  subFeature: Load Vietnamese catalog only when selected
+  trigger: Initial browser load or General language selection
+  input: "Saved EN/VI preference or selected language"
+  output: "Complete selected catalog before rendering its copy, with retryable failure"
+  businessRules:
+    - "AIGATE_EXTENSION: keep English in the initial entry and fetch Vietnamese only for a saved or newly selected VI preference"
+    - "AIGATE_EXTENSION: a failed chunk leaves the saved preference and mounted screen state intact; no locale-triggered API or vendor request"
+    - "IMPLEMENTATION_ACCIDENT: eager inclusion of both static catalogs in every browser entry is not required by the locale contract"
+  state: { reads: ["aigate-language", "browser module cache"], writes: ["existing aigate-language preference"], runtimeOnly: ["loaded Vietnamese catalog"] }
+  dependencies: [settings.browser-locale-core]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "Reload after a failed Vietnamese chunk", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Same-origin Vietnamese JS chunk fetch only when selected"]
+  persistence: ["Existing browser language preference only"]
+  performanceConcerns: ["Measure initial entry and separate catalog chunk; no duplicate Vietnamese copy in entry"]
+  behavior: { streaming: false, cancellation: null, concurrency: "Browser module loader deduplicates imports" }
+  edgeCases: ["saved Vietnamese", "English login", "mounted EN to VI", "chunk failure", "denied storage"]
+  evidence:
+    - { file: "aigate:docs/contracts/browser-locale-loading.md", line: 1, note: "SP62 browser locale delivery contract" }
+  newModule: settings
+  parityStatus: verified
+  labels: [IMPLEMENTATION_ACCIDENT]
