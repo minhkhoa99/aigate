@@ -67,7 +67,6 @@ export type ConnectionData = { [K in keyof typeof data]: string | null };
 export interface OAuthState {
   refreshToken: string | undefined;
   expiresAt: Date | null;
-  // SP16b: codex refreshes a token whose last refresh is 8 days old (9router maxRefreshAgeMs).
   lastRefreshAt: Date | null;
 }
 // The key (or access token) routing and the connection test use, with the row it came from. SP16c: projectId is the
@@ -156,7 +155,6 @@ export class ConnectionsRepository {
         apiKeySealed: this.cipher.seal(tokens.apiKey ?? tokens.accessToken, sealContext(id)), keyHint: keyHint(tokens.apiKey ?? tokens.accessToken), authType: "oauth" as const,
         refreshTokenSealed: tokens.refreshToken ? this.cipher.seal(tokens.refreshToken, refreshContext(id)) : null,
         expiresAt: expiry(now, tokens.expiresIn), email: tokens.email ?? null, oauthData: JSON.stringify(tokens.data), organization: input.organization ?? null,
-        // A sign-in counts as a refresh (9router stamps lastRefreshAt on the codex sign-in).
         accountId: input.accountId ?? null, lastRefreshAt: now,
         isActive: true, testStatus: "active" as const, lastError: null, lastErrorCode: null, lastTestedAt: null, updatedAt: now,
       };
@@ -169,7 +167,6 @@ export class ConnectionsRepository {
   }
 
   // oauth.refresh-lifecycle: the new access token (and refresh token, when the provider sent one) replace the old ones.
-  // A refresh without an expiry keeps the old one, as 9router does.
   async storeRefresh(id: string, tokens: OAuthTokens): Promise<void> {
     const now = new Date();
     await this.database.db.update(t).set({

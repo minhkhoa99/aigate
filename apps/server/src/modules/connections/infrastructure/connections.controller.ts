@@ -80,7 +80,6 @@ async function runTest(provider: ProviderDescriptor, transport: HttpTransportPor
 }
 
 // docs/contracts/speech.md: a TTS-only service is tested with a GET of its own list, never a synthesis that bills
-// (media.tts-lane, 9router's POST "ping" not reproduced). 401/403 is a bad key, 2xx active, anything else unreachable.
 async function probeTest(name: string, request: HttpRequest, transport: HttpTransportPort, proxy?: ProxyConfig): Promise<TestOutcome> {
   const ctx = { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID(), proxy };
   try {
@@ -210,7 +209,6 @@ export class ConnectionsController {
     try {
       listed = await createAdapter(withConnection(provider, fresh), this.transport).getModels(credentialOf(fresh), ctx);
     } catch (error) {
-      // Kept from 9router (user decision 2026-09-27): only the upstream status, not its reason, and "Failed to fetch
       // models" for anything else. 502, not the upstream status, so that a provider's 401 does not read as the dashboard
       // session ending.
       const status = error instanceof EngineError ? error.details.status : undefined;
@@ -219,7 +217,6 @@ export class ConnectionsController {
     return { provider: provider.id, connectionId: id, models: listed.map((m) => ({ id: m.id, inCatalog: builtinRegistry.model(provider.id, m.id) !== undefined })) };
   }
 
-  // provider.github-copilot-oauth (kept from 9router): the provider's own test (github: GET /user with the GitHub token).
   private async flowTest(test: (io: OAuthIO) => Promise<CredentialStatus>, proxy?: ProxyConfig): Promise<TestOutcome> {
     try {
       const status = await test({ transport: this.transport, ctx: { signal: AbortSignal.timeout(TEST_BUDGET_MS), requestId: randomUUID(), proxy } });
@@ -231,7 +228,6 @@ export class ConnectionsController {
     }
   }
 
-  // provider.claude-oauth (kept from 9router): no request, only the expiry. A token due for refresh is valid when the
   // refresh (already tried by credential()) gave a new one.
   private expiryTest(provider: ProviderDescriptor, stored: StoredCredential, fresh: StoredCredential): TestOutcome {
     if (!this.refresher.due(provider.id, stored) || fresh !== stored) return { testStatus: "active", lastError: null, lastErrorCode: null };
@@ -239,7 +235,6 @@ export class ConnectionsController {
     return { testStatus: "invalid", lastError, lastErrorCode: "AUTH_ERROR" };
   }
 
-  // The connection's key and provider; an oauth token about to expire is refreshed first, as 9router does
   // (oauth.refresh-lifecycle).
   private async credential(id: string) {
     let stored: Awaited<ReturnType<ConnectionsRepository["readKey"]>>;

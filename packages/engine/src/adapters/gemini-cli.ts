@@ -8,7 +8,6 @@ import { GeminiAdapter } from "./gemini.js";
 import { GEMINI_CLI_THOUGHT_SIGNATURE } from "./gemini-cli-signature.js";
 import { METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
 
-// provider.gemini-cli-oauth (docs/contracts/oauth.md), kept as 9router's GeminiCLIExecutor has it (user decision
 // 2026-09-27): the Gemini request inside Cloud Code's envelope at cloudcode-pa.googleapis.com/v1internal, with the
 // Gemini CLI's headers; the answer is the Gemini answer inside { response }.
 
@@ -86,7 +85,6 @@ export class GeminiCliAdapter extends GeminiAdapter implements AIProviderPort {
     return { ...base, headers: { ...base.headers, "user-agent": `GeminiCLI/${CLI_VERSION}/${request.model || "unknown"} (${process.platform}; ${ARCH}; terminal)`, "x-goog-api-client": API_CLIENT } };
   }
 
-  // routing: a connection without a project looks it up first (9router's cold-miss path); none found leaves it empty.
   private async withProject(credential: Credential): Promise<Credential> {
     if (credential.projectId || !credential.sessionId) return credential;
     const project = await lookupProject(credential.sessionId, credential.apiKey, LOOKUP_HEADERS, this.transport);

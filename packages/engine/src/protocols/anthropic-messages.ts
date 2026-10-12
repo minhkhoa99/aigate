@@ -9,7 +9,6 @@ import { budgetToLevel } from "../adapters/gemini.js";
 import { toOpenAIError } from "./openai-chat.js";
 
 // Client-facing Anthropic Messages protocol, POST /v1/messages (docs/contracts/protocol-anthropic.md).
-// User decisions (2026-09-27): the request keeps 9router's rules (near passthrough to an Anthropic provider; the
 // claude→openai drops and adjustments for any other one), errors stay OpenAI-shaped, and a non-streaming client gets
 // chat.completion unless the provider is openai-compatible or Anthropic. Corrected: real usage, tool arguments
 // streamed as they come, and signature_delta.
@@ -60,11 +59,9 @@ function optionalPositiveInteger(value: unknown, param: string): number | undefi
 
 export interface AnthropicClientRequest {
   readonly request: CanonicalRequest;
-  // Blocks and tools only an Anthropic provider can take (9router passes them through, and drops them elsewhere).
   readonly anthropicOnly: readonly string[];
 }
 
-// Content given as one block is a one-block array (9router normalizes it the same way).
 const blocksOf = (content: unknown): readonly unknown[] => (typeof content === "string" ? [{ type: "text", text: content }] : Array.isArray(content) ? content : isRecord(content) ? [content] : []);
 
 const blockText = (content: unknown): string => blocksOf(content).map((block) => (isRecord(block) && block.type === "text" ? text(block.text) ?? "" : "")).filter(Boolean).join("\n");
@@ -127,7 +124,6 @@ function parts(content: unknown, param: string, anthropicOnly: string[]): Conten
   return out;
 }
 
-// 9router: a tool call without a result right after it gets "[No response received]" (every target).
 function fillMissingResults(messages: CanonicalMessage[]): CanonicalMessage[] {
   const out: CanonicalMessage[] = [];
   messages.forEach((message, i) => {
@@ -149,7 +145,6 @@ function toTools(value: unknown, anthropicOnly: string[]): ToolDefinition[] {
   return list(value, "tools", MAX_TOOLS).map((raw, i) => {
     if (!isRecord(raw)) throw invalid(`tools[${i}]`, "must be an object");
     const type = text(raw.type);
-    // A server tool (web_search_…) has a type and no schema; 9router sends it to other providers as an empty function.
     if (type && type !== "custom" && raw.input_schema === undefined) anthropicOnly.push(`the ${type} server tool`);
     const name = text(raw.name) ?? type ?? "";
     const description = text(raw.description);
@@ -169,7 +164,6 @@ function toToolChoice(value: unknown): { choice?: ToolChoice; serialTools: boole
   }
 }
 
-// An omitted stream streams, unless the client only accepts JSON (9router chatCore, kept).
 export function streamRequested(flag: unknown, accept: string | undefined): boolean {
   const jsonOnly = accept !== undefined && accept.includes("application/json") && !accept.includes("text/event-stream");
   return flag === true || (flag !== false && !jsonOnly);
@@ -184,7 +178,6 @@ export function parseAnthropicMessagesRequest(input: unknown, accept?: string): 
   list(input.messages, "messages", MAX_MESSAGES).forEach((raw, i) => {
     const param = `messages[${i}]`;
     if (!isRecord(raw)) throw invalid(param, "must be an object");
-    // 9router: a system turn inside the conversation becomes user instructions.
     if (raw.role === "system") {
       const instructions = blockText(raw.content);
       if (instructions.trim()) messages.push({ role: "user", content: [{ type: "text", text: `<instructions>\n${instructions}\n</instructions>` }] });
@@ -237,7 +230,6 @@ export function parseAnthropicMessagesRequest(input: unknown, accept?: string): 
 
 // ---- the request a provider receives (translator.claude-client-request) ----
 
-// A user turn after 9router's claude→openai drops; undefined when nothing is left of a non-empty turn.
 function pivotUser(content: readonly ContentPart[]): ContentPart[] | undefined {
   const out: ContentPart[] = [];
   for (const part of content) {
@@ -250,7 +242,6 @@ function pivotUser(content: readonly ContentPart[]): ContentPart[] | undefined {
       // The OpenAI tool role is text-only, so a tool's images follow in the user turn, tagged with the call.
       if (images.length > 0) out.push({ type: "text", text: `[Image from tool result ${part.toolCallId}]` }, ...images);
     }
-    // URL images, files (documents), and thinking are dropped, as in 9router.
   }
   return out.length > 0 ? out : undefined;
 }
@@ -269,7 +260,6 @@ function adjustMaxTokens(request: CanonicalRequest): number | undefined {
   return Math.min(max, DEFAULT_MAX_TOKENS);
 }
 
-// The effort an OpenAI-style provider gets from a thinking budget (9router applyThinking, budget → level).
 function effortFor(request: CanonicalRequest, provider: ProviderDescriptor): Pick<CanonicalRequest, "reasoning" | "vendorExtensions"> {
   const budget = request.reasoning?.budgetTokens;
   if (budget === undefined) return {};
@@ -281,7 +271,6 @@ function effortFor(request: CanonicalRequest, provider: ProviderDescriptor): Pic
 
 export function anthropicRequestFor(parsed: AnthropicClientRequest, provider: ProviderDescriptor): CanonicalRequest {
   const { request } = parsed;
-  // Claude target: 9router skips the conversion; only what CIP cannot hold is refused.
   if (provider.protocol === "anthropic") {
     const first = parsed.anthropicOnly[0];
     if (first !== undefined) throw unsupported(`${first} on this path`);
@@ -299,7 +288,6 @@ export function anthropicRequestFor(parsed: AnthropicClientRequest, provider: Pr
     stream: request.stream,
     ...(system ? { system: [{ type: "text", text: system }] } : {}),
     ...(request.tools ? { tools: request.tools.map((tool) => ({ name: tool.name, description: tool.description ?? "", parameters: tool.parameters })) } : {}),
-    // 9router maps every choice but auto, any and tool to auto.
     ...(request.toolChoice !== undefined ? { toolChoice: request.toolChoice === "none" ? "auto" : request.toolChoice } : {}),
     ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
     ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
@@ -307,7 +295,6 @@ export function anthropicRequestFor(parsed: AnthropicClientRequest, provider: Pr
   };
 }
 
-// 9router answers a non-streaming Claude client with a message object only for an openai target that is not forced to
 // stream, or a Claude target; every other provider's answer stays a chat.completion (kept).
 export const anthropicClientGetsMessage = (provider: ProviderDescriptor): boolean =>
   provider.protocol === "anthropic" || (provider.protocol === "openai-compatible" && provider.streamOnly !== true);
@@ -349,7 +336,6 @@ export function toAnthropicMessage(response: CanonicalResponse, fallbackId: stri
   };
 }
 
-// count_tokens (routing.count-tokens-estimate): characters / 4, keys included, as 9router counts them.
 function countChars(value: unknown): number {
   if (value === undefined || value === null) return 0;
   if (typeof value === "string") return value.length;
@@ -385,7 +371,6 @@ export function estimateAnthropicInputTokens(body: unknown): number {
 
 // ---- streaming (translator.openai-to-claude-client-response) ----
 
-// 9router fixes the arguments a non-Anthropic model gives Claude Code's Read tool (limit, offset, pages).
 function sanitizeRead(raw: string): string {
   const args = parseJson(raw);
   if (!isRecord(args)) return raw;
@@ -457,7 +442,6 @@ export class AnthropicStreamEncoder {
     return "";
   }
 
-  // 9router's Claude error event, with the OpenAI-shaped error inside (kept).
   fail(error: unknown): string {
     this.assertOpen();
     this.closed = true;

@@ -1,6 +1,5 @@
 import type { Price } from "./pricing.js";
 
-// Built-in rates in USD per 1M tokens, copied from 9router open-sse/providers/pricing.js at 39e36d3d (pricing.cost-calculation-cache-inclusive).
 // Data, not code: edit a rate here, or override it in the dashboard (docs/contracts/usage.md).
 
 // Canonical model prices, provider-agnostic.
@@ -115,7 +114,6 @@ export const MODEL_PRICING: Readonly<Record<string, Price>> = {
   "coder-model": { input: 1.5, output: 6, cached: 0.75, reasoning: 9, cache_creation: 1.5 },
 };
 
-// Provider-specific prices that win over the canonical ones (9router keys github by its alias gh).
 export const PROVIDER_PRICING: Readonly<Record<string, Readonly<Record<string, Price>>>> = {
   "github": {
     "gpt-5.3-codex": { input: 1.75, output: 14, cached: 0.175, reasoning: 14, cache_creation: 1.75 },

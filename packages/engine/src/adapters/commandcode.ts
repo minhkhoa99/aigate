@@ -8,19 +8,15 @@ import { budgetToLevel } from "./gemini.js";
 import { classifyStatus, count, HttpProviderAdapter, isTransient, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
 
 // AIProviderPort for the commandcode family: POST /alpha/generate, NDJSON AI SDK v5 events (docs/contracts/provider-commandcode.md).
-// User decision (2026-09-27): the request and the stream keep 9router's behavior, drops and defaults included; only the
 // executor's lost lines and missing [DONE] are not reproduced, and the connection test is real. Security: an image by
-// URL is refused (9router fetches it server-side) and config.workingDir is "/" (9router sends the server directory).
 
 const TARGET = "commandcode";
 const STREAM_TIMEOUT_MS = 600_000;
 const DEFAULT_MAX_TOKENS = 64_000;
 const DEFAULT_TEMPERATURE = 0.3;
 const MAX_TOOL_CALLS = 128;
-// The events that end 9router's peek: anything client-visible or a finish.
 const COMMIT_EVENTS = new Set(["text-delta", "reasoning-delta", "tool-input-start", "tool-call", "finish", "finish-step"]);
 const FINISH = new Map<string, StopReason>([["stop", "end_turn"], ["length", "max_tokens"], ["tool-calls", "tool_use"], ["tool_use", "tool_use"], ["content-filter", "content_filter"]]);
-// Status guesses for an in-band error without an HTTP status (9router parseCommandCodeError).
 const GUESSES: readonly [RegExp, number][] = [
   [/rate limit|too many requests/, 429], [/unauthorized|invalid api key|authentication/, 401], [/payment required|billing/, 402],
   [/quota|forbidden|permission/, 403], [/not found/, 404],
@@ -32,7 +28,6 @@ const unsupported = (feature: string) => new UnsupportedFeatureError(feature, TA
 
 const joinText = (parts: readonly ContentPart[]) => parts.map((part) => (part.type === "text" ? part.text : "")).filter(Boolean).join("\n");
 
-// Bad JSON becomes {} as in 9router.
 function toolInput(raw: string): unknown {
   if (!raw) return {};
   const parsed = parseJson(raw);
@@ -48,7 +43,6 @@ function userBlocks(parts: readonly ContentPart[]): Json[] {
       const mime = part.source.mediaType;
       blocks.push({ type: "image", image: `data:${mime};base64,${part.source.data}`, mimeType: mime, mediaType: mime });
     }
-    // Audio, files, and other parts without text are dropped, as in 9router.
   }
   return blocks.length > 0 ? blocks : [{ type: "text", text: "" }];
 }
@@ -62,7 +56,6 @@ function toMessages(request: CanonicalRequest): Json[] {
         rest.push(part);
         continue;
       }
-      // 9router reads toolName from the tool message's name, which OpenAI clients leave out.
       out.push({ role: "tool", content: [{ type: "tool-result", toolCallId: part.toolCallId, toolName: "", output: { type: "text", value: joinText(part.content) } }] });
     }
     if (rest.length === 0) continue;
@@ -130,7 +123,6 @@ function eventOf(line: string): Json | undefined {
   return isRecord(event) && typeof event.type === "string" ? event : undefined;
 }
 
-// A reason 9router passes through raw has no CIP form; it ends the turn.
 const finishOf = (reason: unknown): StopReason => FINISH.get(text(reason) ?? "") ?? "end_turn";
 
 const usageOf = (value: unknown): TokenUsage => {
@@ -142,7 +134,6 @@ type Opened = { readonly first: readonly Json[]; readonly rest: AsyncGenerator<s
 type Tally = { emitted: number };
 
 export class CommandCodeAdapter extends HttpProviderAdapter implements AIProviderPort {
-  // 9router collapses the forced stream for a non-streaming client.
   async execute(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): Promise<CanonicalResponse> {
     const tally: Tally = { emitted: 0 };
     let id = "";
@@ -164,7 +155,6 @@ export class CommandCodeAdapter extends HttpProviderAdapter implements AIProvide
         else if (chunk.type === "stop") stopReason = chunk.stopReason;
       }
     } catch (error) {
-      // 9router's non-streaming path loses a mid-stream error behind this text (kept).
       if (error instanceof EngineError && error.details.partial === true) throw this.invalid("a stream that failed: Failed to convert streaming response to JSON");
       throw error;
     }
@@ -181,7 +171,6 @@ export class CommandCodeAdapter extends HttpProviderAdapter implements AIProvide
     yield* this.events(request, credential, ctx, { emitted: 0 });
   }
 
-  // The static catalog, as in 9router.
   async getModels(): Promise<readonly ListedModel[]> {
     return this.provider.models.map((descriptor) => ({ id: descriptor.id, descriptor }));
   }
@@ -209,8 +198,6 @@ export class CommandCodeAdapter extends HttpProviderAdapter implements AIProvide
     };
   }
 
-  // 9router's peek: read up to the first content event; an error event before it is an HTTP-style error, retried when
-  // it is 502/503/504 (the executor's in-band retry). Every line read is kept (9router loses the rest of the read).
   private open(request: CanonicalRequest, credential: Credential, ctx: ExecCtx, attempts = RETRY.maxAttempts, timeoutMs = STREAM_TIMEOUT_MS): Promise<Opened> {
     return withRetry(async () => {
       const response = await this.send(this.generate(request, credential, timeoutMs), credential, ctx, 1);
@@ -315,7 +302,6 @@ export class CommandCodeAdapter extends HttpProviderAdapter implements AIProvide
           await rest.return(undefined);
           return;
         }
-        // 9router streams a mid-stream error as this fixed text (kept); the upstream message is not shown.
         case "error": throw new EngineError("PROVIDER_UNAVAILABLE", "upstream connection lost", { provider: this.provider.id, partial: true });
         default: break;
       }

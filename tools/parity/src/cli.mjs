@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 // pnpm parity <command> (spec §8; docs/contracts/parity.md)
-//   record [--only a,b]  record tapes from 9router (NINEROUTER_URL, default http://localhost:20128; NINEROUTER_PASSWORD, default 123456)
 //   replay               tier 1 (fails on an undeclared difference) and tier 3 (warnings) against AIGate
 //   live                 tier 2 against the real vendor (needs OPENAI_API_KEY; spends a few tokens)
 //   gate [--out file]    the M1 acceptance gate: replay + golden scenarios + coverage (+ tier 2 if a key is set)
@@ -47,7 +46,7 @@ function report({ results, cov, gold, tier2, passed }) {
 async function main() {
   if (command === "record") {
     const only = option("only")?.split(",");
-    const lines = await record({ base: process.env.NINEROUTER_URL ?? "http://localhost:20128", password: process.env.NINEROUTER_PASSWORD ?? "123456", only });
+    const lines = await record({ base: process.env.REFERENCE_URL ?? "http://localhost:20128", password: process.env.REFERENCE_PASSWORD ?? "123456", only });
     console.log(lines.join("\n"));
     return 0;
   }

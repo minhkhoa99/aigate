@@ -4,7 +4,6 @@ import { OAUTH_PROVIDERS, withRetry, type HttpTransportPort, type OAuthTokens } 
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
 import { ConnectionsRepository, type StoredCredential } from "./connections.repo.js";
 
-// oauth.refresh-lifecycle, kept as 9router has it (user decision 2026-09-27): proactive refreshes of one connection share
 // one in-flight promise; the reactive refresh after a 401/403 tries three times (1 s, then 2 s apart) without that lock,
 // even for a connection that cannot refresh; every 5 minutes the tokens that expire within 30 minutes are refreshed.
 const LEAD_MS = 5 * 60_000;
@@ -46,7 +45,6 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
     return token ? { ...stored, apiKey: token.apiKey ?? token.accessToken } : stored;
   }
 
-  // 9router shouldRefreshCredentials.
   due(provider: string, stored: StoredCredential): boolean {
     const oauth = stored.oauth;
     if (!oauth) return false;
@@ -58,11 +56,9 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
   }
 
   // Reactive (refreshWithRetry after a 401/403): three attempts, attempt × delayMs apart, without the lock. A connection
-  // without a refresh token fails every attempt, as in 9router.
   async reactive(provider: string, stored: StoredCredential, delayMs: number): Promise<string | undefined> {
     const refreshToken = stored.oauth?.refreshToken;
     try {
-      // withRetry waits delayMs, then 2 × delayMs: 9router's 1 s and 2 s.
       return await withRetry(async () => {
         const tokens = refreshToken ? await this.refresh(provider, stored) : null;
         if (!tokens) throw new Error(refreshToken ? `${provider} refused the refresh` : `${provider} has no refresh token`);

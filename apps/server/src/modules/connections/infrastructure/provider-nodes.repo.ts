@@ -50,7 +50,6 @@ export const nodeProtocol = (type: NodeType, apiType: ApiType | null): ProviderP
 export const takesThinking = (type: NodeType, apiType: ApiType | null, level: string): boolean =>
   level === "auto" || (isThinkingLevel(level) && familyLevels(nodeProtocol(type, apiType)).includes(level));
 
-// Every catalog id and alias, connectable or not: they always win over a custom prefix at /v1, as in 9router.
 const RESERVED = new Set(CATALOG.flatMap((p) => [p.id, ...p.aliases]));
 export const isReservedPrefix = (prefix: string): boolean => RESERVED.has(prefix);
 
@@ -71,7 +70,6 @@ export function nodeDescriptor(node: StoredNode): ProviderDescriptor {
       headers: { ...node.headers }, auth: { kind: "api-key", header: "authorization", scheme: "bearer" },
     };
   }
-  // connection.anthropic-compatible-node: 9router calls a host official when the URL merely contains api.anthropic.com.
   return {
     ...shared, protocol: "anthropic", chatUrl: `${base}/messages`, headers: { "anthropic-version": ANTHROPIC_VERSION, ...node.headers },
     auth: { kind: "api-key", header: "x-api-key", scheme: "raw" }, anthropicNode: { official: node.baseUrl.includes("api.anthropic.com") },
@@ -101,7 +99,6 @@ export class ProviderNodesRepository {
   }
 
   // One indexed lookup on the /v1 path, only for a prefix that names no built-in provider. Prefixes may repeat;
-  // as in 9router, OpenAI-compatible nodes are searched before Anthropic-compatible ones, and the oldest wins.
   async byPrefix(prefix: string): Promise<StoredNode | undefined> {
     const row = await this.database.db.select(columns).from(n).where(eq(n.prefix, prefix))
       .orderBy(sql`${n.type} <> 'openai-compatible'`, asc(n.createdAt)).limit(1).get();
@@ -120,7 +117,6 @@ export class ProviderNodesRepository {
       const total = await tx.select({ n: count() }).from(n).get();
       if ((total?.n ?? 0) >= MAX_NODES) return "limit";
       const now = new Date();
-      // 9router ids: openai-compatible-<apiType>-<id> (not renamed when apiType changes), anthropic-compatible-<id>.
       const kind = fields.type === "openai-compatible" ? `${fields.type}-${fields.apiType}` : fields.type;
       const id = `${kind}-${randomBytes(6).toString("hex")}`;
       const headers = Object.fromEntries(fields.customHeaders.map((header) => [header.name, header.value ?? ""]));

@@ -14,7 +14,6 @@ export function importChoices(fetched: readonly ListedModel[], listed: ReadonlyS
   return fetched.map((m) => ({ id: m.id, state: m.inCatalog ? "catalog" : listed.has(m.id) ? "added" : "new" }));
 }
 
-// 9router's two messages; null means there is something to pick.
 export function importMessage(choices: readonly ImportChoice[]): string | null {
   if (choices.length === 0) return "No models returned from /models.";
   return choices.some((c) => c.state === "new") ? null : "No new models were added.";

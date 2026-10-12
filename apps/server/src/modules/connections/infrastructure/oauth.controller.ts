@@ -11,11 +11,9 @@ import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
 import { ConnectionsRepository } from "./connections.repo.js";
 import { FixedCallbackRelay } from "./fixed-callback-relay.js";
 
-// oauth.dashboard-flow (docs/contracts/oauth.md), kept as 9router has it (user decision 2026-09-27): authorize returns
 // state and the PKCE verifier to the dashboard, which sends them back on exchange unchecked. Protected by the global
 // dashboard guard, like every /api route.
 const FLOW_BUDGET_MS = 30_000;
-// 9router exchanges these without a PKCE verifier.
 const NO_PKCE = new Set(["cline", "clinepass", "kimchi", "grok-cli"]);
 const DEFAULT_REDIRECT = "http://localhost:8080/callback";
 
@@ -25,7 +23,6 @@ const strings = (value: unknown): Record<string, string> =>
   typeof value === "object" && value !== null ? Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string")) : {};
 const objectRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
-// An upstream failure during sign-in, with the provider's words (9router answers 500 with the error message).
 function flowError(error: unknown): never {
   if (error instanceof EngineError) {
     if (error.code === "INVALID_REQUEST") throw invalid(error.message);
@@ -119,7 +116,6 @@ export class OAuthController {
         const view = await this.save(descriptor, result.tokens);
         return { success: true, connection: { id: view.id, provider: view.provider } };
       }
-      // provider.github-copilot-oauth: GitHub asks to slow down; the dashboard then polls 5 s slower (9router).
       if (result.status === "pending") return { success: false, error: result.slowDown ? "slow_down" : "authorization_pending", pending: true };
       return { success: false, error: result.error, errorDescription: result.description ?? null, pending: false };
     }
@@ -133,7 +129,6 @@ export class OAuthController {
     return { descriptor, flow };
   }
 
-  // provider.cursor-protobuf: fixed local Cursor state locations. The native SQLite reader replaces 9router's bundled
   // dependency/CLI fallback; a missing or unreadable database still leaves manual paste available.
   private async cursorAutoImport(): Promise<{ found: true; accessToken: string; machineId: string } | { found: false; error?: string; windowsManual?: true; dbPath?: string }> {
     const home = homedir();
@@ -156,7 +151,6 @@ export class OAuthController {
         if (accessToken && machineId) return { found: true, accessToken, machineId };
       } finally { db.close(); }
     } catch {
-      // 9router's final manual path; its better-sqlite3 and sqlite3 CLI mechanics are intentionally not carried over.
     }
     return { found: false, windowsManual: true, dbPath };
   }
@@ -192,7 +186,6 @@ export class OAuthController {
       const saved = await this.save(descriptor, { accessToken, expiresIn: 86_400, ...(email ? { email } : {}), data: { machineId, authMethod: "imported", provider: "Imported" } });
       return { success: true, connection: { id: saved.id, provider: saved.provider, email: saved.email } };
     } catch (error) {
-      // SUSPECTED_BUG, kept: 9router's broad handler turns bad operator input into HTTP 500.
       const message = error instanceof Error ? error.message : "Cursor token import failed";
       throw new InternalServerErrorException({ code: "INTERNAL_ERROR", message });
     }

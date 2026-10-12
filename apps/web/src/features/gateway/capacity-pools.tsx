@@ -6,7 +6,6 @@ import { useLocale } from "../../shared/locale";
 import type { MessageKey } from "../../shared/i18n";
 import { testModel, useCapacityPools, useConnectedModels, useSaveCapacityPool, type CapacityCapability, type CapacityPool, type ModelProbe } from "./api";
 
-// docs/contracts/capacity-adapter.md: the server accepts all four pools; PDF and video stay hidden, as in 9router.
 const SHOWN: { capability: CapacityCapability; label: MessageKey; detail: MessageKey }[] = [
   { capability: "vision", label: "capacity.vision", detail: "capacity.visionHint" },
   { capability: "audioInput", label: "capacity.audio", detail: "capacity.audioHint" },

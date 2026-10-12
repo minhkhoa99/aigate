@@ -267,7 +267,6 @@ test("an upstream stream relays to the client as OpenAI SSE, and a cut-off strea
 });
 
 // Cline, Kilo Code and OpenRouter-style clients mark cache breakpoints with cache_control on messages and text parts.
-// As 9router (user decision 2026-09-27): a message's mark goes on the message to every OpenAI-compatible provider, a text
 // part's only with preserveCacheControl (the alicode family); Anthropic gets both on blocks.
 test("cache_control: message marks stay on the message, part marks only for preserveCacheControl, Anthropic on blocks", async () => {
   const mark = { type: "ephemeral" };

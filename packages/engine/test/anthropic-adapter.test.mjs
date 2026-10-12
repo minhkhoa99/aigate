@@ -262,7 +262,6 @@ test("the connection test uses the free model list, then a 1-token message where
   assert.deepEqual(models.map((m) => [m.id, Boolean(m.descriptor)]), [["claude-sonnet-4-20250514", true], ["new", false]]);
 });
 
-// ---- SP14b: Anthropic-compatible custom providers (connection.anthropic-compatible-node), kept as 9router has them ----
 
 const node = (base, official) => ({
   id: "anthropic-compatible-abc", name: "Gateway", protocol: "anthropic", chatUrl: `${base}/messages`, modelsUrl: `${base}/models`,

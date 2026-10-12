@@ -9,7 +9,6 @@ import { streamRequested } from "./anthropic-messages.js";
 import { mediaSource, toOpenAIChatCompletion, toOpenAIError, type CompletionMeta } from "./openai-chat.js";
 
 // Client-facing OpenAI Responses protocol, POST /v1/responses (docs/contracts/protocol-responses.md).
-// User decisions (2026-09-27): everything is kept as 9router has it — the body passes unchanged to a Responses provider;
 // for any other provider the Responses → chat pivot with its drops and copied fields; the SSE events, the non-streaming
 // answer (a response object only for an openai or Responses target), and an omitted stream streaming.
 
@@ -25,14 +24,12 @@ const CUSTOM_PARAMETERS = {
   required: ["input"],
   additionalProperties: false,
 };
-// Fields the pivot turns into CIP or deletes; 9router copies every other one into the chat body.
 const MODELLED = new Set([
   "model", "input", "instructions", "tools", "tool_choice", "max_output_tokens", "max_tokens", "temperature", "top_p", "reasoning", "stream",
   "include", "prompt_cache_key", "store", "client_metadata",
 ]);
 const EFFORTS = new Set(["low", "medium", "high"]);
 const DETAILS = new Set(["low", "high", "auto"]);
-// Protocols whose adapters refuse reasoning in the history; 9router's pivot to them drops reasoning_content.
 const NO_REASONING_HISTORY = new Set(["anthropic", "ollama"]);
 
 const invalid = (param: string, message: string) => new EngineError("INVALID_REQUEST", `${param} ${message}`, { param });
@@ -50,7 +47,6 @@ function optionalPositiveInteger(value: unknown, param: string): number | undefi
   return value;
 }
 
-// ---- request: the Responses body through 9router's pivot, in CIP ----
 
 export interface ResponsesClientRequest {
   readonly request: CanonicalRequest;
@@ -80,7 +76,6 @@ function messageParts(content: unknown, param: string): ContentPart[] {
       if (!DETAILS.has(detail)) throw invalid(`${param}[${i}].detail`, "must be low, high, or auto");
       return { type: "image", source: mediaSource(text(raw.image_url) || text(raw.file_id) || "", `${param}[${i}].image_url`), detail: detail === "low" ? "low" : detail === "high" ? "high" : "auto" };
     }
-    // 9router copies any other part (input_file, refusal, …) into the chat body; CIP cannot carry it as it is.
     if (typeof raw.type !== "string") throw invalid(`${param}[${i}].type`, "must be a string");
     throw unsupported(`${raw.type} content`);
   });
@@ -161,7 +156,6 @@ function pivotItems(items: readonly unknown[]): Pivot {
       }
       default:
         if (type !== undefined && typeof type !== "string") throw invalid(`${param}.type`, "must be a string");
-      // 9router drops item types it has no rule for (item_reference, web_search_call, …).
     }
   });
   flush();
@@ -173,7 +167,6 @@ function parametersOf(value: unknown): Readonly<Record<string, unknown>> {
   return value.type === "object" && value.properties === undefined ? { ...value, properties: {} } : value;
 }
 
-// Chat-shaped tools pass; hosted tools (web_search, file_search, …) have no name and are dropped (9router).
 function toTools(value: readonly unknown[], customTools: Set<string>): ToolDefinition[] {
   if (value.length > MAX_TOOLS) throw invalid("tools", `may have at most ${MAX_TOOLS} tools`);
   return value.flatMap((raw, i): ToolDefinition[] => {
@@ -233,11 +226,9 @@ export function parseOpenAIResponsesRequest(input: unknown, accept?: string): Re
 // ---- the request a provider receives (translator.responses-client-request) ----
 
 export function responsesRequestFor(parsed: ResponsesClientRequest, request: CanonicalRequest, provider: ProviderDescriptor): CanonicalRequest {
-  // Same format: 9router skips the conversion.
   if (provider.protocol === "openai-responses") return { model: request.model, messages: [], stream: request.stream, vendorExtensions: { responses: parsed.body } };
   // An openai target receives the pivot with every copied field.
   if (provider.protocol === "openai-compatible") return request;
-  // 9router's openai → <target> translators build a new body: copied fields are not carried, nor reasoning where the target takes none.
   const messages = NO_REASONING_HISTORY.has(provider.protocol)
     ? request.messages.flatMap((message) => {
       const content = message.content.filter((part) => part.type !== "thinking");
@@ -247,7 +238,6 @@ export function responsesRequestFor(parsed: ResponsesClientRequest, request: Can
   return { ...request, messages, vendorExtensions: undefined };
 }
 
-// 9router answers a non-streaming Responses client with a response object for an openai target (forced to stream or
 // not) and a Responses target; every other provider's answer stays a chat.completion (kept).
 export const responsesClientGetsObject = (provider: ProviderDescriptor): boolean =>
   provider.protocol === "openai-compatible" || provider.protocol === "openai-responses";
@@ -283,14 +273,12 @@ export function toResponsesObject(response: CanonicalResponse, meta: CompletionM
   }
   const finish = text(choice.finish_reason);
   const usage = record(completion.usage);
-  // A Responses provider's own id is kept (9router returns that object as it is).
   const id = text(completion.id) ?? "";
   return {
     id: id.startsWith("resp_") ? id : `resp_${id}`.replace(/^resp_chatcmpl-/, "resp_"),
     object: "response",
     created_at: meta.created,
     model: text(completion.model) || "unknown",
-    // The chat finish reason itself when it is not stop or tool_calls (9router, kept).
     status: !finish || finish === "stop" || finish === "tool_calls" ? "completed" : finish,
     background: false,
     error: null,
@@ -314,14 +302,12 @@ function responsesUsage(usage: TokenUsage): Json {
 
 export interface ResponsesStreamMeta extends CompletionMeta {
   readonly customTools: ReadonlySet<string>;
-  // 9router waits for a usage chunk after the finish only on a direct openai route; on a pivot, response.completed goes
   // out at the finish.
   readonly deferCompleted: boolean;
 }
 
 type Tool = { id?: string; name?: string; added: boolean; done: boolean; args: string };
 
-// 9router's event shapes are kept as they are: reasoning, text and the first tool call share output_index 0,
 // response.completed carries no output, and its status is always completed.
 export class ResponsesStreamEncoder {
   private readonly meta: ResponsesStreamMeta;
@@ -373,7 +359,6 @@ export class ResponsesStreamEncoder {
     return this.meta.deferCompleted && !this.completed ? this.closeAll() + this.complete() : "";
   }
 
-  // 9router's abort frame for a Responses client is the chat error frame and [DONE] (kept).
   fail(error: unknown): string {
     this.assertOpen();
     this.closed = true;

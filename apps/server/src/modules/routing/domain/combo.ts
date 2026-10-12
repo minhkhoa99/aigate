@@ -28,7 +28,6 @@ export type Parsed<T> = { ok: true; value: T } | { ok: false; message: string };
 export const ok = <T>(value: T): Parsed<T> => ({ ok: true, value });
 export const fail = (message: string): Parsed<never> => ({ ok: false, message });
 
-// combo.mode-fusion-panel-completion: 9router's FUSION_DEFAULTS.
 const DEFAULTS: Omit<ComboFields, "name" | "models"> = { strategy: "fallback", judgeModel: null, minPanel: 2, stragglerGraceMs: 8000, panelTimeoutMs: 90000 };
 
 function integer(value: unknown, field: string, min: number, max: number): Parsed<number> {
@@ -102,7 +101,6 @@ export const selfReference = (combo: Pick<ComboFields, "name" | "models">): stri
 export interface Rotation {
   readonly index: number;
   readonly used: number;
-  // A changed sticky limit starts the rotation over, as 9router's settings reset does (settings.combo-rotation-reset).
   readonly limit: number;
 }
 
@@ -115,9 +113,7 @@ export function rotate(members: readonly string[], state: Rotation | undefined, 
   return { order: [...members.slice(index), ...members.slice(0, index)], next };
 }
 
-// ---- fallback between members (combo.mode-fallback, 9router checkFallbackError) ----
 
-// Text rules first; a 502-504 matching one is given this long before the next member (9router's backoff starts at 2 s).
 const WAIT_RULES: readonly (readonly [string, number])[] = [
   ["request not allowed", 5_000], ["rate limit", 2_000], ["too many requests", 2_000], ["quota exceeded", 2_000], ["capacity", 2_000], ["overloaded", 2_000],
 ];
@@ -210,7 +206,6 @@ export async function collectPanel(
   return texts.flatMap((text, index) => (text ? [{ model: panel[index], text }] : []));
 }
 
-// 9router's judge directive: the sources are anonymized so the judge weighs substance, not a model's name.
 function judgePrompt(answers: readonly PanelAnswer[]): string {
   return [
     `You are the JUDGE in a model-fusion panel. ${answers.length} expert models independently answered the user's most recent request. Their responses are below, anonymized by source.`,

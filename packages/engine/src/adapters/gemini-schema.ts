@@ -1,10 +1,8 @@
 import { isRecord, type Json } from "../json.js";
 
-// The tool-schema cleaner of translator.openai-to-gemini-request (9router cleanJSONSchemaForAntigravity), corrected by
 // user decision (2026-09-26): it walks schema positions only, so a parameter named like a keyword ("title", "format",
 // "const", …) keeps its place in `properties`, and it never adds a required "reason" parameter to an empty object.
 
-// Keywords the Gemini schema proto has no field for (9router's list, kept whole).
 const UNSUPPORTED = new Set([
   "minLength", "maxLength", "exclusiveMinimum", "exclusiveMaximum", "minItems", "maxItems", "format", "multipleOf",
   "uniqueItems", "contains", "unevaluatedProperties", "unevaluatedItems", "contentSchema", "prefixItems", "additionalItems",

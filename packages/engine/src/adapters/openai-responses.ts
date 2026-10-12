@@ -12,7 +12,6 @@ import { applyOpenCodeFingerprint } from "./opencode-free.js";
 import { mediaUrl, OpenAICompatibleAdapter, userPart } from "./openai-compatible.js";
 
 // AIProviderPort for the openai-responses family (docs/contracts/provider-openai-responses.md). The request and
-// the stream are 9router's, including its silent drops (user decision 2026-09-26: translator.openai-to-responses-request,
 // translator.responses-to-openai-stream). The non-streaming answer is read correctly (routing.responses-non-stream-answer).
 // The model list and the connection test are the OpenAI ones (GET <modelsUrl>).
 
@@ -22,13 +21,11 @@ const STREAM_TIMEOUT_MS = 600_000;
 const MAX_TOOL_NAME = 128;
 const MAX_CALL_ID = 64;
 const MAX_TOOL_CALLS = 128;
-// The only vendor fields 9router copies; every other one (tool_choice, stop, response_format, …) is dropped.
 const COPIED = ["reasoning", "service_tier", "prompt_cache_key"] as const;
 const TOOL_ITEMS = new Set(["function_call", "custom_tool_call"]);
 
 const unsupported = (feature: string) => new UnsupportedFeatureError(feature, TARGET);
 
-// ---- CIP -> Responses (9router rules) ----
 
 let callSeq = 0;
 // A call id longer than 64 characters is cut; an empty one gets a generated id.
@@ -79,12 +76,10 @@ function toTools(tools: readonly ToolDefinition[]): Json[] {
 
 function toBody(request: CanonicalRequest, stream: boolean): Json {
   const extensions = request.vendorExtensions ?? {};
-  // translator.responses-client-request: a Responses client's body reaches a Responses provider unchanged (9router).
   if (extensions.responses) return { ...extensions.responses, model: request.model, stream };
   if (request.reasoning?.budgetTokens !== undefined) throw unsupported("reasoning.budgetTokens");
   for (const namespace of Object.keys(extensions)) if (namespace !== "openai") throw unsupported(`vendorExtensions.${namespace}`);
   const openai = extensions.openai ?? {};
-  // CIP keeps the leading system messages as one prompt, so all of them become instructions (9router keeps the first).
   const instructions = (request.system ?? []).map((part) => (part.type === "text" ? part.text : "")).filter(Boolean).join("\n");
   const body: Json = { model: request.model, input: toInput(request), stream, store: false, instructions };
   if (request.tools) body.tools = toTools(request.tools);
@@ -115,13 +110,11 @@ function usageOf(value: unknown): TokenUsage {
 }
 
 const INCOMPLETE = new Map<string, StopReason>([["max_output_tokens", "max_tokens"], ["content_filter", "content_filter"]]);
-// provider.codex-oauth (kept from 9router): the model list names client version 0.144.6.
 const CODEX_MODELS_URL = "https://chatgpt.com/backend-api/codex/models?client_version=0.144.6";
 const MAX_LISTED_MODELS = 1_000;
 
 
 export class OpenAIResponsesAdapter extends OpenAICompatibleAdapter implements AIProviderPort {
-  // Correct, unlike 9router (routing.responses-non-stream-answer): stream false, and the Responses object is read.
   override async execute(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): Promise<CanonicalResponse> {
     // provider.codex-oauth: codex only streams, so the stream is collapsed into the answer.
     if (this.codex) return collected(this.stream(request, credential, ctx), request.model);
@@ -166,7 +159,6 @@ export class OpenAIResponsesAdapter extends OpenAICompatibleAdapter implements A
     };
   }
 
-  // translator.responses-to-openai-stream, kept as 9router has it: an error event becomes "[Error] …" text, a stream
   // that stops early still ends normally, and incomplete answers and refusals are not reported.
   override async *stream(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): AsyncGenerator<StreamChunk> {
     const response = await this.send(this.responses(request, credential, true), credential, ctx, RETRY.maxAttempts);
@@ -232,13 +224,11 @@ export class OpenAIResponsesAdapter extends OpenAICompatibleAdapter implements A
         yield { type: "stop", stopReason: "end_turn" };
         return;
       }
-      // Every other event (response.incomplete, refusals, server-side tools, …) is ignored, as in 9router.
     }
     if (!started) yield { type: "start", id: "", model: request.model };
     yield end();
   }
 
-  // provider.codex-oauth: the codex model list, read as 9router reads it (0.144.6, originator, no account id).
   override async getModels(credential: Credential, ctx: ExecCtx): Promise<readonly ListedModel[]> {
     if (!this.codex) return super.getModels(credential, ctx);
     const headers = { "content-type": "application/json", accept: "application/json", authorization: `Bearer ${credential.apiKey}`, originator: "codex_cli_rs" };
@@ -259,7 +249,6 @@ export class OpenAIResponsesAdapter extends OpenAICompatibleAdapter implements A
     const body = toBody(request, stream);
     this.transformResponsesBody(body, request, credential);
     if (this.codex) {
-      // provider.codex-oauth: 9router's CodexExecutor body and headers; the session is the connection's.
       const session = credential.sessionId ?? "default";
       const base = this.request("POST", codexUrl(this.provider.chatUrl, body), credential, timeoutMs);
       return { ...base, headers: { ...base.headers, "content-type": "application/json", accept: "text/event-stream", session_id: session }, body: JSON.stringify(codexBody(body, session)) };

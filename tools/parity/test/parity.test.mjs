@@ -14,7 +14,7 @@ test("every recorded tape passes tier 1 against AIGate, and no deviation is stal
   for (const result of await replayAll(tapes)) {
     assert.ok(result.tier1.pass, `${result.id}: ${result.tier1.problems.join("; ")}`);
     assert.deepEqual(result.tier1.stale, [], `${result.id}: a declared deviation no longer differs`);
-    assert.ok(result.upstreamCalls.aigate <= Math.max(1, result.upstreamCalls.ninerouter), `${result.id}: no extra upstream attempts`);
+    assert.ok(result.upstreamCalls.aigate <= Math.max(1, result.upstreamCalls.reference), `${result.id}: no extra upstream attempts`);
   }
 });
 

@@ -6,7 +6,6 @@ import type { HttpRequest } from "../ports.js";
 import { toOpenAIChatCompletion, type CompletionMeta } from "./openai-chat.js";
 
 // Client-facing Gemini protocol, POST /v1beta/models/{model}:generateContent | :streamGenerateContent and
-// GET /v1beta/models (docs/contracts/protocol-gemini.md). User decisions (2026-09-27): kept as 9router has it — the
 // body becomes a text-only chat request, tool calls and trailing usage are dropped from the answer, a mid-stream error
 // ends the stream silently, the path keeps two segments, and the model list is the whole catalog. A TTS request is
 // forwarded to Google unchanged (ported now).
@@ -39,7 +38,6 @@ function optionalPositiveInteger(value: unknown, param: string): number | undefi
 // ---- the path ----
 
 export interface GeminiRoute {
-  // "<provider>/<model>" or "<model>", as 9router builds it.
   readonly model: string;
   readonly stream: boolean;
   readonly action: typeof STREAM | typeof GENERATE;
@@ -55,7 +53,6 @@ export function parseGeminiPath(path: string): GeminiRoute {
   return { model: segments.length >= 2 ? `${segments[0] ?? ""}/${name}` : name, stream: action === STREAM, action };
 }
 
-// ---- request: 9router's convertGeminiToInternal ----
 
 // A part without text contributes an empty string.
 const partsText = (parts: unknown): string => list(parts).map((part) => text(record(part).text) ?? "").join("\n");
@@ -116,7 +113,6 @@ const FINISH_OF: Readonly<Record<string, string>> = { end_turn: "STOP", stop_seq
 export interface GeminiStreamMeta {
   // The upstream model id, used when the stream has no start chunk.
   readonly model: string;
-  // 9router attaches usage only when the finish chunk itself carries it; an OpenAI-compatible provider sends usage in a
   // trailing chunk, which is dropped.
   readonly usageOnFinish: boolean;
 }
@@ -148,7 +144,6 @@ export class GeminiStreamEncoder {
         const usage = this.meta.usageOnFinish && this.usage ? { usageMetadata: usageMetadata(this.usage), modelVersion: this.model } : {};
         return this.frame([{ text: "" }], FINISH_OF[chunk.stopReason] ?? "STOP", usage);
       }
-      // Tool calls and generated images are dropped (9router, kept).
       case "tool_call_delta":
       case "image_delta":
         return "";
@@ -161,7 +156,6 @@ export class GeminiStreamEncoder {
     return "";
   }
 
-  // 9router drops an error frame, so the stream just ends (kept).
   fail(): string {
     return this.end();
   }
@@ -179,7 +173,6 @@ export class GeminiStreamEncoder {
 // ---- GET /v1beta/models (catalog.v1beta-models-listing) ----
 
 // Every catalog model as models/<alias or id>/<model>, and the gemini models again as models/<model>; the limits are
-// 9router's constants.
 export function geminiModelList(): Json {
   const models: Json[] = [];
   const seen = new Set<string>();

@@ -6,7 +6,6 @@ import { toProblem } from "../../shared/errors";
 import { useLocale } from "../../shared/locale";
 import { cursorAutoImport, kiroApiKeyImport, kiroAutoImport, kiroCliProxyImport, kiroImport, oauthAuthorize, oauthDeviceCode, oauthPoll, traeExchange, traePoll, traeStart, traeStop, useCursorImport, useOAuthExchange, type DeviceCode, type KiroImportHint, type OAuthStart, type ProviderSummary, type TraeStart } from "./api";
 
-// docs/contracts/oauth.md (oauth.dashboard-flow, kept from 9router): the provider's page opens in a popup and returns to
 // /callback, which hands the code back to this window; a remote dashboard pastes the callback URL instead. A device
 // code is shown and polled until it is approved or expires.
 export const OAUTH_CHANNEL = "aigate-oauth";
@@ -234,7 +233,6 @@ function DeviceSignIn({ provider, onDone, meta = {} }: { provider: ProviderSumma
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 
-  // Polls at the provider's interval until the code is approved, refused, or expired. As 9router's dialog: only
   // expired_token and access_denied stop it (other errors keep polling until the code expires), and slow_down adds 5 s
   // to the interval, at most 30 s.
   useEffect(() => {

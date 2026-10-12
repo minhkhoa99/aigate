@@ -6,7 +6,7 @@ The harness implements spec §8: tapes, replay, a normalizer, the three tiers, a
 
 | Command | What it does | Network |
 |---|---|---|
-| `pnpm parity record [--only ids]` | Records one tape per scenario from a running 9router (`NINEROUTER_URL`, default `http://localhost:20128`; `NINEROUTER_PASSWORD`, default the 9router default) | Local only: 9router and a scripted vendor |
+| `pnpm parity record [--only ids]` | Records one tape per scenario from a running reference (`REFERENCE_URL`, default `http://localhost:20128`; `REFERENCE_PASSWORD`, default the reference default) | Local only: the reference and a scripted vendor |
 | `pnpm parity replay` | Replays every tape against AIGate. Tier 1 PASS/FAIL, tier 3 warnings. | None |
 | `pnpm parity live` | Tier 2: sends AIGate's upstream requests to the real OpenAI API (`OPENAI_API_KEY`, never stored) | OpenAI, one request per success tape, at most 16 output tokens |
 | `pnpm parity gate [--out file]` | Runs replay, the 13 golden scenarios, and coverage, plus tier 2 when a key is set; prints the report and exits nonzero until every M1 criterion passes | None without a key |

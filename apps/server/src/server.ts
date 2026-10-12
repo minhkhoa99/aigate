@@ -41,7 +41,6 @@ export interface ServerOptions {
   transport?: HttpTransportPort;
   // AIGATE_STREAM_IDLE_TIMEOUT_MS: longest silence between upstream stream chunks, 1000..600000.
   streamIdleTimeoutMs?: number;
-  // Tests only: the pause unit between the reactive refresh attempts after a 401/403 (9router: 1 s, then 2 s).
   refreshRetryDelayMs?: number;
   // The first wait before a custom provider's stream is retried (retryStreamErrors), 2 s; tests make it short.
   streamRetryDelayMs?: number;

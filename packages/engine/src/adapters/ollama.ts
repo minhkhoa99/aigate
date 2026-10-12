@@ -9,7 +9,6 @@ import { count, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
 
 // AIProviderPort for the ollama family, POST <host>/api/chat (docs/contracts/provider-ollama.md). User decision
-// (2026-09-26): the request and the stream are corrected where 9router drops fields, attachments, errors, or a
 // cut-off (translator.openai-to-ollama-request, translator.ollama-to-openai-response). The connection test is the
 // OpenAI one (GET <modelsUrl>, here /api/tags).
 
@@ -39,7 +38,6 @@ function textOf(parts: readonly ContentPart[], where: string): string {
 }
 
 function toMessages(request: CanonicalRequest): Json[] {
-  // tool_name comes from the assistant call with the same id (9router), else unknown_tool.
   const names = new Map<string, string>();
   for (const message of request.messages) for (const part of message.content) if (part.type === "tool_call") names.set(part.id, part.name);
   const out: Json[] = [];
@@ -51,7 +49,6 @@ function toMessages(request: CanonicalRequest): Json[] {
     for (const part of message.content) {
       switch (part.type) {
         case "tool_result":
-          // An empty result is kept, unlike 9router, so the call keeps its answer.
           out.push({ role: "tool", tool_name: names.get(part.toolCallId) ?? "unknown_tool", content: textOf(part.content, "a tool result") });
           break;
         case "text":
@@ -74,7 +71,6 @@ function toMessages(request: CanonicalRequest): Json[] {
     if (message.role === "assistant") {
       if (texts.length > 0 || calls.length > 0) out.push({ role: "assistant", content: texts.join("\n"), ...(calls.length > 0 ? { tool_calls: calls } : {}) });
     } else if (texts.length > 0 || images.length > 0) {
-      // An image-only turn is kept, unlike 9router.
       out.push({ role: "user", content: texts.join("\n"), ...(images.length > 0 ? { images } : {}) });
     }
   }
@@ -115,7 +111,6 @@ function toBody(request: CanonicalRequest, stream: boolean): Json {
     ...(request.tools && request.tools.length > 0 ? {
       tools: request.tools.map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } })),
     } : {}),
-    // 9router passes tool_choice through in the OpenAI shape.
     ...(request.toolChoice !== undefined ? { tool_choice: typeof request.toolChoice === "string" ? request.toolChoice : { type: "function", function: { name: request.toolChoice.name } } } : {}),
     ...(Object.keys(options).length > 0 ? { options } : {}),
     ...(jsonFormat !== undefined ? { format: jsonFormat } : {}),

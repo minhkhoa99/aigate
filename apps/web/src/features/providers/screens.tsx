@@ -22,7 +22,6 @@ const formText = (form: HTMLFormElement, name: string) => {
   return typeof value === "string" ? value.trim() : "";
 };
 
-// Catalog categories in 9router's page order; "free" (keyless) and "freeTier" share one section there.
 interface Group { id: string; titleKey: "providers.oauthTitle" | "providers.freeTitle" | "providers.apiKeyTitle" | "providers.webAccountTitle" | "providers.otherTitle"; detailKey: "providers.oauthDetail" | "providers.freeDetail" | "providers.apiKeyDetail" | "providers.webAccountDetail" | "providers.otherDetail"; categories: readonly string[] }
 const GROUPS: readonly Group[] = [
   { id: "oauth", titleKey: "providers.oauthTitle", detailKey: "providers.oauthDetail", categories: ["oauth"] },
@@ -59,7 +58,6 @@ export function LlmProviders() {
   const connections = useConnections();
   const connected = new Set(connections.data?.map((c) => c.provider));
   const query = filter.trim().toLocaleLowerCase();
-  // Media and search services have their own screens; hidden entries are hidden in 9router too.
   const llm = (catalog.data ?? []).filter((p) => p.protocol !== "service" && !p.hidden);
   const matches = llm.filter((p) => p.name.toLocaleLowerCase().includes(query) || p.id.includes(query));
   const connectable = llm.filter((p) => p.connectable).length;
@@ -99,7 +97,6 @@ function ProviderConnection({ provider }: { provider: ProviderDetailView }) {
   return <div className="list-row"><div><strong>{connection.name}</strong><small>{connection.authType === "oauth" ? <>{t("providers.signedIn")}{connection.email && <>{t("providers.signedInAs", { email: connection.email })}</>}</> : <>{t("providers.key")} <code>{connection.keyHint}</code></>} · {connection.lastTestedAt ? t("providers.tested", { time: new Date(connection.lastTestedAt).toLocaleString() }) : t("providers.notTestedYet")}</small></div><Pill tone={pill.tone}>{connection.isActive ? t(STATUS_KEYS[connection.testStatus]) : t("providers.statusDisabled")}</Pill><a className="button" href="/providers/connections">{t("providers.manage")}</a></div>;
 }
 
-// docs/contracts/provider-thinking.md (routing.provider-thinking-default, kept from 9router): the level a request gets when
 // it asks for no thinking itself; only for a model that reasons, and never over the client's own effort or budget.
 const levelLabel = (level: string, t: ReturnType<typeof useLocale>["t"]) => (level === "xhigh" ? t("providers.extraHigh") : level.charAt(0).toUpperCase() + level.slice(1));
 
@@ -153,7 +150,6 @@ export function ProviderDetail({ isNew = false, providerId }: { isNew?: boolean;
 }
 
 // Fields a connection supplies besides its key: connection.ollama-local-host (host, no key needed),
-// connection.azure-openai-deployment (9router's form, kept: endpoint, deployment, and organization required),
 // connection.cloudflare-account-id. ponytail: fixed here; expose descriptor.connectionFields in GET /api/providers
 // when the list grows.
 type FieldSpec = { name: ConnectionField; label: string; hint?: string; placeholder?: string; required?: boolean; initial?: string };

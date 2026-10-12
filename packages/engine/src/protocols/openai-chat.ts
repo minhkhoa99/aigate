@@ -95,7 +95,6 @@ export function mediaSource(url: string, param: string): MediaSource {
 }
 
 // cache_control ({ type: "ephemeral" }, as OpenRouter and Anthropic-minded clients send it) on a text part or a message:
-// a cache breakpoint, kept as CIP cacheControl. As in 9router, OpenAI-compatible providers get a message's mark, and a
 // text part's only with the preserveCacheControl quirk (alicode family); Anthropic providers get both
 // (docs/contracts/protocol-openai.md). A ttl is not modelled and is dropped.
 function cacheMark(value: unknown, param: string): boolean {
@@ -109,7 +108,6 @@ function textPart(part: Json, param: string): ContentPart {
   return cacheMark(part.cache_control, `${param}.cache_control`) ? { type: "text", text, cacheControl: "ephemeral" } : { type: "text", text };
 }
 
-// A mark on the whole message stays on the message (CanonicalMessage.cacheControl), as 9router forwards it.
 const messageMark = (message: Json, param: string): { cacheControl?: "ephemeral" } =>
   (cacheMark(message.cache_control, `${param}.cache_control`) ? { cacheControl: "ephemeral" } : {});
 
@@ -379,7 +377,6 @@ export function toOpenAIChatCompletion(response: CanonicalResponse, meta: Comple
     else throw new UnsupportedFeatureError(`${part.type} in a response`, "OpenAI Chat Completions");
   }
   const refusal = response.vendorExtensions?.openai?.refusal;
-  // A provider may pass its own finish_reason through (Gemini's lower-cased reason, kept from 9router).
   const finish = response.vendorExtensions?.openai?.finish_reason;
   const message: Json = {
     role: "assistant",
@@ -464,7 +461,6 @@ export class OpenAIChatStreamEncoder {
     switch (chunk.type) {
       case "text_delta": return head + this.delta({ content: chunk.text });
       case "thinking_delta": return head + this.delta({ reasoning_content: chunk.text });
-      // 9router's non-standard images delta for a generated image (translator.gemini-to-openai-response).
       case "image_delta": return head + this.delta({ images: [{ type: "image_url", image_url: { url: `data:${chunk.mediaType};base64,${chunk.data}` } }] });
       case "tool_call_delta": {
         const fn = { ...(chunk.name ? { name: chunk.name } : {}), arguments: chunk.argumentsDelta };

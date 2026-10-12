@@ -31,10 +31,8 @@ const NOT_PORTED = new Map([
   ["qoder", "Not supported: needs Qoder CLI impersonation"],
   ["qoder-cn", "Not supported: needs Qoder CLI impersonation"],
 ]);
-// 9router forces streaming for these although the vendor answers non-streaming requests too
 // (IMPLEMENTATION_ACCIDENT for OpenAI: the API accepts stream:false; SP3 tapes replay that way).
 const STREAM_OPTIONAL = new Set(["openai"]);
-// provider.codebuddy-request-quirks: what the 9router CodeBuddy executors change in the body.
 // connection.ollama-local-host: the key is optional and each connection may name its own host.
 const OLLAMA_LOCAL = { connectionBaseUrl: { chatPath: "/api/chat", modelsPath: "/api/tags" } } as const;
 // translator.cloudflare-content-flatten: Workers AI takes string content only.
@@ -47,29 +45,23 @@ const EXECUTOR_QUIRKS: Readonly<Record<string, readonly string[]>> = {
   clinepass: ["clineAuth"],
   // provider.kimchi-browser-token: the KimchiExecutor body adjustments, for both sign-ins.
   kimchi: ["kimchi"],
-  // provider.claude-oauth / provider.codex-oauth (SP16b, kept as 9router): prepareClaudeRequest and cloaking; the
   // CodexExecutor body, URL and model list.
   claude: ["claudeCode"],
   codex: ["codex"],
-  // provider.github-copilot-oauth (SP16b2, kept as 9router): the GithubExecutor routes.
   github: ["copilot"],
-  // provider.gemini-cli-oauth (SP16c, kept as 9router): the Cloud Code envelope around the Gemini protocol.
   "gemini-cli": ["geminiCli"],
   antigravity: ["antigravity"],
   "grok-cli": ["grokCli"],
   kimi: ["kimi"],
   iflow: ["iflow"],
 };
-// provider.clinepass-headers-envelope: the Cline client headers, naming AIGate (user decision 2026-09-26; 9router names
 // itself). ponytail: AIGate has no release version yet; 0.1.0 until it does.
 const CLIENT_VERSION = "0.1.0";
 const CLINE_HEADERS = {
   "user-agent": `AIGate/${CLIENT_VERSION}`, "x-platform": process.platform, "x-platform-version": process.version, "x-client-type": "aigate",
   "x-client-version": CLIENT_VERSION, "x-core-version": CLIENT_VERSION, "x-is-multiroot": "false",
 };
-// provider.cline-oauth: Cline's OAuth requests carry the same headers (9router's clineHeaders hook).
 const EXTRA_HEADERS: Readonly<Record<string, Readonly<Record<string, string>>>> = { clinepass: CLINE_HEADERS, cline: CLINE_HEADERS };
-// 9router hides Trae, so the generated extraction omits it; its public data stays local here.
 const traeNames: readonly [string, string][] = [
   ["auto", "Auto (Server Picks)"], ["work", "Work (Fast)"], ["gemini-3.1-pro", "Gemini 3.1 Pro"], ["gemini-3-flash-solo", "Gemini 3 Flash"],
   ["minimax-m3", "MiniMax M3"], ["minimax-m2.7", "MiniMax M2.7"], ["kimi-k2.5", "Kimi K2.5"], ["gpt-5.4", "GPT 5.4"], ["gpt-5.2", "GPT 5.2"],
@@ -81,7 +73,6 @@ const TRAE: CatalogProvider = {
   models: traeNames.map(([id, name]) => ({ id, name, kind: "llm", upstreamModelId: null, capabilities: { vision: false, pdf: false, audioInput: false, videoInput: false, tools: true, reasoning: false }, capabilitySource: "default", contextWindow: null, maxOutputTokens: null })),
 };
 const PORTED_CATALOG = [...CATALOG, TRAE];
-// connection.azure-openai-deployment (kept as 9router, user decision 2026-09-26) and connection.cloudflare-account-id:
 // each connection fills the URL, and the connection test posts a one-token chat. provider.clinepass-headers-envelope:
 // Cline answers GET /models with 200 even without a key, so its test is a one-token chat too (user decision 2026-09-26).
 const PROBE_MESSAGES = [{ role: "user", content: "test" }];
@@ -95,7 +86,6 @@ const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Par
     chatUrl: "{baseUrl}/openai/deployments/{deployment}/chat/completions?api-version={apiVersion}",
     modelsUrl: "{baseUrl}/openai/models?api-version={apiVersion}",
     auth: { kind: "api-key", header: "api-key", scheme: "raw" },
-    // An empty deployment is the request model, as in 9router.
     connectionFields: { required: ["baseUrl"], optional: ["deployment", "apiVersion", "organization"], defaults: { deployment: "{model}", apiVersion: "2024-10-01-preview" } },
     chatProbe: { model: "gpt-4", body: { messages: PROBE_MESSAGES, max_completion_tokens: 1 }, invalidStatuses: [401, 403] },
   }),
@@ -104,14 +94,11 @@ const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Par
   // only by its recommended-models endpoint, which the Cline extension reads; the model import adds them.
   cline: () => ({ recommendedModels: { url: CLINE_RECOMMENDED_URL, groups: ["free", "recommended"] } }),
   clinepass: (provider) => ({ chatProbe: firstModelProbe(provider, [401, 403]), recommendedModels: { url: CLINE_RECOMMENDED_URL, groups: ["clinePass"] } }),
-  // provider.claude-oauth (kept from 9router): the OAuth token goes as Bearer, and the test only reads its expiry.
   claude: () => ({ auth: { kind: "api-key", header: "authorization", scheme: "bearer" }, testByExpiry: true }),
-  // provider.codex-oauth (kept from 9router): the account id header, and the test's empty Responses call (400 is valid).
   codex: () => ({
     accountIdHeader: "chatgpt-account-id",
     chatProbe: { model: "gpt-5.3-codex", body: { model: "gpt-5.3-codex", input: [], stream: false, store: false }, invalidStatuses: [401] },
   }),
-  // provider.gemini-cli-oauth (kept from 9router): the Google token goes as Bearer; the models come from fetchAvailableModels.
   "gemini-cli": () => ({ auth: { kind: "api-key", header: "authorization", scheme: "bearer" }, modelsUrl: "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels" }),
   antigravity: () => ({
     chatUrl: ANTIGRAVITY_IDE_BASE_URL,
@@ -149,7 +136,6 @@ export function unsupportedReason(provider: CatalogProvider): string | undefined
     if (provider.auth.kinds.includes("cookie")) return "Needs a web session (later)";
     return "Keyless providers come later";
   }
-  // gitlab is hidden in 9router's dashboard; it is ported by user decision (2026-09-27), so AIGate lists it.
   if (provider.hidden && !signIn) return "Hidden in the 9router catalog";
   // provider.opencode-free: its public models select Chat, Responses, or Messages at runtime (adapters/opencode.ts).
   if (provider.id === "opencode") return undefined;
@@ -167,14 +153,12 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
   const paths = PATHS[protocol];
   const headers = { ...Object.fromEntries(Object.entries(provider.headers).map(([name, value]) => [name.toLowerCase(), value])), ...EXTRA_HEADERS[provider.id] };
   const opencode = provider.id === "opencode";
-  // 9router authenticates every API key of the Anthropic family with a raw x-api-key, whatever the entry says.
   const auth: ProviderDescriptor["auth"] = provider.auth.kinds.includes("none") && !provider.auth.kinds.includes("api-key") && !signIn
     ? { kind: "none" }
     : protocol === "anthropic"
     ? { kind: "api-key", header: "x-api-key", scheme: "raw" }
     // translator.openai-to-gemini-request: an API key goes in x-goog-api-key (the catalog records the OAuth header).
     : protocol === "gemini" ? { kind: "api-key", header: "x-goog-api-key", scheme: "raw" }
-    // provider.vertex-google-auth: an API key goes in x-goog-api-key (9router: the URL); a JSON credential becomes a Bearer token.
     : GOOGLE_CLOUD.has(provider.id) ? { kind: "api-key", header: "x-goog-api-key", scheme: "raw", googleCloud: true }
     : { kind: "api-key", header: provider.auth.header ?? "authorization", scheme: provider.auth.scheme === "raw" ? "raw" : "bearer", ...(provider.id === "ollama-local" ? { optional: true } : {}) };
   return {
@@ -189,7 +173,6 @@ export function toDescriptor(provider: CatalogProvider, chatUrl: string): Provid
     auth,
     models: provider.models.map((m) => ({
       id: m.id, name: m.name, ...(m.upstreamModelId ? { upstreamModelId: m.upstreamModelId } : {}), kind: m.kind === "llm" ? "chat" : m.kind, capabilities: m.capabilities, contextWindow: m.contextWindow,
-      // 9router mixes sources: tencent's registry declares a 200000 context while the *hunyuan* pattern
       // gives a 262144 output. An output limit above the context window is not trusted, so it is unknown.
       maxOutputTokens: m.contextWindow !== null && m.maxOutputTokens !== null && m.maxOutputTokens > m.contextWindow ? null : m.maxOutputTokens,
     })),

@@ -41,9 +41,7 @@ export function renderCapabilities(entries: FeatureEntry[]): string {
         );
       }
       // Suspected-bug entries are still capabilities AIGate must have — the
-      // defect they carry in 9router does not exempt the underlying behavior
       // from being required. State what AIGate must do; never restate
-      // 9router's actual (buggy) behavior here — that lives only in the
       // "Suspected bugs" table below.
       if (e.labels.includes("SUSPECTED_BUG") && e.suspicion) {
         out.push(`- **AIGate required behavior:** ${e.suspicion.expected}`);

@@ -1,6 +1,5 @@
 import { PRICE_FIELDS, type PriceField, type PriceOverride } from "@aigate/engine";
 
-// docs/contracts/usage.md "Pricing PATCH" (pricing.crud-api validation, kept from 9router).
 export const MAX_PATCH_MODELS = 500;
 export const MAX_OVERRIDES = 5_000;
 const MAX_ID = 200;

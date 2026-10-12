@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import fg from "fast-glob";
-import { NINEROUTER_ROOT, resolveRef } from "./paths.js";
+import { REFERENCE_ROOT, resolveRef } from "./paths.js";
 
 export type Inventory = {
   routes: string[];
@@ -15,7 +15,7 @@ export type Inventory = {
 const IGNORE = ["**/node_modules/**", "**/.next/**", "**/dist/**"];
 
 function glob(pattern: string): string[] {
-  return fg.sync(pattern, { cwd: NINEROUTER_ROOT, ignore: IGNORE });
+  return fg.sync(pattern, { cwd: REFERENCE_ROOT, ignore: IGNORE });
 }
 
 const sorted = (xs: string[]): string[] => [...new Set(xs)].sort();

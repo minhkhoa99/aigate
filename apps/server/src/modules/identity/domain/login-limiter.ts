@@ -2,7 +2,6 @@
 const MAX_FAILS_BEFORE_LOCK = 5;
 const LOCK_STEPS_MS = [30_000, 120_000, 600_000, 1_800_000];
 const FAIL_WINDOW_MS = 60 * 60_000;
-// 9router's map had no bound. ponytail: oldest client is evicted first; an attacker with more
 // than this many source addresses can reset its own entry, which a per-IP limiter cannot stop anyway.
 const MAX_TRACKED_CLIENTS = 10_000;
 

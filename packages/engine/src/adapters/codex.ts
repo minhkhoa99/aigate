@@ -2,7 +2,6 @@ import { CATALOG } from "../catalog/providers.generated.js";
 import { isRecord, list, record, text, type Json } from "../json.js";
 import { CODEX_DEFAULT_INSTRUCTIONS } from "./codex-instructions.js";
 
-// provider.codex-oauth (docs/contracts/oauth.md), kept as 9router has it (user decision 2026-09-27): what 9router's
 // CodexExecutor does to a Responses body, and how it reads the codex model list.
 
 // Server-generated item ids that /responses cannot resolve with store false.
@@ -70,7 +69,6 @@ function normalizeTools(body: Json): void {
 // Codex declares auto, none, low, medium and high; max and ultra become xhigh.
 const normalizeEffort = (value: unknown): unknown => (value === "max" || value === "ultra" ? "xhigh" : value);
 
-// 9router's CodexExecutor.transformRequest.
 export function codexBody(source: Json, sessionId: string): Json {
   const body: Json = { ...source };
   delete body._compact;
@@ -112,7 +110,6 @@ export function codexBody(source: Json, sessionId: string): Json {
   return Object.fromEntries(Object.entries(body).filter(([key]) => ALLOWED.has(key)));
 }
 
-// 9router's CodexExecutor keeps the compact flag on a shared instance and builds the URL before reading the request's
 // flag, so a request goes to /compact when the one before it asked for compaction (kept by user decision 2026-09-27,
 // provider.codex-oauth).
 let previousCompact = false;

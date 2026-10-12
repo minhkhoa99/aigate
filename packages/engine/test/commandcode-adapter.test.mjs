@@ -8,7 +8,6 @@ const credential = { kind: "api-key", apiKey: "user_commandcode_secret_1234" };
 const encoder = new TextEncoder();
 const ctx = () => ({ signal: new AbortController().signal, requestId: "test" });
 const stream = (text) => new ReadableStream({ start(controller) { controller.enqueue(encoder.encode(text)); controller.close(); } });
-// All lines in one read: 9router's peek loses what follows the first content event; AIGate must not.
 const ndjson = (events) => ({ status: 200, headers: { "content-type": "application/x-ndjson" }, body: stream(events.map((e) => (typeof e === "string" ? e : JSON.stringify(e))).join("\n") + "\n") });
 const json = (status, value) => ({ status, headers: { "content-type": "application/json" }, body: stream(JSON.stringify(value)) });
 function fakeTransport(...answers) {

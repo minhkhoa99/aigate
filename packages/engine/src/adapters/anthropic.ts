@@ -15,7 +15,6 @@ const CHAT_TIMEOUT_MS = 300_000;
 const STREAM_TIMEOUT_MS = 600_000;
 const MAX_LISTED_MODELS = 1_000;
 const MAX_TOOL_CALLS = 128;
-// translator.openai-to-claude-request: the 9router output budget rules.
 const DEFAULT_MAX_TOKENS = 64_000;
 const MIN_MAX_TOKENS_WITH_TOOLS = 32_000;
 const THINKING_HEADROOM = 1_024;
@@ -26,8 +25,6 @@ const STOP_REASONS = new Map<string, StopReason>([
   ["refusal", "content_filter"], ["model_context_window_exceeded", "max_tokens"],
 ]);
 const CONTENT_BLOCKS = new Set(["text", "thinking", "redacted_thinking", "tool_use"]);
-// connection.anthropic-compatible-node, kept as 9router has it (user decision 2026-09-26): claude-* models on a
-// custom Anthropic node get the Claude Code beta list, and the connection test is 9router's.
 const CLAUDE_CODE_BETA = "claude-code-20250219";
 const REDACT_THINKING_BETA = "redact-thinking-2026-02-12";
 const NODE_BETAS = [
@@ -37,7 +34,6 @@ const NODE_BETAS = [
 const HEAVY_AGENT_BETAS = ["advanced-tool-use-2025-11-20", "effort-2025-11-24"];
 const NODE_TEST_MODEL = "claude-3-haiku-20240307";
 
-// provider.claude-oauth: the claude provider sends the list whatever the model (9router selectAnthropicBeta).
 function nodeBetas(body: Json, official: boolean, anyModel = false): string | undefined {
   const model = text(body.model) ?? "";
   if (!anyModel && !model.startsWith("claude-")) return undefined;
@@ -100,7 +96,6 @@ function userBlock(part: ContentPart): Json {
 }
 
 // lenient (the claude provider): unsigned thinking goes out with an empty signature, and claudeCodeBody drops it, as
-// 9router keeps only signed thinking for claude.
 function assistantBlock(part: ContentPart, lenient: boolean): Json {
   switch (part.type) {
     case "text": return textBlock(part);
@@ -247,7 +242,6 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
   }
 
   async getModels(credential: Credential, ctx: ExecCtx): Promise<readonly ListedModel[]> {
-    // provider.claude-oauth (kept from 9router): the claude model list sends the OAuth token as x-api-key, with only the
     // version header.
     const request = this.claudeCode
       ? {
@@ -401,7 +395,6 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
     };
   }
 
-  // provider.claude-oauth: the claude provider (claudeCode quirk) gets 9router's preparation and, for an OAuth token,
   // cloaking; names gives the cloaked tool names back.
   private get claudeCode(): boolean {
     return this.provider.quirks?.includes("claudeCode") ?? false;
@@ -411,7 +404,6 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
     const timeoutMs = stream ? STREAM_TIMEOUT_MS : CHAT_TIMEOUT_MS;
     const body = this.body(request, stream);
     const ceiling = this.known.get(request.model)?.maxOutputTokens ?? null;
-    // provider.github-copilot-oauth: Copilot's /v1/messages gets 9router's preparation for a provider that is not claude.
     if (this.provider.quirks?.includes("copilotMessages")) return { http: this.post(copilotMessagesBody(body, ceiling), credential, timeoutMs, stream), names: NO_NAMES };
     if (!this.claudeCode) return { http: this.post(body, credential, timeoutMs, stream), names: NO_NAMES };
     const prepared = await claudeCodeBody(body, credential.apiKey, credential.sessionId, ceiling);
@@ -419,7 +411,6 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
   }
 
   private post(body: Json, credential: Credential, timeoutMs: number, stream: boolean): HttpRequest {
-    // provider.claude-oauth: 9router posts the claude provider to <chatUrl>?beta=true.
     const base = this.request("POST", this.claudeCode ? `${this.provider.chatUrl}?beta=true` : this.provider.chatUrl, credential, timeoutMs);
     const node = this.provider.anthropicNode;
     const beta = this.claudeCode ? nodeBetas(body, true, true) : node ? nodeBetas(body, node.official) : undefined;
@@ -430,7 +421,6 @@ export class AnthropicAdapter extends HttpProviderAdapter implements AIProviderP
     };
   }
 
-  // 9router: <base>/v1/messages (so /v1/v1/messages with the default base), a retired model, and every status but
   // 401/403 counts as a valid key. A network failure is still thrown, so the dashboard shows it as unreachable.
   private async nodeTest(credential: Credential, ctx: ExecCtx): Promise<CredentialStatus> {
     const base = this.request("POST", this.provider.chatUrl.replace(/\/messages$/, "/v1/messages"), credential, METADATA_TIMEOUT_MS);

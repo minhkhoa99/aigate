@@ -53,7 +53,6 @@ export interface ProviderDescriptor {
     readonly defaults?: Readonly<Partial<Record<ConnectionField, string>>>;
   };
   // The connection test posts this chat body; a status in invalidStatuses is an answer about the key, anything else
-  // passes (9router's test for azure and cloudflare-ai). {model} in the URL becomes `model`.
   readonly chatProbe?: { readonly model: string; readonly body: Readonly<Record<string, unknown>>; readonly invalidStatuses: readonly number[] };
   readonly models: readonly ModelDescriptor[];
   // provider.cline-recommended-models: a second list the model import adds, from these arrays of { id } in its answer.
@@ -63,7 +62,6 @@ export interface ProviderDescriptor {
   readonly quirks?: readonly string[];
   // The provider refuses non-streaming chat: execute() streams and collapses the answer (routing.forced-stream-json-collapse).
   readonly streamOnly?: boolean;
-  // An Anthropic-compatible custom provider (connection.anthropic-compatible-node); official = 9router's api.anthropic.com test.
   readonly anthropicNode?: { readonly official: boolean };
   // SP16 (docs/contracts/oauth.md): the provider can be connected by signing in, with this flow.
   readonly oauth?: OAuthFlow;
@@ -71,7 +69,6 @@ export interface ProviderDescriptor {
   readonly organizationHeader?: string;
   // SP16b: the header a signed-in connection's account id goes in (provider.codex-oauth: ChatGPT-Account-ID).
   readonly accountIdHeader?: string;
-  // SP16b: the connection test reads the stored token expiry and calls nobody (provider.claude-oauth, kept from 9router).
   readonly testByExpiry?: boolean;
   // A custom provider that asks for it (docs/contracts/custom-providers.md): a request that fails before its first content
   // with a 429 or a stream error event is sent again, at most twice (adapters/stream-retry.ts).
@@ -90,7 +87,6 @@ export const PROVIDER_PROTOCOLS = ["openai-compatible", "anthropic", "openai-res
 export type ProviderProtocol = (typeof PROVIDER_PROTOCOLS)[number];
 
 // The descriptor a connection talks to. ollama-local: its own host, one trailing "/" removed (resolveOllamaLocalHost).
-// azure / cloudflare-ai: the {field} tokens filled from the connection, values URL-encoded (9router encodes nothing),
 // and OpenAI-Organization when the connection has an organization.
 export function withConnection(connected: ProviderDescriptor, data: ConnectionData): ProviderDescriptor {
   // The organization header, for azure (a connection field) and kilocode (from the sign-in).

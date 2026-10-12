@@ -11,7 +11,6 @@ export const providerThinking = sqliteTable("provider_thinking", {
 }, () => [check("provider_thinking_level", sql.raw(`level IN (${THINKING_LEVEL_VALUES.map((level) => `'${level}'`).join(", ")})`))]);
 
 // docs/contracts/custom-models.md (SP16a). Chat model ids the operator added to a provider, by hand or from its /models.
-// provider is a catalog provider id or a custom provider id, so it has no foreign key; like 9router, deleting a custom
 // provider leaves its rows (catalog.custom-models-orphan-on-node-delete, kept by user decision).
 export const customModels = sqliteTable("custom_models", {
   provider: text("provider").notNull(),

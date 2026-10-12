@@ -10,7 +10,6 @@ export type NodeType = (typeof NODE_TYPES)[number];
 // connection.provider-node-api-type: the OpenAI API an openai-compatible node speaks.
 export const API_TYPES = ["chat", "responses"] as const;
 export type ApiType = (typeof API_TYPES)[number];
-// The 9router defaults when a custom provider names no base URL (user decisions 2026-09-26: keep 9router behavior).
 export const DEFAULT_BASE_URLS: Readonly<Record<NodeType, string>> = {
   "openai-compatible": "https://api.openai.com/v1",
   "anthropic-compatible": "https://api.anthropic.com/v1",
@@ -52,14 +51,12 @@ function parseName(value: unknown): Parsed<string> {
   return name.length > 0 && name.length <= MAX_NAME ? { ok: true, value: name } : fail(`name must be 1-${MAX_NAME} characters`);
 }
 
-// 9router only trims the prefix (connection.provider-node-create-list). A reserved, duplicate, or "/"-containing
 // prefix is stored as given; /v1 then never reaches it, and the dashboard marks the card Unreachable.
 function parsePrefix(value: unknown): Parsed<string> {
   const prefix = typeof value === "string" ? value.trim() : "";
   return prefix.length > 0 && prefix.length <= MAX_PREFIX ? { ok: true, value: prefix } : fail(`prefix must be 1-${MAX_PREFIX} characters`);
 }
 
-// Stored trimmed, as 9router does: a pasted "/chat/completions" is kept, and one trailing "/" is dropped when the URL is built.
 export function parseBaseUrl(value: unknown): Parsed<string> {
   const base = typeof value === "string" ? value.trim() : "";
   if (base === "" || base.length > MAX_URL || /\s/.test(base)) return fail(`baseUrl must be a URL of at most ${MAX_URL} characters, without spaces`);
@@ -180,7 +177,6 @@ export function parseNewNode(input: unknown): Parsed<NodeFields> {
   const { name, prefix, baseUrl, apiType, customHeaders, retryStreamErrors, thinking } = parsed.value;
   if (name === undefined) return fail(`name must be 1-${MAX_NAME} characters`);
   if (prefix === undefined) return fail("prefix is required");
-  // 9router refuses a missing apiType; AIGate keeps chat, the only API before SP14c, so older clients still work.
   return {
     ok: true,
     value: {

@@ -1,8 +1,6 @@
 import type { CanonicalRequest } from "../cip.js";
 import { list, record, text, type Json } from "../json.js";
 
-// provider.claude-oauth and translator.claude-oauth-cloaking (docs/contracts/oauth.md), kept as 9router has them (user
-// decision 2026-09-27): what 9router's prepareClaudeRequest and cloaking do to a Messages body for the claude provider.
 // The body is the finished Messages JSON; nothing here calls the network.
 
 export const CLAUDE_CODE_PROMPT = "You are Claude Code, Anthropic's official CLI for Claude.";
@@ -19,7 +17,6 @@ const DECOY_NAMES = [
   "NotebookEdit", "WebFetch", "WebSearch", "AskUserQuestion", "Skill", "EnterPlanMode", "ExitPlanMode",
 ];
 const DECOYS = DECOY_NAMES.map((name) => ({ name, description: "This tool is currently unavailable.", input_schema: { type: "object", properties: {} } }));
-// 9router's DEFAULT_THINKING_CLAUDE_SIGNATURE, sent on the placeholder thinking block.
 const PLACEHOLDER_SIGNATURE = "EpwGCkYIChgCKkCzVUuRrg7CcglSUWEef4rH6o35g9UYS8ZPe0/VomQTBsFx6sttYNj5l8GqgW6ejuHyYqpFToxIbZl0bw17l5dJEgzCnqDO0Z8fRlMrNgsaDLS1cnCjC53KBqE0CCIwAADQdo1eO+7qPAmo8J4WR3JPmr92S97kmvr5K1iPMiOpkZNj8mEXW8uzBoOJs/9ZKoMFiqHJ3UObwaJDqFOW70E9oCwDoc6jesaWVAEdN5vWfKMpIkjFJjECdjIdkxyJNJ8Ib8yXVal3qwE7uThoPRqSZDdHB5mmwPEjWE/90cSYCbtX2YsJki1265CabBb8/QEkODXg4kgRrL+c8e8rRXz/dr1RswvaPuzEdGKHRNi9UooNUeOK4/ebx1KkP9YZttyohN9GWqlts36kOoW0Cfie/ABDgF9g534BPth/sstxDM6d79QlRmh6NxizyTF74DXJI34u0M4tTRchqE5pAq85SgdJaa+dix1yJPMji8m6nZkwJbscJb9rdc2MKyKWjz8QL2+rTSSuZ2F1k1qSsW0xNcI7qLcI12Vncfn/VqY6YOIZy/saZBR0ezXvN6g+UYbuIdyVg7AyIFZt3nbrO7/kmOEb2VKzygwklHGEIJHfFgMpH3JSrAzbZIowVHOF7VaJ+KXRFDCFin7hHTOiOsdg+1ij1mML9Z/x/9CP4b7OUcaQm1llDZPSHc6rZMNL3DdB+fW5YfmNgKU35S+7AMtA10nVILzDAk1UV4T2K9Do09JlI6rjOs9UuULlIN2Z0eE8YTlANR6uQcw7lMcdfqYE8tke4rDKc2dDiaS5vVe45VewICNpdXGN11yw8QqH7p27CR1HtN30e0tHXOR3bIwWk/Yb6O5fTaKG6Ri8e5ZCPvdD9HqepVi188nM0iTjJqL58F3ni04ECIhcbyaQWnuTes1Kw4CMwiZDLQkk8Hgz7HkUOf1btQTF/0nhD7ry0n0hAEg2PaDM3V6TjOjf4hEldRmeqERcQF1PfgKb6ZM12rlIIfUqKACczWJSzTV158+47HX36o0cgux6nFlv/DE+sEiRVxgB";
 const SIGNATURE_MARKER = 0x12;
 
@@ -82,7 +79,6 @@ function prepareMessages(raw: readonly Json[], thinkingOn: boolean, claude: bool
     return finalAssistant || content.some(hasContent) ? [{ ...message, content }] : [];
   });
   const messages = fixToolUseOrdering(kept);
-  // 9router also needs the last turn to be the user's; AnthropicAdapter already refuses thinking after an assistant turn.
   const thinkingEnabled = thinkingOn;
   let marked = false;
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -94,7 +90,6 @@ function prepareMessages(raw: readonly Json[], thinkingOn: boolean, claude: bool
       if (last >= 0) content[last] = { ...content[last], cache_control: EPHEMERAL };
       marked = true;
     }
-    // Other providers keep their thinking blocks as they are (9router handlesThinkingBlocks is false for them).
     if (!claude) {
       message.content = content;
       continue;
@@ -127,8 +122,6 @@ function hoistToolResultImages(messages: Json[]): Json[] {
   });
 }
 
-// 9router's prepareClaudeRequest, for provider "claude" or (claude false) another provider on a Messages endpoint. The
-// client's cache marks give way to 9router's: 1 h on the last system block and tool, 5 min on the last assistant block.
 function prepare(body: Json, ceiling: number | null, claude = true): Json {
   const out: Json = { ...body };
   if (typeof out.max_tokens === "number") {
@@ -168,7 +161,6 @@ function prepare(body: Json, ceiling: number | null, claude = true): Json {
   return out;
 }
 
-// provider.github-copilot-oauth: Copilot's /v1/messages gets 9router's prepareClaudeRequest for a provider that is not
 // claude (no thinking rules, no cloaking).
 export const copilotMessagesBody = (body: Json, ceiling: number | null): Json => prepare(body, ceiling, false);
 
@@ -228,7 +220,6 @@ export async function claudeCodeBody(body: Json, token: string, sessionId: strin
   return cloakTools(await cloak(prepared, token, sessionId));
 }
 
-// 9router's openai-to-claude: a request from a non-Claude client gets the Claude Code prompt in front, and its own system
 // parts joined into one block after it (Claude clients keep their system prompt as sent).
 export function withClaudeCodePrompt(request: CanonicalRequest): CanonicalRequest {
   const joined = (request.system ?? []).flatMap((part) => (part.type === "text" && part.text ? [part.text] : [])).join("\n");

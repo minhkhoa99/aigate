@@ -1,9 +1,6 @@
 // The recorded scenarios for the M1 lane (OpenAI Chat in, OpenAI-compatible upstream out).
-// `body` is what the client sends (the recorder adds a per-scenario model, because 9router locks a
 // failing account per model). `vendor` is the scripted upstream answer. `covers` names the Feature
 // Matrix entries each tape exercises (coverage, spec §8.5).
-// `deviations` are the intentional differences from 9router, found by recording, each tied to its
-// labeled matrix entry; tier 1 checks that AIGate shows the expected value instead of 9router's.
 
 const completion = (message, finish = "stop") => ({
   id: "chatcmpl-vendor-1", object: "chat.completion", created: 1_700_000_000, model: "gpt-4.1-mini",
@@ -91,8 +88,6 @@ export const SCENARIOS = [
   },
 ];
 
-// Intentional differences from 9router, each tied to its labeled matrix entry and the contract that
-// decided it. Found by recording 9router 0.5.86 (tools/parity/tapes); tier 1 fails on any other difference.
 const USAGE_BUFFER = {
   entry: "routing.non-streaming-response", label: "SUSPECTED_BUG",
   reason: "9router adds 2000 buffer tokens to reported usage (open-sse/utils/usageTracking.js addBufferToUsage); AIGate reports the vendor's numbers",

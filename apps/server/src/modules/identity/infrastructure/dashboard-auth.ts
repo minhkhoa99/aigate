@@ -19,7 +19,6 @@ export class DashboardAuth {
   async isAuthenticated(request: FastifyRequest): Promise<boolean> {
     const token = readSessionToken(request);
     if (token && (await this.identity.isSessionValid(token))) return true;
-    // requireLogin=false exempts local clients only; 9router exempted every caller (SUSPECTED_BUG).
     return isLocal(request) && !(await this.settings.get()).requireLogin;
   }
 }

@@ -24,7 +24,6 @@ export interface CanonicalMessage {
   readonly role: "user" | "assistant" | "tool";
   readonly content: readonly ContentPart[];
   // A cache mark on the whole message (OpenAI Chat clients): OpenAI-compatible providers get it on the message, as
-  // 9router sends it; Anthropic puts it on the message's last text (docs/contracts/protocol-openai.md).
   readonly cacheControl?: "ephemeral";
 }
 
@@ -82,7 +81,6 @@ export type StreamChunk =
   | { readonly type: "text_delta"; readonly index: number; readonly text: string }
   | { readonly type: "thinking_delta"; readonly index: number; readonly text: string; readonly signature?: string }
   | { readonly type: "tool_call_delta"; readonly index: number; readonly id?: string; readonly name?: string; readonly argumentsDelta: string }
-  // A generated image (Gemini image output; translator.gemini-to-openai-response renders it as 9router's images delta).
   | { readonly type: "image_delta"; readonly mediaType: string; readonly data: string }
   | { readonly type: "usage"; readonly usage: TokenUsage }
   | { readonly type: "stop"; readonly stopReason: StopReason };

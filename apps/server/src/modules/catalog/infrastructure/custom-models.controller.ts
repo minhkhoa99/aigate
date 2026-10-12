@@ -1,7 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Post, Query } from "@nestjs/common";
 import { CustomModelsRepository } from "./custom-models.repo.js";
 
-// docs/contracts/custom-models.md. Protected by the global dashboard guard. As in 9router (kept by user decision),
 // the provider and the ids are not checked beyond being non-empty strings.
 const MAX_IDS = 1000;
 const REQUIRED = "provider and ids required";

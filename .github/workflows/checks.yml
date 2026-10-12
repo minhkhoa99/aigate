@@ -29,9 +29,9 @@ jobs:
       - run: pnpm lint:check
       - run: pnpm test
         env:
-          NINEROUTER_PATH: ${{ github.workspace }}/9router
+          REFERENCE_PATH: ${{ github.workspace }}/9router
       - run: pnpm discovery validate
         env:
-          NINEROUTER_PATH: ${{ github.workspace }}/9router
+          REFERENCE_PATH: ${{ github.workspace }}/9router
       - run: pnpm build
       - run: pnpm --filter @aigate/database test:bun

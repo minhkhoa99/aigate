@@ -11,20 +11,17 @@ import { METADATA_TIMEOUT_MS } from "./http-adapter.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
 import { OpenAIResponsesAdapter } from "./openai-responses.js";
 
-// provider.github-copilot-oauth (docs/contracts/oauth.md), kept as 9router's GithubExecutor has it (user decision
 // 2026-09-27): a model named *claude* goes to Copilot's /v1/messages, a model known to need it to /responses (both always
 // streamed), anything else to /chat/completions, and a 400 saying the model is not served there moves it to /responses
 // for the rest of the process. The credential is the Copilot token.
 
 const BASE = "https://api.githubcopilot.com";
 const MAX_LISTED_MODELS = 1_000;
-// 9router's model list names older VS Code and Copilot Chat versions than its requests (kept).
 const MODELS_HEADERS = {
   "content-type": "application/json", "copilot-integration-id": "vscode-chat", "editor-version": "vscode/1.107.1", "editor-plugin-version": "copilot-chat/0.26.7",
   "user-agent": "GitHubCopilotChat/0.26.7",
 };
 const MOVE_TO_RESPONSES = ["not accessible via the /chat/completions endpoint", "The requested model is not supported"];
-// Remembered per process, as 9router's knownCodexModels (a restart pays one failed call per model again).
 const responsesModels = new Set<string>();
 
 const isClaude = (model: string) => /claude/i.test(model);
@@ -52,7 +49,6 @@ export class GithubAdapter implements AIProviderPort {
   }
 
   async *stream(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): AsyncGenerator<StreamChunk> {
-    // 9router's /v1/messages translation always puts the Claude Code prompt in front.
     if (isClaude(request.model)) return yield* this.messages().stream(withClaudeCodePrompt({ ...request, stream: true }), credential, ctx);
     if (this.onResponses(request.model)) return yield* this.responses().stream({ ...request, stream: true }, credential, ctx);
     const iterator = this.chat().stream(request, credential, ctx)[Symbol.asyncIterator]();
@@ -71,7 +67,6 @@ export class GithubAdapter implements AIProviderPort {
     }
   }
 
-  // 9router's Copilot model list: chat models that are not disabled, read with the stored Copilot token.
   async getModels(credential: Credential, ctx: ExecCtx): Promise<readonly ListedModel[]> {
     const response = await this.transport.send({
       method: "GET", url: `${BASE}/models`, headers: { ...MODELS_HEADERS, authorization: `Bearer ${credential.apiKey}` }, timeoutMs: METADATA_TIMEOUT_MS,

@@ -140,7 +140,6 @@ test("the connection test mints a fresh token or probes the key", async () => {
   const minted = fakeTransport(token("fresh"));
   assert.deepEqual(await new VertexAdapter(vertex, minted).validateCredential(serviceAccount("sa-one@my-proj.iam.gserviceaccount.com"), ctx()), { valid: true });
   assert.equal(minted.calls.length, 1, "a cached token is not enough");
-  // 9router: a key pasted with literal backslash-n sequences instead of line breaks still signs.
   const escaped = fakeTransport(token("escaped"));
   assert.deepEqual(await new VertexAdapter(vertex, escaped).validateCredential(serviceAccount("sa-seven@p.iam", { private_key: privateKey.replace(/\n/g, "\\n") }), ctx()), { valid: true });
   const probes = fakeTransport(

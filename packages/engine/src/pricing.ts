@@ -33,7 +33,6 @@ function builtin(provider: string, model: string): { price: Price; source: Price
 }
 
 // The user's override wins field by field; an override of an unpriced model prices what it sets and 0 for the rest of
-// input/output (9router replaced the whole entry, so a partial override billed NaN).
 export function resolvePrice(provider: string, model: string, override?: PriceOverride): { price: Price | null; source: PriceSource } {
   const found = builtin(provider, model);
   if (!override || Object.keys(override).length === 0) return found ?? { price: null, source: "none" };

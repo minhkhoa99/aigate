@@ -1,6 +1,5 @@
 // Replays tapes against AIGate (spec §8.2): the tape's client request goes in, the vendor is stubbed
 // with the tape's upstream response, and the two client responses are compared semantically.
-//   tier 1: every difference from 9router must be a declared, labeled deviation with AIGate's value.
 //   tier 3: differences in the upstream request are reported, never failed ("different ≠ wrong").
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -70,12 +69,12 @@ async function bootAigate(transport) {
 const covers = (path, prefix) => prefix === "*" || path === prefix || path.startsWith(`${prefix}.`) || path.startsWith(`${prefix}[`);
 
 // Tier 1 verdict: undeclared differences fail; each declared deviation must show AIGate's expected value.
-export function judge(ninerouter, aigate, deviations = []) {
+export function judge(reference, aigate, deviations = []) {
   const problems = [];
-  const differing = diff(ninerouter, aigate);
+  const differing = diff(reference, aigate);
   for (const path of differing) {
     if (!deviations.some((d) => covers(path, d.path))) {
-      problems.push(`undeclared difference at ${path}: 9router ${JSON.stringify(get(ninerouter, path))}, AIGate ${JSON.stringify(get(aigate, path))}`);
+      problems.push(`undeclared difference at ${path}: 9router ${JSON.stringify(get(reference, path))}, AIGate ${JSON.stringify(get(aigate, path))}`);
     }
   }
   for (const d of deviations) {
@@ -106,7 +105,7 @@ export async function replayAll(tapes) {
         id: tape.id, title: tape.title, gateway: tape.gateway,
         tier1: judge(theirs, ours, scenario?.deviations),
         tier3: tape.upstreamRequest && sent ? diff(normalizeUpstream(tape.upstreamRequest.body), normalizeUpstream(sent.body)) : [],
-        upstreamCalls: { ninerouter: tape.upstreamCalls, aigate: transport.state.sent.length },
+        upstreamCalls: { reference: tape.upstreamCalls, aigate: transport.state.sent.length },
         ours, theirs, sent,
       });
     }

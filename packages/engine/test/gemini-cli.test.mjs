@@ -1,5 +1,4 @@
 // Contract: docs/contracts/oauth.md (SP16c) — Gemini CLI sign-in, refresh, the Cloud Code envelope, project lookup,
-// model list and connection test, kept as 9router has them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { builtinRegistry, createAdapter, GeminiCliAdapter, OAUTH_PROVIDERS } from "../dist/index.js";

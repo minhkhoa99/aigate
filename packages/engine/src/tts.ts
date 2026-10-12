@@ -270,7 +270,6 @@ const SOURCES: Readonly<Record<string, TtsVoiceSource>> = {
 
 export const ttsVoiceSource = (provider: string): TtsVoiceSource | undefined => SOURCES[provider];
 
-// The connection test of a TTS-only service: a GET of its own list. 401/403 is a bad key (9router probeMediaProvider).
 export function ttsProbe(service: string, apiKey: string, timeoutMs: number): HttpRequest | undefined {
   if (service === "fish-audio") return { method: "GET", url: "https://api.fish.audio/model?page_size=1", headers: { authorization: `Bearer ${apiKey}`, accept: "application/json" }, timeoutMs };
   return service === "elevenlabs" || service === "inworld" ? SOURCES[service].request(apiKey, timeoutMs) : undefined;

@@ -23,7 +23,6 @@ const PROTOCOLS: Readonly<Record<NodeType, { label: string; hint: string; placeh
     label: "Anthropic compatible",
     hint: "The upstream API URL before /messages, not this AIGate gateway URL (a pasted /messages is removed). Empty means https://api.anthropic.com/v1. https, or http to this machine only.",
     placeholder: "https://api.anthropic.com/v1",
-    // connection.anthropic-compatible-node: kept as 9router tests it.
     test: "Add its API key; like 9router, the test posts to <base URL>/v1/messages and accepts any answer except 401/403",
   },
 };
@@ -117,7 +116,6 @@ function NodeForm({ node, type, onType }: { node?: ProviderNode; type: NodeType;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const baseUrl = text(event.currentTarget, "baseUrl");
-    // An empty base URL is left out, so the server applies the 9router default.
     const apiType = type === "openai-compatible" ? apiTypeParam(text(event.currentTarget, "apiType")) : undefined;
     const fields = {
       name: text(event.currentTarget, "name"), prefix: text(event.currentTarget, "prefix"), ...(baseUrl ? { baseUrl } : {}), ...(apiType ? { apiType } : {}),

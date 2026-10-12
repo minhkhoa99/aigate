@@ -32,7 +32,6 @@ export function classifyStatus(status: number, upstreamCode: string | undefined)
   return "INVALID_REQUEST";
 }
 
-// provider.codex-oauth (9router's CodexExecutor.parseError): the reset of a usage_limit_reached error, from resets_at
 // (epoch seconds) or else resets_in_seconds; only a time still ahead counts.
 export function usageResetMs(error: Readonly<Record<string, unknown>>, now: number): number | undefined {
   const { resets_at: at, resets_in_seconds: inSeconds } = error;
@@ -78,7 +77,6 @@ export abstract class HttpProviderAdapter {
     // provider.cline-oauth: a Cline OAuth token goes as "workos:<jwt>".
     const key = this.provider.quirks?.includes("clineAuth") ? clineAccessToken(credential.apiKey) : credential.apiKey;
     const headers = { ...this.provider.headers, [header]: scheme === "bearer" ? `Bearer ${key}` : key };
-    // connection.anthropic-compatible-node: 9router also sends the key as Bearer to any gateway but api.anthropic.com.
     if (this.provider.anthropicNode?.official === false) headers.authorization = `Bearer ${credential.apiKey}`;
     return { method, url, headers, timeoutMs };
   }
@@ -122,7 +120,6 @@ export abstract class HttpProviderAdapter {
     });
   }
 
-  // 9router's streaming check: a body without a content type is read as SSE (codex sends none), and any other type (an
   // HTML error page, JSON) is refused with the page title, the upstream error message, or a short body.
   protected async sseBody(response: HttpResponse, credential: Credential): Promise<ReadableStream<Uint8Array>> {
     const type = (response.headers["content-type"] ?? "").toLowerCase();

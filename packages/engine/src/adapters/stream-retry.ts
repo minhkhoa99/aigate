@@ -3,7 +3,6 @@ import { EngineError } from "../errors.js";
 import type { AIProviderPort, Credential, CredentialStatus, ExecCtx, ListedModel } from "../ports.js";
 import { withRetry } from "../retry.js";
 
-// A custom provider with retryStreamErrors (docs/contracts/custom-providers.md; an AIGate option, not in 9router): a
 // request that fails before its first content is sent again, five times at most, as opencode retries such errors
 // (2 s, then doubling, at most 30 s: 2, 4, 8, 16, 30 s). Only a 429 that is not a spent quota, or an error the stream
 // sent before any event (partial: false), counts; the HTTP layer already retries 502/503/504 and network failures.

@@ -1,4 +1,3 @@
-// provider.codex-oauth: 9router's CODEX_DEFAULT_INSTRUCTIONS (open-sse/config/codexInstructions.js), the Codex CLI prompt a
 // codex request gets when it has no instructions. Copied as is.
 
 export const CODEX_DEFAULT_INSTRUCTIONS = `You are Codex, based on GPT-5. You are running as a coding agent in the Codex CLI on a user's computer.

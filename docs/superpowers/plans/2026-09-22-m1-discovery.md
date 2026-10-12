@@ -1,6 +1,6 @@
 # M-1 Discovery Implementation Plan
 
-> **Execution checkpoint (2026-09-25): M-1 complete against 9Router `39e36d3d` (`v0.5.86`).** Tasks 1-19 have artifacts and the exit gate passes: 283 matrix entries, 166/166 API routes, 11/11 DB repos, 54/54 discovery tests. The unchecked step boxes below are the original procedure, not the current task list. See `docs/PROGRESS_HANDOFF.md` for completed work and the next M0 step. The fixed counts and `E:\` paths below describe the original 2026-09-22 snapshot; set `NINEROUTER_PATH=D:\9router` for the currently verified checkout.
+> **Execution checkpoint (2026-09-25): M-1 complete against 9Router `39e36d3d` (`v0.5.86`).** Tasks 1-19 have artifacts and the exit gate passes: 283 matrix entries, 166/166 API routes, 11/11 DB repos, 54/54 discovery tests. The unchecked step boxes below are the original procedure, not the current task list. See `docs/PROGRESS_HANDOFF.md` for completed work and the next M0 step. The fixed counts and `E:\` paths below describe the original 2026-09-22 snapshot; set `REFERENCE_PATH=D:\9router` for the currently verified checkout.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Repo root is `E:\AIgate`. All paths in this plan are relative to it unless noted.
-- The 9router checkout is at `E:\9router`. It is **read-only reference material**. Never modify it. Configure via env var `NINEROUTER_PATH`, defaulting to `E:/9router`.
+- The 9router checkout is at `E:\9router`. It is **read-only reference material**. Never modify it. Configure via env var `REFERENCE_PATH`, defaulting to `E:/9router`.
 - No AIGate product code is written in M-1. Only `tools/discovery/**` and `docs/**`. (`behavioral.md §4` — discovery precedes design precedes code.)
 - TypeScript `strict: true`. No `any`, no `as` escape hatches.
 - Every matrix entry MUST carry at least one `evidence` item, and every evidence `file` must exist in the 9router checkout with `line` within the file's line count. The validator enforces this.
@@ -45,7 +45,7 @@ tools/discovery/
 ├── tsconfig.json
 ├── vitest.config.ts
 ├── src/
-│   ├── paths.ts              # resolve NINEROUTER_PATH, repo root
+│   ├── paths.ts              # resolve REFERENCE_PATH, repo root
 │   ├── schema.ts             # Zod schema for one Feature Matrix entry
 │   ├── validate.ts           # load + validate all matrix files, incl. evidence existence
 │   ├── inventory.ts          # scan 9router -> Inventory object
@@ -194,7 +194,7 @@ Allowed `errorCases[].code` values: `AUTH_ERROR` · `RATE_LIMIT` · `QUOTA_EXHAU
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `NINEROUTER_ROOT: string`, `REPO_ROOT: string`, `resolveRef(relative: string): string` — all other tasks import these from `../src/paths.js`.
+- Produces: `REFERENCE_ROOT: string`, `REPO_ROOT: string`, `resolveRef(relative: string): string` — all other tasks import these from `../src/paths.js`.
 
 - [ ] **Step 1: Create the workspace root files**
 
@@ -286,10 +286,10 @@ export default defineConfig({
 ```ts
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
-import { NINEROUTER_ROOT, REPO_ROOT, resolveRef } from "../src/paths.js";
+import { REFERENCE_ROOT, REPO_ROOT, resolveRef } from "../src/paths.js";
 
 describe("paths", () => {
-  it("points NINEROUTER_ROOT at a real 9router checkout", () => {
+  it("points REFERENCE_ROOT at a real 9router checkout", () => {
     expect(existsSync(resolveRef("open-sse/providers/index.js"))).toBe(true);
     expect(existsSync(resolveRef("src/app/api"))).toBe(true);
   });
@@ -302,8 +302,8 @@ describe("paths", () => {
     expect(() => resolveRef("../secrets.txt")).toThrow(/escapes/);
   });
 
-  it("exposes NINEROUTER_ROOT as an absolute path", () => {
-    expect(NINEROUTER_ROOT).toMatch(/^([A-Za-z]:|\/)/);
+  it("exposes REFERENCE_ROOT as an absolute path", () => {
+    expect(REFERENCE_ROOT).toMatch(/^([A-Za-z]:|\/)/);
   });
 });
 ```
@@ -327,8 +327,8 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 export const REPO_ROOT = resolve(here, "..", "..", "..");
 
 /** Read-only 9router checkout used as behavioral reference. */
-export const NINEROUTER_ROOT = resolve(
-  process.env["NINEROUTER_PATH"] ?? "E:/9router",
+export const REFERENCE_ROOT = resolve(
+  process.env["REFERENCE_PATH"] ?? "E:/9router",
 );
 
 /**
@@ -337,8 +337,8 @@ export const NINEROUTER_ROOT = resolve(
  * arbitrary files off the machine.
  */
 export function resolveRef(relative: string): string {
-  const full = resolve(NINEROUTER_ROOT, relative);
-  if (full !== NINEROUTER_ROOT && !full.startsWith(NINEROUTER_ROOT + sep)) {
+  const full = resolve(REFERENCE_ROOT, relative);
+  if (full !== REFERENCE_ROOT && !full.startsWith(REFERENCE_ROOT + sep)) {
     throw new Error(`Path escapes 9router root: ${relative}`);
   }
   return full;
@@ -783,7 +783,7 @@ EOF
 - Test: `tools/discovery/test/inventory.test.ts`
 
 **Interfaces:**
-- Consumes: `resolveRef`, `NINEROUTER_ROOT` from `../src/paths.js`.
+- Consumes: `resolveRef`, `REFERENCE_ROOT` from `../src/paths.js`.
 - Produces: `buildInventory(): Inventory` where
   `Inventory = { routes: string[]; pages: string[]; providers: string[]; executors: string[]; translators: string[]; repos: string[]; settingsKeys: string[] }`
   — all arrays sorted and de-duplicated. `routes`/`pages` are `src/app`-relative directory paths; `translators` are 9router-relative file paths; the rest are bare identifiers.
@@ -851,7 +851,7 @@ Expected: FAIL — `Cannot find module '../src/inventory.js'`
 ```ts
 import { readFileSync } from "node:fs";
 import fg from "fast-glob";
-import { NINEROUTER_ROOT, resolveRef } from "./paths.js";
+import { REFERENCE_ROOT, resolveRef } from "./paths.js";
 
 export type Inventory = {
   routes: string[];
@@ -866,7 +866,7 @@ export type Inventory = {
 const IGNORE = ["**/node_modules/**", "**/.next/**", "**/dist/**"];
 
 function glob(pattern: string): string[] {
-  return fg.sync(pattern, { cwd: NINEROUTER_ROOT, ignore: IGNORE });
+  return fg.sync(pattern, { cwd: REFERENCE_ROOT, ignore: IGNORE });
 }
 
 const sorted = (xs: string[]): string[] => [...new Set(xs)].sort();

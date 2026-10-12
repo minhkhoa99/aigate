@@ -69,7 +69,6 @@ export class CombosRepository {
     }
   }
 
-  // Any saved change restarts the combo's rotation (9router resets it on every PUT).
   async update(id: string, changes: Partial<ComboFields>): Promise<Combo | "missing" | "exists"> {
     try {
       const [row] = await this.database.db.update(c).set({ ...changes, updatedAt: new Date() }).where(eq(c.id, id)).returning(columns);

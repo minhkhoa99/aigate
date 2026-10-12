@@ -20,7 +20,6 @@ export class ProviderThinkingRepository {
     return (await this.all()).get(provider);
   }
 
-  // auto deletes the provider's row, as 9router deletes its settings entry.
   async set(provider: string, level: ThinkingLevel | "auto"): Promise<void> {
     if (level === "auto") await this.database.db.delete(t).where(eq(t.provider, provider));
     else {

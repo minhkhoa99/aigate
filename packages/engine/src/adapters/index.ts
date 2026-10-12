@@ -28,7 +28,6 @@ export function createAdapter(provider: ProviderDescriptor, transport: HttpTrans
 
 function familyAdapter(provider: ProviderDescriptor, transport: HttpTransportPort): AIProviderPort {
   if (provider.quirks?.includes("opencodeFree")) return new OpenCodeAdapter(provider, transport);
-  // provider.github-copilot-oauth: Copilot routes each model to one of three families (9router GithubExecutor).
   if (provider.quirks?.includes("copilot")) return new GithubAdapter(provider, transport);
   // provider.gemini-cli-oauth: the Gemini protocol inside Cloud Code's envelope.
   if (provider.quirks?.includes("geminiCli")) return new GeminiCliAdapter(provider, transport);

@@ -409,7 +409,7 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Output:** { success, message, configPath }
 - **Rules:**
   - has9RouterConfig detects either an explicit providers['9router'] entry OR any provider whose base_url contains 'localhost:20128' — a looser heuristic than most other tools' name-only checks
-  - config.toml gets a providers['9router'] entry with api_key_env: 'JCODE_9ROUTER_API_KEY' and env_file: 'provider-9router.env' pointing at where the actual key lives; the key never appears in config.toml itself
+  - config.toml gets a providers['9router'] entry with api_key_env: 'JCODE_AIGATE_API_KEY' and env_file: 'provider-9router.env' pointing at where the actual key lives; the key never appears in config.toml itself
   - The env file path is derived from XDG_CONFIG_HOME (falling back to ~/.config), independent of the jcode config directory itself (~/.jcode) — two different base directories for the two files
   - default_model falls back to a hardcoded 'cc/claude-opus-4-7' if models[] is empty
 - **Errors:** `INVALID_REQUEST` (baseUrl or apiKey missing — 400), `INTERNAL_ERROR` (any error thrown is passed through as error.message with a 500)

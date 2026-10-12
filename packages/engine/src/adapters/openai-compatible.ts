@@ -21,7 +21,6 @@ const STOP_REASONS = new Map<string, StopReason>([
   ["stop", "end_turn"], ["length", "max_tokens"], ["tool_calls", "tool_use"], ["function_call", "tool_use"], ["content_filter", "content_filter"],
 ]);
 
-// provider.codebuddy-request-quirks, kept as 9router has it (user decision 2026-09-26).
 const NEUTRAL_PROMPT = "You are a helpful AI assistant that helps with software engineering tasks.";
 const MAX_SYSTEM_PROMPT = 2000;
 const AGENT_PATTERN = /you are claude code|claude.?code.+official.+cli|anthropic.+official.+cli|anxthxropic.+official.+cli|you are (?:cursor|windsurf|cline|aider|continue|copilot|cody)|you are an? (?:ai )?(?:coding |code )?agent|cc_entrypoint\s*=\s*(?:cli|vscode|jetbrains|gui)|claude.?code.+issues|give feedback.+claude.?code|you are .{0,30}(?:powerful )?ai agent|orchestration capabilities|OhMyOpenCode|<agent-identity>|<Role>|<Behavior_Instructions>/i;
@@ -49,7 +48,6 @@ function compact(parts: readonly Json[]): string | readonly Json[] {
   return only?.type === "text" && typeof only.text === "string" && only.cache_control === undefined ? only.text : parts;
 }
 
-// 9router's filterToOpenAIFormat (kept by user decision 2026-09-27): a message's cache mark goes on the message for every
 // provider; a text part's only with the preserveCacheControl quirk (the alicode family).
 const EPHEMERAL = { type: "ephemeral" };
 const messageMark = (message: { cacheControl?: "ephemeral" }): Json => (message.cacheControl ? { cache_control: EPHEMERAL } : {});
@@ -83,7 +81,6 @@ export function userPart(part: ContentPart): Json {
   }
 }
 
-// Reasoning in the history goes back as reasoning_content, its signature as encrypted_content (9router's
 // translator.responses-client-request; only a Responses client sends reasoning history here).
 function assistantMessage(parts: readonly ContentPart[], keepCache: boolean): Json {
   const texts: Json[] = [];
@@ -164,7 +161,6 @@ function neutralAgentPrompt(message: Json): Json {
   return { ...message, content: typeof content === "string" ? NEUTRAL_PROMPT : [{ type: "text", text: NEUTRAL_PROMPT }] };
 }
 
-// provider.kimchi-browser-token: what the 9router KimchiExecutor changes in the finished body.
 const KIMCHI_DROPS = ["anthropic_version", "anthropic_beta", "client_metadata", "mcp_servers", "stop_sequences", "thinking", "top_k"];
 const REASONING_PLACEHOLDER_MAX = 8;
 const ANTHROPIC_MODEL = /(^|[-_/])(?:claude|anthropic)(?:[-_/]|$)/i;
@@ -201,7 +197,6 @@ function kimchiBody(body: Json): void {
   if (Array.isArray(body.tools)) body.tools = body.tools.map((tool: unknown) => withoutKeys(tool, ["cache_control"]));
 }
 
-// provider.github-copilot-oauth (kept from 9router): Copilot's /chat/completions takes only text and image_url parts, so
 // other parts go as text, empty text parts go, and a message left with none has null content; the token limit is
 // max_tokens except for gpt-5 and o1/o3/o4 models (AIGate cannot tell which name the client used); reasoning_effort none
 // is dropped; gpt-5.4 loses temperature.
@@ -224,7 +219,6 @@ function copilotChatBody(body: Json): void {
   if (/gpt-5\.4/i.test(model)) delete body.temperature;
 }
 
-// What the 9router CodeBuddy executors change in the finished body.
 function applyQuirks(body: Json, quirks: readonly string[]): void {
   if (quirks.includes("kimchi")) kimchiBody(body);
   if (quirks.includes("copilotChat")) copilotChatBody(body);
@@ -234,7 +228,6 @@ function applyQuirks(body: Json, quirks: readonly string[]): void {
     else if (effort) body.reasoning_summary = "auto";
   }
   if (quirks.includes("neutralAgentPrompt")) body.messages = list(body.messages).map((message) => neutralAgentPrompt(record(message)));
-  // translator.cloudflare-content-flatten, corrected (user decision 2026-09-26): text parts are joined as 9router does,
   // but a part the endpoint cannot take is refused instead of becoming "".
   if (quirks.includes("flattenContent")) {
     for (const message of list(body.messages).map(record)) {
@@ -298,7 +291,6 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
   async execute(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): Promise<CanonicalResponse> {
     const streamOnly = this.provider.streamOnly === true;
     const response = await this.send(this.chat(request, credential, streamOnly), credential, ctx, RETRY.maxAttempts);
-    // routing.forced-stream-json-collapse: 9router buffers a stream-only answer without a size limit (user decision
     // 2026-09-26); only the transport deadline bounds it. Every other JSON answer keeps the 4 MiB cap.
     const raw = await readBoundedText(response.body, streamOnly ? Number.MAX_SAFE_INTEGER : DEFAULT_MAX_BODY_BYTES);
     if (streamOnly && (response.headers["content-type"] ?? "").includes("text/event-stream")) return this.collapse(raw, request, credential);
@@ -442,7 +434,6 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
   }
 
   // connection.azure-openai-deployment, connection.cloudflare-account-id: one small chat; only the listed statuses are
-  // answers about the key, every other status passes, as in 9router.
   private async probeChat(probe: NonNullable<ProviderDescriptor["chatProbe"]>, credential: Credential, ctx: ExecCtx): Promise<CredentialStatus> {
     const base = this.request("POST", this.url(this.provider.chatUrl, probe.model), credential, METADATA_TIMEOUT_MS);
     const response = await this.transport.send({ ...base, headers: { ...base.headers, "content-type": "application/json" }, body: JSON.stringify(probe.body) }, ctx);
@@ -470,7 +461,6 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
     };
   }
 
-  // routing.forced-stream-json-collapse, kept as 9router has it (user decision 2026-09-26): unparsable lines are
   // skipped, a stream cut off before its end is a complete answer, and reasoning is dropped when there is content.
   private collapse(raw: string, request: CanonicalRequest, credential: Credential): CanonicalResponse {
     const chunks: Json[] = [];
@@ -521,7 +511,6 @@ export class OpenAICompatibleAdapter extends HttpProviderAdapter implements AIPr
     };
   }
 
-  // An error event keeps the upstream status when it is 400..599, as 9router does; the message is bounded and redacted.
   private collapsedError(value: unknown, credential: Credential): EngineError {
     const error = record(value);
     const status = Number(error.status);

@@ -9,7 +9,7 @@ Scope, per spec §9 ("SP4 | `tools/extract`: extract 9router registry data into 
 | | |
 |---|---|
 | Source | `.reference/9router/open-sse/providers/registry/*.js` at commit `39e36d3d` (0.5.86), imported as-is (plain ESM, no install), with 9router's own `getCapabilitiesForModel` |
-| Tool | `tools/extract/src/extract.mjs` (generate) and `verify.mjs` (diff); run with `pnpm extract` / `pnpm extract verify` (`NINEROUTER_PATH`) |
+| Tool | `tools/extract/src/extract.mjs` (generate) and `verify.mjs` (diff); run with `pnpm extract` / `pnpm extract verify` (`REFERENCE_PATH`) |
 | Output | `packages/engine/src/catalog/providers.generated.ts`: `CATALOG`, one `CatalogProvider` per registry entry. Never hand-edited; the header names the source commit. |
 | Schema | `packages/engine/src/catalog/schema.ts`, with `validateCatalog` |
 

@@ -44,7 +44,6 @@ export class CapacityPoolsRepository {
     }
   }
 
-  // One request per member, as 9router's single-model adapter run (no sticky limit there). No await between the read
   // and the write, so requests cannot interleave.
   order(capability: CapacityCapability, models: readonly string[]): readonly string[] {
     const { order, next } = rotate(models, this.rotations.get(capability), 1);

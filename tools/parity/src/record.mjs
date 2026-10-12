@@ -1,5 +1,3 @@
-// Records one tape per scenario from a running 9router (spec §8.2), against the scripted vendor.
-// 9router's code is not touched. A temporary OpenAI-compatible provider node points at the vendor,
 // with a connection and a client key; all three carry TEMP_NAME and are deleted by cleanup(), before
 // and after recording. No real vendor is called and no credit is spent.
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -55,12 +53,10 @@ export async function record({ base, password, only }) {
       name: TEMP_NAME, prefix: PREFIX, apiType: "chat", baseUrl: `${vendor.url}/v1`, type: "openai-compatible",
     });
     await call(base, cookie, "POST", "/api/providers", { provider: node.id, apiKey: FAKE_KEY, name: TEMP_NAME });
-    // A client key, in case 9router requires one on /v1.
     const { json: clientKey } = await call(base, cookie, "POST", "/api/keys", { name: TEMP_NAME });
     mkdirSync(TAPES_DIR, { recursive: true });
     for (const scenario of SCENARIOS.filter((s) => !only || only.includes(s.id))) {
       vendor.setScript(scenario.vendor);
-      // A model per scenario: 9router locks a failing account per model, so errors cannot leak into later tapes.
       const clientBody = { model: `${PREFIX}/parity-${scenario.id}`, ...scenario.body };
       const response = await fetch(new URL("/v1/chat/completions", base), {
         method: "POST",

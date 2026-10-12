@@ -5,7 +5,6 @@ import type { CredentialStatus, ExecCtx, HttpTransportPort } from "./ports.js";
 import { cloudCodeCall, codeAssistMetadata, defaultTier, projectOf } from "./adapters/cloud-code.js";
 import { withRetry } from "./retry.js";
 
-// OAuth sign-in and refresh for the SP16 and SP16b providers (docs/contracts/oauth.md). Kept as 9router has them (user decisions
 // 2026-09-27): cline, clinepass (whose tokens the ClinePass API rejects, #2333), gitlab (PKCE with the operator's own
 // app), kilocode (device code), kimchi (browser token). Every call goes through the transport port.
 
@@ -20,7 +19,6 @@ export interface OAuthTokens {
   readonly expiresIn?: number;
   readonly email?: string;
   readonly displayName?: string;
-  // The provider's own sign-in data (9router's providerSpecificData), strings only.
   readonly data: Readonly<Record<string, string>>;
 }
 
@@ -59,7 +57,6 @@ export interface OAuthProvider {
   // A callback the provider accepts only at this address (codex: its CLI's fixed port); the dashboard pastes it back.
   readonly fixedRedirect?: string;
   // How long before expiry a proactive refresh runs (5 minutes when unset), and the age of the last refresh that forces
-  // one (9router's refreshLeadMs and maxRefreshAgeMs).
   readonly refreshLeadMs?: number;
   readonly maxRefreshAgeMs?: number;
   // false: the 5-minute background loop leaves this provider alone (github: the Copilot token is short-lived).
@@ -90,7 +87,6 @@ const secondsUntil = (iso: unknown): number | undefined => {
 
 const first = (value: unknown): unknown => (Array.isArray(value) ? value[0] : undefined);
 
-// ---- PKCE (9router generatePKCE: 32 random bytes, S256, a 32-byte state) ----
 
 const base64url = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
@@ -194,7 +190,6 @@ const gitlab: OAuthProvider = {
       }),
     };
   },
-  // 9router has no GitLab refresher (kept).
 };
 
 // ---- kilocode (provider.kilocode-device-auth) ----
@@ -361,7 +356,6 @@ const trae: OAuthProvider = {
   async refresh(refreshToken, io) { return traeToken(refreshToken, "", io); },
 };
 
-// ---- claude (provider.claude-oauth), kept as 9router has it (user decision 2026-09-27) ----
 
 const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const CLAUDE_TOKEN_URL = "https://api.anthropic.com/v1/oauth/token";
@@ -399,20 +393,17 @@ const claude: OAuthProvider = {
     if (!tokens) throw failed("claude", "Claude returned no access token");
     return tokens;
   },
-  // Any failure is a refused refresh (null), as 9router has it (kept).
   async refresh(refreshToken, io) {
     const answer = await call(io, "POST", CLAUDE_TOKEN_URL, JSON_HEADERS, JSON.stringify({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: CLAUDE_CLIENT_ID }));
     return answer.ok ? claudeTokens(record(parseJson(answer.text)), refreshToken) ?? null : null;
   },
 };
 
-// ---- codex (provider.codex-oauth), kept as 9router has it (user decision 2026-09-27) ----
 
 const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token";
 export const CODEX_REDIRECT = "http://localhost:1455/auth/callback";
 
-// A JWT's payload, or an empty record (9router decodeJwtPayload).
 function jwtPayload(token: unknown): Record<string, unknown> {
   const part = typeof token === "string" ? token.split(".")[1] : undefined;
   if (!part) return {};
@@ -470,20 +461,17 @@ const codex: OAuthProvider = {
   },
 };
 
-// ---- github (provider.github-copilot-oauth), kept as 9router has it (user decision 2026-09-27: keep 9router) ----
 
 const GITHUB_CLIENT_ID = "Iv1.b507a08c87ecfe98";
 const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
 const COPILOT_TOKEN_URL = "https://api.github.com/copilot_internal/v2/token";
 const FORM_HEADERS = { "content-type": "application/x-www-form-urlencoded", accept: "application/json" };
-// The sign-in reads the Copilot token and the user as 9router's postExchange; later refreshes use its executor's headers.
 const SIGN_IN_HEADERS = { accept: "application/json", "x-github-api-version": "2022-11-28", "user-agent": "GitHubCopilotChat/0.26.7" };
 const REFRESH_HEADERS = {
   "user-agent": "GitHubCopilotChat/0.38.0", "editor-version": "vscode/1.110.0", "editor-plugin-version": "copilot-chat/0.38.0", accept: "application/json", "x-github-api-version": "2025-04-01",
 };
 
 // AIGate seals the Copilot token as the connection's access token and the GitHub token (with GitHub's own refresh token,
-// when it sends one) as its refresh token, so every token stays encrypted (9router keeps them in plain connection data).
 const packGithub = (github: string, refresh?: string): string => JSON.stringify({ github, ...(refresh ? { refresh } : {}) });
 function unpackGithub(value: string): { github: string; refresh?: string } {
   const parsed = record(parseJson(value));
@@ -492,7 +480,6 @@ function unpackGithub(value: string): { github: string; refresh?: string } {
   return github ? { github, ...(refresh ? { refresh } : {}) } : { github: value };
 }
 
-// Copilot's expires_at is unix seconds (milliseconds and ISO strings are read too, as 9router does).
 function secondsFrom(expiresAt: unknown): number | undefined {
   if (typeof expiresAt === "number") return Math.floor(((expiresAt < 1e12 ? expiresAt * 1000 : expiresAt) - Date.now()) / 1000);
   return secondsUntil(expiresAt);
@@ -507,7 +494,6 @@ async function copilotToken(io: OAuthIO, headers: Readonly<Record<string, string
   return token ? { token, ...(expiresIn !== undefined ? { expiresIn } : {}) } : undefined;
 }
 
-// 9router's postExchange: a failed Copilot or user read is ignored, so the GitHub token itself becomes the access token.
 async function githubTokens(root: Record<string, unknown>, github: string, io: OAuthIO): Promise<OAuthTokens> {
   const read = async (url: string) => {
     try {
@@ -563,7 +549,6 @@ const github: OAuthProvider = {
     const description = text(root.error_description);
     return { status: "error", error, ...(description ? { description } : {}) };
   },
-  // 9router refreshCredentials: a new Copilot token from the GitHub token; when that fails, GitHub's refresh token (if
   // any) renews the GitHub token first.
   async refresh(packed, io) {
     const { github: token, refresh } = unpackGithub(packed);
@@ -577,10 +562,8 @@ const github: OAuthProvider = {
     const repacked = packGithub(next, text(renewed.refresh_token) || refresh);
     const fresh = await copilotToken(io, { ...REFRESH_HEADERS, authorization: `token ${next}` });
     if (fresh) return { accessToken: fresh.token, refreshToken: repacked, ...(fresh.expiresIn !== undefined ? { expiresIn: fresh.expiresIn } : {}), data: {} };
-    // No Copilot token: the renewed GitHub token is sent as the bearer, as 9router falls back to it.
     return { accessToken: next, refreshToken: repacked, ...(typeof renewed.expires_in === "number" ? { expiresIn: renewed.expires_in } : {}), data: {} };
   },
-  // 9router's test: GET /user with the GitHub token (its User-Agent names 9Router; AIGate names itself).
   async test(packed, io) {
     const answer = await call(io, "GET", "https://api.github.com/user", { authorization: `Bearer ${unpackGithub(packed).github}`, "user-agent": "AIGate", accept: "application/vnd.github+json" });
     if (answer.ok) return { valid: true };
@@ -888,14 +871,12 @@ const kiro: OAuthProvider = {
   },
 };
 
-// ---- Google Cloud Code sign-ins (provider.gemini-cli-oauth), kept as 9router has them (user decision 2026-09-27) ----
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v1/userinfo?alt=json";
 const GOOGLE_SCOPES = ["cloud-platform", "userinfo.email", "userinfo.profile"].map((scope) => `https://www.googleapis.com/auth/${scope}`);
 const ANTIGRAVITY_SCOPES = [...GOOGLE_SCOPES, "https://www.googleapis.com/auth/cclog", "https://www.googleapis.com/auth/experimentsandconfigs"];
 
-// The public OAuth client of the CLI or IDE AIGate signs in as. 9router ships both in its source; AIGate reads them from
 // the environment (.env, see .env.example) so that no client secret is in the repository, and checks them on each use.
 interface GoogleClient { readonly id: string; readonly secret: string; readonly scopes: readonly string[] }
 export const GOOGLE_CLIENT_ENV: Readonly<Record<string, { readonly id: string; readonly secret: string }>> = {

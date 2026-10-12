@@ -82,7 +82,6 @@ export function parsePeriod(query: { period?: unknown; from?: unknown; to?: unkn
   }
 }
 
-// routing.usage-recording-timing (9router): without upstream usage, about four characters per token.
 export const estimateTokens = (chars: number): number => Math.ceil(Math.max(0, chars) / 4);
 
 export function csvField(value: string | number | null): string {

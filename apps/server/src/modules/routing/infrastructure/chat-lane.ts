@@ -52,7 +52,6 @@ export interface ChatLimits {
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000;
 export const DEFAULT_REFRESH_RETRY_DELAY_MS = 1_000;
 export const REQUEST_BUDGET_MS = 600_000;
-// catalog.model-connectivity-test: 9router's 15 s per probe.
 const PROBE_TIMEOUT_MS = 15_000;
 
 // POST /api/models/test (docs/contracts/custom-models.md).
@@ -192,7 +191,6 @@ const answerOf: Deliver<CanonicalResponse> = (target, adapter, credential, call)
   adapter.execute(target.request, credential, { signal: call.signal, requestId: call.requestId, proxy: target.proxy });
 
 // combo.mode-fallback, combo.aggregate-status-first-failure (corrected): every member failed, so the last member's error is
-// the answer, with the earliest Retry-After any member gave; no active connection anywhere is 503, as 9router's rule.
 export function exhausted(last: unknown, retryAfter: number | undefined): Error {
   const { status, body } = errorOf(last);
   const noConnection = last instanceof GatewayError && last.code === "no_active_connection";
@@ -231,7 +229,6 @@ interface StreamEncoder {
 }
 
 // A client protocol on the lane: how its body becomes CIP, and how the answer goes back. Errors stay OpenAI-shaped
-// for every protocol (9router, kept by user decision 2026-09-27).
 interface ClientProtocol {
   parse(body: unknown, accept: string | undefined): ParsedClientRequest;
 }
@@ -287,7 +284,6 @@ const OPENAI_RESPONSES: ClientProtocol = {
 };
 
 // docs/contracts/protocol-gemini.md: the model and the stream decision come from the URL, the rest of the chat path is the
-// OpenAI one (9router hands the converted body to handleChat).
 const geminiGenerate = (route: GeminiRoute): ClientProtocol => ({
   parse(body) {
     return {
@@ -299,7 +295,6 @@ const geminiGenerate = (route: GeminiRoute): ClientProtocol => ({
   },
 });
 
-// A Gemini client's own key convention, read only on the TTS passthrough (9router).
 export type GeminiRequest = FastifyRequest<{ Params: { "*": string }; Querystring: Record<string, string | string[] | undefined> }>;
 function googleKey(request: GeminiRequest): string | undefined {
   const header = request.headers["x-goog-api-key"];
@@ -313,7 +308,6 @@ const claudeCodePrompt = (request: CanonicalRequest, provider: ProviderDescripto
 const MISSING_KEY = "Missing API key. Send Authorization: Bearer <key>, using a key from AIGate: Gateway → Endpoint & Keys.";
 
 // routing.responses-compact-lane: the same lane with _compact set in the body, which only a Responses provider or a
-// chat body carries upstream (9router, kept).
 const OPENAI_RESPONSES_COMPACT: ClientProtocol = {
   parse: (body, accept) => OPENAI_RESPONSES.parse(typeof body === "object" && body !== null && !Array.isArray(body) ? { ...body, _compact: true } : body, accept),
 };
@@ -376,7 +370,6 @@ export class ChatLane {
     return this.fail(reply, new GatewayError(401, "invalid_request_error", "missing_api_key", MISSING_KEY));
   }
 
-  // GET /v1beta/models (catalog.v1beta-models-listing): the whole catalog, without a key, as in 9router.
   geminiModels(reply: FastifyReply): FastifyReply {
     return reply.header("cache-control", "no-store").send(geminiModelList());
   }
@@ -867,7 +860,6 @@ export class ChatLane {
         const memberRetryAfter = error instanceof GatewayError ? error.retryAfter
           : error instanceof EngineError && typeof error.details.retryAfterMs === "number" ? error.details.retryAfterMs : undefined;
         if (memberRetryAfter !== undefined) retryAfter = Math.min(retryAfter ?? memberRetryAfter, memberRetryAfter);
-        // A briefly overloaded member gets its short cooldown before the next one (9router), within the request's signal.
         if (waitMs > 0 && index < members.length - 1) await delay(waitMs, undefined, { signal: call.signal }).catch(() => call.signal.throwIfAborted());
       }
     }
@@ -884,7 +876,6 @@ export class ChatLane {
       (model, signal) => this.route({ ...call, signal, rewritten: true }, { ...panel, model }, answerOf, depth));
     call.signal.throwIfAborted();
     if (answers.length === 0) throw new GatewayError(503, "api_error", "provider_unavailable", `All fusion panel models of "${combo.name}" failed.`);
-    // The only answer came without streaming or tools, so that member answers the client's own request again (9router).
     if (answers.length === 1) return this.route(call, { ...request, model: answers[0].model }, deliver, depth);
     return this.route({ ...call, rewritten: true }, { ...judgeRequest(request, answers), model: combo.judgeModel ?? first }, deliver, depth);
   }
@@ -897,7 +888,6 @@ export class ChatLane {
     for (let attempts = 0; attempts < 100; attempts += 1) {
       const resolved = await this.resolve(request, excluded);
       const prepared = await this.thought(call.parsed.prepare(resolved.request, resolved.provider, call.rewritten), resolved.provider);
-      // provider.claude-oauth (kept from 9router): a non-Claude client's request to claude gets the Claude Code prompt.
       const target = { ...resolved, request: call.protocol === ANTHROPIC_MESSAGES ? prepared : claudeCodePrompt(prepared, resolved.provider) };
       let transport = this.transport;
       if (call.pxpipe.enabled && call.protocol === ANTHROPIC_MESSAGES && target.provider.protocol === "anthropic") {
@@ -933,7 +923,6 @@ export class ChatLane {
     throw new GatewayError(503, "api_error", "provider_unavailable", "No eligible provider account remained.");
   }
 
-  // Combos first (9router), then each provider with an active connection: its catalog chat models, then its custom models
   // (docs/contracts/custom-models.md); a custom provider lists its custom models under its prefix.
   async models(reply: FastifyReply): Promise<FastifyReply> {
     const combos = (await this.combos.list()).map((combo) => ({ id: combo.name, object: "model", created: 0, owned_by: "combo" }));
@@ -954,13 +943,11 @@ export class ChatLane {
   }
 
   // catalog.model-connectivity-test (docs/contracts/custom-models.md): one real chat request through the /v1 resolution and
-  // adapter, without the key gate (the dashboard session stands in for it; 9router calls its own /v1 with a key).
   async probe(model: string): Promise<ModelProbe> {
     const started = Date.now();
     const requestId = randomUUID();
     const budget = deadline(PROBE_TIMEOUT_MS, `The model did not answer within ${PROBE_TIMEOUT_MS / 1000} s`);
     try {
-      // max_tokens 1024: reasoning models spend the budget thinking before they answer (9router #3010).
       const { request } = parseOpenAIChatRequest({ model, max_tokens: 1024, stream: false, messages: [{ role: "user", content: "hi" }] });
       const resolved = await this.resolve(request);
       const target = { ...resolved, request: claudeCodePrompt(await this.thought(resolved.request, resolved.provider), resolved.provider) };
@@ -1000,7 +987,6 @@ export class ChatLane {
     return JSON.parse(body);
   }
 
-  // oauth.refresh-lifecycle (9router, kept): a 401/403 before the first byte refreshes the connection's token, for every
   // provider, and the request is sent once more with the new token.
   private async withRefresh<T>(target: Target, run: (credential: Credential) => Promise<T>, canRetry: () => boolean): Promise<T> {
     if (target.connection.id === "noauth") return run(target.credential);
@@ -1034,7 +1020,6 @@ export class ChatLane {
     });
     try {
       if (requireApiKey) {
-        // 9router's TTS path reads Authorization: Bearer, then x-goog-api-key, then ?key= (not x-api-key).
         const auth = request.headers.authorization;
         const failure = await this.checkKey((typeof auth === "string" && auth.startsWith("Bearer ") ? auth.slice(7) : "") || googleKey(request));
         if (failure) throw failure;
@@ -1095,7 +1080,6 @@ export class ChatLane {
       if (status && !status.connectable) {
         throw new GatewayError(400, "invalid_request_error", "provider_not_supported", `${prefix} cannot be connected yet: ${status.reason}.`);
       }
-      // A custom provider prefix (docs/contracts/custom-providers.md); catalog ids and aliases always win, as in 9router.
       const node = isReservedPrefix(prefix) ? undefined : await this.nodes.byPrefix(prefix);
       if (node) prefixed = nodeDescriptor(node);
     }
@@ -1122,7 +1106,6 @@ export class ChatLane {
     // oauth.refresh-lifecycle: an oauth token about to expire is refreshed first.
     const stored = await this.refresher.fresh(provider.id, selected.credential);
     // connection.ollama-local-host: a connection may point the provider at its own host.
-    // The connection id is the session id claude and codex send (9router derives one per connection); gemini-cli names
     // the project its sign-in found.
     const credential: Credential = { kind: "api-key", apiKey: stored.apiKey, sessionId: stored.id, ...(stored.projectId ? { projectId: stored.projectId } : {}), ...(stored.providerData ? { providerData: stored.providerData } : {}) };
     const connected = withConnection(provider, stored);

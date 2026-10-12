@@ -62,7 +62,6 @@ export const accountLocks = sqliteTable("account_locks", {
 }, (t) => [index("account_locks_connection_model").on(t.connectionId, t.model), index("account_locks_until").on(t.until)]);
 
 // docs/contracts/custom-providers.md (SP13b, SP14b). OpenAI- or Anthropic-compatible endpoints the user defines;
-// a connection under one stores this id as its provider. The prefix is how /v1 names it. Like 9router it may
 // repeat (OpenAI-compatible nodes first, then the oldest wins), so it is indexed for the lookup but not unique.
 export const providerNodes = sqliteTable("provider_nodes", {
   id: text("id").primaryKey(),

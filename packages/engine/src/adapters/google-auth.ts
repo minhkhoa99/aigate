@@ -17,7 +17,6 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 const JWT_GRANT = "urn:ietf:params:oauth:grant-type:jwt-bearer";
 const TOKEN_LIFETIME_S = 3_600;
-// 9router reuses a token while more than 5 minutes remain.
 const EARLY_REFRESH_MS = 5 * 60_000;
 const MAX_TOKENS = 256;
 const TOKEN_BODY_BYTES = 64 * 1024;
@@ -48,7 +47,6 @@ const b64url = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes)
 const jsonPart = (value: unknown): string => b64url(new TextEncoder().encode(JSON.stringify(value)));
 
 async function signedAssertion(credential: Extract<GoogleCredential, { kind: "service-account" }>, providerId: string): Promise<string> {
-  // 9router: a pasted key may carry literal \n sequences instead of line breaks.
   const pem = credential.privateKey.replace(/\\n/g, "\n").replace(/-----(BEGIN|END) PRIVATE KEY-----/g, "").replace(/\s+/g, "");
   let key: CryptoKey;
   try {
@@ -63,7 +61,6 @@ async function signedAssertion(credential: Extract<GoogleCredential, { kind: "se
   return `${unsigned}.${b64url(new Uint8Array(signature))}`;
 }
 
-// ponytail: no in-flight dedup, as in 9router; concurrent first requests may each mint a token. Share the promise if
 // the token endpoint ever rate-limits AIGate.
 const tokens = new Map<string, { token: string; expiresAt: number }>();
 

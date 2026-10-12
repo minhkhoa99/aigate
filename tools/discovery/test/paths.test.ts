@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { NINEROUTER_ROOT, REPO_ROOT, resolveRef, resolveEvidence } from "../src/paths.js";
+import { REFERENCE_ROOT, REPO_ROOT, resolveRef, resolveEvidence } from "../src/paths.js";
 
 describe("paths", () => {
   it("allows explicit local evidence without expanding reference access", () => {
@@ -10,7 +10,7 @@ describe("paths", () => {
       expect(() => resolveEvidence(path)).toThrow();
     expect(() => resolveRef("../outside")).toThrow();
   });
-  it("points NINEROUTER_ROOT at a real 9router checkout", () => {
+  it("points REFERENCE_ROOT at a real reference checkout", () => {
     expect(existsSync(resolveRef("open-sse/providers/index.js"))).toBe(true);
     expect(existsSync(resolveRef("src/app/api"))).toBe(true);
   });
@@ -23,7 +23,7 @@ describe("paths", () => {
     expect(() => resolveRef("../secrets.txt")).toThrow(/escapes/);
   });
 
-  it("exposes NINEROUTER_ROOT as an absolute path", () => {
-    expect(NINEROUTER_ROOT).toMatch(/^([A-Za-z]:|\/)/);
+  it("exposes REFERENCE_ROOT as an absolute path", () => {
+    expect(REFERENCE_ROOT).toMatch(/^([A-Za-z]:|\/)/);
   });
 });

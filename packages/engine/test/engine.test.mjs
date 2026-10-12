@@ -103,7 +103,6 @@ test("the built-in registry is the connectable part of the catalog, with a reaso
   assert.deepEqual(builtinRegistry.status("qoder"), { connectable: false, reason: "Not supported: needs Qoder CLI impersonation" });
   assert.deepEqual(builtinRegistry.status("openai"), { connectable: true });
   assert.equal(builtinRegistry.status("no-such-provider"), undefined);
-  // 9router data defect: an output limit above the context window is not trusted.
   assert.equal(builtinRegistry.model("tencent", "hunyuan-turbos-latest")?.maxOutputTokens, null);
 });
 

@@ -11,7 +11,6 @@ import { count, METADATA_TIMEOUT_MS, RETRY } from "./http-adapter.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
 
 // AIProviderPort for the gemini family, POST <base>/<model>:generateContent (docs/contracts/provider-gemini.md).
-// User decision (2026-09-26): the request and the answer keep 9router's behavior, including its silent drops
 // (translator.openai-to-gemini-request, translator.gemini-to-openai-response); only the tool-schema cleaner is
 // corrected (gemini-schema.ts).
 
@@ -21,21 +20,18 @@ const STREAM_TIMEOUT_MS = 600_000;
 const MAX_LISTED_MODELS = 1_000;
 const MAX_TOOL_CALLS = 128;
 const MAX_FUNCTION_NAME = 64;
-// 9router sends every request with the safety filters off.
 const SAFETY_SETTINGS = ["HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_DANGEROUS_CONTENT", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_CIVIC_INTEGRITY"]
   .map((category) => ({ category, threshold: "OFF" }));
 const FINISH = new Map<string, StopReason>([
   ["STOP", "end_turn"], ["MAX_TOKENS", "max_tokens"], ["SAFETY", "content_filter"], ["RECITATION", "content_filter"],
   ["BLOCKLIST", "content_filter"], ["PROHIBITED_CONTENT", "content_filter"],
 ]);
-// 9router thinking tables (translator/concerns/thinking.js, thinkingUnified.js).
 const LEVEL_TO_BUDGET: Readonly<Record<string, number>> = { none: 0, minimal: 512, low: 1024, medium: 8192, high: 24576, xhigh: 32768, max: 128000 };
 const LEVEL_FLOOR: Readonly<Record<string, number>> = { minimal: 4096, low: 8192, medium: 16384, high: 65535 };
 const MAX_BUDGET = 24576;
 
 const unsupported = (feature: string) => new UnsupportedFeatureError(feature, TARGET);
 
-// ---- thought signatures (9router thoughtSignatureStore, the in-memory part the Gemini path reads) ----
 
 const SIGNATURE_TTL_MS = 60 * 60_000;
 const MAX_SIGNATURES = 2_000;
@@ -65,7 +61,6 @@ function cachedSignature(callId: string, model: string): string | undefined {
   return entry && entry.family === familyOf(model) ? entry.signature : undefined;
 }
 
-// ---- CIP -> generateContent (9router rules) ----
 
 // [a-zA-Z0-9_.:-], starting with a letter or "_", at most 64; the answer keeps the sanitized name.
 function sanitizeName(name: string): string {
@@ -74,7 +69,6 @@ function sanitizeName(name: string): string {
   return (/^[a-zA-Z_]/.test(safe) ? safe : `_${safe}`).slice(0, MAX_FUNCTION_NAME);
 }
 
-// 9router tryParseJSON: the parsed value, or null.
 const tryParse = (raw: string): unknown => {
   const value = parseJson(raw);
   return value === undefined ? null : value;
@@ -89,7 +83,6 @@ function userParts(parts: readonly ContentPart[]): Json[] {
     } else if (part.type === "image" && part.source.kind === "url" && /^https?:\/\//.test(part.source.url)) {
       out.push({ fileData: { fileUri: part.source.url, mimeType: "image/*" } });
     }
-    // Any other part (a file or audio by URL, video, …) is dropped, as in 9router.
   }
   return out;
 }
@@ -111,7 +104,6 @@ function functionResponse(id: string, name: string, answer: string, options: Bod
 type Turn = { role: "user" | "model"; parts: Json[] };
 
 // Same-role turns merged, and a "..." user turn first when the model speaks first. toContents never builds an empty
-// turn or part, so 9router's empty-part filter has nothing to do here.
 function normalize(contents: readonly Turn[]): Turn[] {
   const out: Turn[] = [];
   for (const content of contents) {
@@ -171,7 +163,6 @@ function intentOf(request: CanonicalRequest): Intent | undefined {
   return level === "auto" ? { mode: "auto" } : { mode: "level", level };
 }
 
-// 9router's budget-to-level table (translator/concerns/thinking.js), shared with the commandcode adapter.
 export function budgetToLevel(budget: number): string | undefined {
   if (budget <= 0) return undefined;
   if (budget <= 768) return "minimal";
@@ -188,8 +179,6 @@ function budgetFloor(budget: number): number {
   return budget <= 24576 ? 32768 : 65535;
 }
 
-// 9router capability patterns: gemini-3 models take a thinking level, gemini-2.5 a budget; others cannot reason.
-// ponytail: 9router also caps the floor at the model's output limit (65535 or 65536); every floor is at most 65535, so
 // the cap never applies. Add it back with a model whose limit is lower.
 function thinkingFormat(model: string): "level" | "budget" | undefined {
   if (/gemini.*image/.test(model)) return undefined;
@@ -235,7 +224,6 @@ function toBody(request: CanonicalRequest, options: BodyOptions): Json {
   if (topK !== undefined) config.topK = topK;
   if (request.maxOutputTokens !== undefined) config.maxOutputTokens = request.maxOutputTokens;
   applyThinking(config, request);
-  // 9router keeps one system text; CIP holds the leading system messages as one prompt, joined here.
   const system = request.system?.map((part) => (part.type === "text" ? part.text : "")).join("");
   const contents = toContents(request, options);
   if (system !== undefined && request.messages.length === 0) contents.push({ role: "user", parts: [{ text: system }] });
@@ -277,7 +265,6 @@ export class GeminiAdapter extends OpenAICompatibleAdapter implements AIProvider
   // <base>/<model>:generateContent; Vertex builds the base from the credential, the Gemini API uses the catalog URL.
   protected modelsBase?(credential: Credential): string;
 
-  // 9router's non-streaming mapping, kept: raw lower-cased finish_reason, thoughts counted as prompt tokens,
   // generated images as markdown in the text.
   override async execute(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): Promise<CanonicalResponse> {
     const response = await this.send(this.generate(request, credential, false), credential, ctx, RETRY.maxAttempts);
@@ -285,7 +272,6 @@ export class GeminiAdapter extends OpenAICompatibleAdapter implements AIProvider
     const body = isRecord(root.response) ? root.response : root;
     const candidate = list(body.candidates)[0];
     const model = text(body.modelVersion) ?? "gemini";
-    // 9router returns such a body as is; CIP has no raw form, so it is an empty answer.
     if (!isRecord(candidate)) return { id: "", model, content: [], stopReason: "end_turn", usage: { inputTokens: 0, outputTokens: 0 } };
     let answer = "";
     let reasoning = "";
@@ -315,7 +301,6 @@ export class GeminiAdapter extends OpenAICompatibleAdapter implements AIProvider
     };
   }
 
-  // 9router's stream mapping, kept: chunks without candidates (errors, blocked prompts) yield nothing, and a stream
   // without finishReason still ends normally.
   override async *stream(request: CanonicalRequest, credential: Credential, ctx: ExecCtx): AsyncGenerator<StreamChunk> {
     const response = await this.send(this.generate(request, credential, true), credential, ctx, RETRY.maxAttempts);

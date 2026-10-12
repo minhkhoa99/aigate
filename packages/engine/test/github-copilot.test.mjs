@@ -1,5 +1,4 @@
 // Contract: docs/contracts/oauth.md (SP16b2) — GitHub Copilot sign-in, token refresh, request routing and model list,
-// kept as 9router has them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { builtinRegistry, createAdapter, GithubAdapter, OAUTH_PROVIDERS } from "../dist/index.js";

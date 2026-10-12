@@ -1,4 +1,3 @@
-// Contract: docs/contracts/oauth.md (SP16b) — claude and codex sign-in, requests and model lists, kept as 9router has them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";

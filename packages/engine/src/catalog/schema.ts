@@ -1,6 +1,5 @@
 import type { ModelCapabilities } from "../registry.js";
 
-// The provider catalog extracted from 9router (docs/contracts/registry-extract.md). Static data:
 // providers.generated.ts was written by tools/extract (SP4; removed in SP13b, restorable from git d2783c1)
 // and is never edited by hand. SP13 turned it into the runtime registry.
 
@@ -22,12 +21,10 @@ export interface CatalogAuth {
 export interface CatalogModel {
   readonly id: string;
   readonly name: string;
-  // chat, embedding, image, tts, … as 9router names them.
   readonly kind: string;
   // The id sent upstream when it differs from the catalog id.
   readonly upstreamModelId: string | null;
   readonly capabilities: ModelCapabilities;
-  // "declared": 9router's tiers named this model; "default": only the floor applied, so no limits are known.
   readonly capabilitySource: "declared" | "default";
   readonly contextWindow: number | null;
   readonly maxOutputTokens: number | null;
@@ -40,20 +37,17 @@ export interface CatalogProvider {
   readonly aliases: readonly string[];
   readonly protocol: CatalogProtocol;
   readonly auth: CatalogAuth;
-  // The request URL as 9router uses it; null when each connection brings its own (Azure).
   readonly chatUrl: string | null;
   readonly modelsUrl: string | null;
   // Static request headers the provider expects (public constants, e.g. OpenRouter attribution); never credentials.
   readonly headers: Readonly<Record<string, string>>;
   // The upstream answers only streaming requests.
   readonly forceStream: boolean;
-  // Names of 9router request quirks (behaviour flags); their handling belongs to the SP that models each.
   readonly quirks: readonly string[];
   readonly serviceKinds: readonly string[];
   readonly hidden: boolean;
   readonly deprecated: boolean;
   readonly models: readonly CatalogModel[];
-  // Names of 9router fields AIGate does not model yet (never their values); the SP that models one removes it.
   readonly unmodelled: readonly string[];
 }
 

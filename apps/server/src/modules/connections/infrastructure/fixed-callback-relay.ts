@@ -1,6 +1,5 @@
 import { createServer, type Server } from "node:http";
 
-// provider.codex-oauth: 9router listens on 127.0.0.1:1455 for codex's fixed callback (a paste is the fallback). AIGate
 // listens only while a sign-in waits, and sends the browser on to the dashboard's /callback with the same query, so the
 // code reaches the dashboard window that holds the PKCE verifier and the usual exchange runs. One sign-in at a time:
 // a new authorize replaces the waiting one.

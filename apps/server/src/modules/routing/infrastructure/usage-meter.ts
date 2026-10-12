@@ -15,7 +15,6 @@ const codeOf = (error: unknown): string =>
 const abortCode = (signal: AbortSignal): string | undefined =>
   (!signal.aborted ? undefined : signal.reason instanceof EngineError ? signal.reason.code : "CLIENT_CLOSED");
 
-// The request's text, for the estimate when the upstream reports no usage (9router estimates from the body).
 const requestChars = (request: CanonicalRequest): number => JSON.stringify({ system: request.system, messages: request.messages, tools: request.tools }).length;
 
 function answerChars(response: CanonicalResponse): number {

@@ -4,13 +4,11 @@ import type { ModelCapabilities, ModelDescriptor } from "./registry.js";
 
 export type Capability = keyof ModelCapabilities;
 
-// 9router's floor for a model nobody declared (capabilities.js:42): tools on, every modality off. Kept for callers that
 // build a declared model; undeclared models use UNDECLARED_CAPABILITIES.
 export const DEFAULT_CAPABILITIES: ModelCapabilities = {
   vision: false, pdf: false, audioInput: false, videoInput: false, tools: true, reasoning: false,
 };
 
-// Name-only vision signal for undeclared models (9router visionPatterns.js:12-41). NOT_VISION is
 // tested first, so image-generation, embedding, and audio ids never pass as vision input
 // (catalog.capability-vision-pattern-order).
 const SEP = "[-_/:.]";
@@ -30,7 +28,6 @@ export function looksLikeVisionModel(modelId: string): boolean {
   return !NOT_VISION.test(modelId) && VISION_NAME.test(modelId);
 }
 
-// catalog.capability-undeclared-open (user decision 2026-10-08, replaces 9router's floor for undeclared models): an
 // imported or custom model has no declared capabilities, and the provider lists none, so AIGate does not refuse its
 // content; it gets every capability and the provider answers what it cannot take.
 export const UNDECLARED_CAPABILITIES: ModelCapabilities = {
@@ -61,7 +58,6 @@ function partNeeds(part: ContentPart, needs: Set<Capability>, pending: ContentPa
 }
 
 // What a model must support to take this request whole. Every message is scanned, including the
-// system prompt and earlier turns, because all of it is sent upstream. 9router scanned only the
 // trailing user turn, so an image from an earlier turn reached non-vision models (labeled
 // SUSPECTED_BUG in docs/contracts/engine.md).
 export function detectRequiredCapabilities(request: CanonicalRequest): Set<Capability> {
