@@ -2,7 +2,8 @@ import { useState, type ChangeEvent } from "react";
 import { useLocale } from "../../shared/locale";
 import { ApiError, api } from "../../shared/api";
 import { toProblem } from "../../shared/errors";
-import { Button, Field, Input, Modal, Panel, StateBlock, Table, Warning } from "../../shared/ui";
+import { Button, Field, Input, Panel, StateBlock, Table, Warning } from "../../shared/ui";
+import { Modal } from "../../shared/dialog";
 
 const MAX_FILE_BYTES = 180 * 1024 * 1024;
 interface BackupPreview { expectedVersion: string; createdAt: string; databaseBytes: number; files: string[]; encrypted: true; restartRequired: true }

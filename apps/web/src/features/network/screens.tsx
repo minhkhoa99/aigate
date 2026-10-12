@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Button, ConfirmDialog, CopyField, Dot, PageHeading, Panel, Pill, StateBlock, Table, Warning } from "../../shared/ui";
+import { Button, CopyField, Dot, PageHeading, Panel, Pill, StateBlock, Table, Warning } from "../../shared/ui";
+import { ConfirmDialog } from "../../shared/dialog";
 import { isApiError } from "../../shared/api";
 import { toProblem } from "../../shared/errors";
 import { createFormatters } from "../../shared/i18n";

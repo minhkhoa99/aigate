@@ -1726,3 +1726,30 @@
   newModule: settings
   parityStatus: verified
   labels: []
+
+- id: settings.browser-dialog-loading
+  group: Settings
+  feature: Browser shell performance
+  subFeature: Defer Radix Dialog from the initial browser entry
+  trigger: Initial page load or navigation to a feature route with a modal
+  input: Current route, existing dialog state and browser locale
+  output: Same accessible modal and confirmation behavior, with dialog code loaded only on relevant routes
+  businessRules:
+    - "AIGATE_EXTENSION: keep the shell, auth gate, locale and core shared controls available without loading Radix Dialog on initial entry"
+    - "AIGATE_EXTENSION: preserve portal, overlay, title, Escape/outside dismissal, typed-name confirmation, pending guards and EN/VI copy; restore focus to the surviving opener on close"
+    - "IMPLEMENTATION_ACCIDENT: common shared/ui.tsx file layout pulling Dialog into the initial chunk is not part of the user contract"
+  state: { reads: ["route", "existing dialog/confirmation state", "browser locale"], writes: ["existing dialog/confirmation state only"], runtimeOnly: ["browser module cache"] }
+  dependencies: [settings.browser-route-loading]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "Existing UI_LOAD_FAILED route Reload", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Same-origin dialog chunk fetch on relevant route only"]
+  persistence: []
+  performanceConcerns: ["Measure initial entry reduction and deferred chunk size; no duplicate dialog dependency in entry"]
+  behavior: { streaming: false, cancellation: null, concurrency: "Vite/browser module cache deduplicates shared imports" }
+  edgeCases: ["login before session gate", "dialog open/close focus", "opener removed during close", "Escape/outside dismissal", "typed confirmation", "mounted EN/VI", "390px dialog"]
+  evidence:
+    - { file: "aigate:docs/contracts/browser-dialog-loading.md", line: 1, note: "SP61 browser delivery and dialog parity" }
+  newModule: settings
+  parityStatus: verified
+  labels: [IMPLEMENTATION_ACCIDENT]

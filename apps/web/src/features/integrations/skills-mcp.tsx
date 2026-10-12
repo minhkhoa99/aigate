@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { Button, ConfirmDialog, CopyField, Field, Modal, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
+import { Button, CopyField, Field, PageHeading, Panel, Pill, StateBlock, Table, Tabs, Warning } from "../../shared/ui";
+import { ConfirmDialog, Modal } from "../../shared/dialog";
 import { useLocale } from "../../shared/locale";
 import { toProblem } from "../../shared/errors";
 import { useToast } from "../../shared/toast";

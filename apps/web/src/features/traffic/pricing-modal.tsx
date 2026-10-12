@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Field, Modal, Pill, Table } from "../../shared/ui";
+import { Button, Field, Pill, Table } from "../../shared/ui";
+import { Modal } from "../../shared/dialog";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
 import { useLocale } from "../../shared/locale";

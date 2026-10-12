@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
-import { Button, ConfirmDialog, Field, Input, Modal, PageHeading, Panel, Pill, StateBlock, Table, Warning } from "../../shared/ui";
+import { Button, Field, Input, PageHeading, Panel, Pill, StateBlock, Table, Warning } from "../../shared/ui";
+import { ConfirmDialog, Modal } from "../../shared/dialog";
 import { toProblem } from "../../shared/errors";
 import { useLocale } from "../../shared/locale";
 import { useToast } from "../../shared/toast";

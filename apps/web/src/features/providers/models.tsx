@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { Button, Modal, Panel, Pill, Table } from "../../shared/ui";
+import { Button, Panel, Pill, Table } from "../../shared/ui";
+import { Modal } from "../../shared/dialog";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
 import { useLocale } from "../../shared/locale";

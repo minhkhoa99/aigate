@@ -1,5 +1,4 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
 import { useLocale } from "./locale";
 
 export type Tone = "healthy" | "warning" | "danger" | "muted" | "info";
@@ -95,23 +94,4 @@ export function StateBlock({ state, code, action }: {
 
 export function Warning({ children, tone = "warning" }: { children: ReactNode; tone?: "warning" | "danger" }) {
   return <div className={`warning warning-${tone}`}>{children}</div>;
-}
-
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  return <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}><Dialog.Portal>
-    <Dialog.Overlay className="modal-backdrop" />
-    <Dialog.Content className="modal" aria-describedby={undefined}>
-      <Dialog.Title>{title}</Dialog.Title>{children}
-    </Dialog.Content>
-  </Dialog.Portal></Dialog.Root>;
-}
-
-export function ConfirmDialog({ name, detail, pending = false, onClose, onConfirm }: { name: string; detail?: ReactNode; pending?: boolean; onClose: () => void; onConfirm: () => void }) {
-  const { t } = useLocale();
-  const [typed, setTyped] = useState("");
-  return <Modal title={t("common.confirmRemoval")} onClose={onClose}>
-    {detail && <p>{detail}</p>}<p>{t("common.confirmInstruction", { name })}</p>
-    <input className="input confirm-input" aria-label={t("common.confirmAria", { name })} placeholder={name} value={typed} onChange={(e) => setTyped(e.target.value)} />
-    <div className="modal-actions"><Button onClick={onClose} disabled={pending}>{t("common.cancel")}</Button><Button variant="danger" disabled={typed !== name || pending} onClick={onConfirm}>{t("common.remove", { name })}</Button></div>
-  </Modal>;
 }
