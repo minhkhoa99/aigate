@@ -1,8 +1,8 @@
 {
   "id": "upstream-500",
   "title": "Upstream 500 (not retried in place)",
-  "gateway": "9router@0.5.55",
-  "recordedAt": "2026-09-25T18:25:21.992Z",
+  "gateway": "9router@0.5.86",
+  "recordedAt": "2026-10-12T07:32:17.822Z",
   "covers": [
     "fallback.error-classification",
     "fallback.executor-retry-budget"
@@ -51,8 +51,8 @@
     "cut": false
   },
   "clientResponse": {
-    "status": 500,
+    "status": 503,
     "contentType": "application/json",
-    "body": "{\"error\":{\"message\":\"[openai-compatible-chat-20285e06-2ae9-4993-b3d6-b5b0bcc46c95/parity-upstream-500] [500]: {\\\"error\\\":{\\\"message\\\":\\\"The server had an error while processing your request.\\\",\\\"type\\\":\\\"server_error\\\",\\\"param\\\":null,\\\"code\\\":null}} (reset after 2s)\"}}"
+    "body": "{\"error\":{\"message\":\"[openai-compatible-chat-f6846fd4-3426-4749-b4c8-4cfe842b02dc/parity-upstream-500] [500]: {\\\"error\\\":{\\\"message\\\":\\\"The server had an error while processing your request.\\\",\\\"type\\\":\\\"server_error\\\",\\\"param\\\":null,\\\"code\\\":null}} (reset after 2s)\"}}"
   }
 }

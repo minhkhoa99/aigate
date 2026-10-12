@@ -1,8 +1,8 @@
 {
   "id": "stream-tool-call",
   "title": "Streaming tool call",
-  "gateway": "9router@0.5.55",
-  "recordedAt": "2026-09-25T18:25:18.783Z",
+  "gateway": "9router@0.5.86",
+  "recordedAt": "2026-10-12T07:32:14.455Z",
   "covers": [
     "routing.streaming-pipeline",
     "translator.tool-id-normalization"

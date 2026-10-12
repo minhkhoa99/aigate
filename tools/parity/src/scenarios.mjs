@@ -92,14 +92,18 @@ export const SCENARIOS = [
 ];
 
 // Intentional differences from 9router, each tied to its labeled matrix entry and the contract that
-// decided it. Found by recording 9router 0.5.55 (tools/parity/tapes); tier 1 fails on any other difference.
+// decided it. Found by recording 9router 0.5.86 (tools/parity/tapes); tier 1 fails on any other difference.
 const USAGE_BUFFER = {
   entry: "routing.non-streaming-response", label: "SUSPECTED_BUG",
   reason: "9router adds 2000 buffer tokens to reported usage (open-sse/utils/usageTracking.js addBufferToUsage); AIGate reports the vendor's numbers",
 };
 const ERROR_SHAPE = {
   entry: "fallback.upstream-error-result", label: "REFERENCE_BEHAVIOR",
-  reason: "9router 0.5.55 answers { error: { message } } only, with its node id and the raw upstream body in the message; AIGate sends the OpenAI shape with type and code (docs/contracts/protocol-openai.md)",
+  reason: "9router answers { error: { message } } only, with its node id and the raw upstream body in the message; AIGate sends the OpenAI shape with type and code (docs/contracts/protocol-openai.md)",
+};
+const RATE_STATUS = {
+  path: "status", aigate: 429, entry: "fallback.accounts-exhausted-response", label: "REFERENCE_BEHAVIOR",
+  reason: "9router 0.5.86 turns a single account's upstream 429 into 503 after locking it; AIGate returns the rate-limit or quota status to the client (docs/contracts/protocol-openai.md)",
 };
 const DEVIATIONS = {
   "normal-json": [{ path: "usage", aigate: { prompt: 12, completion: 5, total: 17 }, ...USAGE_BUFFER }],
@@ -122,8 +126,8 @@ const DEVIATIONS = {
     { path: "status", aigate: 502, entry: "fallback.upstream-error-result", label: "SUSPECTED_BUG", reason: "an upstream credential failure is AIGate's configuration, not the client's key; 401 would blame the client (docs/contracts/protocol-openai.md)" },
     { path: "error", aigate: { type: "upstream_auth_error", code: "upstream_auth_error" }, ...ERROR_SHAPE },
   ],
-  "upstream-429-rate": [{ path: "error", aigate: { type: "rate_limit_error", code: "rate_limit_exceeded" }, ...ERROR_SHAPE }],
-  "upstream-429-quota": [{ path: "error", aigate: { type: "insufficient_quota", code: "insufficient_quota" }, ...ERROR_SHAPE }],
+  "upstream-429-rate": [RATE_STATUS, { path: "error", aigate: { type: "rate_limit_error", code: "rate_limit_exceeded" }, ...ERROR_SHAPE }],
+  "upstream-429-quota": [RATE_STATUS, { path: "error", aigate: { type: "insufficient_quota", code: "insufficient_quota" }, ...ERROR_SHAPE }],
   "upstream-500": [
     { path: "status", aigate: 502, entry: "fallback.error-classification", label: "REFERENCE_BEHAVIOR", reason: "an upstream 5xx is PROVIDER_UNAVAILABLE, which a gateway reports as 502 Bad Gateway (docs/contracts/protocol-openai.md)" },
     { path: "error", aigate: { type: "api_error", code: "provider_unavailable" }, ...ERROR_SHAPE },

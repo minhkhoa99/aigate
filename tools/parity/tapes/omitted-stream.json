@@ -1,8 +1,8 @@
 {
   "id": "omitted-stream",
   "title": "No stream flag (OpenAI default: JSON)",
-  "gateway": "9router@0.5.55",
-  "recordedAt": "2026-09-25T18:25:18.864Z",
+  "gateway": "9router@0.5.86",
+  "recordedAt": "2026-10-12T07:32:14.524Z",
   "covers": [
     "routing.stream-mode-decision"
   ],

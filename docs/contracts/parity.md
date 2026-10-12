@@ -9,7 +9,7 @@ The harness implements spec §8: tapes, replay, a normalizer, the three tiers, a
 | `pnpm parity record [--only ids]` | Records one tape per scenario from a running 9router (`NINEROUTER_URL`, default `http://localhost:20128`; `NINEROUTER_PASSWORD`, default the 9router default) | Local only: 9router and a scripted vendor |
 | `pnpm parity replay` | Replays every tape against AIGate. Tier 1 PASS/FAIL, tier 3 warnings. | None |
 | `pnpm parity live` | Tier 2: sends AIGate's upstream requests to the real OpenAI API (`OPENAI_API_KEY`, never stored) | OpenAI, one request per success tape, at most 16 output tokens |
-| `pnpm parity gate [--out file]` | Runs replay, the 13 golden scenarios, and coverage, plus tier 2 when a key is set; prints the report | None without a key |
+| `pnpm parity gate [--out file]` | Runs replay, the 13 golden scenarios, and coverage, plus tier 2 when a key is set; prints the report and exits nonzero until every M1 criterion passes | None without a key |
 
 `pnpm test` runs `tools/parity/test/parity.test.mjs`, so CI replays every committed tape.
 
@@ -23,7 +23,7 @@ recorder ──> 9router :20128 ──> scripted vendor (tools/parity/src/vendor
 - **9router's code is not changed.** Recording creates a temporary OpenAI-compatible provider node, a connection with a fake key, and a client key, all named `AIGate parity (temporary)`. `cleanup()` deletes everything with that name before and after each run, so nothing of the user's is touched. No real vendor is called.
 - **Deviation from spec §8.2.** The spec points 9router's `outboundProxyUrl` at a recording proxy. Upstream traffic is HTTPS, so a forward proxy would see only an encrypted tunnel unless it ran a MITM CA that 9router trusted. Pointing an OpenAI-compatible node's `baseUrl` at a local scripted vendor records the same request in plain HTTP, with no CA and no change to 9router's settings. A real-vendor recording proxy returns with M2, when tapes need vendor behaviour that a script cannot know.
 - **One model id per scenario** (`aigateparity/parity-<id>`), because 9router locks a failing account per model; without it, an error tape would poison the next tape.
-- **Token Saver bypass.** Each recording request sends `x-9router-token-saver: off`. The recorded instance had Token Saver on, which injects a system prompt and changes usage. AIGate has no Token Saver until SP21. Only that request is affected; 9router's settings are unchanged.
+- **Token Saver bypass.** Each recording request sends `x-9router-token-saver: off` to isolate base chat parity from prompt and usage changes. Only that request is affected; 9router's settings are unchanged.
 - **Secrets.** The vendor masks `Authorization` and similar headers to their scheme (`Bearer ***`). The test "tapes never hold a credential" enforces it.
 
 A tape records: `{ id, title, gateway, recordedAt, covers, clientRequest, upstreamRequest, upstreamCalls, upstreamResponse, clientResponse }`.
@@ -37,9 +37,9 @@ A tape records: `{ id, title, gateway, recordedAt, covers, clientRequest, upstre
 - **Tier 2**: the upstream request AIGate produced is sent to OpenAI. It passes on a 2xx of the right class: a finished SSE stream for a stream request, a `chat.completion` otherwise.
 - **Tier 3**: the semantic difference of the upstream request body, with the model id ignored. It only warns.
 
-## What recording 9router 0.5.55 showed
+## What recording 9router 0.5.86 showed
 
-The running reference is 0.5.55; the Feature Matrix was traced at 0.5.86. Findings, now in the matrix and declared as deviations:
+The tapes and Feature Matrix now use the same 0.5.86 reference. Findings, now in the matrix and declared as deviations:
 
 | Tape | 9router | AIGate | Entry and label |
 |---|---|---|---|
@@ -48,8 +48,9 @@ The running reference is 0.5.55; the Feature Matrix was traced at 0.5.86. Findin
 | `omitted-stream` | no `stream` sent upstream; the JSON answer is sent as `text/event-stream` followed by a bare `data: [DONE]`, so it is readable as neither | JSON, the OpenAI default | `routing.stream-mode-decision`, `SUSPECTED_BUG` |
 | `stream-cut` | the stream ends silently, with no error and no `[DONE]` | an error event, no `[DONE]` | `fallback.partial-stream-failure`, `SUSPECTED_BUG` |
 | 4xx/5xx tapes | `{ error: { message } }` only; the message holds the internal node id and the raw upstream body | the OpenAI shape with `type` and `code` | `fallback.upstream-error-result` |
-| `upstream-401` | 401 | 502 `upstream_auth_error` | `fallback.upstream-error-result`, `SUSPECTED_BUG` |
-| `upstream-500` | 500 | 502 `provider_unavailable` | `fallback.error-classification` (gateway semantics, `protocol-openai.md`) |
+| `upstream-401` | 503 after locking the only account | 502 `upstream_auth_error` | `fallback.upstream-error-result`, `SUSPECTED_BUG` |
+| `upstream-429-rate`, `upstream-429-quota` | 503 after locking the only account | 429 with the rate or quota code | `fallback.accounts-exhausted-response`; `protocol-openai.md` |
+| `upstream-500` | 503 after locking the only account | 502 `provider_unavailable` | `fallback.error-classification` (gateway semantics, `protocol-openai.md`) |
 
 `stream-text` matches 9router exactly. Tier 3 has 3 warnings, all expected:
 - AIGate always sends `stream_options.include_usage` when streaming.
@@ -60,9 +61,9 @@ The running reference is 0.5.55; the Feature Matrix was traced at 0.5.86. Findin
 | Criterion | Result |
 |---|---|
 | Tier 1 clean | **11/11 tapes PASS** |
-| Tier 2 clean | Needs an OpenAI key: `pnpm parity live`. Not run in CI. |
-| 13 golden scenarios | **10 pass, 0 fail**. Deferred: 3, because they need several accounts or providers (SP17, SP19) or OAuth (SP16). They are skipped with that reason in `apps/server/test/golden.test.mjs`. |
-| Coverage | 11/284 capabilities are covered by tapes. The M2 threshold is still open (spec §12). |
+| Tier 2 clean | Needs an OpenAI key: `pnpm parity live`. Not run in CI. M1 remains incomplete until this passes. |
+| 13 golden scenarios | **13 pass, 0 fail, 0 deferred**. OAuth refresh, account failover, and provider fallback now run in `apps/server/test/golden.test.mjs`. |
+| Coverage | 11/398 capabilities are covered by tapes (2026-10-12). The M2 threshold is still open (spec §13). |
 
 Golden scenarios at M1 scope:
 - **Rate limit and quota:** the right code, with no blind retry.

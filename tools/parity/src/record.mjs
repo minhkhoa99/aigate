@@ -64,8 +64,7 @@ export async function record({ base, password, only }) {
       const clientBody = { model: `${PREFIX}/parity-${scenario.id}`, ...scenario.body };
       const response = await fetch(new URL("/v1/chat/completions", base), {
         method: "POST",
-        // Token Saver rewrites prompts (a system message, inflated usage); AIGate has none until SP21,
-        // so each tape asks 9router to bypass it for that request only, without touching its settings.
+      // Isolate base chat parity from the reference's Token Saver prompt and usage changes.
         headers: { "content-type": "application/json", authorization: `Bearer ${clientKey.key}`, "x-9router-token-saver": "off" },
         body: JSON.stringify(clientBody),
         signal: AbortSignal.timeout(TIMEOUT_MS),

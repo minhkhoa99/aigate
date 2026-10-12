@@ -18,18 +18,19 @@ const option = (name) => { const i = args.indexOf(`--${name}`); return i >= 0 ? 
 const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
 function golden() {
-  const run = spawnSync(process.execPath, ["--test", "--test-timeout=30000", "apps/server/test/golden.test.mjs"], { cwd: ROOT, encoding: "utf8" });
+  const run = spawnSync(process.execPath, ["--test", "--test-timeout=60000", "apps/server/test/golden.test.mjs"], { cwd: ROOT, encoding: "utf8" });
   const count = (name) => Number(run.stdout.match(new RegExp(`^# ${name} (\\d+)`, "m"))?.[1] ?? 0);
   const skipped = [...run.stdout.matchAll(/^ok \d+ - (golden: [^#\n]+?) # SKIP (.+)$/gm)].map(([, name, reason]) => `${name.trim()} — ${reason}`);
   return { pass: count("pass"), fail: count("fail"), skipped, ok: run.status === 0 };
 }
 
-function report({ results, cov, gold, tier2 }) {
+function report({ results, cov, gold, tier2, passed }) {
   const tier1 = results.filter((r) => r.tier1.pass).length;
   const lines = [
     "# Parity report (M1 gate)", "",
     `Generated ${new Date().toISOString()} by \`pnpm parity gate\`. Tapes recorded from ${[...new Set(results.map((r) => r.gateway))].join(", ")}.`, "",
     "| Check | Result |", "|---|---|",
+    `| M1 acceptance gate | ${passed ? "PASS" : "INCOMPLETE"} |`,
     `| Tier 1, client contract | ${tier1}/${results.length} tapes PASS |`,
     `| Tier 2, vendor acceptance | ${tier2 ? `${tier2.filter((t) => t.pass).length}/${tier2.length} PASS (live)` : "not run (set OPENAI_API_KEY and run `pnpm parity live`)"} |`,
     `| Tier 3, upstream drift | ${results.reduce((n, r) => n + r.tier3.length, 0)} warnings (non-blocking) |`,
@@ -38,7 +39,7 @@ function report({ results, cov, gold, tier2 }) {
     `| Matrix parityStatus | ${Object.entries(cov.statuses).map(([k, v]) => `${k} ${v}`).join(", ")} |`,
     "", "## Tapes", "", "| Tape | Tier 1 | Intentional deviations | Tier 3 warnings |", "|---|---|---|---|",
     ...results.map((r) => `| ${r.id} | ${r.tier1.pass ? "PASS" : `FAIL: ${r.tier1.problems.join("; ")}`} | ${r.deviations.map((d) => `\`${d.path}\` (${d.label}, ${d.entry})`).join("<br>") || "none"} | ${r.tier3.join(", ") || "none"} |`),
-    "", "## Deferred golden scenarios", "", ...gold.skipped.map((s) => `- ${s}`),
+    ...(gold.skipped.length ? ["", "## Deferred golden scenarios", "", ...gold.skipped.map((s) => `- ${s}`)] : []),
   ];
   return `${lines.join("\n")}\n`;
 }
@@ -72,11 +73,14 @@ async function main() {
     return tier2.every((t) => t.pass) ? 0 : 1;
   }
   const gold = golden();
-  const text = report({ results, cov: await coverage(tapes), gold, tier2 });
+  const passed = results.length >= SCENARIOS.length && results.every((r) => r.tier1.pass)
+    && gold.ok && gold.pass === 13 && gold.fail === 0 && gold.skipped.length === 0
+    && tier2?.length > 0 && tier2.every((t) => t.pass);
+  const text = report({ results, cov: await coverage(tapes), gold, tier2, passed });
   const out = option("out");
   if (out) writeFileSync(out, text);
   console.log(text);
-  return results.every((r) => r.tier1.pass) && gold.ok && (!tier2 || tier2.every((t) => t.pass)) ? 0 : 1;
+  return passed ? 0 : 1;
 }
 
 main().then((code) => process.exit(code), (error) => { console.error(error); process.exit(1); });

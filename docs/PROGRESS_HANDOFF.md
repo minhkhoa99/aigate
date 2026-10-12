@@ -2,6 +2,8 @@
 
 Updated: 2026-10-12. Read this before continuing the project plan.
 
+Current acceptance status (2026-10-12): all listed implementation SPs through SP65 have scoped checks, but the original M1 gate remains incomplete without live Tier 2 vendor acceptance. The 13 golden scenarios now pass without skips. Tier 1 tapes were re-recorded from the isolated 9router 0.5.86 reference and pass 11/11. M2 has no agreed parity coverage threshold; the refreshed matrix/capability set has 398 entries and the committed tapes cover 11. Release tooling has synthetic acceptance only; no signing key, HTTPS channel, or managed installation has been supplied for an operator release trial. Historical "next" notes below describe the state at their dates and are not the current task list.
+
 ## Task board
 
 Update this table, and the section of the SP you touched, every time an SP or subtask finishes (user rule, 2026-09-25).
@@ -22,7 +24,8 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | M1 SP10 `engine`: protocol adapter in/out (OpenAI only) | Done, no UI | `docs/contracts/protocol-openai.md` |
 | M1 SP11 `connections` (one API-key account) | Done, UI wired | `docs/contracts/connections.md` |
 | M1 SP12 routing + `/v1` streaming | Done, UI wired | `docs/contracts/chat-lane.md` |
-| M1 acceptance gate (parity tiers 1+2, 13 golden scenarios) | **Passed** (tier 1 11/11, golden 10/10 + 3 deferred); tier 2 waits for an OpenAI key | `docs/parity/m1-gate-report.md` |
+| M1 acceptance gate (parity tiers 1+2, 13 golden scenarios) | **Incomplete**: tier 1 11/11 and golden 13/13 pass; tier 2 needs a real OpenAI key | `docs/parity/m1-gate-report.md` |
+| M2 acceptance gate (agreed parity coverage threshold) | **Incomplete**: threshold not agreed; 11/398 capabilities covered by committed tapes | `docs/parity/m1-gate-report.md`, spec §9/§13 |
 | M0 SP4 `tools/extract` registry extraction | Done, no UI | `docs/contracts/registry-extract.md` |
 | M2 SP13 catalog → runtime registry (41 connectable providers) | Done, UI wired | `docs/contracts/catalog-providers.md` |
 | M2 SP13b custom OpenAI-compatible providers; `tools/extract` deleted | Done, UI wired | `docs/contracts/custom-providers.md` |
@@ -95,6 +98,7 @@ Update this table, and the section of the SP you touched, every time an SP or su
 | SP63 / M3 U7 Usage model table windowing | Verified with synthetic Chrome Usage acceptance; local checkpoint | SP63 section below |
 | SP64 / M3 U4 Connections list paging | Verified with synthetic Chrome Connections acceptance; local checkpoint | `docs/contracts/connection-list-paging.md`, SP64 section below |
 | SP65 / M3 U5 Voice Browser list paging | Verified with synthetic Chrome Voice Browser acceptance; local checkpoint | `docs/contracts/voice-list-paging.md`, SP65 section below |
+| Operator release trial | **Pending external setup**: real signing key, HTTPS channel, and managed install target | SP49–SP56 sections below |
 
 ## Completed and verified
 
@@ -1311,3 +1315,10 @@ Checks and status:
 - **Scope.** Started from clean `5c5b3f2`. The Voice Browser could load up to 2,000 account voices but mounted the first 200 filtered rows and made later voices reachable only through further filtering. It now shows 25 rows per page across the entire filtered result. Provider/model/filter changes reset page one; a shorter result clamps the page; EN/VI keeps it. Listen, Copy, pending preview and audio remain. The SP64 page calculation and localization are shared by both screens. No API, upstream call, dependency or storage key changed.
 - **Browser acceptance.** A same-origin Chrome fixture mounted the actual Voice Browser with 210 synthetic voices. The first page mounted 25 rows; page nine reached voices 200–209 with Listen still enabled, beyond the former display cutoff. VI→EN kept page nine. Shrinking to 30 voices clamped to page two with five rows. Searching reset to the first matching page, and an unmatched search showed the existing empty state without page controls. At 390 px, the document stayed within the viewport and the table scrolled horizontally. Fixture, tab and server were removed. No provider credentials, real voice-list request or paid preview was used.
 - **Gates.** Web tests pass 44/44, including the shared 2,000-row boundary; full build and lint pass (732 modules/2678 dependencies), discovery validates 398 entries, and diff checks pass. AST-only graph refresh ran (11,804 nodes/26,198 edges, no semantic extraction). The old `D:\aigate` graph root again caused unrelated generated path/community churn, so tracked graph files and the unchanged 135-line project map were retained. Matrix `media.tts-voice-list-paging` is verified. Local checkpoint only, no push.
+
+### Acceptance follow-up (2026-10-12)
+
+- **M1.** Replaced the three skipped golden cases with OAuth refresh, same-provider account failover, and cross-provider combo fallback checks. The full golden file passes 13/13. Re-recorded all 11 Tier 1 tapes from 9router 0.5.86 in an isolated data directory; replay and the parity harness pass. The reference now returns 503 for single-account 429 rate/quota responses, while AIGate returns the classified 429; the declared deviations and parity contract record this. `pnpm parity gate` now exits nonzero when Tier 2 is absent, any golden scenario is skipped, or another M1 criterion fails. The current report correctly says `INCOMPLETE` because no `OPENAI_API_KEY` is configured.
+- **M2.** Regenerated discovery coverage and `docs/capabilities.md` from the 398-entry Feature Matrix. Tape coverage is 11/398. The acceptance threshold in spec §13 still needs agreement; the matrix's 170 traced, 13 contracted, 170 implemented, and 45 verified statuses need per-capability reconciliation before claiming full parity.
+- **Release.** No real signing key, published HTTPS channel, or managed install target is configured. SP49–SP56 remain synthetically verified; an operator release trial is outstanding. A real IdP check for OIDC/SAML is likewise a deployment step.
+- **Checks.** Golden 13/13, Tier 1 replay 11/11, parity harness 5/5, `pnpm discovery validate` 398, lint and `git diff --check` pass. The strict M1 gate returns nonzero for the missing live Tier 2. The isolated reference server was stopped and its generated `AGENTS.md` removed; automatic approval review blocked recursive cleanup of task-generated ignored `node_modules`, `.next`, and temporary reference data.

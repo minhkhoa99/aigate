@@ -1,35 +1,35 @@
 # Discovery coverage
 
-Entries: 344
+Entries: 398
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
 | routes | 166/166 |  |
-| pages | 6/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/combos, (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint … +14 |
-| providers | 26/124 | alicode-intl, alims-intl, alitp-intl, assemblyai, aws-polly, azure, baidu, bazaarlink … +90 |
-| executors | 20/31 | devin-cli, grok-web, mimo-free, opencode, opencode-go, opencode-zen, perplexity-web, windsurf … +3 |
+| pages | 7/28 | , (dashboard)/dashboard, (dashboard)/dashboard/basic-chat, (dashboard)/dashboard/cli-tools, (dashboard)/dashboard/cli-tools/[toolId], (dashboard)/dashboard/console-log, (dashboard)/dashboard/endpoint, (dashboard)/dashboard/media-providers/[kind]/[id] … +13 |
+| providers | 29/124 | alicode-intl, alims-intl, alitp-intl, assemblyai, azure, baidu, bazaarlink, black-forest-labs … +87 |
+| executors | 21/31 | devin-cli, grok-web, mimo-free, opencode-go, opencode-zen, perplexity-web, windsurf, xiaomi-mimo … +2 |
 | translators | 44/48 | open-sse/translator/concerns/json.js, open-sse/translator/concerns/kiroConversation.js, open-sse/translator/concerns/message.js, open-sse/translator/concerns/modality.js |
 | repos | 11/11 |  |
 | settingsKeys | 47/52 | cloudEnabled, dnsToolEnabled, oidcLoginLabel, samlLoginLabel, tunnelProvider |
 
 ## Entries per bounded context
 
-- apikeys: 9
-- catalog: 32
-- connections: 73
+- apikeys: 10
+- catalog: 34
+- connections: 74
 - identity: 11
-- media: 15
-- routing: 112
-- settings: 10
-- tooling: 45
-- transport: 14
-- usage: 23
+- media: 23
+- routing: 122
+- settings: 26
+- tooling: 51
+- transport: 16
+- usage: 31
 
 ## Labels
 
-- IMPLEMENTATION_ACCIDENT: 21
-- REFERENCE_BEHAVIOR: 296
-- SUSPECTED_BUG: 86
+- IMPLEMENTATION_ACCIDENT: 40
+- REFERENCE_BEHAVIOR: 309
+- SUSPECTED_BUG: 97
 
 ## Missing — pages
 
@@ -38,7 +38,6 @@ Entries: 344
 - (dashboard)/dashboard/basic-chat
 - (dashboard)/dashboard/cli-tools
 - (dashboard)/dashboard/cli-tools/[toolId]
-- (dashboard)/dashboard/combos
 - (dashboard)/dashboard/console-log
 - (dashboard)/dashboard/endpoint
 - (dashboard)/dashboard/media-providers/[kind]/[id]
@@ -62,7 +61,6 @@ Entries: 344
 - alims-intl
 - alitp-intl
 - assemblyai
-- aws-polly
 - azure
 - baidu
 - bazaarlink
@@ -79,7 +77,6 @@ Entries: 344
 - comfyui
 - coqui
 - cursor
-- deepgram
 - devin-cli
 - edge-tts
 - elevenlabs
@@ -118,7 +115,6 @@ Entries: 344
 - ollama
 - ollama-local
 - ollama-search
-- opencode
 - opencode-go
 - opencode-zen
 - perplexity
@@ -162,7 +158,6 @@ Entries: 344
 - devin-cli
 - grok-web
 - mimo-free
-- opencode
 - opencode-go
 - opencode-zen
 - perplexity-web

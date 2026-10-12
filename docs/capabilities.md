@@ -778,6 +778,17 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Claude-style content-block arrays containing type:'tool_use' or type:'tool_result' blocks are rebuilt into one string: all text blocks joined first, then one combined '[Called tools: ...]' line, then one combined '[Tool result: ...]' line — this discards the original interleaved block ordering
   - A message with neither shape (plain text, or an array with no tool_use/tool_result blocks) passes through completely unchanged
 
+### EN/VI presentation for Combo list/form and Capacity adapter
+
+- **id:** `routing.editors-browser-i18n` · **module:** `routing`
+- **Trigger:** Open the Routing Combo/Capacity tabs or change the browser language
+- **Input:** Existing combo/pool/model reads, draft state, browser locale
+- **Output:** Localized owned copy with literal names, IDs, limits and raw diagnostics
+- **Rules:**
+  - AIGATE_EXTENSION: Combo and Capacity owned UI copy renders through the shared EN/VI catalogs without changing saved payloads or query keys
+  - AIGATE_EXTENSION: a locale change preserves the selected tab, form/pool drafts and pending mutations; it never probes a model or replays a save
+  - AIGATE_EXTENSION: combo/model names, API codes, numeric limits and upstream diagnostics remain literal
+
 ## Console Log
 
 ### Batched SSE flush timer and log line formatting (ANSI strip, arg serialization)
@@ -790,6 +801,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - formatArg() strips ANSI escape codes (terminal color codes) from strings, Error stacks/messages, and JSON-stringified objects alike (src/lib/consoleLogBuffer.js) so the dashboard playground never renders raw \x1b[...m sequences
   - scheduleFlush() debounces at FLUSH_INTERVAL_MS=100ms via setTimeout, but appendLine() bypasses the debounce and flushes immediately once pendingLines reaches MAX_BATCH_LINES=50 in the same call, clearing any pending timer first — a burst of 50+ log lines in one microtask flushes as one large 'lines' batch instead of waiting out the 100ms window
   - The flush timer is unref()'d (scheduleFlush) so a pending flush never keeps the Node process alive on its own — an intentional 'this is debug tooling, not a durability guarantee' choice
+- **Streaming:** yes
+
+### Browser-local EN/VI, Developer mode gate, bounded live log and Clear states
+
+- **id:** `console.dashboard-browser-i18n` · **module:** `tooling`
+- **Trigger:** Open /traffic/console or change browser language while mounted
+- **Input:** Browser language, level/search controls, Pause/Resume/Clear
+- **Output:** Localized UI with literal event metadata and stable stream/cache state
+- **Rules:**
+  - AIGATE_EXTENSION: Only explicit Clear sends DELETE; a pending Clear cannot be repeated
+  - AIGATE_EXTENSION: Locale changes do not fetch, reopen SSE, replay Clear or reset filters
+  - AIGATE_EXTENSION: GET and SSE retain the existing 200-event and eight-stream server bounds; read and Clear errors show code/diagnostic
 - **Streaming:** yes
 
 ### Why the ring buffer lives on global._* and the hot-reload guard that protects it
@@ -825,6 +848,20 @@ Every item below is a capability AIGate must have. Derived from tracing
   - translator.playground-console-logs (docs/discovery/feature-matrix/11-translation-i18n.yaml) already traces the full request/response/SSE behavior of these two routes end to end — this entry does not re-derive it, only records why the path is /api/translator/console-logs and not something like /api/console-log or /api/system/logs
   - Nothing in the route handlers or in consoleLogBuffer.js is translator-specific: initConsoleLogCapture() patches the process-wide console object and captures every console.* call in the entire Next.js process, not just calls made during a translation request — the capability is a general-purpose debug console viewer that happens to have been built for, and nested under, the translator playground UI
   - The naming/placement is a historical/organizational accident (the feature shipped as a debugging aid for the translator playground page and inherited that page's route prefix), not a deliberate API design choice — record this so AIGate does not copy the /api/translator/console-logs path for what is really a general process-console-log capability; if the capability is kept at all, a fresh AIGate design should place it under its own diagnostics/tooling path
+- **Streaming:** yes
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### Bounded DOM and keyboard scroll for the 200-event log
+
+- **id:** `console.windowed-dashboard` · **module:** `tooling`
+- **Trigger:** Open or scroll /traffic/console, receive an event, filter, Clear or change locale
+- **Input:** Existing 200-event metadata ring, active filters and scroll position
+- **Output:** Complete one-line messages in a stable vertical/horizontal scroll region
+- **Rules:**
+  - AIGATE_EXTENSION: mount only the visible 26 px event rows plus five overscan rows above and below inside a 400 px scrollport
+  - AIGATE_EXTENSION: keep complete messages accessible by horizontal scroll, stable scroll extent, keyboard focus and separate announcement only for a new visible event
+  - AIGATE_EXTENSION: filters and Clear reset scroll; live append, Pause/Resume and EN/VI preserve scroll and existing GET/SSE/Clear behavior
+  - IMPLEMENTATION_ACCIDENT: eagerly mounting all 200 rows and wrapping messages are presentation details
 - **Streaming:** yes
 - **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
@@ -897,6 +934,17 @@ Every item below is a capability AIGate must have. Derived from tracing
   - An inactive key (isActive false/0) is rejected even though the row matched — the query fetches isActive and the caller re-checks it explicitly rather than filtering isActive in the WHERE clause
 - **Errors:** `AUTH_ERROR` (no row matches the key string), `AUTH_ERROR` (row matches but isActive is false/0)
 
+### Protocol-specific client setup and EN/VI presentation
+
+- **id:** `endpoint.dashboard-protocol-setup` · **module:** `apikeys`
+- **Trigger:** Open Gateway Endpoint & Keys or select a client protocol
+- **Input:** Browser locale, selected protocol, existing key/settings/connection reads
+- **Output:** Correct protocol URL, literal setup command and test request, localized surrounding UI
+- **Rules:**
+  - AIGATE_EXTENSION: OpenAI Chat and Responses clients use the /v1 base, Anthropic clients use the origin and /v1/messages, and Gemini shows its full /v1beta/models/* request URL
+  - AIGATE_EXTENSION: copied commands include a quoted placeholder rather than any saved or one-time real API key
+  - AIGATE_EXTENSION: selecting a protocol or language preserves key dialogs, mutations and cached queries without fetching or calling a provider
+
 ### Gate chat requests behind settings.requireApiKey
 
 - **id:** `endpoint.enforce-require-api-key` · **module:** `apikeys`
@@ -956,6 +1004,41 @@ Every item below is a capability AIGate must have. Derived from tracing
   - The bucket key is a proxy-stamped real IP only when the custom server proves it set the header, X-Forwarded-For only when TRUST_PROXY=true, and otherwise the single bucket 'unknown', so a client cannot rotate a spoofed header to escape its lockout
 - **Errors:** `AUTH_ERROR` (the password does not match (401)), `RATE_LIMIT` (the client's bucket is locked (429 with Retry-After))
 
+## Integrations
+
+### Browser-local EN/VI for list and Claude/Codex/OpenCode/Cline review flows
+
+- **id:** `integrations.cli-core-browser-i18n` · **module:** `tooling`
+- **Trigger:** Open CLI list/detail or change browser language while mounted
+- **Input:** Browser locale, existing status and explicit Preview/Apply/Reset actions
+- **Output:** Localized owned UI with literal tool names, paths, models, codes and redacted diffs
+- **Rules:**
+  - AIGATE_EXTENSION: CLI list is read-only host detection; locale changes do not refetch or submit actions
+  - AIGATE_EXTENSION: four core detail screens keep the server-owned one-use redacted preview and explicit apply boundary
+  - AIGATE_EXTENSION: pending actions cannot overlap; stale/expired preview clears and requires a fresh review
+
+### Browser-local EN/VI for 14 SP25 adapter routes
+
+- **id:** `integrations.cli-secondary-browser-i18n` · **module:** `tooling`
+- **Trigger:** Open a CLI detail route or change language while mounted
+- **Input:** Browser locale, existing status and explicit Preview/Apply/Reset
+- **Output:** Localized owned UI with literal paths, model IDs, codes and redacted diffs
+- **Rules:**
+  - AIGATE_EXTENSION: locale changes preserve drafts and reviewed previews without requests
+  - AIGATE_EXTENSION: pending actions cannot overlap; expired/changed reviews require fresh preview
+  - AIGATE_EXTENSION: no local CLI file write before explicit SP25 Apply
+
+### Browser-local EN/VI with stable registry and marketplace actions
+
+- **id:** `integrations.skills-mcp-browser-i18n` · **module:** `tooling`
+- **Trigger:** Open Skills/MCP or change browser language while mounted
+- **Input:** Browser locale, saved registry, bounded marketplace and explicit actions
+- **Output:** Localized owned UI with literal IDs, URLs, names, codes and copied JSON
+- **Rules:**
+  - AIGATE_EXTENSION: locale changes preserve tab, form draft and pending mutation without refetch or replay
+  - AIGATE_EXTENSION: failed registry/marketplace reads show code, permitted diagnostic and Retry; failed mutations retain drafts
+  - AIGATE_EXTENSION: skill URLs are copied without fetching; AIGate never connects to or executes MCP endpoints
+
 ## MCP
 
 ### The two /api/mcp/[plugin]/* routes spawn an allowlisted local MCP server process and bridge it over SSE
@@ -987,6 +1070,30 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Genuinely SHARED (same imported functions, same module, same DB fields): getProviderCredentials, markAccountUnavailable, clearAccountError (src/sse/services/auth.js) and checkAndRefreshToken/updateProviderCredentials (src/sse/services/tokenRefresh.js) — every one of embeddings.js, imageGeneration.js, tts.js, stt.js, videoGeneration.js, search.js, fetch.js imports these from the exact same files the chat lane's handleChat uses; the modelLock_*/testStatus persistence model (account.lock-storage-persistence) is identical across all 8 lanes (7 media + chat)
   - DUPLICATED (independently re-implemented per file, not shared as a function): the outer while(true) retry-and-rotate loop itself. All 7 non-chat handlers hand-write their own copy of: init excludeConnectionIds/lastError/lastStatus, call getProviderCredentials, branch on allRateLimited vs exhausted vs found, call the core handler, branch on result.success, call markAccountUnavailable, and continue-or-return — this is the same ~25-30 line shape rewritten 7 times rather than factored into one shared helper (e.g. runWithAccountFallback(provider, model, coreFn))
   - Combo expansion (open-sse/services/combo.js's handleComboChat/getComboModels) is shared code but inconsistently WIRED: present in tts, webSearch, webFetch; absent in embeddings, image generation, stt, video generation — video generation is the only lane that explicitly rejects a combo model with its own error message, the other three combo-less lanes simply treat a combo name as an unresolvable provider id
+
+### Distinguish catalog routes from configured and tested accounts
+
+- **id:** `media.dashboard-availability` · **module:** `media`
+- **Trigger:** Dashboard opens a media kind or provider
+- **Input:** Session-protected catalog and connection reads, URL kind/provider IDs
+- **Output:** Accurate route/account states and TTS voice browser gating
+- **Rules:**
+  - AIGATE_EXTENSION: serviceKinds are catalog claims, routeKinds are working AIGate lanes, and a configured provider requires a route plus an enabled account
+  - AIGATE_EXTENSION: an unknown kind or provider outside that kind is a visible not-found state, not another provider's details
+  - AIGATE_EXTENSION: a failed connection read is unknown rather than an empty account list; TTS voices mount only after required metadata succeeds
+  - AIGATE_EXTENSION: provider detail offers endpoint copy only when its lane exists; existing TTS voice-list loading may contact the vendor when TTS is opened, while preview remains user-initiated
+- **Errors:** `AUTH_ERROR` (dashboard session is missing or expired (wire code UNAUTHENTICATED))
+
+### EN/VI browser presentation over existing catalog and voice data
+
+- **id:** `media.dashboard-browser-i18n` · **module:** `media`
+- **Trigger:** Open a Media Providers route or change the local language preference
+- **Input:** Browser locale preference and existing provider, connection and voice reads
+- **Output:** Localized owned copy with literal provider/model/voice identifiers
+- **Rules:**
+  - AIGATE_EXTENSION: kind/status/voice controls and states use shared EN/VI catalogs; native language and region names follow the selected app locale
+  - AIGATE_EXTENSION: provider/model/voice IDs and names, endpoints, error codes, raw diagnostics and the preview sample remain literal
+  - AIGATE_EXTENSION: a locale change preserves voice selection/filters and causes no query refetch, replay or preview
 
 ### COMBO_KINDS is a permanently-empty Set — combo creation/listing UI for image and tts kinds is unreachable, and the code that would render it is dead
 
@@ -1106,7 +1213,7 @@ Every item below is a capability AIGate must have. Derived from tracing
   - REFERENCE_BEHAVIOR: Region and language names are rendered with Intl.DisplayNames, with raw codes as fallback.
   - REFERENCE_BEHAVIOR: A preview uses the selected provider, model, voice and a short input, and displays returned audio. AIGate previews through the same synthesis path as /v1/audio/speech for every provider with a TTS route and an active saved connection; installed browser voices play locally.
   - IMPLEMENTATION_ACCIDENT: The old UI passes an API key through its client example path; AIGate's dashboard preview reads an already-saved connection on the server.
-  - REFERENCE_BEHAVIOR: voice pickers for elevenlabs, inworld and minimax load the account's own voices; the language filter groups them. AIGate adds a text search, shows at most 200 matching rows, and copies the ready <provider>/<model>/<voice> model string.
+  - REFERENCE_BEHAVIOR: voice pickers for elevenlabs, inworld and minimax load the account's own voices; the language filter groups them. AIGate adds text search, shows 25 matching rows per page, and copies the ready <provider>/<model>/<voice> model string.
 - **Errors:** `INVALID_REQUEST` (model or voice does not belong to the selected provider), `INVALID_REQUEST` (a remote preview or account voice list has no active saved credential (dashboard code NO_ACTIVE_CONNECTION)), `PROVIDER_UNAVAILABLE` (upstream refuses or returns oversized audio (dashboard code VOICE_PREVIEW_FAILED)), `PROVIDER_UNAVAILABLE` (the account voice list cannot be fetched (dashboard code VOICES_FETCH_FAILED))
 - **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
@@ -1177,6 +1284,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - SUSPECTED_BUG: synthesizeMacOrWin always runs macOS say (and ffmpeg) although voices are also listed through Windows SAPI. AIGate plays installed voices in the browser and has no server-side local-device synthesis.
 - **Errors:** `INVALID_REQUEST` (provider has no TTS route)
 - **AIGate required behavior:** A listed TTS provider can synthesize on the platforms it lists voices for.
+
+### Bounded Voice Browser table with access to every loaded voice
+
+- **id:** `media.tts-voice-list-paging` · **module:** `media`
+- **Trigger:** Browse or filter voices on the TTS dashboard
+- **Input:** Existing voice list, provider/model selection, local filters, page and browser locale
+- **Output:** At most 25 voice rows per page with localized Previous/Next controls
+- **Rules:**
+  - REFERENCE_BEHAVIOR: preserve voice names/IDs, language/region/gender and text filtering, Listen and Copy actions
+  - AIGATE_EXTENSION: filter before paging so every voice in the server's bounded result is reachable; reset page on provider/model/filter change and clamp after a shorter result
+  - AIGATE_EXTENSION: mounted EN/VI preserves page, filters, preview state and audio; names, IDs and model strings remain literal
+  - IMPLEMENTATION_ACCIDENT: the prior client mounted the first 200 filtered rows and hid later matches behind further filtering
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
 ### Voice listing — one generic credential-free route plus four dedicated per-provider routes that require a stored connection
 
@@ -1591,6 +1711,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Stickiness clears in exactly one way: once consecutiveUseCount reaches stickyLimit, the else branch runs instead — it re-sorts availableConnections by lastUsedAt ascending (oldest/never-used first, using priority as a tiebreak for two never-used connections) and picks that one, resetting consecutiveUseCount to 1 for the new connection. A never-used connection (no lastUsedAt) is also picked over any used one, since !a.lastUsedAt sorts it first in the ascending sort
   - Locking a connection out of availableConnections (model lock or exclude-set) also implicitly breaks stickiness: if the current sticky connection becomes unavailable, it is filtered out upstream and round-robin's 'current' becomes whichever remaining connection has the most recent lastUsedAt
   - Both the stick-with-current and the rotate-to-oldest branches await updateProviderConnection() before returning, so the DB write for bookkeeping happens synchronously with selection, not fire-and-forget
+
+## Network
+
+### Browser-local EN/VI with guarded actions and reviewed MITM preview
+
+- **id:** `network.tunnel-mitm-browser-i18n` · **module:** `tooling`
+- **Trigger:** Open Tunnel/MITM or change browser language while mounted
+- **Input:** Browser locale, synthetic status, explicit confirmation and preview actions
+- **Output:** Localized owned UI with literal URLs, paths, IDs and server changes
+- **Rules:**
+  - AIGATE_EXTENSION: locale changes do not submit actions, replay mutations or replace a MITM preview
+  - AIGATE_EXTENSION: Tunnel keeps server access/route gates and type-to-confirm; translated confirmation resets unsubmitted typing
+  - AIGATE_EXTENSION: MITM Apply needs an explicit reviewed preview ID; expiry clears stale preview
 
 ## OAuth providers
 
@@ -2648,6 +2781,43 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Errors:** `PROVIDER_UNAVAILABLE` (the token cannot be minted (502 'Vertex: failed to mint access token from Service Account JSON')), `AUTH_ERROR` (Vertex answers 401/403)
 - **AIGate required behavior:** A 401 forces a new token, the cache follows the credential itself, ADC tokens are cached until they expire, and the key never goes in the URL
 
+### Browser-local EN/VI over the existing provider, model, connection and sign-in UI
+
+- **id:** `providers.authflow-connections-browser-i18n` · **module:** `catalog`
+- **Trigger:** Open a U4 provider screen or change browser language while it is mounted
+- **Input:** Browser locale, existing catalog/connections/models query state and explicit provider actions
+- **Output:** Localized owned UI with literal provider/model data, URLs, codes, diagnostics and credential values
+- **Rules:**
+  - AIGATE_EXTENSION: locale changes preserve catalog/detail/connection query state, typed custom-provider and connection drafts, OAuth callback/device sessions, and pending actions without refetch or replay
+  - AIGATE_EXTENSION: built-in/custom names and IDs, endpoints, callback values, protocol/wire values, API codes and raw diagnostics remain literal; credentials are never copied into catalogs or messages
+  - AIGATE_EXTENSION: existing explicit Add/Save/Test/Import/OAuth/Enable/Delete actions and SP13–SP17/M2 payloads remain unchanged
+
+### Bounded built-in API Key card rendering on expansion and search
+
+- **id:** `providers.catalog-card-windowing` · **module:** `catalog`
+- **Trigger:** Browse, search, or expand the API Key section of /providers
+- **Input:** Existing catalog and connection reads, search text, viewport width and scroll position
+- **Output:** Same category counts, card content/status/detail links and Show all/Show fewer behavior with bounded mounted API Key cards
+- **Rules:**
+  - REFERENCE_BEHAVIOR: retain OAuth, Free, API Key, Web account and Other group order; local name/ID search, counts, status pills, reason titles and detail links
+  - REFERENCE_BEHAVIOR: the unsearched API Key group starts with 20 cards and Show all/Show fewer controls its expansion
+  - AIGATE_EXTENSION: above 20 API Key matches, mount only visible responsive grid rows plus two rows of overscan inside a keyboard-scrollable region; search resets it and locale/connection updates preserve it
+  - IMPLEMENTATION_ACCIDENT: the prior grid mounted every expanded card
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### Bounded account table rendering
+
+- **id:** `providers.connections-list-paging` · **module:** `connections`
+- **Trigger:** Browse connections, switch attention filter, or change the account list
+- **Input:** Existing bounded connection read, local filter, page, and browser locale
+- **Output:** At most 25 visible account rows with localized Previous/Next controls
+- **Rules:**
+  - REFERENCE_BEHAVIOR: preserve provider/priority order, All/Needs attention filtering, account details, and every existing row action
+  - AIGATE_EXTENSION: reset to page one on tab change; clamp after deletion or refresh; preserve page and pending actions across locale changes
+  - AIGATE_EXTENSION: Priority Down counts every account for that provider, including accounts on other pages
+  - IMPLEMENTATION_ACCIDENT: the prior table mounted every connection and refiltered all accounts for each row
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
 ## Proxy Pools
 
 ### A real (non-noAuth) connection is bound to a proxy pool via its own create/update body
@@ -2699,6 +2869,17 @@ Every item below is a capability AIGate must have. Derived from tracing
   - name and proxyUrl are required (trimmed, non-empty) on create; isActive defaults to true when omitted; strictProxy defaults to false (only true if the body literal is `true`)
   - includeUsage=true triggers a second full table scan (getProviderConnections() with no filter) to build a Map of proxyPoolId -> count of connections whose providerSpecificData.proxyPoolId matches, then merges boundConnectionCount onto each pool in the response — this count only reflects real (non-noAuth) connections bound via proxypool.assign-to-connection, not noAuth providers using the pool through rotation/pin in settings.providerStrategies
 - **Errors:** `INVALID_REQUEST` (POST body missing name or proxyUrl), `INTERNAL_ERROR` (DB read/write throws)
+
+### Browser-local EN/VI Pool and Deploy Wizard states
+
+- **id:** `proxypool.dashboard-browser-i18n` · **module:** `transport`
+- **Trigger:** Open pool list/deploy wizard or change browser language while mounted
+- **Input:** Browser locale, existing pool/rotation data and explicit form actions
+- **Output:** Localized owned UI with literal IDs, URLs, codes and diagnostics
+- **Rules:**
+  - AIGATE_EXTENSION: locale changes preserve drafts and pending work without refetch or mutation replay
+  - AIGATE_EXTENSION: failed pool/rotation reads show code, diagnostic and Retry
+  - AIGATE_EXTENSION: deploy token stays in component memory; only explicit Deploy submits it
 
 ### POST /api/proxy-pools/deno-deploy — creates a Deno Deploy app, deploys the relay, polls status, and rolls back on 2 of its 3 failure paths
 
@@ -2896,6 +3077,17 @@ Every item below is a capability AIGate must have. Derived from tracing
   - A 409 no_credit response is returned distinctly from other 4xx/5xx failures when the vendor reports zero credits available
   - The dashboard confirms via a modal showing the remaining credit count, then re-fetches the connection's quota (fetchQuota) after a successful reset so the UI reflects the freshly-reset window immediately
 - **Errors:** `QUOTA_EXHAUSTED` (vendor responds with noCredit (no reset credits available)), `PROVIDER_UNAVAILABLE` (the consume call returns an unexpected non-4xx-non-2xx response)
+
+### EN/VI presentation and truthful unknown balances
+
+- **id:** `quota.dashboard-browser-i18n` · **module:** `usage`
+- **Trigger:** Open /providers/quota or change the browser language
+- **Input:** Existing quota read, manual refresh state, browser locale
+- **Output:** Localized owned copy with literal vendor labels and diagnostics
+- **Rules:**
+  - AIGATE_EXTENSION: owned Quota UI copy renders through shared EN/VI catalogs without changing read/refresh requests
+  - AIGATE_EXTENSION: missing balances and pending/failed reads remain unknown rather than showing fabricated zero amounts
+  - AIGATE_EXTENSION: locale changes retain mounted query and pending refresh, with no extra GET or POST
 
 ### Active account quota rows, refresh, and visible error state
 
@@ -3458,6 +3650,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Endpoint wins first: a path containing /v1/responses is openai-responses; /v1/messages is claude; /v1/chat/completions with an input[] array is openai (Cursor CLI sends a Responses body to the chat endpoint)
   - Otherwise body sniffing, in order: input (array or string) without messages -> openai-responses; request.contents + userAgent antigravity -> antigravity; contents[] -> gemini; any OpenAI-only field (stream_options, response_format, logprobs, n, penalties, logit_bias, user) -> openai; Claude-shaped content blocks or system/anthropic_version -> claude; default openai
 
+### Read-only local configuration and active-lock snapshot
+
+- **id:** `routing.status-snapshot` · **module:** `routing`
+- **Trigger:** Dashboard opens Routing Overview or Fallback
+- **Input:** Authenticated GET with no body
+- **Output:** Bounded provider-route and active-lock metadata with fallback settings
+- **Rules:**
+  - AIGATE_EXTENSION: show enabled-account provider groups and built-in keyless chat providers without claiming model or provider health
+  - AIGATE_EXTENSION: show account/model locks whose until is at or after the snapshot time, including disabled accounts; do not run live lock cleanup
+  - AIGATE_EXTENSION: cap provider routes and lock rows at 100 each, signal source overflow, and use SQL grouping for account counts
+  - AIGATE_EXTENSION: reuse current settings, combo and capacity repositories; no vendor, refresh, decryption, transport, usage or rotation effect
+- **Errors:** `AUTH_ERROR` (dashboard session is missing or expired (wire code UNAUTHENTICATED))
+
 ### Whether the upstream call streams, and whether the client gets SSE
 
 - **id:** `routing.stream-mode-decision` · **module:** `routing`
@@ -3697,6 +3902,28 @@ Every item below is a capability AIGate must have. Derived from tracing
   - dashboardGuard.js's isAuthenticated() treats the caller as authenticated if EITHER the auth_token cookie verifies (hasValidToken → verifyDashboardAuthToken) OR settings.requireLogin === false — the JWT check and the requireLogin bypass are two independent ways to pass the same gate
   - logout is unconditional and itself unauthenticated (no session check gates calling it) — it always clears auth_token plus the three OIDC PKCE/state cookies regardless of whether an OIDC flow was ever started, but does not clear saml_state
 
+### Browser-local EN/VI for the visual-only OIDC and SAML tabs
+
+- **id:** `settings.auth-sso-browser-i18n` · **module:** `settings`
+- **Trigger:** Open Settings → Auth and switch language while OIDC or SAML is selected
+- **Input:** Browser locale, selected tab and existing visual-only field state
+- **Output:** Localized owned panel copy with literal protocol names, URLs and credential-shaped values
+- **Rules:**
+  - AIGATE_EXTENSION: locale changes preserve the selected OIDC/SAML tab, field values and copied assertion URL without network calls or submit replay
+  - AIGATE_EXTENSION: this is presentation only; no OIDC/SAML backend route, save, test or identity-provider interaction is claimed
+
+### Defer Radix Dialog from the initial browser entry
+
+- **id:** `settings.browser-dialog-loading` · **module:** `settings`
+- **Trigger:** Initial page load or navigation to a feature route with a modal
+- **Input:** Current route, existing dialog state and browser locale
+- **Output:** Same accessible modal and confirmation behavior, with dialog code loaded only on relevant routes
+- **Rules:**
+  - AIGATE_EXTENSION: keep the shell, auth gate, locale and core shared controls available without loading Radix Dialog on initial entry
+  - AIGATE_EXTENSION: preserve portal, overlay, title, Escape/outside dismissal, typed-name confirmation, pending guards and EN/VI copy; restore focus to the surviving opener on close
+  - IMPLEMENTATION_ACCIDENT: common shared/ui.tsx file layout pulling Dialog into the initial chunk is not part of the user contract
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
 ### SP28 browser-local EN/VI for shell, Auth, Settings, Overview and shared copy
 
 - **id:** `settings.browser-locale-core` · **module:** `settings`
@@ -3710,6 +3937,30 @@ Every item below is a capability AIGate must have. Derived from tracing
   - REFERENCE_BEHAVIOR: native Intl uses en-US/vi-VN, retains USD, precision and usage timezone; no refetch/SSE restart/form reset/toast lifetime extension on selection.
   - IMPLEMENTATION_ACCIDENT: the reference Next cookie POST /api/locale and its framework/many-language machinery are not required for the approved two-language browser-only slice.
 - **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### Load Vietnamese catalog only when selected
+
+- **id:** `settings.browser-locale-loading` · **module:** `settings`
+- **Trigger:** Initial browser load or General language selection
+- **Input:** Saved EN/VI preference or selected language
+- **Output:** Complete selected catalog before rendering its copy, with retryable failure
+- **Rules:**
+  - AIGATE_EXTENSION: keep English in the initial entry and fetch Vietnamese only for a saved or newly selected VI preference
+  - AIGATE_EXTENSION: a failed chunk leaves the saved preference and mounted screen state intact; no locale-triggered API or vendor request
+  - IMPLEMENTATION_ACCIDENT: eager inclusion of both static catalogs in every browser entry is not required by the locale contract
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### Lazy feature screen modules by route
+
+- **id:** `settings.browser-route-loading` · **module:** `settings`
+- **Trigger:** Initial browser load or navigation to a feature route
+- **Input:** Current route, query parameters, locale and Developer mode
+- **Output:** Same screen after a bounded module load, localized loading state or reloadable error
+- **Rules:**
+  - AIGATE_EXTENSION: keep shell/auth/locale eager and load feature screen modules on route entry
+  - AIGATE_EXTENSION: preserve route/query, Developer gate, preview state and mounted EN/VI state without refetch or replay
+  - AIGATE_EXTENSION: show localized loading skeleton and visible UI_LOAD_FAILED with Reload on chunk/render failure
+  - IMPLEMENTATION_ACCIDENT: eager import of every visual handoff screen is not a required runtime behavior
 
 ### Combo rotation state invalidated when combo strategy settings change
 
@@ -3764,6 +4015,47 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Rules:**
   - getSettings() always does a fresh `SELECT data FROM settings WHERE id = 1` — there is no in-process cache, TTL, or invalidation-on-write layer; every caller re-reads and re-parses the JSON blob
   - Of the full settings object, handleChat's enforcement gate only actually reads the single boolean requireApiKey
+
+### SP47 encrypted full persistent-state backup, reviewed restore on restart
+
+- **id:** `settings.installation-backup-restore` · **module:** `settings`
+- **Trigger:** Authenticated dashboard owner exports or reviews and stages a restore from General settings
+- **Input:** Fresh dashboard password, backup passphrase, or a bounded encrypted backup document
+- **Output:** Encrypted versioned archive; redacted preview; staged restore requiring restart
+- **Rules:**
+  - REFERENCE_BEHAVIOR: owner can export and restore settings, connections, API keys and routing state as one installation
+  - REFERENCE_BEHAVIOR: sensitive backup actions require a fresh password in addition to a valid dashboard session
+  - SUSPECTED_BUG: plaintext credential export and partial-payload table wipe are rejected; AIGate encrypts the complete snapshot and validates it before staging
+  - IMPLEMENTATION_BOUNDARY: database snapshot, secret key, MCP registry and local MITM certificate material are included; OS trust, hosts entries, installed PXPIPE binaries and external CLI configuration are outside AIGate's data directory contract
+  - AIGATE_EXTENSION: restore never replaces a live database; it stages a verified image, checks a reviewed fingerprint, and applies before the next database open with rollback files
+- **Errors:** `AUTH_ERROR` (UNAUTHENTICATED session or INVALID_CREDENTIALS fresh password), `INVALID_REQUEST` (BACKUP_INVALID malformed, altered or incompatible archive or wrong passphrase), `INVALID_REQUEST` (BACKUP_TOO_LARGE database/archive bound), `INVALID_REQUEST` (BACKUP_CHANGED stale review or BACKUP_PENDING staged restore), `INVALID_REQUEST` (BACKUP_KEY_CONFLICT environment key mismatch)
+- **AIGate required behavior:** A backup should protect credentials and reject missing or malformed table data before replacing an installation.
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
+### Explicit cleanup of unreferenced managed releases
+
+- **id:** `settings.managed-release-prune` · **module:** `settings`
+- **Trigger:** Operator lists releases or selects one version for cleanup
+- **Input:** Existing managed root, exact version and explicit --apply for deletion
+- **Output:** Protected/candidate release list or removal of one unreferenced release
+- **Rules:**
+  - AIGATE_EXTENSION: current, previous and pending releases are always protected
+  - AIGATE_EXTENSION: re-read state under the existing managed update lock before explicit one-version deletion
+  - AIGATE_EXTENSION: limit directory scan, validate direct release markers and reject symlinks or path escapes; never touch application data
+  - IMPLEMENTATION_ACCIDENT: the reference npm global overwrite/kill behavior does not define managed retention
+
+### Verified managed release staging and rollback
+
+- **id:** `settings.managed-update` · **module:** `settings`
+- **Trigger:** Operator installs a signed release or explicitly stages/rolls back from General
+- **Input:** Pinned manifest/key, signed archive, fresh dashboard password, managed root
+- **Output:** Immutable installed release and pending switch or prior-release rollback
+- **Rules:**
+  - AIGATE_EXTENSION: a new managed root and stable launcher own version selection; source checkouts are not overwritten
+  - AIGATE_EXTENSION: only fixed-channel signed metadata and same-directory archive are trusted; exact bytes and SHA-256 are checked before extraction
+  - AIGATE_EXTENSION: activation waits for readiness; early failure restores the prior release; user data remains outside the release root
+  - IMPLEMENTATION_ACCIDENT: the reference's npm-global probe and forced process kill are not used
+- **Streaming:** yes
 
 ### Outbound proxy env vars applied immediately on PATCH, without restart
 
@@ -3831,6 +4123,17 @@ Every item below is a capability AIGate must have. Derived from tracing
   - The setting itself is never persisted by this route — it is a stateless connectivity probe; saving the tested value into settings.outboundProxyUrl happens via the normal PATCH /api/settings path (settings.outbound-proxy-live-apply)
 - **Errors:** `INVALID_REQUEST` (proxyUrl missing or fails ProxyAgent's own URL parsing), `TIMEOUT` (the HEAD request does not complete within timeoutMs)
 
+### Signed versioned release package and installed-version display
+
+- **id:** `settings.release-foundation` · **module:** `settings`
+- **Trigger:** Operator packages a built release, or opens General Settings
+- **Input:** Built outputs, server package version, operator-owned Ed25519 key
+- **Output:** Signed manifest plus relocatable built tarball; authenticated runtime appVersion
+- **Rules:**
+  - AIGATE_EXTENSION: the version is read from the server package; no release channel or remote lookup exists by default
+  - AIGATE_EXTENSION: package only explicit built files, migrations and frozen workspace manifests, never user data, environment, source, tests or node_modules
+  - AIGATE_EXTENSION: the manifest signature covers canonical metadata; a separately pinned Ed25519 public key and artifact SHA-256 are both required for verification
+
 ### GET /api/settings/require-login — public pre-auth login-page context
 
 - **id:** `settings.require-login-public-status` · **module:** `settings`
@@ -3842,6 +4145,83 @@ Every item below is a capability AIGate must have. Derived from tracing
   - requireLogin is the exact toggle read by dashboardGuard.js's isAuthenticated() to decide whether ANY caller (not just this route) is treated as pre-authenticated across every PROTECTED_API_PATHS route — this GET only reports the current value; it cannot change it
   - Turning requireLogin OFF is not reachable from this route (GET-only): it happens through the generic PATCH /api/settings, which is itself in PROTECTED_API_PATHS — so, unlike the tunnel-enable gap recorded in tunnel.enable-lacks-server-side-security-gate (13-console-remote.yaml), disabling requireLogin requires the caller to already hold a valid session or CLI token (or requireLogin to already be false); an unauthenticated remote caller cannot flip it themselves
   - Once requireLogin is false, dashboardGuard.js's isAuthenticated() (the settings.requireLogin===false branch) is consulted by the generic /api/* fallback with no additional locality check — the bypass is not scoped to loopback callers the way LOCAL_ONLY_PATHS's equivalent bypass is, so a deliberately-disabled requireLogin removes the login requirement for every PROTECTED_API_PATHS route (settings, keys, providers, combos, models, usage, oauth, media-providers, pricing, tags, cli-tools, mcp, translator, tunnel) from any network location that can reach the server, not just the local machine — this matches the setting's literal name/intent but is a materially broader blast radius than a 'local-only testing convenience' if the server is ever reachable remotely while it is set
+
+### Explicit signed release availability check
+
+- **id:** `settings.signed-update-check` · **module:** `settings`
+- **Trigger:** Dashboard user clicks Check for updates in General Settings
+- **Input:** Operator-pinned HTTPS manifest URL and Ed25519 public-key file
+- **Output:** Current/latest version and availability metadata, or precise error
+- **Rules:**
+  - AIGATE_EXTENSION: no network call without explicit user action; absent channel is shown as unconfigured
+  - AIGATE_EXTENSION: validate the exact SP49 manifest and signature against a separately pinned key before comparing full SemVer
+  - AIGATE_EXTENSION: no archive download, installation, restart, process kill or manifest-supplied URL is used in this slice
+
+### Explicit cleanup of one signed static channel archive
+
+- **id:** `settings.static-channel-prune` · **module:** `settings`
+- **Trigger:** Operator previews or applies removal of a retained archive
+- **Input:** Retained signed manifest, pinned public key, existing local channel, optional --apply
+- **Output:** Current/target preview or removal of exactly the selected archive
+- **Rules:**
+  - AIGATE_EXTENSION: verify current and target signed manifests and channel archives with one pinned Ed25519 key
+  - AIGATE_EXTENSION: protect the current archive; require explicit --apply under the publish lock and reverify before removal
+  - AIGATE_EXTENSION: remove only the signed target basename; reject missing, tampered or symlinked files and busy writers
+  - IMPLEMENTATION_ACCIDENT: npm global updater does not define signed static channel archive cleanup
+- **Streaming:** yes
+
+### Explicit restore of one missing signed static channel archive
+
+- **id:** `settings.static-channel-restore` · **module:** `settings`
+- **Trigger:** Operator previews or applies restore from a retained signed release
+- **Input:** Signed manifest and same-directory archive, pinned public key, existing local channel, optional --apply
+- **Output:** Current/target preview or atomic creation of the missing archive
+- **Rules:**
+  - AIGATE_EXTENSION: verify current manifest signature and source manifest/archive with one pinned Ed25519 key
+  - AIGATE_EXTENSION: allow restoration of a missing current or unreferenced archive without changing latest.manifest.json
+  - AIGATE_EXTENSION: reject any existing target path; verify a staged copy before exclusive link under the publish lock
+  - IMPLEMENTATION_ACCIDENT: npm global updater does not define signed static channel archive restore
+- **Streaming:** yes
+
+### Explicit rollback of a signed static release channel
+
+- **id:** `settings.static-channel-rollback` · **module:** `settings`
+- **Trigger:** Operator previews or applies an older signed manifest
+- **Input:** Prior signed manifest, pinned public key, existing local channel, optional --apply
+- **Output:** Current/target preview or atomic replacement of latest.manifest.json
+- **Rules:**
+  - AIGATE_EXTENSION: verify current manifest signature and target manifest/archive with one pinned Ed25519 key; permit recovery from a damaged current archive
+  - AIGATE_EXTENSION: target must be strictly older by full SemVer; explicit --apply updates only the fixed manifest under publish lock
+  - AIGATE_EXTENSION: keep immutable archives, reject symlinks, wrong key, tamper, missing archive and concurrent publication
+  - IMPLEMENTATION_ACCIDENT: npm global updater behavior does not define static channel rollback
+- **Streaming:** yes
+
+### Operator publication to a local static release channel
+
+- **id:** `settings.static-release-channel` · **module:** `settings`
+- **Trigger:** Operator explicitly promotes a signed release into an existing channel directory
+- **Input:** SP49 manifest/archive, pinned public key, local channel directory
+- **Output:** Immutable archive and fixed latest.manifest.json for same-directory HTTPS hosting
+- **Rules:**
+  - AIGATE_EXTENSION: verify source and staged copy against a separately pinned Ed25519 key before publication
+  - AIGATE_EXTENSION: promote only a newer full-SemVer version; preserve prior archives and update the manifest last
+  - AIGATE_EXTENSION: reject symlinks and concurrent publication; no remote hosting or real key configuration is implicit
+  - IMPLEMENTATION_ACCIDENT: the reference's npm updater and forced process termination do not apply
+- **Streaming:** yes
+
+### SP48 current-user AIGate startup registration
+
+- **id:** `settings.windows-signin-startup` · **module:** `settings`
+- **Trigger:** Owner enables or disables startup from General Settings
+- **Input:** Desired enabled state and fresh dashboard password
+- **Output:** Current registration state or a stable refusal code
+- **Rules:**
+  - AIGATE_EXTENSION: an explicit owner action registers this built installation for current-user Windows sign-in only
+  - AIGATE_EXTENSION: dashboard authorization and a fresh password protect either OS mutation; Local Mode is loopback-only and still requires the password
+  - AIGATE_EXTENSION: a foreign or modified Startup entry is never overwritten or deleted; the generated script contains paths but no credentials
+  - IMPLEMENTATION_BOUNDARY: installed package updates, other operating systems, process supervision and shell-only environment overrides are outside this registration
+- **Errors:** `AUTH_ERROR` (UNAUTHENTICATED session or INVALID_CREDENTIALS password), `INVALID_REQUEST` (STARTUP_UNSUPPORTED platform/build/key override or STARTUP_INVALID_REQUEST malformed body), `INVALID_REQUEST` (STARTUP_CONFLICT foreign entry or STARTUP_IO_ERROR filesystem failure)
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
 ### GET /api/health and GET /api/init — liveness/init-ping endpoints
 
@@ -3918,6 +4298,17 @@ Every item below is a capability AIGate must have. Derived from tracing
   - Per CLAUDE.md's own note, skills.js (this catalogue) and the actual files under skills/ (tracked separately in skills/README.md's table) are two independently-maintained sources kept in sync only by convention/process, not by any code in this repository
 
 ## Token Saver
+
+### EN/VI presentation and PXPIPE read states
+
+- **id:** `tokensaver.dashboard-browser-i18n` · **module:** `routing`
+- **Trigger:** Open Token Saver or change the browser language
+- **Input:** Existing settings/PXPIPE reads, mounted Headroom URL draft, browser locale
+- **Output:** Localized owned copy with literal setting keys, stage names and API diagnostics
+- **Rules:**
+  - AIGATE_EXTENSION: owned Token Saver UI copy renders through shared EN/VI catalogs without changing settings or PXPIPE requests
+  - AIGATE_EXTENSION: locale changes preserve draft and pending operations and never install PXPIPE or replay a PATCH
+  - AIGATE_EXTENSION: PXPIPE status read failure is distinct from not installed and exposes code, message and Retry
 
 ### Headroom stage: send messages to an external compression proxy, fail open on any failure
 
@@ -4682,6 +5073,30 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Errors:** `INVALID_REQUEST` (PATCH body has an unknown pricing field or a negative/non-numeric value)
 - **AIGate required behavior:** GET /api/pricing/defaults returns the built-in default pricing table over HTTP, matching the route's own doc comment
 
+### EN/VI list, attempt detail and explicit read failures
+
+- **id:** `requests.dashboard-browser-i18n` · **module:** `usage`
+- **Trigger:** Open /traffic/requests, a request detail, or change browser language
+- **Input:** Existing request rows/filters/detail responses and browser locale
+- **Output:** Localized owned copy and Intl values with literal IDs, names and codes
+- **Rules:**
+  - AIGATE_EXTENSION: locale changes render list/detail in EN/VI without changing filters, cursor pages or network requests
+  - AIGATE_EXTENSION: filter and next-page errors show code, permitted diagnostic and Retry; loaded rows remain visible after a next-page failure
+  - AIGATE_EXTENSION: detail errors offer Retry and Back; a missing id does not fetch
+
+### Bounded DOM rows in the loaded Requests table
+
+- **id:** `requests.table-windowing` · **module:** `usage`
+- **Trigger:** Open or scroll /traffic/requests, load another cursor page, or change a filter
+- **Input:** Existing request pages (100 rows each, at most 500), filter state, browser scroll
+- **Output:** Same localized metadata and detail links in a scrollable semantic table
+- **Rules:**
+  - AIGATE_EXTENSION: mount only the 468 px scrollport's 36 px rows plus five overscan rows on each side; spacer rows retain the scroll extent and stable columns
+  - AIGATE_EXTENSION: preserve 100-row cursor pages, 500-row cap, URL filters, error/Retry, Load more and raw metadata; filter changes reset table scroll
+  - AIGATE_EXTENSION: loading a page or switching EN/VI keeps scroll position; all loaded rows remain reachable with vertical/horizontal scrolling and keyboard
+  - IMPLEMENTATION_ACCIDENT: mapping every loaded request to React table cells is not a user-visible contract
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
 ### getActiveRequests — active counters plus a deduped recent-request ring buffer
 
 - **id:** `usage.active-requests-and-recent-ring` · **module:** `usage`
@@ -4718,6 +5133,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - byApiKey buckets missing apiKey under the literal key 'local-no-key' rather than omitting the request from that breakdown
   - Each breakdown key embeds enough context to redisplay later without re-joining (rawModel, provider) via addToCounter's `meta` merge
   - AIGate (schema rule 2): the day comes from AIGATE_USAGE_TIMEZONE (IANA, default the server zone at startup), named in every usage response; the rollup is a typed usage_daily table keyed by day, provider, model, connection, API key, and endpoint, and a request without a key has a null key (shown as 'No key') instead of 'local-no-key'. Daily rows are kept 400 days.
+
+### EN/VI presentation of charts, live state and pricing controls
+
+- **id:** `usage.dashboard-browser-i18n` · **module:** `usage`
+- **Trigger:** Open /traffic/usage, change browser language, or edit a price
+- **Input:** Existing summary/chart/live/pricing data and browser locale
+- **Output:** Localized owned copy and Intl values with literal identifiers and USD
+- **Rules:**
+  - AIGATE_EXTENSION: locale changes render Usage, charts and Pricing in EN/VI without changing query keys, SSE connection or mutations
+  - AIGATE_EXTENSION: server usage timezone defines chart buckets; browser locale only changes their displayed labels
+  - AIGATE_EXTENSION: incomplete custom dates neither query summary/chart nor export CSV; period and pricing drafts survive a locale change
+- **Streaming:** yes
 
 ### Why live counters live on global.* instead of module-scope state
 
@@ -4758,6 +5185,18 @@ Every item below is a capability AIGate must have. Derived from tracing
   - AIGate (schema rule 5): not reproduced; every event gets its own id and row.
 - **Errors:** `INTERNAL_ERROR` (the transaction throws (e.g. adapter failure))
 - **AIGate required behavior:** Every completed request that calls saveRequestUsage produces its own usageHistory row
+
+### Window the provider/model breakdown table
+
+- **id:** `usage.model-table-windowing` · **module:** `usage`
+- **Trigger:** Open Usage or scroll its Provider × model table
+- **Input:** Existing at-most-200 byModel rows, selected period and locale
+- **Output:** All loaded rows reachable with a bounded mounted table window
+- **Rules:**
+  - AIGATE_EXTENSION: mount only visible 36 px rows plus five-row overscan without changing order, values or CSV
+  - AIGATE_EXTENSION: reset scroll for a new period; preserve it for locale, Pricing and live updates
+  - IMPLEMENTATION_ACCIDENT: mounting all 200 summary rows is not required by the usage contract
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
 
 ### SP26 aggregate overview and existing live usage stream
 
@@ -4912,6 +5351,7 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `apikey.legacy-format-unenforced` | Given generateCrc/parseApiKey/verifyApiKeyCrc exist specifically to bind a key to a machineId and detect tampering, the request-time auth path (validateApiKey / isValidApiKey) calls verifyApiKeyCrc (or parseApiKey) to reject a key whose embedded CRC doesn't match its machineId+keyId before or in addition to the DB lookup | validateApiKey performs only a raw string equality lookup against the stored apiKeys.key column; parseApiKey/verifyApiKeyCrc/isNewFormatKey are dead code outside of key generation and are never invoked on the read/auth path | The CRC provides no security property at request time — it cannot be used to detect a corrupted/tampered key independent of the DB, and the legacy sk-{random8} format is accepted with exactly the same trust as the new format purely because both are opaque strings to validateApiKey; anyone who can insert or copy a row into apiKeys (backup restore, DB access, export leak) gets a working key regardless of format |
 | `settings.patch-password-change` | The first-time password-change gate in PATCH /api/settings checks currentPassword against the operator's actual configured initial password, i.e. `process.env.INITIAL_PASSWORD \|\| "123456"`, mirroring the check already implemented in src/app/api/auth/login/route.js line 58 for the same purpose | settings/route.js line 62 compares currentPassword only against the hardcoded literal "123456", never consulting process.env.INITIAL_PASSWORD | An operator who sets INITIAL_PASSWORD to a non-default value (as CLAUDE.md instructs: 'must override') cannot use that real initial password to complete their first password change through the dashboard/API — currentPassword !== '123456' is rejected with 401 even though it is the correct, configured initial password. Worse, the well-known literal '123456' still satisfies this specific check regardless of what INITIAL_PASSWORD was set to, so on an install that changed the env var specifically to move off the public default, a local caller who still knows the old default can pass this gate anyway. |
 | `identity.saml-replay-inresponseto-gap` | A signed SAML assertion should be usable to establish a session at most once: either node-saml's own validateInResponseTo tracking should be enabled ('always' or 'ifPresent'), or the code's manual InResponseTo/expectedRequestId comparison should be mandatory (reject when expectedRequestId is missing) rather than only applied when a saml_state cookie happens to still be present. | createSamlInstance sets validateInResponseTo: 'never', and validateSamlResponse's own fallback InResponseTo check is wrapped in `if (expectedRequestId)`, so a request with no saml_state cookie (already consumed, expired, or simply not sent) skips replay validation entirely and is judged solely on signature and time-window validity. | Any captured, correctly-signed SAMLResponse (via browser history/cache, a shared proxy log, a compromised extension, or a non-TLS hop) can be POSTed to /api/auth/saml/acs and re-establish a valid dashboard session for that identity at any point before the assertion's IdP-set NotOnOrAfter expiry, with no per-assertion one-time-use enforcement — a classic SAML replay attack that InResponseTo tracking exists specifically to prevent. |
+| `settings.installation-backup-restore` | A backup should protect credentials and reject missing or malformed table data before replacing an installation. | The reference exports credentials as plaintext JSON and a partial payload can wipe tables omitted from the import. | A copied export discloses provider credentials and an incomplete import can silently erase unrelated installation data. |
 | `oauth.cursor-auto-import` | A local filesystem failure returns a stable, non-sensitive explanation | The outer catch returns error.message directly in a 500 response | A runtime error can expose local implementation details to the authenticated dashboard |
 | `oauth.cursor-import` | A malformed credential pair is an INVALID_REQUEST response | The route throws inside its broad catch and returns HTTP 500 with the local validation message | The dashboard describes operator input as a server failure |
 | `oauth.kiro-social-exchange` | The social OAuth state returned by authorize should be checked when the code is exchanged. | The reference exchange takes only code, codeVerifier, and provider; it never accepts or compares state. | A callback state mismatch is not detected by this endpoint; the port keeps parity and leaves a CSRF behavior change for a separate decision. |

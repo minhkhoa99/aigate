@@ -1,13 +1,12 @@
 // The 13 golden scenarios (spec §8.4; .agents/skills/porting-behavior-not-code/golden-scenarios.md) on the
-// /v1 chat lane, at M1 scope: one provider, one API-key account. Each asserts what a client can observe
+// /v1 chat lane. Each asserts what a client can observe
 // (status, error code, body, stream shape) and how many upstream attempts were made — never calls.
-// Three need later SPs and are skipped with the reason; "usage recorded" is asserted on the response
-// until the usage context (SP24) persists it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EngineError } from "@aigate/engine";
 import { withTempDb } from "./helpers.mjs";
-import { chunk, completion, errorOf, fakeUpstream, frames, hello, json, listening, openStream, ready, sse } from "./lane-helpers.mjs";
+import { SECRET, chunk, completion, errorOf, fakeUpstream, frames, hello, json, listening, openStream, ready, sse } from "./lane-helpers.mjs";
+import { UsageRecorder } from "../dist/modules/usage/infrastructure/usage-recorder.js";
 
 const stream = { ...hello, stream: true, stream_options: { include_usage: true } };
 const text = (out) => out.filter((f) => f !== "[DONE]" && typeof f.choices?.[0]?.delta?.content === "string").map((f) => f.choices[0].delta.content).join("");
@@ -71,9 +70,53 @@ test("golden: invalid credentials — AUTH_ERROR, no retry with the same credent
     await app.close();
   }));
 
-test("golden: token refresh", { skip: "needs OAuth credentials (SP16): M1 has API-key accounts only" }, () => {});
-test("golden: account failover", { skip: "needs several accounts per provider (SP17)" }, () => {});
-test("golden: provider fallback", { skip: "needs several providers and a fallback policy (SP17, SP19)" }, () => {});
+test("golden: token refresh — one refresh, request succeeds, new token persists", () =>
+  withTempDb(async (file) => {
+    const token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJnb2xkZW4ifQ.sig";
+    const fresh = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJyZWZyZXNoZWQifQ.sig";
+    const upstream = fakeUpstream(
+      json(200, { data: { accessToken: fresh, refreshToken: "rt-new", expiresAt: new Date(Date.now() + 3_600_000).toISOString() } }),
+      json(200, completion), json(200, completion),
+    );
+    const { app, dash, chat } = await ready(file, upstream);
+    const code = Buffer.from(JSON.stringify({ accessToken: token, refreshToken: "rt-old", email: "golden@example.test", expiresAt: new Date(Date.now() + 60_000).toISOString() })).toString("base64");
+    assert.equal((await dash({ method: "POST", url: "/api/oauth/cline/exchange", body: { code, redirectUri: "http://cb" } })).statusCode, 200);
+    const request = { ...hello, model: "cline/anthropic/claude-sonnet-4.6" };
+    assert.equal((await chat(request)).statusCode, 200);
+    assert.equal((await chat(request)).statusCode, 200);
+    assert.equal(upstream.calls.filter(({ request }) => request.url.endsWith("/auth/refresh")).length, 1);
+    assert.deepEqual(upstream.calls.slice(1).map(({ request }) => request.headers.authorization), [`Bearer workos:${fresh}`, `Bearer workos:${fresh}`]);
+    assert.ok(Date.parse((await dash({ url: "/api/connections" })).json().find((row) => row.provider === "cline").expiresAt) > Date.now() + 3_000_000);
+    await app.close();
+  }));
+
+test("golden: account failover — the second account serves a rejected first account", () =>
+  withTempDb(async (file) => {
+    const backup = "sk-golden-backup-9876";
+    const upstream = fakeUpstream(json(401, { error: { message: "bad key" } }), json(200, completion));
+    const { app, dash, chat } = await ready(file, upstream);
+    assert.equal((await dash({ method: "POST", url: "/api/connections", body: { provider: "openai", apiKey: backup } })).statusCode, 201);
+    const result = await chat(hello);
+    assert.deepEqual([result.statusCode, result.json().choices[0].message.content], [200, "Hello!"]);
+    assert.deepEqual(upstream.calls.map(({ request }) => request.headers.authorization), [`Bearer ${SECRET}`, `Bearer ${backup}`]);
+    await app.close();
+  }));
+
+test("golden: provider fallback — another provider serves the request and both attempts are recorded", () =>
+  withTempDb(async (file) => {
+    const upstream = fakeUpstream(json(429, { error: { message: "rate limit" } }), json(200, completion));
+    const { app, dash, chat } = await ready(file, upstream);
+    assert.equal((await dash({ method: "POST", url: "/api/connections", body: { provider: "deepseek", apiKey: "sk-deepseek-golden-1234" } })).statusCode, 201);
+    assert.equal((await dash({ method: "POST", url: "/api/combos", body: { name: "golden-fallback", models: ["deepseek/deepseek-chat", "openai/gpt-4.1"] } })).statusCode, 201);
+    const result = await chat({ ...hello, model: "golden-fallback" });
+    assert.deepEqual([result.statusCode, result.json().choices[0].message.content], [200, "Hello!"]);
+    assert.deepEqual(upstream.calls.map(({ request }) => new URL(request.url).host), ["api.deepseek.com", "api.openai.com"]);
+    await app.get(UsageRecorder).flush();
+    const [row] = (await dash({ url: "/api/requests?limit=1" })).json().items;
+    assert.equal(row.attempts, 2);
+    assert.deepEqual((await dash({ url: `/api/requests/${row.id}` })).json().attempts.map(({ provider, status }) => [provider, status]), [["deepseek", "error"], ["openai", "success"]]);
+    await app.close();
+  }));
 
 test("golden: client cancellation — upstream aborted, no further attempts", () =>
   withTempDb(async (file) => {
