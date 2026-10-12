@@ -68,6 +68,34 @@
   parityStatus: verified
   labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
 
+- id: providers.connections-list-paging
+  group: Providers
+  feature: Connections dashboard
+  subFeature: Bounded account table rendering
+  trigger: Browse connections, switch attention filter, or change the account list
+  input: Existing bounded connection read, local filter, page, and browser locale
+  output: At most 25 visible account rows with localized Previous/Next controls
+  businessRules:
+    - "REFERENCE_BEHAVIOR: preserve provider/priority order, All/Needs attention filtering, account details, and every existing row action"
+    - "AIGATE_EXTENSION: reset to page one on tab change; clamp after deletion or refresh; preserve page and pending actions across locale changes"
+    - "AIGATE_EXTENSION: Priority Down counts every account for that provider, including accounts on other pages"
+    - "IMPLEMENTATION_ACCIDENT: the prior table mounted every connection and refiltered all accounts for each row"
+  state: { reads: ["existing connection query cache", "tab and page UI state"], writes: ["tab and page UI state"], runtimeOnly: ["visible account page", "per-provider counts"] }
+  dependencies: []
+  providerInteraction: "None added; existing explicit connection actions retain their provider interactions"
+  fallback: { hasFallback: false, retry: "existing connection read Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["Only existing explicit connection actions"]
+  persistence: []
+  performanceConcerns: ["At most 25 rows mounted from the 100-account server read; provider counts computed once per render"]
+  behavior: { streaming: false, cancellation: null, concurrency: "existing mutation guards remain" }
+  edgeCases: ["page boundary", "filtered list", "list shrinks", "cross-page priority", "mounted EN/VI", "variable-height rows", "390px width"]
+  evidence:
+    - { file: "aigate:docs/contracts/connection-list-paging.md", line: 1, note: "SP64 paging and action boundary" }
+  newModule: connections
+  parityStatus: verified
+  labels: [REFERENCE_BEHAVIOR, IMPLEMENTATION_ACCIDENT]
+
 - id: catalog.registry-build
   group: Providers
   feature: Provider catalog

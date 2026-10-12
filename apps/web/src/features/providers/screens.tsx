@@ -12,6 +12,7 @@ import {
   type ConnectionField, type ProviderDetailView, type ProviderSummary, type ThinkingLevel,
 } from "./api";
 import { CATALOG_CARD_STEP, catalogWindow } from "./catalog-window";
+import { connectionPage } from "./connections-page";
 import { testNotice, needsAttention, statusPill, STATUS_KEYS } from "./test-result";
 import { SignIn } from "./sign-in";
 import { useProxyPools } from "../network/api";
@@ -268,6 +269,7 @@ export function Connections() {
   const { t } = useLocale();
   const requested = new URLSearchParams(window.location.search).get("provider");
   const [tab, setTab] = useState("all");
+  const [page, setPage] = useState(0);
   const [adding, setAdding] = useState(Boolean(requested));
   const [replacing, setReplacing] = useState<Connection | null>(null);
   const [signingIn, setSigningIn] = useState<Connection | null>(null);
@@ -282,16 +284,19 @@ export function Connections() {
   const runTest = (id: string) => testConnection.mutate(id, { onSuccess: (view) => showToast(testNotice(view)), onError: fail });
   const testing = (id: string) => testConnection.isPending && testConnection.variables === id;
   const rows = (connections.data ?? []).filter((c) => tab === "all" || needsAttention(c));
+  const { pages, page: currentPage, start, end } = connectionPage(rows.length, page);
+  useEffect(() => { if (page !== currentPage) setPage(currentPage); }, [page, currentPage]);
+  const providerCounts = new Map<string, number>();
+  for (const connection of connections.data ?? []) providerCounts.set(connection.provider, (providerCounts.get(connection.provider) ?? 0) + 1);
 
   return <><PageHeading eyebrow={`Providers / ${t("providers.connectionsTitle")}`} title={t("providers.connectionsTitle")} description={t("providers.connectionsDescription")} action={<Button variant="primary" onClick={() => setAdding(true)}>+ {t("providers.addConnection")}</Button>} />
-    <div className="section-gap"><Tabs items={[t("providers.allConnections"), t("providers.needsAttention")]} active={tab === "all" ? t("providers.allConnections") : t("providers.needsAttention")} onChange={(value) => setTab(value === t("providers.needsAttention") ? "attention" : "all")} /></div>
+    <div className="section-gap"><Tabs items={[t("providers.allConnections"), t("providers.needsAttention")]} active={tab === "all" ? t("providers.allConnections") : t("providers.needsAttention")} onChange={(value) => { setTab(value === t("providers.needsAttention") ? "attention" : "all"); setPage(0); }} /></div>
     <Panel title={tab === "attention" ? t("providers.connectionsAction") : t("providers.connectedAccounts")} detail={t("providers.priorityHint")} className="section-gap panel-flush">
       {connections.isPending ? <StateBlock state="loading" />
         : connections.isError ? <StateBlock state="error" code={toProblem(connections.error).code} action={<Button onClick={() => void connections.refetch()}>Retry</Button>} />
-        : <Table empty={tab === "attention" ? t("providers.attentionEmpty") : t("providers.connectionsEmpty")}
-          columns={[t("providers.account"), t("providers.key"), t("providers.status"), t("providers.lastTested"), t("providers.actions")]} rows={rows.map((c) => {
+        : <><Table empty={tab === "attention" ? t("providers.attentionEmpty") : t("providers.connectionsEmpty")}
+          columns={[t("providers.account"), t("providers.key"), t("providers.status"), t("providers.lastTested"), t("providers.actions")]} rows={rows.slice(start, end).map((c) => {
             const pill = statusPill(c);
-            const sameProvider = (connections.data ?? []).filter((other) => other.provider === c.provider);
             return [
               <div><strong>{c.name}</strong>{c.name !== c.providerName && <small className="muted"> · {c.providerName}</small>}{c.baseUrl && <small className="muted"> · {c.baseUrl}</small>}{c.deployment && <small className="muted"> · {c.deployment}</small>}{c.accountId && <small className="muted"> · account {c.accountId}</small>}</div>,
               c.authType === "oauth"
@@ -301,14 +306,18 @@ export function Connections() {
               c.lastTestedAt ? new Date(c.lastTestedAt).toLocaleString() : t("providers.never"),
               <><Button variant="ghost" disabled={testConnection.isPending} onClick={() => runTest(c.id)}>{testing(c.id) ? t("providers.testing") : t("providers.test")}</Button>
                 <Button variant="ghost" disabled={update.isPending || c.priority === 1} onClick={() => update.mutate({ id: c.id, priority: c.priority - 1 }, { onError: fail })}>{t("providers.priorityUp")}</Button>
-                <Button variant="ghost" disabled={update.isPending || c.priority === sameProvider.length} onClick={() => update.mutate({ id: c.id, priority: c.priority + 1 }, { onError: fail })}>{t("providers.priorityDown")}</Button>
+                <Button variant="ghost" disabled={update.isPending || c.priority === providerCounts.get(c.provider)} onClick={() => update.mutate({ id: c.id, priority: c.priority + 1 }, { onError: fail })}>{t("providers.priorityDown")}</Button>
                 {c.authType === "oauth"
                   ? <Button variant="ghost" onClick={() => setSigningIn(c)}>{t("providers.signInAgain")}</Button>
                   : <Button variant="ghost" onClick={() => setReplacing(c)}>{fieldsOf(c.provider).length > 0 ? t("providers.edit") : t("providers.replaceKey")}</Button>}
                 <Button variant="ghost" disabled={update.isPending} onClick={() => update.mutate({ id: c.id, isActive: !c.isActive }, { onError: fail })}>{c.isActive ? t("providers.disable") : t("providers.enable")}</Button>
                 <Button variant="ghost" onClick={() => setRemoving(c)}>{t("providers.delete")}</Button></>,
             ];
-          })} />}
+          })} />{pages > 1 && <div className="connections-pages">
+            <Button disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>{t("providers.previousPage")}</Button>
+            <span aria-live="polite">{t("providers.pageOf", { page: currentPage + 1, total: pages })}</span>
+            <Button disabled={currentPage === pages - 1} onClick={() => setPage(currentPage + 1)}>{t("providers.nextPage")}</Button>
+          </div>}</>}
     </Panel>
     {adding && <AddConnection requested={requested} onClose={() => setAdding(false)} onCreated={(view) => { setAdding(false); runTest(view.id); }} onSignedIn={() => setAdding(false)} />}
     {signingIn && <Modal title={`${t("providers.signInAgain")} · ${signingIn.name}`} onClose={() => setSigningIn(null)}>
