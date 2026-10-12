@@ -1117,3 +1117,29 @@
   newModule: usage
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+- id: usage.model-table-windowing
+  group: Usage
+  feature: Usage dashboard
+  subFeature: Window the provider/model breakdown table
+  trigger: Open Usage or scroll its Provider × model table
+  input: "Existing at-most-200 byModel rows, selected period and locale"
+  output: "All loaded rows reachable with a bounded mounted table window"
+  businessRules:
+    - "AIGATE_EXTENSION: mount only visible 36 px rows plus five-row overscan without changing order, values or CSV"
+    - "AIGATE_EXTENSION: reset scroll for a new period; preserve it for locale, Pricing and live updates"
+    - "IMPLEMENTATION_ACCIDENT: mounting all 200 summary rows is not required by the usage contract"
+  state: { reads: ["existing Usage summary", "scroll position", "locale"], writes: [], runtimeOnly: ["table scroll position"] }
+  dependencies: [usage.dashboard-browser-i18n]
+  providerInteraction: null
+  fallback: { hasFallback: true, retry: "Existing summary Retry", timeout: null, quota: null }
+  errorCases: []
+  sideEffects: []
+  persistence: []
+  performanceConcerns: ["Bound mounted rows independently of the 200-row API limit"]
+  behavior: { streaming: false, cancellation: null, concurrency: null }
+  edgeCases: ["first and last row", "shorter refreshed list", "period reset", "EN/VI", "keyboard and 390 px scroll"]
+  evidence:
+    - { file: "aigate:docs/contracts/usage-model-windowing.md", line: 1, note: "SP63 usage table presentation contract" }
+  newModule: usage
+  parityStatus: verified
+  labels: [IMPLEMENTATION_ACCIDENT]

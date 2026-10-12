@@ -6,6 +6,7 @@ import { CostChart, Legend, TokenChart, type Series } from "./charts";
 import { useLiveUsage } from "../../shared/live-usage";
 import { periodParams, useUsageChart, useUsageSummary, type PeriodQuery } from "./api";
 import { PricingModal } from "./pricing-modal";
+import { UsageModelTable } from "./usage-model-table";
 import { assignSlots, chartSeries, errorRate, formatCost, formatTokens, OTHER } from "./usage-format";
 
 // docs/contracts/usage.md "UI": the period lives in the URL (?period=, and from/to for custom).
@@ -94,9 +95,7 @@ export function Usage() {
             <Panel title={t("usage.cost")} detail={t("usage.costHint")}><CostChart chart={chart.data} /></Panel>
           </div>
           <Panel title={t("usage.providerModel")} detail={t("usage.tableHint")} className="section-gap panel-flush">
-            <Table columns={[t("usage.provider"), t("usage.model"), t("usage.requests"), t("usage.input"), t("usage.output"), t("usage.cacheRead"), t("usage.cost"), t("usage.errorPercent")]}
-              rows={summary.data?.byModel.map((row) => [row.providerName, <code>{row.model}</code>, number(row.requests), tokens(row.inputTokens), tokens(row.outputTokens),
-                tokens(row.cacheReadTokens), row.unpriced === row.requests ? <span className="muted">{t("usage.unpriced")}</span> : cost(row.cost), percent(row.errors, row.requests)]) ?? []} />
+            <UsageModelTable key={periodParams(query)} rows={summary.data?.byModel ?? []} />
           </Panel>
         </>}
       </>}
