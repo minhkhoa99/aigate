@@ -105,6 +105,30 @@ test("a custom provider gets a connection, is tested at its own URL, and serves 
     await app.close();
   }));
 
+test("custom Chat nodes keep the client's token-limit field; built-in OpenAI keeps its mapping", () =>
+  withTempDb(async (file) => {
+    const upstream = fakeUpstream(...Array.from({ length: 5 }, () => json(200, completion)));
+    const { app, dash, chat } = await ready(file, upstream);
+    const create = async (name, prefix, baseUrl) => (await dash({ method: "POST", url: "/api/provider-nodes", body: { name, prefix, baseUrl } })).json();
+    const radox = await create("Radox AI", "radox", "https://radoxai.com/v1");
+    const generic = await create("Generic", "generic", "https://other.example/v1");
+    for (const node of [radox, generic]) {
+      assert.equal((await dash({ method: "POST", url: "/api/connections", body: { provider: node.id, apiKey: "sk-node-key-1234" } })).statusCode, 201);
+    }
+    assert.equal((await chat({ ...hello, model: "radox/claude-fable-5.1", max_tokens: 128 })).statusCode, 200);
+    assert.equal((await chat({ ...hello, model: "generic/claude-fable-5.1", max_tokens: 128 })).statusCode, 200);
+    assert.equal((await chat({ ...hello, model: "radox/claude-fable-5.1", max_completion_tokens: 128 })).statusCode, 200);
+    assert.equal((await chat({ ...hello, model: "radox/claude-fable-5.1" })).statusCode, 200);
+    assert.equal((await chat({ ...hello, model: "openai/gpt-4.1", max_tokens: 128 })).statusCode, 200);
+    const sent = upstream.calls.map((call) => JSON.parse(call.request.body));
+    assert.deepEqual([sent[0].max_tokens, sent[0].max_completion_tokens], [128, undefined]);
+    assert.deepEqual([sent[1].max_tokens, sent[1].max_completion_tokens], [128, undefined]);
+    assert.deepEqual([sent[2].max_tokens, sent[2].max_completion_tokens], [undefined, 128]);
+    assert.deepEqual([sent[3].max_tokens, sent[3].max_completion_tokens], [undefined, undefined]);
+    assert.deepEqual([sent[4].max_tokens, sent[4].max_completion_tokens], [undefined, 128]);
+    await app.close();
+  }));
+
 test("a custom provider pointed back at AIGate reports the endpoint, not a bad provider key", () =>
   withTempDb(async (file) => {
     const upstream = fakeUpstream(json(401, { error: {

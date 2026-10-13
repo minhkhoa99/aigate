@@ -49,6 +49,8 @@ export interface CanonicalRequest {
   readonly toolChoice?: ToolChoice;
   readonly stream: boolean;
   readonly maxOutputTokens?: number;
+  // Keep the client's OpenAI Chat spelling when forwarding to a compatible custom provider.
+  readonly maxOutputTokensField?: "max_tokens" | "max_completion_tokens";
   readonly temperature?: number;
   readonly topP?: number;
   readonly stop?: readonly string[];

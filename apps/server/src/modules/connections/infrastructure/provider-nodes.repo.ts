@@ -69,6 +69,7 @@ export function nodeDescriptor(node: StoredNode): ProviderDescriptor {
     return {
       ...shared, protocol: responses ? "openai-responses" : "openai-compatible", chatUrl: `${base}${responses ? "/responses" : "/chat/completions"}`,
       headers: { ...node.headers }, auth: { kind: "api-key", header: "authorization", scheme: "bearer" },
+      ...(responses ? {} : { quirks: ["preserveTokenLimitField"] }),
     };
   }
   // connection.anthropic-compatible-node: 9router calls a host official when the URL merely contains api.anthropic.com.

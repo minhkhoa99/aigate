@@ -338,6 +338,7 @@ export function parseOpenAIChatRequest(body: unknown): OpenAIChatInput {
       ...(present(input.tools) ? { tools: toTools(input.tools) } : {}),
       ...(present(input.tool_choice) ? { toolChoice: toToolChoice(input.tool_choice) } : {}),
       ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+      ...(maxTokens !== undefined && maxCompletion === undefined ? { maxOutputTokensField: "max_tokens" as const } : {}),
       ...(temperature !== undefined ? { temperature } : {}),
       ...(topP !== undefined ? { topP } : {}),
       ...(present(input.stop) ? { stop: toStop(input.stop) } : {}),

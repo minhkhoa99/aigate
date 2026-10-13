@@ -53,6 +53,8 @@ At most **100** custom providers (409 `NODE_LIMIT`); the count and the insert ru
 
 The OpenAI descriptor: with one trailing `/` removed from the base URL, `chatUrl` = `<base>/chat/completions` (apiType `chat`, OpenAI adapter) or `<base>/responses` (apiType `responses`, Responses adapter, `provider-openai-responses.md`) and `modelsUrl` = `<base>/models`; `Authorization: Bearer <key>`, the custom headers, no declared models. The Anthropic descriptor is under "Anthropic-compatible".
 
+For an OpenAI-compatible Chat node, AIGate keeps the client's output-limit field: `max_tokens` stays `max_tokens`, and `max_completion_tokens` stays `max_completion_tokens`. If the client sends neither, AIGate sends neither and the upstream chooses its default. The node declares no model output limit, so AIGate does not cap this value; the upstream may still impose its own limit. Built-in catalog providers keep their adapter-specific mapping.
+
 The Base URL form asks for the **upstream provider API**, not AIGate's own `/v1` URL. A self-referential URL (for example the Vite proxy at `http://127.0.0.1:5173/v1`) returns AIGate's `invalid_api_key` when tested with a provider key; the test reports `unreachable` / `INVALID_REQUEST` with an Edit Base URL instruction (`connections.md`).
 
 ## API (dashboard session)
