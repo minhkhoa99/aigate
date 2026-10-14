@@ -26,10 +26,11 @@ export const useApiKeys = () => useQuery({ queryKey: keysKey, queryFn: () => api
 function useKeyMutation<T, V>(mutationFn: (variables: V) => Promise<T>) {
   const client = useQueryClient();
   // Settled, not just success: a 404 from another tab's delete must refresh the list too.
-  return useMutation({ mutationFn, onSettled: () => client.invalidateQueries({ queryKey: keysKey }) });
+  return useMutation({ mutationFn, gcTime: 0, onSettled: () => client.invalidateQueries({ queryKey: keysKey }) });
 }
 
 export const useCreateKey = () => useKeyMutation((name: string) => api<CreatedApiKey>("/api/keys", { method: "POST", body: { name } }));
+export const useRotateKey = () => useKeyMutation((id: string) => api<CreatedApiKey>(`/api/keys/${encodeURIComponent(id)}/rotate`, { method: "POST" }));
 export const useSetKeyActive = () =>
   useKeyMutation(({ id, isActive }: { id: string; isActive: boolean }) =>
     api<ApiKey>(`/api/keys/${encodeURIComponent(id)}`, { method: "PATCH", body: { isActive } }));

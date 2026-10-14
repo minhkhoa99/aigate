@@ -12,7 +12,7 @@ import { RoutingStatusTab } from "./routing-status";
 import { clientProtocols, endpointSetup, type ClientProtocol } from "./endpoint-variants";
 import type { MessageKey } from "../../shared/i18n";
 import {
-  useApiKeys, useChatReadiness, useComboStickyLimit, useCombos, useCreateKey, useDeleteCombo, useDeleteKey, useRequireApiKey, useSetComboStickyLimit, useSetKeyActive,
+  useApiKeys, useChatReadiness, useComboStickyLimit, useCombos, useCreateKey, useDeleteCombo, useDeleteKey, useRequireApiKey, useRotateKey, useSetComboStickyLimit, useSetKeyActive,
   useSetRequireApiKey, type ApiKey, type ChatReadiness, type Combo, type ComboStrategy, type CreatedApiKey,
 } from "./api";
 
@@ -36,8 +36,11 @@ export function EndpointKeys() {
   const [showCreate, setShowCreate] = useState(false);
   const [created, setCreated] = useState<CreatedApiKey | null>(null);
   const [revoke, setRevoke] = useState<ApiKey | null>(null);
+  const [rotate, setRotate] = useState<ApiKey | null>(null);
+  const [secretAction, setSecretAction] = useState<"create" | "rotate">("create");
   const keys = useApiKeys();
   const createKey = useCreateKey();
+  const rotateKey = useRotateKey();
   const setActive = useSetKeyActive();
   const deleteKey = useDeleteKey();
   const requireApiKey = useRequireApiKey();
@@ -51,7 +54,7 @@ export function EndpointKeys() {
   const settingsProblem = requireApiKey.isError ? toProblem(requireApiKey.error, language) : null;
   const setup = endpointSetup(window.location.origin, protocol);
   const date = new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US");
-  const closeCreate = () => { setShowCreate(false); setCreated(null); createKey.reset(); };
+  const closeCreate = () => { setShowCreate(false); setCreated(null); setSecretAction("create"); createKey.reset(); rotateKey.reset(); };
 
   const submitCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -72,13 +75,14 @@ export function EndpointKeys() {
       {setup.setup && <CopyField label={t("endpoint.posixSetup")} value={setup.setup} />}
       <CopyField label={t("endpoint.testRequest")} value={setup.testRequest} />
     </Panel>
-    <Panel title={t("endpoint.keysTitle")} detail={t("endpoint.keysDetail")} className="section-gap panel-flush" action={<Button variant="primary" onClick={() => setShowCreate(true)}>+ {t("endpoint.createKey")}</Button>}>
+    <Panel title={t("endpoint.keysTitle")} detail={t("endpoint.keysDetail")} className="section-gap panel-flush" action={<Button variant="primary" onClick={() => { setSecretAction("create"); setShowCreate(true); }}>+ {t("endpoint.createKey")}</Button>}>
       {keys.isPending ? <StateBlock state="loading" />
         : keys.isError ? <><StateBlock state="error" code={keysProblem?.code} action={<Button onClick={() => void keys.refetch()}>{t("common.retry")}</Button>} /><Warning tone="danger">{keysProblem?.message}</Warning></>
         : <Table empty={t("endpoint.keysEmpty")} columns={[t("endpoint.name"), t("endpoint.maskedKey"), t("endpoint.created"), t("endpoint.status"), t("endpoint.actions")]} rows={keys.data.map((key) => [
           key.name, <code>{key.maskedKey}</code>, date.format(new Date(key.createdAt)),
           <Pill tone={key.isActive ? "healthy" : "muted"}>{t(key.isActive ? "endpoint.active" : "endpoint.disabled")}</Pill>,
-          <><Button variant="ghost" disabled={setActive.isPending} onClick={() => setActive.mutate({ id: key.id, isActive: !key.isActive }, { onError: fail })}>{t(key.isActive ? "endpoint.disable" : "endpoint.enable")}</Button>
+          <><Button variant="ghost" disabled={rotateKey.isPending} onClick={() => setRotate(key)}>{t("endpoint.rotate")}</Button>
+            <Button variant="ghost" disabled={setActive.isPending} onClick={() => setActive.mutate({ id: key.id, isActive: !key.isActive }, { onError: fail })}>{t(key.isActive ? "endpoint.disable" : "endpoint.enable")}</Button>
             <Button variant="ghost" onClick={() => setRevoke(key)}>{t("endpoint.revoke")}</Button></>,
         ])} />}
     </Panel>
@@ -86,9 +90,16 @@ export function EndpointKeys() {
       <div className="list-row"><div><strong>{t("endpoint.requireKey")}</strong><small>{t("endpoint.requireKeyHint")}</small></div><input type="checkbox" checked={requireApiKey.data ?? true} disabled={requireApiKey.data === undefined || setRequireApiKey.isPending} onChange={(e) => setRequireApiKey.mutate(e.target.checked, { onError: fail })} aria-label={t("endpoint.requireKey")} /></div>
       {settingsProblem && <Warning tone="danger"><code>{settingsProblem.code}</code> · {settingsProblem.message} <Button onClick={() => void requireApiKey.refetch()}>{t("common.retry")}</Button></Warning>}
     </Panel>
-    {showCreate && <Modal title={t("endpoint.createTitle")} onClose={closeCreate}>
+    {showCreate && <Modal title={t(secretAction === "rotate" ? "endpoint.rotateTitle" : "endpoint.createTitle")} onClose={closeCreate}>
       {created ? <><Warning>{t("endpoint.onceWarning")}</Warning><CopyField label={created.name} value={created.key} /><div className="modal-actions"><Button variant="primary" onClick={closeCreate}>{t("endpoint.done")}</Button></div></>
         : <form onSubmit={submitCreate}><p>{t("endpoint.namePrompt")}</p><Field label={t("endpoint.name")}><Input name="name" required maxLength={64} placeholder={t("endpoint.namePlaceholder")} /></Field><div className="modal-actions"><Button onClick={closeCreate}>{t("common.cancel")}</Button><Button type="submit" variant="primary" disabled={createKey.isPending}>{t(createKey.isPending ? "endpoint.creating" : "endpoint.createKey")}</Button></div></form>}
+    </Modal>}
+    {rotate && <Modal title={t("endpoint.rotateTitle")} onClose={() => setRotate(null)}>
+      <Warning tone="danger">{t("endpoint.rotateHint")}</Warning>
+      <div className="modal-actions"><Button onClick={() => setRotate(null)} disabled={rotateKey.isPending}>{t("common.cancel")}</Button><Button variant="danger" disabled={rotateKey.isPending} onClick={() => rotateKey.mutate(rotate.id, {
+        onSuccess: (value) => { setRotate(null); setSecretAction("rotate"); setCreated(value); setShowCreate(true); },
+        onError: fail,
+      })}>{t(rotateKey.isPending ? "endpoint.rotating" : "endpoint.rotate")}</Button></div>
     </Modal>}
     {revoke && <ConfirmDialog name={revoke.name} onClose={() => setRevoke(null)} onConfirm={() => deleteKey.mutate(revoke.id, {
       onSuccess: () => { setRevoke(null); showToast({ tone: "success", localized: { key: "endpoint.revoked", params: { name: revoke.name } } }); },

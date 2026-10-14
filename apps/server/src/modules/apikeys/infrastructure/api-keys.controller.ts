@@ -29,6 +29,15 @@ export class ApiKeysController {
     return { ...created.view, key: created.key };
   }
 
+  @Post(":id/rotate")
+  @HttpCode(HttpStatus.OK)
+  @Header("Cache-Control", "no-store")
+  async rotate(@Param("id") id: string): Promise<ApiKeyView & { key: string }> {
+    const rotated = await this.keys.rotate(id);
+    if (!rotated) throw notFound();
+    return { ...rotated.view, key: rotated.key };
+  }
+
   @Patch(":id")
   @Header("Cache-Control", "no-store")
   async update(@Param("id") id: string, @Body() body: unknown): Promise<ApiKeyView> {

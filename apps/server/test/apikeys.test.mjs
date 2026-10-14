@@ -61,6 +61,23 @@ test("validation follows the stored hash and the active flag", () =>
     assert.equal((await call({ method: "PATCH", url: `/api/keys/${id}`, body: { isActive: true } })).statusCode, 404);
   }));
 
+test("rotating a key invalidates the old secret and returns the replacement once", () =>
+  signedIn(async ({ app, call }) => {
+    const repo = app.get(ApiKeysRepository);
+    const original = (await call({ method: "POST", url: "/api/keys", body: { name: "CI" } })).json();
+    const rotated = await call({ method: "POST", url: `/api/keys/${original.id}/rotate` });
+    assert.equal(rotated.statusCode, 200);
+    assert.equal(rotated.headers["cache-control"], "no-store");
+    const { key, ...view } = rotated.json();
+    assert.match(key, /^aigate_[A-Za-z0-9_-]{43}$/);
+    assert.notEqual(key, original.key);
+    assert.equal(view.maskedKey, `aigate_••••${key.slice(-4)}`);
+    assert.equal(await repo.isValid(original.key), false);
+    assert.equal(await repo.isValid(key), true);
+    assert.equal((await call({ url: "/api/keys" })).body.includes(key.slice(7, 20)), false);
+    assert.equal((await call({ method: "POST", url: "/api/keys/missing/rotate" })).statusCode, 404);
+  }));
+
 test("names, status bodies, and the key count are bounded", () =>
   signedIn(async ({ call }) => {
     for (const body of [{ name: "" }, { name: "   " }, { name: "x".repeat(65) }, { name: "ok", keyHash: "x" }, ["CI"], { name: 1 }]) {

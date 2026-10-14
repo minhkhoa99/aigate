@@ -7,7 +7,8 @@ SP33 dashboard setup: `/gateway/endpoint` now selects one of the four
 implemented client protocol examples and renders its surrounding key controls
 in EN/VI. The create response's plaintext key stays only in the one-time
 modal and mutation state until that modal closes; it is never inserted into a
-setup command or the cached list. Key CRUD routes and limits are unchanged.
+setup command or the cached list. Existing keys can be rotated to receive a new
+one-time secret; rotation immediately invalidates the old key.
 See `endpoint-setup.md` for exact client URLs, snippets and UI acceptance.
 
 Scope, per spec §9: dashboard password login and API key issuing and validation. OIDC and SAML come later. The source is the Feature Matrix entries below in `docs/discovery/feature-matrix/01-endpoint-apikey-settings.yaml`. AIGate does not reproduce any rule labeled `SUSPECTED_BUG` or `IMPLEMENTATION_ACCIDENT`.
@@ -93,6 +94,7 @@ Error bodies are `{ code, message }`.
 |---|---|---|---|
 | `GET /api/keys` | — | `200 [{ id, name, maskedKey, isActive, createdAt }]`, newest first | — |
 | `POST /api/keys` | `{ name }`, 1–64 chars after trimming | `201 { …same fields, key }`. `key` appears only here. | `400 INVALID_REQUEST`, `409 LIMIT_REACHED` at 100 keys |
+| `POST /api/keys/:id/rotate` | — | `200 { …same fields, key }`. Replaces the stored hash and returns the new key once. | `404 NOT_FOUND` |
 | `PATCH /api/keys/:id` | `{ isActive: boolean }` | `200` with the key | `400`, `404 NOT_FOUND` |
 | `DELETE /api/keys/:id` | — | `204` | `404 NOT_FOUND` |
 

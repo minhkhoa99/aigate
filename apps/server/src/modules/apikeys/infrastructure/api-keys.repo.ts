@@ -44,6 +44,14 @@ export class ApiKeysRepository {
     });
   }
 
+  async rotate(id: string): Promise<{ view: ApiKeyView; key: string } | undefined> {
+    const key = KEY_PREFIX + randomBytes(32).toString("base64url");
+    const [row] = await this.database.db.update(apiKeys)
+      .set({ keyHash: sha256(key), lastFour: key.slice(-4) })
+      .where(eq(apiKeys.id, id)).returning(columns);
+    return row ? { view: toView(row), key } : undefined;
+  }
+
   async setActive(id: string, isActive: boolean): Promise<ApiKeyView | undefined> {
     const [row] = await this.database.db.update(apiKeys).set({ isActive }).where(eq(apiKeys.id, id)).returning(columns);
     return row ? toView(row) : undefined;
