@@ -256,9 +256,11 @@ function toBody(request: CanonicalRequest, stream: boolean, quirks: readonly str
   if (request.toolChoice !== undefined) {
     body.tool_choice = typeof request.toolChoice === "string" ? request.toolChoice : { type: "function", function: { name: request.toolChoice.name } };
   }
-  // ponytail: max_completion_tokens only (OpenAI rejects max_tokens on reasoning models); add a
-  // descriptor flag when a provider accepts only max_tokens.
-  if (request.maxOutputTokens !== undefined) body.max_completion_tokens = request.maxOutputTokens;
+  // Catalog providers keep the OpenAI reasoning-model spelling; custom Chat nodes keep the client's spelling.
+  if (request.maxOutputTokens !== undefined) {
+    const field = quirks.includes("preserveTokenLimitField") && request.maxOutputTokensField === "max_tokens" ? "max_tokens" : "max_completion_tokens";
+    body[field] = request.maxOutputTokens;
+  }
   if (request.temperature !== undefined) body.temperature = request.temperature;
   if (request.topP !== undefined) body.top_p = request.topP;
   if (request.stop !== undefined) body.stop = request.stop;

@@ -53,7 +53,7 @@ test("a full OpenAI body maps to CIP, with unknown fields carried in vendorExten
       { name: "ping", parameters: { type: "object", properties: {} } },
     ],
     toolChoice: { name: "lookup" },
-    maxOutputTokens: 300, temperature: 0.5, topP: 1, stop: ["END"], reasoning: { effort: "low" },
+    maxOutputTokens: 300, maxOutputTokensField: "max_tokens", temperature: 0.5, topP: 1, stop: ["END"], reasoning: { effort: "low" },
     vendorExtensions: { openai: { user: "u-1", seed: 7, response_format: { type: "text" }, presence_penalty: null } },
   });
 });

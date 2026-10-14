@@ -68,6 +68,7 @@ export function nodeDescriptor(node: StoredNode): ProviderDescriptor {
     return {
       ...shared, protocol: responses ? "openai-responses" : "openai-compatible", chatUrl: `${base}${responses ? "/responses" : "/chat/completions"}`,
       headers: { ...node.headers }, auth: { kind: "api-key", header: "authorization", scheme: "bearer" },
+      ...(responses ? {} : { quirks: ["preserveTokenLimitField"] }),
     };
   }
   return {
