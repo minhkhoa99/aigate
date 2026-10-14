@@ -1,6 +1,7 @@
 import {
   BadRequestException, Body, ConflictException, Controller, Delete, Get, Header, HttpCode, HttpStatus, NotFoundException, Param, Patch, Post,
 } from "@nestjs/common";
+import { SecretUnreadableError } from "../../../secret-cipher.js";
 import { MAX_KEYS, parseKeyName, parseKeyStatus } from "../domain/api-key.js";
 import { ApiKeysRepository, type ApiKeyView } from "./api-keys.repo.js";
 
@@ -15,6 +16,19 @@ export class ApiKeysController {
   @Header("Cache-Control", "no-store")
   list(): Promise<ApiKeyView[]> {
     return this.keys.list();
+  }
+
+  @Get(":id/reveal")
+  @Header("Cache-Control", "no-store")
+  async reveal(@Param("id") id: string): Promise<{ key: string }> {
+    try {
+      const key = await this.keys.reveal(id);
+      if (!key) throw notFound();
+      return { key };
+    } catch (error) {
+      if (error instanceof SecretUnreadableError) throw new ConflictException({ code: "CREDENTIAL_UNREADABLE", message: "The saved key cannot be decrypted because the secret key changed." });
+      throw error;
+    }
   }
 
   // The plaintext key appears in this response only.

@@ -8,6 +8,8 @@ export const apiKeys = sqliteTable(
     name: text("name").notNull(),
     keyHash: text("key_hash").notNull().unique(),
     lastFour: text("last_four").notNull(),
+    // 0025: sealed copy so the dashboard can copy the full key without rotating (AES-GCM via SecretCipherPort).
+    keySealed: text("key_sealed"),
     isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },

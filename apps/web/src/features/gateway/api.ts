@@ -35,6 +35,7 @@ export const useSetKeyActive = () =>
   useKeyMutation(({ id, isActive }: { id: string; isActive: boolean }) =>
     api<ApiKey>(`/api/keys/${encodeURIComponent(id)}`, { method: "PATCH", body: { isActive } }));
 export const useDeleteKey = () => useKeyMutation((id: string) => apiVoid(`/api/keys/${encodeURIComponent(id)}`, "DELETE"));
+export const revealKey = (id: string) => api<{ key: string }>(`/api/keys/${encodeURIComponent(id)}/reveal`);
 
 // Shared with the providers feature by query key only (docs/contracts/chat-lane.md, "UI").
 const connectionsKey = ["connections"] as const;

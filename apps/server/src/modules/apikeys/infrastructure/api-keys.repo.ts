@@ -3,6 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { and, count, desc, eq } from "drizzle-orm";
 import { apiKeys, type DatabaseHandle } from "@aigate/database";
 import { DATABASE } from "../../../database.provider.js";
+import { SECRET_CIPHER, type SecretCipherPort } from "../../../secret-cipher.js";
 import { isWellFormedKey, KEY_PREFIX, maskKey, MAX_KEYS } from "../domain/api-key.js";
 
 export interface ApiKeyView {
@@ -20,10 +21,14 @@ const sha256 = (value: string) => createHash("sha256").update(value).digest("hex
 const toView = (row: Row): ApiKeyView => ({
   id: row.id, name: row.name, maskedKey: maskKey(row.lastFour), isActive: row.isActive, createdAt: row.createdAt.toISOString(),
 });
+const sealContext = (id: string): string => `api_keys:${id}:key`;
 
 @Injectable()
 export class ApiKeysRepository {
-  constructor(@Inject(DATABASE) private readonly database: DatabaseHandle) {}
+  constructor(
+    @Inject(DATABASE) private readonly database: DatabaseHandle,
+    @Inject(SECRET_CIPHER) private readonly cipher: SecretCipherPort,
+  ) {}
 
   async list(): Promise<ApiKeyView[]> {
     const rows = await this.database.db.select(columns).from(apiKeys).orderBy(desc(apiKeys.createdAt)).limit(MAX_KEYS);
@@ -37,8 +42,9 @@ export class ApiKeysRepository {
       const total = await tx.select({ n: count() }).from(apiKeys).get();
       if ((total?.n ?? 0) >= MAX_KEYS) return undefined;
       const key = KEY_PREFIX + randomBytes(32).toString("base64url");
+      const id = randomUUID();
       const [row] = await tx.insert(apiKeys)
-        .values({ id: randomUUID(), name, keyHash: sha256(key), lastFour: key.slice(-4), createdAt: new Date() })
+        .values({ id, name, keyHash: sha256(key), lastFour: key.slice(-4), keySealed: this.cipher.seal(key, sealContext(id)), createdAt: new Date() })
         .returning(columns);
       return row ? { view: toView(row), key } : undefined;
     });
@@ -47,9 +53,17 @@ export class ApiKeysRepository {
   async rotate(id: string): Promise<{ view: ApiKeyView; key: string } | undefined> {
     const key = KEY_PREFIX + randomBytes(32).toString("base64url");
     const [row] = await this.database.db.update(apiKeys)
-      .set({ keyHash: sha256(key), lastFour: key.slice(-4) })
+      .set({ keyHash: sha256(key), lastFour: key.slice(-4), keySealed: this.cipher.seal(key, sealContext(id)) })
       .where(eq(apiKeys.id, id)).returning(columns);
     return row ? { view: toView(row), key } : undefined;
+  }
+
+  // Reveal the full key without rotating (copy without rotate). Throws SecretUnreadableError if sealed value unreadable.
+  async reveal(id: string): Promise<string | undefined> {
+    const row = await this.database.db.select({ keySealed: apiKeys.keySealed }).from(apiKeys).where(eq(apiKeys.id, id)).get();
+    if (!row) return undefined;
+    if (!row.keySealed) return undefined;
+    return this.cipher.open(row.keySealed, sealContext(id));
   }
 
   async setActive(id: string, isActive: boolean): Promise<ApiKeyView | undefined> {

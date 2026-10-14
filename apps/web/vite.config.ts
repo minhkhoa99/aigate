@@ -6,4 +6,4 @@ import tailwindcss from "@tailwindcss/vite";
 const server = "http://127.0.0.1:20200";
 const proxy = Object.fromEntries(["/api", "/v1", "/v1beta", "/codex", "/responses", "/health"].map((path) => [path, server]));
 
-export default defineConfig({ plugins: [react(), tailwindcss()], server: { proxy } });
+export default defineConfig({ plugins: [react(), tailwindcss()], server: { proxy, port: 5175 } });

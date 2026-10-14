@@ -176,6 +176,13 @@
       "when": 1790765000000,
       "tag": "0024_sso_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1791962316755,
+      "tag": "0025_silky_moon",
+      "breakpoints": true
     }
   ]
 }

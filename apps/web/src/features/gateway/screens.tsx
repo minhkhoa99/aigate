@@ -12,7 +12,7 @@ import { RoutingStatusTab } from "./routing-status";
 import { clientProtocols, endpointSetup, type ClientProtocol } from "./endpoint-variants";
 import type { MessageKey } from "../../shared/i18n";
 import {
-  useApiKeys, useChatReadiness, useComboStickyLimit, useCombos, useCreateKey, useDeleteCombo, useDeleteKey, useRequireApiKey, useRotateKey, useSetComboStickyLimit, useSetKeyActive,
+  revealKey, useApiKeys, useChatReadiness, useComboStickyLimit, useCombos, useCreateKey, useDeleteCombo, useDeleteKey, useRequireApiKey, useRotateKey, useSetComboStickyLimit, useSetKeyActive,
   useSetRequireApiKey, type ApiKey, type ChatReadiness, type Combo, type ComboStrategy, type CreatedApiKey,
 } from "./api";
 
@@ -47,6 +47,14 @@ export function EndpointKeys() {
   const setRequireApiKey = useSetRequireApiKey();
   const showToast = useToast();
   const fail = (error: unknown) => showToast({ tone: "error", error });
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+  const copyFullKey = (id: string) => {
+    setCopyingId(id);
+    revealKey(id).then(({ key }) => navigator.clipboard.writeText(key)).then(
+      () => showToast({ tone: "success", localized: { key: "comboList.copied", params: { name: "API key" } } }),
+      () => showToast({ tone: "error", localized: { key: "comboList.copyFailed" } }),
+    ).finally(() => setCopyingId(null));
+  };
   const readiness = useChatReadiness();
   const state = readiness.data ? READINESS[readiness.data] : undefined;
   const readinessProblem = readiness.isError ? toProblem(readiness.error, language) : null;
@@ -79,7 +87,7 @@ export function EndpointKeys() {
       {keys.isPending ? <StateBlock state="loading" />
         : keys.isError ? <><StateBlock state="error" code={keysProblem?.code} action={<Button onClick={() => void keys.refetch()}>{t("common.retry")}</Button>} /><Warning tone="danger">{keysProblem?.message}</Warning></>
         : <Table empty={t("endpoint.keysEmpty")} columns={[t("endpoint.name"), t("endpoint.maskedKey"), t("endpoint.created"), t("endpoint.status"), t("endpoint.actions")]} rows={keys.data.map((key) => [
-          key.name, <code>{key.maskedKey}</code>, date.format(new Date(key.createdAt)),
+          key.name, <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><code>{key.maskedKey}</code><button type="button" className="button button-ghost" aria-label={t("common.copyLabel", { label: key.maskedKey })} title={t("common.copy")} disabled={copyingId === key.id} onClick={() => copyFullKey(key.id)} style={{ padding: "2px 6px", fontSize: 12 }}>{copyingId === key.id ? "…" : "⧉"}</button></span>, date.format(new Date(key.createdAt)),
           <Pill tone={key.isActive ? "healthy" : "muted"}>{t(key.isActive ? "endpoint.active" : "endpoint.disabled")}</Pill>,
           <><Button variant="ghost" disabled={rotateKey.isPending} onClick={() => setRotate(key)}>{t("endpoint.rotate")}</Button>
             <Button variant="ghost" disabled={setActive.isPending} onClick={() => setActive.mutate({ id: key.id, isActive: !key.isActive }, { onError: fail })}>{t(key.isActive ? "endpoint.disable" : "endpoint.enable")}</Button>
