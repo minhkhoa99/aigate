@@ -1028,6 +1028,19 @@ Every item below is a capability AIGate must have. Derived from tracing
   - AIGATE_EXTENSION: pending actions cannot overlap; expired/changed reviews require fresh preview
   - AIGATE_EXTENSION: no local CLI file write before explicit SP25 Apply
 
+### Persisted link or uploaded SKILL.md skills replace the hardcoded 9router catalogue
+
+- **id:** `integrations.skills-dynamic-registry` · **module:** `tooling`
+- **Trigger:** Operator adds, edits, toggles or deletes a skill on /integrations/skills; an agent fetches GET /v1/skills/:id/SKILL.md
+- **Input:** { name, description?, source: link, url } or { name, description?, source: file, content }; agent request with an AIGate API key
+- **Output:** Skill rows without content in the list; uploaded content as text/markdown to keyed agents
+- **Rules:**
+  - AIGATE_EXTENSION: deliberate deviation from skills.catalogue-raw-github-contract — no hardcoded or seeded skills; the operator owns the list
+  - AIGATE_EXTENSION: link skills store only the URL (HTTPS, HTTP for localhost, no credentials or fragment); AIGate never fetches or proxies them
+  - AIGATE_EXTENSION: file skills store at most 256 KiB of UTF-8 text and are served only when enabled, always behind an active API key even in keyless /v1 mode
+  - AIGATE_EXTENSION: names are unique ignoring ASCII case; at most 200 skills; source cannot change
+- **Errors:** `INVALID_REQUEST` (400 INVALID_REQUEST: name, description, URL or content violates the contract, or a patch changes source), `INVALID_REQUEST` (409 SKILL_EXISTS: another skill has the same name ignoring ASCII case; 409 SKILL_LIMIT: 200 skills already exist), `INVALID_REQUEST` (404 NOT_FOUND: unknown id; on the agent route also a disabled or link skill), `AUTH_ERROR` (401 MISSING_API_KEY / INVALID_API_KEY: agent route without a key, or with an unknown or disabled key)
+
 ### Browser-local EN/VI with stable registry and marketplace actions
 
 - **id:** `integrations.skills-mcp-browser-i18n` · **module:** `tooling`

@@ -888,6 +888,38 @@
   parityStatus: verified
   labels: []
 
+- id: integrations.skills-dynamic-registry
+  group: Integrations
+  feature: AIGate Skills registry
+  subFeature: Persisted link or uploaded SKILL.md skills replace the hardcoded 9router catalogue
+  trigger: Operator adds, edits, toggles or deletes a skill on /integrations/skills; an agent fetches GET /v1/skills/:id/SKILL.md
+  input: "{ name, description?, source: link, url } or { name, description?, source: file, content }; agent request with an AIGate API key"
+  output: Skill rows without content in the list; uploaded content as text/markdown to keyed agents
+  businessRules:
+    - "AIGATE_EXTENSION: deliberate deviation from skills.catalogue-raw-github-contract — no hardcoded or seeded skills; the operator owns the list"
+    - "AIGATE_EXTENSION: link skills store only the URL (HTTPS, HTTP for localhost, no credentials or fragment); AIGate never fetches or proxies them"
+    - "AIGATE_EXTENSION: file skills store at most 256 KiB of UTF-8 text and are served only when enabled, always behind an active API key even in keyless /v1 mode"
+    - "AIGATE_EXTENSION: names are unique ignoring ASCII case; at most 200 skills; source cannot change"
+  state: { reads: ["skills table", "api_keys"], writes: ["skills table"], runtimeOnly: [] }
+  dependencies: []
+  providerInteraction: null
+  fallback: { hasFallback: false, retry: "explicit failed read Retry", timeout: null, quota: null }
+  errorCases:
+    - { code: INVALID_REQUEST, when: "400 INVALID_REQUEST: name, description, URL or content violates the contract, or a patch changes source", partial: false }
+    - { code: INVALID_REQUEST, when: "409 SKILL_EXISTS: another skill has the same name ignoring ASCII case; 409 SKILL_LIMIT: 200 skills already exist", partial: false }
+    - { code: INVALID_REQUEST, when: "404 NOT_FOUND: unknown id; on the agent route also a disabled or link skill", partial: false }
+    - { code: AUTH_ERROR, when: "401 MISSING_API_KEY / INVALID_API_KEY: agent route without a key, or with an unknown or disabled key", partial: false }
+  sideEffects: ["Explicit skill create/update/delete only"]
+  persistence: ["skills table (migration 0026_skills)"]
+  performanceConcerns: ["List omits content and is capped at 200 rows; byte size computed in SQL"]
+  behavior: { streaming: false, cancellation: null, concurrency: "Count and insert share one transaction" }
+  edgeCases: ["Non-ASCII names differ only by case are distinct", "link skill on the agent route is 404", "disabled key or skill refused"]
+  evidence:
+    - { file: "aigate:docs/contracts/skills.md", line: 1, note: "Skills registry contract" }
+  newModule: tooling
+  parityStatus: verified
+  labels: []
+
 - id: integrations.cli-core-browser-i18n
   group: Integrations
   feature: AIGate CLI discovery and core configuration UI

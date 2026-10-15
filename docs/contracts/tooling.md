@@ -57,12 +57,12 @@ JCode uses `GET/POST /api/tooling/cli-tools/jcode` plus `/preview` and `/apply`.
 
 Oh My Pi uses `GET/POST /api/tooling/cli-tools/omp` plus `/preview` and `/apply` to manage only its `9router` provider entry in `~/.omp/agent/models.yml`. Grok Build uses the corresponding `grok-build` route to manage model slot `9router`, the default model mapping, and optional general-purpose, explore, and plan subagent slots. It records and restores prior mappings on Reset. Both use the standard preview, stale-file, backup, and atomic replace flow.
 
-## Skills catalogue
+## Skills registry
 
-The Skills page lists the eight repository skills and copies each raw `SKILL.md` URL on request. URLs target `decolua/9router`'s `master` branch. Skills are not installed by the dashboard.
+The Skills page manages persisted skills in the `skills` table: link skills (URL only, never fetched by AIGate) and uploaded SKILL.md files served at `GET /v1/skills/:id/SKILL.md` behind an AIGate API key. The former eight hardcoded 9router links were removed. See `skills.md`. Skills are not installed into any client by the dashboard.
 
-SP42 localizes the Skills page's owned text in EN/VI while copied URLs, skill
-IDs and endpoint paths remain literal. See `integrations-skills-mcp-ui-i18n.md`.
+SP42 localizes the Skills page's owned text in EN/VI; saved names, URLs and
+content remain literal. See `integrations-skills-mcp-ui-i18n.md`.
 
 ## Console log
 

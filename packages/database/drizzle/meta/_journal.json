@@ -183,6 +183,13 @@
       "when": 1791962316755,
       "tag": "0025_silky_moon",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1791969332014,
+      "tag": "0026_skills",
+      "breakpoints": true
     }
   ]
 }

@@ -124,3 +124,27 @@ export const useDeleteMcpServer = () => {
 };
 export interface McpMarketplaceServer { name: string; title: string; description: string; url: string; transport: "http" | "sse"; requiresAuth: boolean }
 export const useMcpMarketplace = () => useQuery({ queryKey: ["tooling", "mcp-marketplace"], queryFn: () => api<{ cached: boolean; servers: McpMarketplaceServer[] }>("/api/tooling/mcp/marketplace") });
+
+// docs/contracts/skills.md. The list omits content; the detail carries it.
+export interface Skill { id: string; name: string; description: string; source: "link" | "file"; url: string | null; bytes: number; enabled: boolean; createdAt: string; updatedAt: string }
+export interface SkillDetail extends Skill { content: string | null }
+export type SkillInput = { name: string; description: string } & ({ source: "link"; url: string } | { source: "file"; content: string });
+export type SkillPatch = Partial<{ name: string; description: string; url: string; content: string; enabled: boolean }>;
+const skillsKey = ["tooling", "skills"] as const;
+export const useSkills = () => useQuery({ queryKey: skillsKey, queryFn: () => api<Skill[]>("/api/tooling/skills") });
+export const useSkill = (id: string | null) => useQuery({ queryKey: [...skillsKey, id], enabled: id !== null, queryFn: () => api<SkillDetail>(`/api/tooling/skills/${encodeURIComponent(id ?? "")}`) });
+export const useCreateSkill = () => {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (body: SkillInput) => api<SkillDetail>("/api/tooling/skills", { method: "POST", body }),
+    onSettled: () => client.invalidateQueries({ queryKey: skillsKey }) });
+};
+export const useUpdateSkill = () => {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ id, ...body }: SkillPatch & { id: string }) => api<SkillDetail>(`/api/tooling/skills/${encodeURIComponent(id)}`, { method: "PATCH", body }),
+    onSettled: () => client.invalidateQueries({ queryKey: skillsKey }) });
+};
+export const useDeleteSkill = () => {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => apiVoid(`/api/tooling/skills/${encodeURIComponent(id)}`, "DELETE"),
+    onSettled: () => client.invalidateQueries({ queryKey: skillsKey }) });
+};
