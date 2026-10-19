@@ -137,6 +137,7 @@ All of these reach the dashboard through `apps/web/src/shared/errors.ts`.
 - `httpStatus`, `errorCode` (the lane's code, or the last attempt's).
 - `attempts` (the request's usage events), and `finalProvider`, `finalModel`, `finalConnectionId` from the last attempt.
 - The attempts' summed tokens, `cost` (null when no attempt was priced), `unpriced` (attempts without a price), `latencyMs`, `ttftMs` (the last attempt's).
+- `skills` (migration 0030): the comma-separated ids of the skills the chat lane added or the model loaded, at most 8, or null (`skills.md`). A hybrid skill round is one more attempt on the same provider and model.
 
 Nothing from a request or answer body is stored. Rows share the writer and the event retention.
 
@@ -150,7 +151,7 @@ Paging and filters:
 - `limit` is 1–100 (default 50).
 - `cursor` is the opaque `nextCursor` of the previous page (`null` on the last page).
 - `status=error` matches error and aborted.
-- `fallback=1` keeps requests with more than one attempt.
+- `fallback=1` keeps requests with more than one attempt (a hybrid skill round counts as one; see `skills` above).
 - `provider` and `model` match the final attempt.
 - `from` and `to` are epoch ms.
 - Items carry display names for the provider, the account, and the key.

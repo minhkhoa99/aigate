@@ -74,6 +74,8 @@ export interface RequestOutcome {
   readonly errorCode: string | null;
   // The client closed the connection before the answer ended.
   readonly clientGone: boolean;
+  // docs/contracts/skills.md: ids of the skills added to the request, preloaded or loaded by the model.
+  readonly skills?: readonly string[];
 }
 interface RequestTally {
   attempts: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number;
@@ -88,8 +90,9 @@ type EventRow = typeof usageEvents.$inferInsert & { at: Date; cost: number | nul
 type RequestRow = typeof usageRequests.$inferInsert;
 // Requests in flight whose attempts are being tallied; the oldest is forgotten past this (a handler that never finished).
 const MAX_OPEN_REQUESTS = 10_000;
-// 22 request columns x 40 rows stays under SQLite's 999 bound variables.
+// 23 request columns x 40 rows stays under SQLite's 999 bound variables.
 const REQUESTS_PER_INSERT = 40;
+const MAX_REQUEST_SKILLS = 8;
 interface DailyRow {
   day: string; provider: string; model: string; connectionId: string; apiKeyId: string; endpoint: string;
   requests: number; errors: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number; cost: number; unpriced: number;
@@ -176,6 +179,7 @@ export class UsageRecorder implements OnModuleInit, OnModuleDestroy {
         attempts: tally.attempts, finalProvider: last?.provider ?? null, finalModel: last?.model ?? null, finalConnectionId: last?.connectionId ?? null,
         inputTokens: tally.inputTokens, outputTokens: tally.outputTokens, cacheReadTokens: tally.cacheReadTokens, cacheWriteTokens: tally.cacheWriteTokens, reasoningTokens: tally.reasoningTokens,
         cost: tally.priced > 0 ? tally.cost : null, unpriced: tally.unpriced, latencyMs: Math.max(0, at - outcome.startedAt), ttftMs: last?.ttftMs ?? null,
+        skills: outcome.skills?.length ? outcome.skills.slice(0, MAX_REQUEST_SKILLS).join(",") : null,
       });
       if (this.requests.length > MAX_QUEUE) {
         this.requests.shift();

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const BOUNDED_CONTEXTS = [
   "identity", "apikeys", "catalog", "connections", "routing",
-  "transport", "usage", "media", "tooling", "settings",
+  "transport", "usage", "media", "tooling", "settings", "skills",
 ] as const;
 
 export const LABELS = [

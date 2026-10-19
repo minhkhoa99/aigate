@@ -12,7 +12,7 @@ import {
   estimateAnthropicInputTokens, geminiModelList, GeminiStreamEncoder, geminiTtsRequest, isGeminiTtsRequest, OpenAIChatStreamEncoder,
   parseAnthropicMessagesRequest, parseGeminiGenerateRequest, parseGeminiPath, parseOpenAIChatRequest, parseOpenAIResponsesRequest,
   responsesClientGetsObject, responsesRequestFor, ResponsesStreamEncoder, toAnthropicMessage, toGeminiResponse, toOpenAIChatCompletion, toOpenAIError,
-  splitThinkingSuffix, toResponsesObject, UnsupportedFeatureError, withClaudeCodePrompt, withConnection, withThinking, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Capability, type Credential,
+  splitThinkingSuffix, toResponsesObject, UnsupportedFeatureError, withClaudeCodePrompt, withConnection, withThinking, resolveCapabilities, type AIProviderPort, type CanonicalRequest, type CanonicalResponse, type Capability, type Credential,
   type ExecCtx, type GeminiRoute, type HttpRequest, type HttpTransportPort, type OpenAIError, type ProviderDescriptor, type ProxyConfig, type StreamChunk,
 } from "@aigate/engine";
 import { SecretUnreadableError } from "../../../secret-cipher.js";
@@ -37,6 +37,9 @@ import { CombosRepository } from "./combos.repo.js";
 import { resolveModelTarget } from "../domain/model-resolution.js";
 import { PxpipeService } from "./pxpipe.service.js";
 import { meter, meteredSend } from "./usage-meter.js";
+import { SkillContext, type SkillSession } from "../../skills/infrastructure/skill-context.js";
+import { TOOL_PROTOCOLS, toolAllowed } from "../../skills/domain/skill-tool.js";
+import { withSkillRounds } from "./skill-rounds.js";
 
 // The /v1 chat lane (docs/contracts/chat-lane.md): key gate, parse, resolve, adapter, stream.
 
@@ -160,11 +163,18 @@ interface Target {
   // The connection the credential came from (SP16: its oauth token can be refreshed).
   connection: StoredCredential;
   proxy?: ProxyConfig;
+  // The model id the catalog knows it by (capabilities), before any upstream rename.
+  catalogModelId?: string;
 }
 
 // The provider answered 401 or 403 (not a key AIGate refused before sending).
 const upstreamAuthFailure = (error: unknown): boolean =>
   error instanceof EngineError && error.code === "AUTH_ERROR" && (error.details.status === 401 || error.details.status === 403);
+
+// docs/contracts/skills.md, "Model-loaded skills": a target that can take the hidden skill tool. Its adapter family
+// carries tool calls natively, the model takes tools, and the client let the model choose its tools.
+const toolable = (target: Target): boolean => TOOL_PROTOCOLS.has(target.provider.protocol)
+  && resolveCapabilities(builtinRegistry.model(target.provider.id, target.catalogModelId ?? target.request.model)).tools && toolAllowed(target.request);
 
 export const mediaCooldown = (status: number): number | undefined =>
   status === 429 ? 2_000 : status === 401 || status === 403 ? 120_000 : status >= 500 ? 30_000 : undefined;
@@ -182,6 +192,8 @@ interface Call {
   readonly pxpipe: { enabled: boolean; minChars: number; timeoutMs: number };
   // docs/contracts/usage.md: the client route and the AIGate key the gate accepted.
   readonly usage: { readonly endpoint: string; readonly apiKeyId: string | null };
+  // docs/contracts/skills.md: the request's skills, added per target; `tools` is false where the hidden tool must not go.
+  readonly skills?: { readonly session: SkillSession; readonly tools: boolean; readonly report: (ids: readonly string[]) => void };
 }
 
 // What the lane does with a resolved target: answer the client, or (a fusion panel member) return the answer.
@@ -329,6 +341,7 @@ export class ChatLane {
     private readonly capacity: CapacityPoolsRepository,
     private readonly pxpipe: PxpipeService,
     private readonly usage: UsageRecorder,
+    private readonly skills: SkillContext,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
     @Inject(CHAT_LIMITS) private readonly limits: ChatLimits,
   ) {}
@@ -747,6 +760,7 @@ export class ChatLane {
     let requestedModel = modelOf(request.body);
     let stream = false;
     let errorCode: string | null = null;
+    const skillTrace: { ids: readonly string[] } = { ids: [] };
     const client = new AbortController();
     reply.raw.once("close", () => {
       if (!reply.raw.writableFinished) client.abort(new ClientGone());
@@ -763,6 +777,8 @@ export class ChatLane {
       requestedModel = parsed.request.model;
       stream = parsed.request.stream === true;
       const settings = await this.settings.get();
+      const usage = this.usageOf(request);
+      const skills = await this.skillSession(parsed.request, settings, request.headers["x-aigate-skills"], usage.apiKeyId, reply, skillTrace);
       const tokenHeader = request.headers["x-aigate-token-saver"];
       const tokenSaverOptOut = typeof tokenHeader === "string" && tokenHeader.toLowerCase() === "off";
       const savedRequest = await applyTokenSaver(
@@ -771,9 +787,9 @@ export class ChatLane {
       );
       const ids = { created: Math.floor(Date.now() / 1000), fallbackId: `chatcmpl-${requestId.replaceAll("-", "")}`, requestId };
       const call: Call = {
-        parsed, protocol, reply, requestId, signal: AbortSignal.any([client.signal, budget.signal]), rewritten: savedRequest !== parsed.request,
+        parsed, protocol, reply, requestId, signal: AbortSignal.any([client.signal, budget.signal]), rewritten: savedRequest !== parsed.request || skills !== undefined,
         pxpipe: { enabled: settings.tokenSaverEnabled && settings.pxpipeEnabled && !tokenSaverOptOut, minChars: settings.pxpipeMinChars, timeoutMs: settings.pxpipeTimeoutMs },
-        usage: this.usageOf(request),
+        usage, ...(skills ? { skills } : {}),
       };
       await this.route(call, savedRequest, async (target, adapter, credential) => {
         if (!target.request.stream) {
@@ -797,7 +813,7 @@ export class ChatLane {
       reply.code(status).header("cache-control", "no-store").send(body);
     } finally {
       budget.clear();
-      this.finishRequest(request, reply, { requestId, startedAt, requestedModel, stream, errorCode, clientGone: client.signal.aborted });
+      this.finishRequest(request, reply, { requestId, startedAt, requestedModel, stream, errorCode, clientGone: client.signal.aborted, skills: skillTrace.ids });
     }
   }
 
@@ -873,7 +889,7 @@ export class ChatLane {
     if (combo.models.length === 1) return this.route(call, { ...request, model: first }, deliver, depth);
     const panel = panelRequest(request);
     const answers = await collectPanel(combo.models, combo, call.signal,
-      (model, signal) => this.route({ ...call, signal, rewritten: true }, { ...panel, model }, answerOf, depth));
+      (model, signal) => this.route({ ...call, signal, rewritten: true, ...(call.skills ? { skills: { ...call.skills, tools: false } } : {}) }, { ...panel, model }, answerOf, depth));
     call.signal.throwIfAborted();
     if (answers.length === 0) throw new GatewayError(503, "api_error", "provider_unavailable", `All fusion panel models of "${combo.name}" failed.`);
     if (answers.length === 1) return this.route(call, { ...request, model: answers[0].model }, deliver, depth);
@@ -908,7 +924,8 @@ export class ChatLane {
           },
         };
       }
-      const adapter = meter(createAdapter(target.provider, transport), { ...this.callOf(call.requestId, target), ...call.usage }, this.usage);
+      const metered = meter(createAdapter(target.provider, transport), { ...this.callOf(call.requestId, target), ...call.usage }, this.usage);
+      const adapter = call.skills ? withSkillRounds(metered, this.skills, call.skills.session, call.skills.tools && toolable(target), call.skills.report) : metered;
       try {
         const result = await this.withRefresh(target, (credential) => deliver(target, adapter, credential, call), () => !call.reply.sent && !call.signal.aborted);
         await this.connections.clearLock(target.connection.id, splitThinkingSuffix(target.request.model).model);
@@ -972,6 +989,29 @@ export class ChatLane {
   private async thought(request: CanonicalRequest, provider: ProviderDescriptor): Promise<CanonicalRequest> {
     const level = provider.defaultThinking ?? await this.thinking.get(provider.id);
     return withThinking(request, provider, level);
+  }
+
+  // docs/contracts/skills.md, "Automatic skills" and "Model-loaded skills": the request's skills, added per target after
+  // Token Saver. Fails open, so a broken index never blocks a request. The header is set on the raw response, so it
+  // survives both reply.send and the hijacked stream's writeHead; a stream's later rounds reach only the request row.
+  private async skillSession(
+    request: CanonicalRequest, settings: Settings, header: string | string[] | undefined, apiKeyId: string | null, reply: FastifyReply, trace: { ids: readonly string[] },
+  ): Promise<Call["skills"]> {
+    if (!settings.skillsAutoEnabled || (typeof header === "string" && header.toLowerCase() === "off")) return undefined;
+    try {
+      const session = await this.skills.sessionFor(request, settings, apiKeyId);
+      if (!session.lexical.block && !session.hybrid?.block) return undefined;
+      const report = (ids: readonly string[]) => {
+        trace.ids = ids;
+        if (reply.raw.headersSent) return;
+        if (ids.length) reply.raw.setHeader("x-aigate-skills", ids.join(","));
+        else reply.raw.removeHeader("x-aigate-skills");
+      };
+      return { session, tools: true, report };
+    } catch (error) {
+      this.logger.warn(`automatic skills skipped: ${error instanceof Error ? error.message : String(error)}`);
+      return undefined;
+    }
   }
 
   private async headroom(request: CanonicalRequest, settings: Settings, signal: AbortSignal, requestId: string): Promise<unknown> {
@@ -1095,7 +1135,7 @@ export class ChatLane {
     } else assertModelSupports({ ...upstream, model: catalogModelId }, provider.id, descriptor, catalogModelId);
     if (provider.auth.kind === "none") {
       const connection: StoredCredential = { id: "noauth", apiKey: "", proxyPoolId: null, baseUrl: null, deployment: null, apiVersion: null, organization: null, accountId: null };
-      return { provider, request: upstream, connection, credential: { kind: "api-key", apiKey: "" }, proxy: await this.pools.resolveNoAuth(provider.id) };
+      return { provider, request: upstream, connection, credential: { kind: "api-key", apiKey: "" }, proxy: await this.pools.resolveNoAuth(provider.id), catalogModelId };
     }
     const strategy = (await this.settings.get()).fallbackStrategy;
     const selected = await this.connections.selectActive(provider.id, catalogModelId, excluded, strategy);
@@ -1110,7 +1150,7 @@ export class ChatLane {
     const credential: Credential = { kind: "api-key", apiKey: stored.apiKey, sessionId: stored.id, ...(stored.projectId ? { projectId: stored.projectId } : {}), ...(stored.providerData ? { providerData: stored.providerData } : {}) };
     const connected = withConnection(provider, stored);
     const retrying = connected.retryStreamErrors ? { ...connected, streamRetryDelayMs: this.limits.streamRetryDelayMs } : connected;
-    return { provider: retrying, request: upstream, credential, connection: stored, proxy: await this.pools.resolve(stored.proxyPoolId) };
+    return { provider: retrying, request: upstream, credential, connection: stored, proxy: await this.pools.resolve(stored.proxyPoolId), catalogModelId };
   }
 
   private async mediaCredential(serviceId: string, lockKey: string, excluded: ReadonlySet<string> = new Set()): Promise<{ credential: StoredCredential; proxy?: ProxyConfig }> {
@@ -1178,7 +1218,7 @@ export class ChatLane {
   }
 
   // One request row when a handler ends; a client that left is recorded as 499, as proxies log it.
-  private finishRequest(request: FastifyRequest, reply: FastifyReply, row: { requestId: string; startedAt: number; requestedModel: string | null; stream: boolean; errorCode: string | null; clientGone: boolean }): void {
+  private finishRequest(request: FastifyRequest, reply: FastifyReply, row: { requestId: string; startedAt: number; requestedModel: string | null; stream: boolean; errorCode: string | null; clientGone: boolean; skills?: readonly string[] }): void {
     this.usage.finish({ ...row, ...this.usageOf(request), httpStatus: row.clientGone ? 499 : reply.raw.statusCode });
   }
 

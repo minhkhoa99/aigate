@@ -1,6 +1,6 @@
 # Discovery coverage
 
-Entries: 399
+Entries: 400
 
 | Dimension | Covered | Missing (sample) |
 |---|---|---|
@@ -21,7 +21,8 @@ Entries: 399
 - media: 23
 - routing: 122
 - settings: 26
-- tooling: 52
+- skills: 2
+- tooling: 51
 - transport: 16
 - usage: 31
 

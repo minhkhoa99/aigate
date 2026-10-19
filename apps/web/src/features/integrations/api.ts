@@ -125,11 +125,23 @@ export const useDeleteMcpServer = () => {
 export interface McpMarketplaceServer { name: string; title: string; description: string; url: string; transport: "http" | "sse"; requiresAuth: boolean }
 export const useMcpMarketplace = () => useQuery({ queryKey: ["tooling", "mcp-marketplace"], queryFn: () => api<{ cached: boolean; servers: McpMarketplaceServer[] }>("/api/tooling/mcp/marketplace") });
 
-// docs/contracts/skills.md. The list omits content; the detail carries it.
-export interface Skill { id: string; name: string; description: string; source: "link" | "file"; url: string | null; bytes: number; enabled: boolean; createdAt: string; updatedAt: string }
+// docs/contracts/skills.md. The list omits content; the detail carries it (a link's cached copy, or null).
+export const SKILL_MODES = ["auto", "always", "off"] as const;
+export type SkillMode = (typeof SKILL_MODES)[number];
+export interface Skill {
+  id: string; name: string; description: string; source: "link" | "file"; url: string | null; bytes: number; enabled: boolean; mode: SkillMode;
+  fetchedAt: string | null; fetchError: string | null; createdAt: string; updatedAt: string;
+}
 export interface SkillDetail extends Skill { content: string | null }
-export type SkillInput = { name: string; description: string } & ({ source: "link"; url: string } | { source: "file"; content: string });
-export type SkillPatch = Partial<{ name: string; description: string; url: string; content: string; enabled: boolean }>;
+export type SkillInput = { name: string; description: string; mode: SkillMode } & ({ source: "link"; url: string } | { source: "file"; content: string });
+export type SkillPatch = Partial<{ name: string; description: string; url: string; content: string; enabled: boolean; mode: SkillMode }>;
+export interface SkillScore { id: string; name: string; score: number }
+// The top-level selection is what a target without tool calls gets; `hybrid` is what a tool-calling target gets.
+export interface SkillPreview {
+  selection: "lexical" | "hybrid";
+  candidates: SkillScore[]; always: { id: string; name: string }[]; selected: SkillScore[]; block: string | null; chars: number;
+  hybrid: { preloaded: { id: string; name: string }[]; loadable: string[]; block: string | null; chars: number } | null;
+}
 const skillsKey = ["tooling", "skills"] as const;
 export const useSkills = () => useQuery({ queryKey: skillsKey, queryFn: () => api<Skill[]>("/api/tooling/skills") });
 export const useSkill = (id: string | null) => useQuery({ queryKey: [...skillsKey, id], enabled: id !== null, queryFn: () => api<SkillDetail>(`/api/tooling/skills/${encodeURIComponent(id ?? "")}`) });
@@ -148,3 +160,9 @@ export const useDeleteSkill = () => {
   return useMutation({ mutationFn: (id: string) => apiVoid(`/api/tooling/skills/${encodeURIComponent(id)}`, "DELETE"),
     onSettled: () => client.invalidateQueries({ queryKey: skillsKey }) });
 };
+export const useRefreshSkill = () => {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => api<SkillDetail>(`/api/tooling/skills/${encodeURIComponent(id)}/refresh`, { method: "POST" }),
+    onSettled: () => client.invalidateQueries({ queryKey: skillsKey }) });
+};
+export const useSkillPreview = () => useMutation({ mutationFn: (text: string) => api<SkillPreview>("/api/tooling/skills/preview", { method: "POST", body: { text } }) });

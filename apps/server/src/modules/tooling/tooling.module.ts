@@ -43,8 +43,6 @@ import { McpMarketplaceController } from "./mcp-marketplace.controller.js";
 import { McpMarketplaceService } from "./mcp-marketplace.service.js";
 import { MitmController } from "./mitm.controller.js";
 import { MitmService } from "./mitm.service.js";
-import { SkillFileController, SkillsController } from "./infrastructure/skills.controller.js";
-import { SkillsRepository } from "./infrastructure/skills.repo.js";
 
 const home = homedir();
 const tools = [
@@ -112,7 +110,7 @@ export function toolingModule(dataDir: string): DynamicModule {
   return {
     module: ToolingModule,
     imports: [ApiKeysModule, IdentityModule, SettingsModule],
-    controllers: [ToolingController, CliToolsController, CodexSettingsController, ClaudeSettingsController, OpenCodeSettingsController, ClineSettingsController, DroidSettingsController, CopilotSettingsController, ManagedJsonSettingsController, ManagedTomlSettingsController, KiloSettingsController, OpenClawSettingsController, HermesSettingsController, JcodeSettingsController, OmpSettingsController, GrokBuildSettingsController, TunnelController, McpController, McpMarketplaceController, MitmController, SkillsController, SkillFileController],
-    providers: [ConsoleLogService, CodexSettingsService, ClaudeSettingsService, OpenCodeSettingsService, ClineSettingsService, DroidSettingsService, CopilotSettingsService, ManagedJsonSettingsService, ManagedTomlSettingsService, KiloSettingsService, OpenClawSettingsService, HermesSettingsService, JcodeSettingsService, OmpSettingsService, GrokBuildSettingsService, TunnelService, McpServerStore, McpMarketplaceService, MitmService, SkillsRepository, { provide: TOOLING_DATA_DIR, useValue: dataDir }],
+    controllers: [ToolingController, CliToolsController, CodexSettingsController, ClaudeSettingsController, OpenCodeSettingsController, ClineSettingsController, DroidSettingsController, CopilotSettingsController, ManagedJsonSettingsController, ManagedTomlSettingsController, KiloSettingsController, OpenClawSettingsController, HermesSettingsController, JcodeSettingsController, OmpSettingsController, GrokBuildSettingsController, TunnelController, McpController, McpMarketplaceController, MitmController],
+    providers: [ConsoleLogService, CodexSettingsService, ClaudeSettingsService, OpenCodeSettingsService, ClineSettingsService, DroidSettingsService, CopilotSettingsService, ManagedJsonSettingsService, ManagedTomlSettingsService, KiloSettingsService, OpenClawSettingsService, HermesSettingsService, JcodeSettingsService, OmpSettingsService, GrokBuildSettingsService, TunnelService, McpServerStore, McpMarketplaceService, MitmService, { provide: TOOLING_DATA_DIR, useValue: dataDir }],
   };
 }

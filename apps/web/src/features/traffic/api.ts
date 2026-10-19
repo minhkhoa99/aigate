@@ -100,6 +100,8 @@ export interface RequestRow {
   finalProvider: string | null; providerName: string | null; finalModel: string | null; finalConnectionId: string | null; connectionName: string | null;
   inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number;
   cost: number | null; unpriced: number; latencyMs: number; ttftMs: number | null;
+  // Comma-separated ids of the skills the request used (docs/contracts/skills.md).
+  skills: string | null;
 }
 export interface Attempt {
   id: string; at: number; provider: string; providerName: string | null; model: string; connectionId: string | null; connectionName: string | null;

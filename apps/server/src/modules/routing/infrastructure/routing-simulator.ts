@@ -16,7 +16,7 @@ type Failure = { status: number; code: string; message: string };
 type Branch = { outcome: "candidate" | "blocked" | "conditional" | "unknown"; failure?: Failure };
 const unknown = (): Branch => ({ outcome: "unknown" });
 
-// Concrete local inspector. No transport, secret cipher, refresher, proxy or recorder is injected.
+// Concrete local inspector. No secret cipher, refresher, proxy or recorder is injected.
 @Injectable()
 export class RoutingSimulator {
   constructor(private readonly settings: SettingsRepository, private readonly combos: CombosRepository,
@@ -35,6 +35,7 @@ export class RoutingSimulator {
       if (settings.headroomEnabled && headroomInput(input.request)) warnings.add("headroom-skipped");
       if (settings.pxpipeEnabled) warnings.add("pxpipe-skipped");
     }
+    // Skills are added per target after routing and never change it (docs/contracts/skills.md), so they are not simulated.
     const request = await applyTokenSaver(input.request, { ...settings, headroomEnabled: false }, input.tokenSaverOptOut,
       async () => { throw new Error("Simulation never executes Headroom"); }, signal);
     signal.throwIfAborted();

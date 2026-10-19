@@ -36,6 +36,13 @@ export const settings = sqliteTable(
     samlAttributeEmail: text("saml_attribute_email").notNull().default(""),
     samlAttributeName: text("saml_attribute_name").notNull().default(""),
     ssoPublicOrigin: text("sso_public_origin").notNull().default(""),
+    // docs/contracts/skills.md, "Automatic skills" (migration 0027).
+    skillsAutoEnabled: integer("skills_auto_enabled", { mode: "boolean" }).notNull().default(false),
+    skillsMaxSelected: integer("skills_max_selected").notNull().default(2),
+    skillsBudgetChars: integer("skills_budget_chars").notNull().default(8000),
+    skillsCatalogEnabled: integer("skills_catalog_enabled", { mode: "boolean" }).notNull().default(true),
+    // 0030: lexical (the gate picks) or hybrid (the gate adds the best match, the model loads more through a hidden tool).
+    skillsSelection: text("skills_selection", { enum: ["lexical", "hybrid"] }).notNull().default("hybrid"),
   },
   (table) => [check("settings_single_row", sql`${table.id} = 1`)],
 );

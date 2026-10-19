@@ -5,13 +5,16 @@ import { useLocale } from "../../shared/locale";
 import { toProblem } from "../../shared/errors";
 import { useToast } from "../../shared/toast";
 import {
-  useCreateMcpServer, useCreateSkill, useDeleteMcpServer, useDeleteSkill, useMcpMarketplace, useMcpServers, useSkill, useSkills, useUpdateMcpServer, useUpdateSkill,
-  type McpServer, type Skill, type SkillInput, type SkillPatch,
+  useCreateMcpServer, useCreateSkill, useDeleteMcpServer, useDeleteSkill, useMcpMarketplace, useMcpServers, useRefreshSkill, useSkill, useSkills, useUpdateMcpServer, useUpdateSkill,
+  type McpServer, type Skill, type SkillInput, type SkillMode, type SkillPatch, SKILL_MODES,
 } from "./api";
+import { AutoSkillsPanels } from "./skills-auto";
 import { MAX_SKILL_BYTES, MAX_SKILL_DESCRIPTION, MAX_SKILL_NAME, readFrontmatter, skillBytes, skillFileUrl } from "./skill-rules";
 
-type SkillDraft = { name: string; description: string; source: Skill["source"]; url: string; content: string | null; fileName: string };
-const emptyDraft: SkillDraft = { name: "", description: "", source: "link", url: "", content: null, fileName: "" };
+type SkillDraft = { name: string; description: string; source: Skill["source"]; url: string; content: string | null; fileName: string; mode: SkillMode };
+const emptyDraft: SkillDraft = { name: "", description: "", source: "link", url: "", content: null, fileName: "", mode: "auto" };
+const MODE_LABEL = { auto: "skills.modeAuto", always: "skills.modeAlways", off: "skills.modeOff" } as const;
+const toMode = (value: string): SkillMode => SKILL_MODES.find((mode) => mode === value) ?? "auto";
 
 export function Skills() {
   const { language, t } = useLocale();
@@ -19,6 +22,7 @@ export function Skills() {
   const create = useCreateSkill();
   const update = useUpdateSkill();
   const deletion = useDeleteSkill();
+  const refresh = useRefreshSkill();
   const toast = useToast();
   const [editing, setEditing] = useState<Skill | "new" | null>(null);
   const [draft, setDraft] = useState<SkillDraft>(emptyDraft);
@@ -27,14 +31,14 @@ export function Skills() {
   const [remove, setRemove] = useState<Skill | null>(null);
   const pick = useRef(0);
   const detail = useSkill(viewing?.id ?? null);
-  const busy = create.isPending || update.isPending || deletion.isPending;
+  const busy = create.isPending || update.isPending || deletion.isPending || refresh.isPending;
   const fail = (error: unknown) => toast({ tone: "error", error });
   const kib = (bytes: number) => new Intl.NumberFormat(language === "vi" ? "vi-VN" : "en-US", { maximumFractionDigits: 1 }).format(bytes / 1024);
   const fetchUrl = (skill: Skill) => skill.source === "link" ? skill.url ?? "" : skillFileUrl(window.location.origin, skill.id);
   const open = (target: Skill | "new") => {
     pick.current += 1;
     setFileError(null);
-    setDraft(target === "new" ? emptyDraft : { name: target.name, description: target.description, source: target.source, url: target.url ?? "", content: null, fileName: "" });
+    setDraft(target === "new" ? emptyDraft : { name: target.name, description: target.description, source: target.source, url: target.url ?? "", content: null, fileName: "", mode: target.mode });
     setEditing(target);
   };
   // A slower earlier read, or one finishing after the modal reopened, must not overwrite the current draft.
@@ -54,31 +58,37 @@ export function Skills() {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busy || !editing) return;
-    const { name, description } = draft;
+    const { name, description, mode } = draft;
     if (editing === "new") {
       let input: SkillInput;
-      if (draft.source === "link") input = { name, description, source: "link", url: draft.url };
-      else if (draft.content !== null) input = { name, description, source: "file", content: draft.content };
+      if (draft.source === "link") input = { name, description, mode, source: "link", url: draft.url };
+      else if (draft.content !== null) input = { name, description, mode, source: "file", content: draft.content };
       else { setFileError(t("skills.fileRequired")); return; }
       create.mutate(input, { onSuccess: () => { setEditing(null); toast({ tone: "success", localized: { key: "skills.created", params: { name } } }); }, onError: fail });
       return;
     }
-    const patch: SkillPatch = { name, description, ...(editing.source === "link" ? { url: draft.url } : draft.content !== null ? { content: draft.content } : {}) };
+    const patch: SkillPatch = { name, description, mode, ...(editing.source === "link" ? { url: draft.url } : draft.content !== null ? { content: draft.content } : {}) };
     update.mutate({ id: editing.id, ...patch }, { onSuccess: () => { setEditing(null); toast({ tone: "success", localized: { key: "skills.updated", params: { name } } }); }, onError: fail });
   };
   const readError = (error: unknown, retry: () => void) => { const problem = toProblem(error, language); return <div className="state-block error"><code>{problem.code}</code><strong>{t("common.loadFailed")}</strong><p>{problem.message}</p><Button onClick={retry}>{t("common.retry")}</Button></div>; };
   const source = editing === "new" ? draft.source : editing?.source;
   return <><PageHeading eyebrow={t("skills.eyebrow")} title={t("skills.title")} description={t("skills.description")} action={<Button variant="primary" disabled={busy} onClick={() => open("new")}>{t("skills.addSkill")}</Button>} />
     <Warning>{t("skills.warning")}</Warning>
+    <AutoSkillsPanels />
     <Panel title={t("skills.listTitle")} detail={t("skills.listDetail")} className="section-gap panel-flush">
       {skills.isPending ? <StateBlock state="loading" /> : skills.isError ? readError(skills.error, () => void skills.refetch())
-        : <Table empty={t("skills.empty")} columns={[t("skills.columnSkill"), t("skills.columnSource"), t("skills.columnState"), t("skills.columnUrl"), ""]} rows={(skills.data ?? []).map((skill) => [
+        : <Table empty={t("skills.empty")} columns={[t("skills.columnSkill"), t("skills.columnSource"), t("skills.columnState"), t("skills.columnAuto"), t("skills.columnUrl"), ""]} rows={(skills.data ?? []).map((skill) => [
           <><strong>{skill.name}</strong>{skill.description ? <p className="muted">{skill.description}</p> : null}</>,
-          <Pill tone="info">{skill.source === "link" ? t("skills.sourceLink") : t("skills.sourceFileSize", { kib: kib(skill.bytes) })}</Pill>,
+          skill.source === "file" ? <Pill tone="info">{t("skills.sourceFileSize", { kib: kib(skill.bytes) })}</Pill>
+            : <><Pill tone={skill.fetchError ? "warning" : "info"}>{skill.fetchError ? t("skills.linkFailed") : t("skills.sourceLink")}</Pill>
+              <small className="muted">{skill.fetchError ?? (skill.fetchedAt ? t("skills.linkCached", { kib: kib(skill.bytes) }) : t("skills.linkPending"))}</small></>,
           <Pill tone={skill.enabled ? "healthy" : "muted"}>{t(skill.enabled ? "skills.enabledState" : "skills.disabledState")}</Pill>,
+          <select className="input" value={skill.mode} disabled={busy} aria-label={t("skills.modeAria", { name: skill.name })} onChange={(event) => update.mutate({ id: skill.id, mode: toMode(event.target.value) }, { onError: fail })}>
+            {SKILL_MODES.map((mode) => <option key={mode} value={mode}>{t(MODE_LABEL[mode])}</option>)}</select>,
           <CopyField value={fetchUrl(skill)} />,
           <><Button variant="ghost" disabled={busy} onClick={() => update.mutate({ id: skill.id, enabled: !skill.enabled }, { onError: fail })}>{t(skill.enabled ? "skills.disable" : "skills.enable")}</Button>
-            {skill.source === "file" && <Button variant="ghost" onClick={() => setViewing(skill)}>{t("skills.view")}</Button>}
+            {(skill.source === "file" || skill.bytes > 0) && <Button variant="ghost" onClick={() => setViewing(skill)}>{t("skills.view")}</Button>}
+            {skill.source === "link" && <Button variant="ghost" disabled={busy} onClick={() => refresh.mutate(skill.id, { onSuccess: () => toast({ tone: "success", localized: { key: "skills.refreshed", params: { name: skill.name } } }), onError: fail })}>{refresh.isPending && refresh.variables === skill.id ? t("skills.refreshing") : t("skills.refresh")}</Button>}
             <Button variant="ghost" disabled={busy} onClick={() => open(skill)}>{t("skills.edit")}</Button>
             <Button variant="ghost" disabled={busy} onClick={() => setRemove(skill)}>{t("skills.delete")}</Button></>,
         ])} />}
@@ -92,11 +102,14 @@ export function Skills() {
       {fileError && <Warning tone="danger">{fileError}</Warning>}
       <Field label={t("skills.name")} hint={t("skills.nameHint")}><input className="input" value={draft.name} maxLength={MAX_SKILL_NAME} required disabled={busy} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></Field>
       <Field label={t("skills.descriptionLabel")}><textarea className="input" value={draft.description} maxLength={MAX_SKILL_DESCRIPTION} rows={3} disabled={busy} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></Field>
+      <Field label={t("skills.mode")} hint={t("skills.modeHint")}><select className="input" value={draft.mode} disabled={busy} onChange={(event) => { const mode = toMode(event.target.value); setDraft((current) => ({ ...current, mode })); }}>
+        {SKILL_MODES.map((mode) => <option key={mode} value={mode}>{t(MODE_LABEL[mode])}</option>)}</select></Field>
       <div className="modal-actions"><Button onClick={() => setEditing(null)} disabled={busy}>{t("common.cancel")}</Button><Button type="submit" variant="primary" disabled={busy}>{busy ? t("skills.saving") : t("skills.save")}</Button></div>
     </form></Modal>}
     {viewing && <Modal title={t("skills.viewTitle", { name: viewing.name })} onClose={() => setViewing(null)}><div className="stack">
-      <CopyField label={t("skills.fetchCommand")} value={`curl -H "Authorization: Bearer $AIGATE_KEY" ${fetchUrl(viewing)}`} />
-      <p className="muted">{t("skills.fetchHint")}</p>
+      {viewing.source === "file"
+        ? <><CopyField label={t("skills.fetchCommand")} value={`curl -H "Authorization: Bearer $AIGATE_KEY" ${fetchUrl(viewing)}`} /><p className="muted">{t("skills.fetchHint")}</p></>
+        : <p className="muted">{t("skills.cachedHint")}</p>}
       {detail.isPending ? <StateBlock state="loading" /> : detail.isError ? readError(detail.error, () => void detail.refetch()) : <pre className="code-block">{detail.data.content ?? ""}</pre>}
     </div></Modal>}
     {remove && <ConfirmDialog name={remove.name} detail={t("skills.removeDetail")} pending={busy} onClose={() => { if (!busy) setRemove(null); }} onConfirm={() => { if (busy) return; deletion.mutate(remove.id, { onSuccess: () => { setRemove(null); toast({ tone: "success", localized: { key: "skills.removed", params: { name: remove.name } } }); }, onError: fail }); }} />}

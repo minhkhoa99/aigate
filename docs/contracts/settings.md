@@ -34,6 +34,8 @@ SP5 has only the two keys the M1 walking skeleton needs. Each later context adds
 | `fallbackStrategy` | `"fill-first"` \| `"round-robin"` | `"fill-first"` | routing, account selection (SP17, `multi-account.md`) |
 | `comboStickyLimit` | integer 1–1000 | `1` | routing, round-robin combos: requests per member before rotating (SP19, `combos.md`; 9router `comboStickyRoundRobinLimit`) |
 | `tokenSaverEnabled`, `rtkEnabled`, `headroomEnabled`, `headroomUrl`, `headroomCompressUserMessages`, `headroomTimeoutMs`, `cavemanEnabled`, `cavemanLevel`, `ponytailEnabled`, `ponytailLevel`, `pxpipeEnabled`, `pxpipeMinChars`, `pxpipeTimeoutMs` | typed stage flags, URL, bounded timeouts/thresholds, or `lite`/`full`/`ultra` level | documented in migrations 0020–0021 | Token Saver request pipeline (SP21, `token-saver.md`) |
+| `skillsAutoEnabled`, `skillsMaxSelected`, `skillsBudgetChars`, `skillsCatalogEnabled` | boolean; integer 1–5; integer 1000–32000; boolean | `false`, `2`, `8000`, `true` (migration 0027) | Automatic skills on `/v1` (`skills.md`, "Automatic skills") |
+| `skillsSelection` | `"lexical"` or `"hybrid"` | `"hybrid"` (migration 0030) | Hybrid lets a tool-calling model load listed skills (`skills.md`, "Model-loaded skills") |
 
 Storage: a single row in table `settings` with `id = 1` enforced by a `CHECK`, one `NOT NULL` column per key with its default, created on first read.
 
@@ -66,7 +68,8 @@ Server tests call these routes through Fastify inject. They cover:
 
 The numbered M2 roadmap ends at SP25; this slice follows SP26 Overview and
 wires General according to design §10.9.18. It is a portable settings transfer,
-not a database backup. Its v1 export contains 16 transferable keys. Connections,
+not a database backup. Its v1 export contains 21 transferable keys (16 until the four automatic-skill keys of
+migration 0027, then `skillsSelection` of 0030). Connections,
 passwords, sessions, keys, proxy credentials,
 usage, combos and environment variables never enter the document. Service URLs
 (`headroomUrl`) are also excluded because their query strings may carry secrets.

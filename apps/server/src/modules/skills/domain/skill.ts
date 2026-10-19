@@ -1,19 +1,25 @@
 // Skill rules (docs/contracts/skills.md). Pure: no framework imports.
 export type SkillSource = "link" | "file";
+// auto: chosen when it matches the request; always: added to every /v1 request; off: never added.
+export const SKILL_MODES = ["auto", "always", "off"] as const;
+export type SkillMode = (typeof SKILL_MODES)[number];
 
 export const MAX_SKILLS = 200;
+export const MAX_ALWAYS_SKILLS = 3;
 export const MAX_SKILL_NAME = 64;
 export const MAX_SKILL_DESCRIPTION = 280;
 export const MAX_SKILL_URL = 2048;
 export const MAX_SKILL_BYTES = 262_144;
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; message: string };
-export interface SkillFields { name: string; description: string; source: SkillSource; url: string | null; content: string | null }
-export type SkillChanges = Partial<Pick<SkillFields, "name" | "description" | "url" | "content">> & { enabled?: boolean };
+export interface SkillFields { name: string; description: string; source: SkillSource; url: string | null; content: string | null; mode: SkillMode }
+export type SkillChanges = Partial<Pick<SkillFields, "name" | "description" | "url" | "content" | "mode">> & { enabled?: boolean };
 
 const fail = (message: string): { ok: false; message: string } => ({ ok: false, message });
 const object = (input: unknown): Record<string, unknown> | undefined =>
   typeof input === "object" && input !== null && !Array.isArray(input) ? Object.fromEntries(Object.entries(input)) : undefined;
+const isMode = (value: unknown): value is SkillMode => SKILL_MODES.some((mode) => mode === value);
+const MODE_MESSAGE = "mode must be auto, always or off.";
 
 function name(raw: unknown): Parsed<string> {
   const value = typeof raw === "string" ? raw.trim() : "";
@@ -35,10 +41,20 @@ function url(raw: unknown): Parsed<string> {
   try { parsed = new URL(text); } catch { return fail(message); }
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname.toLowerCase());
   if (!(parsed.protocol === "https:" || parsed.protocol === "http:" && local) || parsed.username || parsed.password || parsed.hash) return fail(message);
-  return { ok: true, value: parsed.toString() };
+  return { ok: true, value: rawSkillUrl(parsed.toString()) };
 }
 
-function content(raw: unknown): Parsed<string> {
+// A github.com blob or raw link is a web page or a redirect; the file itself is served by raw.githubusercontent.com.
+export function rawSkillUrl(value: string): string {
+  let parsed: URL;
+  try { parsed = new URL(value); } catch { return value; }
+  if (parsed.protocol !== "https:" || !["github.com", "www.github.com"].includes(parsed.hostname.toLowerCase())) return value;
+  const match = /^\/([^/]+)\/([^/]+)\/(?:blob|raw)\/(.+)$/.exec(parsed.pathname);
+  return match ? `https://raw.githubusercontent.com/${match[1]}/${match[2]}/${match[3]}` : value;
+}
+
+// Also checks a fetched link document, which must meet the same rules as an upload.
+export function content(raw: unknown): Parsed<string> {
   if (typeof raw !== "string" || !raw.trim()) return fail("content must be the non-empty text of a SKILL.md file.");
   if (new TextEncoder().encode(raw).byteLength > MAX_SKILL_BYTES) return fail(`content must be at most ${MAX_SKILL_BYTES / 1024} KiB.`);
   if (raw.includes("\u0000")) return fail("content must be text, not binary data.");
@@ -52,15 +68,17 @@ export function parseSkill(input: unknown): Parsed<SkillFields> {
   if (!parsedName.ok) return parsedName;
   const parsedDescription = description(body.description);
   if (!parsedDescription.ok) return parsedDescription;
+  if (body.mode !== undefined && !isMode(body.mode)) return fail(MODE_MESSAGE);
+  const mode = isMode(body.mode) ? body.mode : "auto";
   if (body.source === "link") {
     if (body.content !== undefined) return fail("A link skill has no content.");
     const parsedUrl = url(body.url);
-    return parsedUrl.ok ? { ok: true, value: { name: parsedName.value, description: parsedDescription.value, source: "link", url: parsedUrl.value, content: null } } : parsedUrl;
+    return parsedUrl.ok ? { ok: true, value: { name: parsedName.value, description: parsedDescription.value, source: "link", url: parsedUrl.value, content: null, mode } } : parsedUrl;
   }
   if (body.source === "file") {
     if (body.url !== undefined) return fail("A file skill has no url.");
     const parsedContent = content(body.content);
-    return parsedContent.ok ? { ok: true, value: { name: parsedName.value, description: parsedDescription.value, source: "file", url: null, content: parsedContent.value } } : parsedContent;
+    return parsedContent.ok ? { ok: true, value: { name: parsedName.value, description: parsedDescription.value, source: "file", url: null, content: parsedContent.value, mode } } : parsedContent;
   }
   return fail("source must be link or file.");
 }
@@ -69,7 +87,7 @@ export function parseSkill(input: unknown): Parsed<SkillFields> {
 export function parseSkillPatch(input: unknown, source: SkillSource): Parsed<SkillChanges> {
   const body = object(input);
   if (!body) return fail("Body must be a JSON object.");
-  const known = new Set(["name", "description", "url", "content", "enabled"]);
+  const known = new Set(["name", "description", "url", "content", "enabled", "mode"]);
   if (body.source !== undefined) return fail("source cannot be changed; create a new skill instead.");
   const unknown = Object.keys(body).find((key) => !known.has(key));
   if (unknown) return fail(`Unknown field: ${unknown}.`);
@@ -85,5 +103,6 @@ export function parseSkillPatch(input: unknown, source: SkillSource): Parsed<Ski
     const parsed = content(body.content); if (!parsed.ok) return parsed; changes.content = parsed.value;
   }
   if (body.enabled !== undefined) { if (typeof body.enabled !== "boolean") return fail("enabled must be a boolean."); changes.enabled = body.enabled; }
+  if (body.mode !== undefined) { if (!isMode(body.mode)) return fail(MODE_MESSAGE); changes.mode = body.mode; }
   return Object.keys(changes).length ? { ok: true, value: changes } : fail("Send at least one field to change.");
 }

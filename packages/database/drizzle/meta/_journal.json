@@ -190,6 +190,34 @@
       "when": 1791969332014,
       "tag": "0026_skills",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1792032280738,
+      "tag": "0027_skills_auto",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1792050954500,
+      "tag": "0028_skills_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1792051024351,
+      "tag": "0029_skills_drop_auto",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1792053173103,
+      "tag": "0030_skills_hybrid",
+      "breakpoints": true
     }
   ]
 }

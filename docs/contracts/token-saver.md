@@ -2,6 +2,8 @@
 
 The token saver transforms a chat request immediately before provider dispatch. It is a fixed, fail-open pipeline: RTK tool-result compression, optional Headroom compression, Caveman prompt injection, Ponytail prompt injection, then optional PXPIPE image conversion. The `x-aigate-token-saver: off` request header bypasses every stage. The header is case-insensitive; other values do not opt out. Compression can reduce input tokens, while Caveman and Ponytail add input tokens; total savings are request- and provider-dependent and are not currently measured by AIGate. See `docs/discovery/feature-matrix/07-token-saver.yaml` for the traced rules and evidence.
 
+Automatic skills (`skills.md`) are added after this pipeline, per routing target, with their own `x-aigate-skills: off` opt-out. Token Saver (and Headroom) sees only the client's request; the skill block and any hidden `aigate_load_skill` tool are appended after the Caveman and Ponytail text, so a hybrid skill tool never makes Headroom skip a request.
+
 RTK only rewrites successful tool output between 500 B and 10 MiB. It detects common structured output (git diff/status/log, build logs, grep/find results, directory listings, and long numbered or noisy output), compresses it, and keeps the original whenever the result is empty or not shorter. Error tool results are never rewritten.
 
 ## Decisions

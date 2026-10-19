@@ -25,7 +25,7 @@ const requestColumns = {
   id: r.id, at: r.at, endpoint: r.endpoint, requestedModel: r.requestedModel, apiKeyId: r.apiKeyId, stream: r.stream, status: r.status, httpStatus: r.httpStatus,
   errorCode: r.errorCode, attempts: r.attempts, finalProvider: r.finalProvider, finalModel: r.finalModel, finalConnectionId: r.finalConnectionId,
   inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheReadTokens: r.cacheReadTokens, cacheWriteTokens: r.cacheWriteTokens, reasoningTokens: r.reasoningTokens,
-  cost: r.cost, unpriced: r.unpriced, latencyMs: r.latencyMs, ttftMs: r.ttftMs,
+  cost: r.cost, unpriced: r.unpriced, latencyMs: r.latencyMs, ttftMs: r.ttftMs, skills: r.skills,
 };
 const e = usageEvents;
 const attemptColumns = {

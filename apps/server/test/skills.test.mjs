@@ -5,8 +5,23 @@ import { boot, setUp, withTempDb } from "./helpers.mjs";
 
 const markdown = "---\nname: deploy\ndescription: Ship it\n---\n# Deploy\nRun `pnpm build`. Tiếng Việt.\n";
 
-async function ready(file) {
-  const { app, call } = await boot(file);
+// Link fetches answer from this map; anything else is a 404, so no request leaves the machine.
+export function linkTransport(pages = {}) {
+  const calls = [];
+  return {
+    calls,
+    async send(request) {
+      calls.push(request);
+      const page = pages[request.url];
+      if (page instanceof Error) throw page;
+      if (!page) return { status: 404, headers: {}, body: null };
+      return { status: page.status ?? 200, headers: { "content-type": page.type ?? "text/markdown; charset=utf-8" }, body: new Response(page.text).body };
+    },
+  };
+}
+
+async function ready(file, transport = linkTransport()) {
+  const { app, call } = await boot(file, { transport });
   const cookie = await setUp(call);
   const dash = (request) => call({ ...request, cookie });
   const { id: keyId, key } = (await dash({ method: "POST", url: "/api/keys", body: { name: "agent" } })).json();

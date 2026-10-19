@@ -893,30 +893,64 @@
   feature: AIGate Skills registry
   subFeature: Persisted link or uploaded SKILL.md skills replace the hardcoded 9router catalogue
   trigger: Operator adds, edits, toggles or deletes a skill on /integrations/skills; an agent fetches GET /v1/skills/:id/SKILL.md
-  input: "{ name, description?, source: link, url } or { name, description?, source: file, content }; agent request with an AIGate API key"
+  input: "{ name, description?, mode?, source: link, url } or { name, description?, mode?, source: file, content }; agent request with an AIGate API key"
   output: Skill rows without content in the list; uploaded content as text/markdown to keyed agents
   businessRules:
     - "AIGATE_EXTENSION: deliberate deviation from skills.catalogue-raw-github-contract — no hardcoded or seeded skills; the operator owns the list"
-    - "AIGATE_EXTENSION: link skills store only the URL (HTTPS, HTTP for localhost, no credentials or fragment); AIGate never fetches or proxies them"
+    - "AIGATE_EXTENSION: link skills keep their URL for agents; AIGate fetches one bounded copy (8 s, 256 KiB, no retry) on save, URL change or Refresh, for automatic selection only, and never proxies the link"
+    - "AIGATE_EXTENSION: a github.com blob/raw file page URL is stored as its raw.githubusercontent.com file; an HTML page (text/html, or a body starting <!doctype html / <html) is refused as a link document"
     - "AIGATE_EXTENSION: file skills store at most 256 KiB of UTF-8 text and are served only when enabled, always behind an active API key even in keyless /v1 mode"
-    - "AIGATE_EXTENSION: names are unique ignoring ASCII case; at most 200 skills; source cannot change"
-  state: { reads: ["skills table", "api_keys"], writes: ["skills table"], runtimeOnly: [] }
+    - "AIGATE_EXTENSION: names are unique ignoring ASCII case; at most 200 skills; source cannot change; mode auto, always or off, at most 3 always"
+  state: { reads: ["skills table", "skill_index", "api_keys"], writes: ["skills table", "skill_index"], runtimeOnly: [] }
   dependencies: []
   providerInteraction: null
-  fallback: { hasFallback: false, retry: "explicit failed read Retry", timeout: null, quota: null }
+  fallback: { hasFallback: false, retry: "explicit failed read Retry; explicit link Refresh", timeout: "link fetch 8 s", quota: null }
   errorCases:
-    - { code: INVALID_REQUEST, when: "400 INVALID_REQUEST: name, description, URL or content violates the contract, or a patch changes source", partial: false }
-    - { code: INVALID_REQUEST, when: "409 SKILL_EXISTS: another skill has the same name ignoring ASCII case; 409 SKILL_LIMIT: 200 skills already exist", partial: false }
+    - { code: INVALID_REQUEST, when: "400 INVALID_REQUEST: name, description, URL, content or mode violates the contract, or a patch changes source", partial: false }
+    - { code: INVALID_REQUEST, when: "409 SKILL_EXISTS: another skill has the same name ignoring ASCII case; 409 SKILL_LIMIT: 200 skills already exist; 409 SKILL_ALWAYS_LIMIT: 3 other skills are already always on", partial: false }
     - { code: INVALID_REQUEST, when: "404 NOT_FOUND: unknown id; on the agent route also a disabled or link skill", partial: false }
     - { code: AUTH_ERROR, when: "401 MISSING_API_KEY / INVALID_API_KEY: agent route without a key, or with an unknown or disabled key", partial: false }
-  sideEffects: ["Explicit skill create/update/delete only"]
-  persistence: ["skills table (migration 0026_skills)"]
+    - { code: PROVIDER_UNAVAILABLE, when: "502 SKILL_FETCH_FAILED: a link Refresh failed (status, type, HTML page, size or network); the previous copy is kept", partial: true }
+  sideEffects: ["Explicit skill create/update/delete/refresh only"]
+  persistence: ["skills table (migrations 0026_skills, 0027_skills_auto, 0028_skills_mode carrying auto into mode, 0029_skills_drop_auto)", "skill_index cached link copy and lexical index"]
   performanceConcerns: ["List omits content and is capped at 200 rows; byte size computed in SQL"]
-  behavior: { streaming: false, cancellation: null, concurrency: "Count and insert share one transaction" }
-  edgeCases: ["Non-ASCII names differ only by case are distinct", "link skill on the agent route is 404", "disabled key or skill refused"]
+  behavior: { streaming: false, cancellation: null, concurrency: "Counts and insert share one transaction; a change to always counts the others in the update transaction" }
+  edgeCases: ["Non-ASCII names differ only by case are distinct", "link skill on the agent route is 404", "disabled key or skill refused", "a link saved as a GitHub page before the rewrite is moved to its raw URL on Refresh"]
   evidence:
     - { file: "aigate:docs/contracts/skills.md", line: 1, note: "Skills registry contract" }
-  newModule: tooling
+  newModule: skills
+  parityStatus: verified
+  labels: []
+
+- id: routing.skills-auto-context
+  group: Integrations
+  feature: Automatic skills on the /v1 gate
+  subFeature: Saved skills added to every chat request's system text for any client protocol and provider, chosen by lexical GraphRAG or, by default, loaded by the model through a hidden tool (hybrid)
+  trigger: A chat request on /v1/chat/completions, /v1/messages, /v1/responses, /responses, /codex/* or /v1beta with skillsAutoEnabled on and no x-aigate-skills off header
+  input: "The two latest user texts of the canonical request; enabled auto and always skills with their stored lexical index"
+  output: "The request with an `--- AIGate Skills ---` system block (framing line, always-on skills, optional catalogue, matched or preloaded skill excerpts), for hybrid targets the hidden aigate_load_skill tool and its rounds, an x-aigate-skills response header and the usage_requests.skills ids"
+  businessRules:
+    - "AIGATE_EXTENSION: off by default; a single request opts out with x-aigate-skills: off (case-insensitive); both cover always-on skills too"
+    - "AIGATE_EXTENSION: diacritic-folded unigram/bigram terms, BM25 plus 0.3 x one-hop neighbour score over related:/cosine edges, threshold max(1, 0.35 x best), at most 1-5 auto skills"
+    - "AIGATE_EXTENSION: matched skills share a 1000-32000 character budget; whole body when it fits, else opening plus best-matching sections"
+    - "AIGATE_EXTENSION: up to 3 always skills are added to every request without scoring, sharing a fixed 4000-character budget outside skillsMaxSelected, for general guidelines that share no words with a task"
+    - "AIGATE_EXTENSION: added per target after resolve() and Token Saver, around the metered adapter, so combos, fallback and custom providers all receive it and Headroom never sees it; lexical adds nothing when nothing matches and no skill is always on"
+    - "AIGATE_EXTENSION: skillsSelection hybrid (default) preloads always-on skills, the conversation's earlier loads and the top lexical match, lists the other auto skills and adds aigate_load_skill({name}) for targets whose adapter family carries tool calls, whose model takes tools and whose client tool_choice is absent or auto; the gate answers the calls and asks again, at most 2 extra rounds and skillsMaxSelected skills; fusion panels and other targets get lexical"
+    - "AIGATE_EXTENSION: the client never sees the hidden tool; usage is summed over rounds, a stream is merged into one with client tool calls renumbered, and each round is one metered attempt"
+    - "AIGATE_EXTENSION: a rewritten request loses the Responses raw passthrough, as Token Saver already does"
+  state: { reads: ["settings skills*", "skills table", "skill_index"], writes: ["skill_index backfill for pre-0027 skills", "usage_requests.skills"], runtimeOnly: ["graph and always-on list cached per repository write version", "conversation LRU of loaded skill ids (1000 entries, 30 minutes, 5 ids)"] }
+  dependencies: [integrations.skills-dynamic-registry]
+  providerInteraction: "Lexical adds none; hybrid adds up to 2 extra calls to the same provider, account and model when the model loads a skill"
+  fallback: { hasFallback: true, retry: null, timeout: null, quota: null }
+  errorCases: []
+  sideEffects: ["x-aigate-skills response header"]
+  persistence: ["settings columns skills_auto_enabled, skills_max_selected, skills_budget_chars, skills_catalog_enabled (migration 0027), skills_selection (migration 0030)", "usage_requests.skills (migration 0030)"]
+  performanceConcerns: ["In-memory scoring of at most 200 skills x 400 terms; graph rebuilt only after a write; at most eight skill texts (5 matched, 3 always-on) read per request"]
+  behavior: { streaming: true, cancellation: "extra rounds share the request signal", concurrency: "Graph build shared by concurrent requests of the same version; selection and skill loading fail open" }
+  edgeCases: ["tool-result-only latest turn uses earlier user text", "client resending the block is left alone", "link without cached copy skipped", "skill text cannot close its own block", "always-on skills alone add no catalogue"]
+  evidence:
+    - { file: "aigate:docs/contracts/skills.md", line: 1, note: "Automatic skills section" }
+  newModule: skills
   parityStatus: verified
   labels: []
 

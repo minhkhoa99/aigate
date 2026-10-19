@@ -1030,16 +1030,17 @@ Every item below is a capability AIGate must have. Derived from tracing
 
 ### Persisted link or uploaded SKILL.md skills replace the hardcoded 9router catalogue
 
-- **id:** `integrations.skills-dynamic-registry` · **module:** `tooling`
+- **id:** `integrations.skills-dynamic-registry` · **module:** `skills`
 - **Trigger:** Operator adds, edits, toggles or deletes a skill on /integrations/skills; an agent fetches GET /v1/skills/:id/SKILL.md
-- **Input:** { name, description?, source: link, url } or { name, description?, source: file, content }; agent request with an AIGate API key
+- **Input:** { name, description?, mode?, source: link, url } or { name, description?, mode?, source: file, content }; agent request with an AIGate API key
 - **Output:** Skill rows without content in the list; uploaded content as text/markdown to keyed agents
 - **Rules:**
   - AIGATE_EXTENSION: deliberate deviation from skills.catalogue-raw-github-contract — no hardcoded or seeded skills; the operator owns the list
-  - AIGATE_EXTENSION: link skills store only the URL (HTTPS, HTTP for localhost, no credentials or fragment); AIGate never fetches or proxies them
+  - AIGATE_EXTENSION: link skills keep their URL for agents; AIGate fetches one bounded copy (8 s, 256 KiB, no retry) on save, URL change or Refresh, for automatic selection only, and never proxies the link
+  - AIGATE_EXTENSION: a github.com blob/raw file page URL is stored as its raw.githubusercontent.com file; an HTML page (text/html, or a body starting <!doctype html / <html) is refused as a link document
   - AIGATE_EXTENSION: file skills store at most 256 KiB of UTF-8 text and are served only when enabled, always behind an active API key even in keyless /v1 mode
-  - AIGATE_EXTENSION: names are unique ignoring ASCII case; at most 200 skills; source cannot change
-- **Errors:** `INVALID_REQUEST` (400 INVALID_REQUEST: name, description, URL or content violates the contract, or a patch changes source), `INVALID_REQUEST` (409 SKILL_EXISTS: another skill has the same name ignoring ASCII case; 409 SKILL_LIMIT: 200 skills already exist), `INVALID_REQUEST` (404 NOT_FOUND: unknown id; on the agent route also a disabled or link skill), `AUTH_ERROR` (401 MISSING_API_KEY / INVALID_API_KEY: agent route without a key, or with an unknown or disabled key)
+  - AIGATE_EXTENSION: names are unique ignoring ASCII case; at most 200 skills; source cannot change; mode auto, always or off, at most 3 always
+- **Errors:** `INVALID_REQUEST` (400 INVALID_REQUEST: name, description, URL, content or mode violates the contract, or a patch changes source), `INVALID_REQUEST` (409 SKILL_EXISTS: another skill has the same name ignoring ASCII case; 409 SKILL_LIMIT: 200 skills already exist; 409 SKILL_ALWAYS_LIMIT: 3 other skills are already always on), `INVALID_REQUEST` (404 NOT_FOUND: unknown id; on the agent route also a disabled or link skill), `AUTH_ERROR` (401 MISSING_API_KEY / INVALID_API_KEY: agent route without a key, or with an unknown or disabled key), `PROVIDER_UNAVAILABLE` (502 SKILL_FETCH_FAILED: a link Refresh failed (status, type, HTML page, size or network); the previous copy is kept)
 
 ### Browser-local EN/VI with stable registry and marketplace actions
 
@@ -1051,6 +1052,23 @@ Every item below is a capability AIGate must have. Derived from tracing
   - AIGATE_EXTENSION: locale changes preserve tab, form draft and pending mutation without refetch or replay
   - AIGATE_EXTENSION: failed registry/marketplace reads show code, permitted diagnostic and Retry; failed mutations retain drafts
   - AIGATE_EXTENSION: skill URLs are copied without fetching; AIGate never connects to or executes MCP endpoints
+
+### Saved skills added to every chat request's system text for any client protocol and provider, chosen by lexical GraphRAG or, by default, loaded by the model through a hidden tool (hybrid)
+
+- **id:** `routing.skills-auto-context` · **module:** `skills`
+- **Trigger:** A chat request on /v1/chat/completions, /v1/messages, /v1/responses, /responses, /codex/* or /v1beta with skillsAutoEnabled on and no x-aigate-skills off header
+- **Input:** The two latest user texts of the canonical request; enabled auto and always skills with their stored lexical index
+- **Output:** The request with an `--- AIGate Skills ---` system block (framing line, always-on skills, optional catalogue, matched or preloaded skill excerpts), for hybrid targets the hidden aigate_load_skill tool and its rounds, an x-aigate-skills response header and the usage_requests.skills ids
+- **Rules:**
+  - AIGATE_EXTENSION: off by default; a single request opts out with x-aigate-skills: off (case-insensitive); both cover always-on skills too
+  - AIGATE_EXTENSION: diacritic-folded unigram/bigram terms, BM25 plus 0.3 x one-hop neighbour score over related:/cosine edges, threshold max(1, 0.35 x best), at most 1-5 auto skills
+  - AIGATE_EXTENSION: matched skills share a 1000-32000 character budget; whole body when it fits, else opening plus best-matching sections
+  - AIGATE_EXTENSION: up to 3 always skills are added to every request without scoring, sharing a fixed 4000-character budget outside skillsMaxSelected, for general guidelines that share no words with a task
+  - AIGATE_EXTENSION: added per target after resolve() and Token Saver, around the metered adapter, so combos, fallback and custom providers all receive it and Headroom never sees it; lexical adds nothing when nothing matches and no skill is always on
+  - AIGATE_EXTENSION: skillsSelection hybrid (default) preloads always-on skills, the conversation's earlier loads and the top lexical match, lists the other auto skills and adds aigate_load_skill({name}) for targets whose adapter family carries tool calls, whose model takes tools and whose client tool_choice is absent or auto; the gate answers the calls and asks again, at most 2 extra rounds and skillsMaxSelected skills; fusion panels and other targets get lexical
+  - AIGATE_EXTENSION: the client never sees the hidden tool; usage is summed over rounds, a stream is merged into one with client tool calls renumbered, and each round is one metered attempt
+  - AIGATE_EXTENSION: a rewritten request loses the Responses raw passthrough, as Token Saver already does
+- **Streaming:** yes
 
 ## MCP
 

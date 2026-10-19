@@ -59,7 +59,7 @@ Oh My Pi uses `GET/POST /api/tooling/cli-tools/omp` plus `/preview` and `/apply`
 
 ## Skills registry
 
-The Skills page manages persisted skills in the `skills` table: link skills (URL only, never fetched by AIGate) and uploaded SKILL.md files served at `GET /v1/skills/:id/SKILL.md` behind an AIGate API key. The former eight hardcoded 9router links were removed. See `skills.md`. Skills are not installed into any client by the dashboard.
+The Skills page manages persisted skills, now in their own `skills` module (`apps/server/src/modules/skills`): link skills (URL kept for agents, a copy fetched and cached for automatic selection) and uploaded SKILL.md files served at `GET /v1/skills/:id/SKILL.md` behind an AIGate API key. Automatic selection adds relevant skills to `/v1` requests. The former eight hardcoded 9router links were removed. See `skills.md`. Skills are not installed into any client by the dashboard.
 
 SP42 localizes the Skills page's owned text in EN/VI; saved names, URLs and
 content remain literal. See `integrations-skills-mcp-ui-i18n.md`.

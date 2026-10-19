@@ -18,6 +18,13 @@ export interface Settings {
   pxpipeEnabled: boolean;
   pxpipeMinChars: number;
   pxpipeTimeoutMs: number;
+  // docs/contracts/skills.md, "Automatic skills".
+  skillsAutoEnabled: boolean;
+  skillsMaxSelected: number;
+  skillsBudgetChars: number;
+  skillsCatalogEnabled: boolean;
+  // docs/contracts/skills.md, "Model-loaded skills".
+  skillsSelection: "lexical" | "hybrid";
   authMode: "password" | "oidc" | "saml" | "both";
   oidcIssuerUrl: string;
   oidcClientId: string;
@@ -71,6 +78,7 @@ const EDITABLE: Record<keyof SettingsPatch, true> = {
   tokenSaverEnabled: true, rtkEnabled: true, headroomEnabled: true, headroomUrl: true, headroomCompressUserMessages: true, headroomTimeoutMs: true,
   cavemanEnabled: true, cavemanLevel: true, ponytailEnabled: true, ponytailLevel: true,
   pxpipeEnabled: true, pxpipeMinChars: true, pxpipeTimeoutMs: true,
+  skillsAutoEnabled: true, skillsMaxSelected: true, skillsBudgetChars: true, skillsCatalogEnabled: true, skillsSelection: true,
   authMode: true, oidcIssuerUrl: true, oidcClientId: true, oidcClientSecret: true, oidcScopes: true, oidcLoginLabel: true,
   samlEntryPoint: true, samlIssuer: true, samlCert: true, samlAttributeEmail: true, samlAttributeName: true, ssoPublicOrigin: true,
 };
@@ -97,6 +105,10 @@ export function parseSettingsPatch(body: unknown): PatchResult {
     else if (key === "headroomTimeoutMs" && Number.isSafeInteger(value) && typeof value === "number" && value >= 250 && value <= 15000) patch.headroomTimeoutMs = value;
     else if (key === "pxpipeMinChars" && Number.isSafeInteger(value) && typeof value === "number" && value >= 1000 && value <= 1_000_000) patch.pxpipeMinChars = value;
     else if (key === "pxpipeTimeoutMs" && Number.isSafeInteger(value) && typeof value === "number" && value >= 1000 && value <= 60_000) patch.pxpipeTimeoutMs = value;
+    else if ((key === "skillsAutoEnabled" || key === "skillsCatalogEnabled") && typeof value === "boolean") Object.assign(patch, { [key]: value });
+    else if (key === "skillsMaxSelected" && Number.isSafeInteger(value) && typeof value === "number" && value >= 1 && value <= 5) patch.skillsMaxSelected = value;
+    else if (key === "skillsBudgetChars" && Number.isSafeInteger(value) && typeof value === "number" && value >= 1000 && value <= 32_000) patch.skillsBudgetChars = value;
+    else if (key === "skillsSelection" && (value === "lexical" || value === "hybrid")) patch.skillsSelection = value;
     else if (key === "authMode" && (value === "password" || value === "oidc" || value === "saml" || value === "both")) patch.authMode = value;
     else if ((key === "oidcIssuerUrl" || key === "samlEntryPoint") && typeof value === "string" && value.length <= 2048 && (!value || validSsoUrl(value, key === "samlEntryPoint"))) Object.assign(patch, { [key]: value.trim() });
     else if (["oidcClientId", "oidcScopes", "oidcLoginLabel", "samlIssuer", "samlAttributeEmail", "samlAttributeName"].includes(key) && typeof value === "string" && value.length <= 256) Object.assign(patch, { [key]: value.trim() });

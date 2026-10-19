@@ -3,6 +3,7 @@ import { ApiKeysModule } from "../apikeys/apikeys.module.js";
 import { CatalogModule } from "../catalog/catalog.module.js";
 import { ConnectionsModule } from "../connections/connections.module.js";
 import { SettingsModule } from "../settings/settings.module.js";
+import { SkillsModule } from "../skills/skills.module.js";
 import { CapacityPoolsController } from "./infrastructure/capacity-pools.controller.js";
 import { CapacityPoolsRepository } from "./infrastructure/capacity-pools.repo.js";
 import { CHAT_LIMITS, ChatLane, type ChatLimits } from "./infrastructure/chat-lane.js";
@@ -24,7 +25,7 @@ export class RoutingModule {
   static with(limits: ChatLimits, dataDir: string): DynamicModule {
     return {
       module: RoutingModule,
-      imports: [SettingsModule, ApiKeysModule, ConnectionsModule, CatalogModule],
+      imports: [SettingsModule, ApiKeysModule, ConnectionsModule, CatalogModule, SkillsModule],
       controllers: [ModelTestController, CombosController, CapacityPoolsController, PxpipeController, VoicesController, RoutingSimulatorController, RoutingStatusController],
       providers: [ChatLane, SpeechLane, RoutingSimulator, CombosRepository, CapacityPoolsRepository, PxpipeService, { provide: PXPIPE_DATA_DIR, useValue: dataDir }, { provide: CHAT_LIMITS, useValue: limits }],
       exports: [ChatLane, SpeechLane],

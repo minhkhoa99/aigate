@@ -20,6 +20,7 @@ export interface Settings {
   tokenSaverEnabled: boolean; rtkEnabled: boolean; headroomEnabled: boolean; headroomUrl: string;
   headroomCompressUserMessages: boolean; headroomTimeoutMs: number; cavemanEnabled: boolean; cavemanLevel: "lite" | "full" | "ultra";
   ponytailEnabled: boolean; ponytailLevel: "lite" | "full" | "ultra"; pxpipeEnabled: boolean; pxpipeMinChars: number; pxpipeTimeoutMs: number;
+  skillsAutoEnabled: boolean; skillsMaxSelected: number; skillsBudgetChars: number; skillsCatalogEnabled: boolean; skillsSelection: "lexical" | "hybrid";
   authMode: "password" | "oidc" | "saml" | "both"; oidcIssuerUrl: string; oidcClientId: string; oidcScopes: string; oidcLoginLabel: string;
   oidcConfigured: boolean; samlEntryPoint: string; samlIssuer: string; samlAttributeEmail: string; samlAttributeName: string; samlConfigured: boolean; ssoPublicOrigin: string;
 }

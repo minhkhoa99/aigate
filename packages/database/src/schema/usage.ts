@@ -52,6 +52,8 @@ export const usageRequests = sqliteTable("usage_requests", {
   unpriced: integer("unpriced").notNull(),
   latencyMs: integer("latency_ms").notNull(),
   ttftMs: integer("ttft_ms"),
+  // 0030: comma-separated ids of the skills added to the request, preloaded or loaded by the model (at most 8).
+  skills: text("skills"),
 }, (t) => [index("usage_requests_at").on(t.at, t.id), index("usage_requests_status_at").on(t.status, t.at)]);
 
 // The per-day rollup the long periods read. "" stands for no connection or no key, so the composite key matches on

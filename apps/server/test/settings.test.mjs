@@ -26,7 +26,7 @@ test("GET returns every setting with its default and no-store", () =>
     assert.equal(res.statusCode, 200);
     assert.deepEqual(res.json(), { requireLogin: true, requireApiKey: true, fallbackStrategy: "fill-first", comboStickyLimit: 1,
       tokenSaverEnabled: true, rtkEnabled: true, headroomEnabled: false, headroomUrl: "http://127.0.0.1:8787", headroomCompressUserMessages: false, headroomTimeoutMs: 3000,
-       cavemanEnabled: false, cavemanLevel: "full", ponytailEnabled: false, ponytailLevel: "full", pxpipeEnabled: false, pxpipeMinChars: 25000, pxpipeTimeoutMs: 15000,
+       cavemanEnabled: false, cavemanLevel: "full", ponytailEnabled: false, ponytailLevel: "full", pxpipeEnabled: false, pxpipeMinChars: 25000, pxpipeTimeoutMs: 15000, skillsAutoEnabled: false, skillsMaxSelected: 2, skillsBudgetChars: 8000, skillsCatalogEnabled: true, skillsSelection: "hybrid",
        authMode: "password", oidcIssuerUrl: "", oidcClientId: "", oidcScopes: "openid profile email", oidcLoginLabel: "Sign in with OIDC",
        samlEntryPoint: "", samlIssuer: "urn:aigate:sp", samlAttributeEmail: "", samlAttributeName: "", ssoPublicOrigin: "", oidcConfigured: false, samlConfigured: false });
     assert.equal(res.headers["cache-control"], "no-store");
@@ -39,13 +39,13 @@ test("PATCH applies, shows on the next GET, and survives a restart", () =>
       assert.equal(res.statusCode, 200);
       assert.deepEqual(res.json(), { requireLogin: true, requireApiKey: false, fallbackStrategy: "fill-first", comboStickyLimit: 1,
         tokenSaverEnabled: true, rtkEnabled: true, headroomEnabled: false, headroomUrl: "http://127.0.0.1:8787", headroomCompressUserMessages: false, headroomTimeoutMs: 3000,
-         cavemanEnabled: false, cavemanLevel: "full", ponytailEnabled: false, ponytailLevel: "full", pxpipeEnabled: false, pxpipeMinChars: 25000, pxpipeTimeoutMs: 15000,
+         cavemanEnabled: false, cavemanLevel: "full", ponytailEnabled: false, ponytailLevel: "full", pxpipeEnabled: false, pxpipeMinChars: 25000, pxpipeTimeoutMs: 15000, skillsAutoEnabled: false, skillsMaxSelected: 2, skillsBudgetChars: 8000, skillsCatalogEnabled: true, skillsSelection: "hybrid",
          authMode: "password", oidcIssuerUrl: "", oidcClientId: "", oidcScopes: "openid profile email", oidcLoginLabel: "Sign in with OIDC",
          samlEntryPoint: "", samlIssuer: "urn:aigate:sp", samlAttributeEmail: "", samlAttributeName: "", ssoPublicOrigin: "", oidcConfigured: false, samlConfigured: false });
       assert.equal((await request("GET")).json().requireApiKey, false);
       assert.deepEqual((await request("PATCH", {})).json(), { requireLogin: true, requireApiKey: false, fallbackStrategy: "fill-first", comboStickyLimit: 1,
          tokenSaverEnabled: true, rtkEnabled: true, headroomEnabled: false, headroomUrl: "http://127.0.0.1:8787", headroomCompressUserMessages: false, headroomTimeoutMs: 3000,
-         cavemanEnabled: false, cavemanLevel: "full", ponytailEnabled: false, ponytailLevel: "full", pxpipeEnabled: false, pxpipeMinChars: 25000, pxpipeTimeoutMs: 15000,
+         cavemanEnabled: false, cavemanLevel: "full", ponytailEnabled: false, ponytailLevel: "full", pxpipeEnabled: false, pxpipeMinChars: 25000, pxpipeTimeoutMs: 15000, skillsAutoEnabled: false, skillsMaxSelected: 2, skillsBudgetChars: 8000, skillsCatalogEnabled: true, skillsSelection: "hybrid",
          authMode: "password", oidcIssuerUrl: "", oidcClientId: "", oidcScopes: "openid profile email", oidcLoginLabel: "Sign in with OIDC",
          samlEntryPoint: "", samlIssuer: "urn:aigate:sp", samlAttributeEmail: "", samlAttributeName: "", ssoPublicOrigin: "", oidcConfigured: false, samlConfigured: false }, "empty patch is a no-op");
     });
@@ -100,7 +100,8 @@ test("portable settings: safe export, preview, validation, merge and atomic stal
         "requireLogin", "requireApiKey", "fallbackStrategy", "comboStickyLimit", "tokenSaverEnabled", "rtkEnabled",
         "headroomEnabled", "headroomCompressUserMessages", "headroomTimeoutMs", "cavemanEnabled", "cavemanLevel",
         "ponytailEnabled", "ponytailLevel", "pxpipeEnabled", "pxpipeMinChars", "pxpipeTimeoutMs",
-      ].sort(), "only the 16 transferable keys are exported");
+        "skillsAutoEnabled", "skillsMaxSelected", "skillsBudgetChars", "skillsCatalogEnabled", "skillsSelection",
+      ].sort(), "only the 21 transferable keys are exported");
       assert.ok(!exported.body.includes("headroomUrl") && !exported.body.includes("do-not-export"));
       const runtime = (await dash({ url: "/api/settings/runtime" })).json();
       assert.equal(runtime.appVersion, "0.1.0-dev.0");

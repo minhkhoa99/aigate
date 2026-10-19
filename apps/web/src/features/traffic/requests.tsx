@@ -118,6 +118,7 @@ export function RequestDetail({ requestId }: { requestId: string }) {
           <div className="list-row"><div><strong>{t("requests.finalProvider")}</strong><small>{request.providerName ?? "—"} · {request.connectionName ?? t("requests.noConnection")}</small></div></div>
           <div className="list-row"><div><strong>{t("requests.finalModel")}</strong><small><code>{request.finalModel ?? "—"}</code></small></div></div>
           <div className="list-row"><div><strong>{t("requests.apiKey")}</strong><small>{request.keyName ?? t("requests.keyless")}</small></div></div>
+          <div className="list-row"><div><strong>{t("requests.skills")}</strong><small>{request.skills ? request.skills.split(",").map((id) => <code key={id}>{id} </code>) : t("requests.noSkills")}</small></div></div>
         </div>
       </Panel>
     </div>
