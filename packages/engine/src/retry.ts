@@ -2,6 +2,8 @@
 // finite attempt count, capped backoff, and stops the moment the shared request signal aborts.
 // Only operations that are safe to repeat may use it; never retry a stream after its first chunk.
 
+import { EngineError } from "./errors.js";
+
 export interface RetryOptions {
   readonly signal: AbortSignal;
   readonly maxAttempts: number;
@@ -51,7 +53,7 @@ export async function withRetry<T>(operation: (attempt: number, signal: AbortSig
       return await operation(attempt, signal);
     } catch (error) {
       // An abort is never retried: the client left or the request budget is spent.
-      if (signal.aborted || attempt >= maxAttempts || !shouldRetry(error)) throw error;
+      if (signal.aborted || attempt >= maxAttempts || error instanceof EngineError && error.details.noReplay === true || !shouldRetry(error)) throw error;
       const custom = options.delayMs?.(attempt, error);
       await delay(Math.min(maxDelayMs, custom ?? baseDelayMs * 2 ** (attempt - 1)), signal);
     }

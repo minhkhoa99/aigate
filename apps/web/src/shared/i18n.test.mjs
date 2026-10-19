@@ -9,6 +9,22 @@ import { toProblem } from "./errors.ts";
 const mod = await import("./i18n.ts");
 assert.equal(mod.translate("vi", "common.retry"), "Retry");
 await mod.loadVietnamese();
+
+test("every Qoder API diagnostic has EN/VI advice and its owned confirmation UI is wired", async () => {
+  const paths = ["../../../../packages/engine/src/qoder.ts", "../../../../packages/engine/src/adapters/qoder.ts", "../../../server/src/modules/connections/infrastructure/qoder-oauth.controller.ts", "../../../server/src/modules/connections/infrastructure/token-refresher.ts"];
+  for (const path of paths) {
+    const source = await readFile(new URL(path, import.meta.url), "utf8");
+    for (const [, code] of source.matchAll(/"(QODER_[A-Z_]+)"/g)) {
+      const key = `errors.${code}`;
+      assert.ok(mod.isMessageKey(key), key);
+      assert.notEqual(mod.translate("vi", key), mod.translate("en", key), key);
+    }
+  }
+  const signIn = await readFile(new URL("../features/providers/sign-in.tsx", import.meta.url), "utf8");
+  assert.match(signIn, /provider.id === "qoder".*QoderSignIn/);
+  const component = await readFile(new URL("../features/providers/qoder-sign-in.tsx", import.meta.url), "utf8");
+  for (const action of ["qoderStart", "qoderPoll", "qoderConfirm", "qoderCancel"]) assert.ok(component.includes(action));
+});
 test("locale catalogs preserve keys and placeholder counts", async () => {
   assert.ok(mod);
   const en = JSON.parse(await readFile(new URL("./locales/en.json", import.meta.url), "utf8"));

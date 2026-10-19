@@ -20,14 +20,14 @@ export const STATUS_KEYS = {
 } as const satisfies Record<TestStatus, MessageKey>;
 type Translate = (key: MessageKey, params?: Params) => string;
 
-export function testNotice(connection: Pick<Connection, "providerName" | "testStatus" | "lastError" | "lastErrorCode">): {
+export function testNotice(connection: Pick<Connection, "providerName" | "testStatus" | "lastError" | "lastErrorCode"> & { provider?: string }): {
   tone: "success" | "error"; code?: string; localized: Message;
 } {
   const { tone, code } = describeTest(connection);
   const provider = connection.providerName;
   let localized: Message;
   switch (connection.testStatus) {
-    case "active": localized = { key: "providers.testAccepted", params: { provider } }; break;
+    case "active": localized = connection.provider === "qoder" ? { key: "providers.qoderAccountVerified" } : { key: "providers.testAccepted", params: { provider } }; break;
     case "invalid": localized = connection.lastError?.includes("Check it in AIGate: Gateway → Endpoint & Keys.")
       ? { key: "providers.testSelfReference", params: { provider } }
       : connection.lastError ? { key: "providers.testRejected", params: { detail: connection.lastError } }

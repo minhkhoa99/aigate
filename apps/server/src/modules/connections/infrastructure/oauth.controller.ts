@@ -123,6 +123,7 @@ export class OAuthController {
   }
 
   private provider(id: string): { descriptor: ProviderDescriptor; flow: OAuthProvider } {
+    if (id === "qoder" || builtinRegistry.provider(id)?.id === "qoder") throw invalid("Use the owned Qoder sign-in attempts API");
     const descriptor = builtinRegistry.provider(id);
     const flow = descriptor ? OAUTH_PROVIDERS[descriptor.id] : undefined;
     if (!descriptor || !flow) throw new BadRequestException({ code: "PROVIDER_NOT_SUPPORTED", message: `${id} does not support signing in from AIGate.` });
@@ -150,8 +151,7 @@ export class OAuthController {
         const machineId = this.cursorValue(query(["storage.serviceMachineId", "storage.machineId", "telemetry.machineId"]));
         if (accessToken && machineId) return { found: true, accessToken, machineId };
       } finally { db.close(); }
-    } catch {
-    }
+    } catch { /* An unreadable IDE database leaves manual import available. */ }
     return { found: false, windowsManual: true, dbPath };
   }
 

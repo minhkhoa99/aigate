@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, apiBlob, apiVoid } from "../../shared/api";
 
+export type QoderAttempt = { id: string; authUrl: string; expiresAt: string; interval: number; status: "pending" };
+export type QoderApproval = { id: string; status: "approved"; account: { id: string; name?: string; email?: string }; expiresAt: string | null };
+const qoderPath = (id: string) => `/api/oauth/qoder/attempts/${encodeURIComponent(id)}`;
+export const qoderStart = (clientId: string) => api<QoderAttempt>("/api/oauth/qoder/attempts", { method: "POST", body: clientId ? { clientId } : {} });
+export const qoderPoll = (id: string) => api<QoderApproval | { id: string; status: "pending" }>(`${qoderPath(id)}/poll`, { method: "POST", timeoutMs: 35_000 });
+export const qoderConfirm = (id: string) => api<{ success: true }>(`${qoderPath(id)}/confirm`, { method: "POST" });
+export const qoderCancel = (id: string) => apiVoid(qoderPath(id), "DELETE");
+
 // docs/contracts/connections.md
 export type TestStatus = "untested" | "active" | "invalid" | "no_quota" | "unreachable";
 

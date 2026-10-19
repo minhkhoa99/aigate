@@ -26,9 +26,8 @@ const PATHS: Readonly<Record<ProviderProtocol, { chat: RegExp; models: string }>
 };
 // provider.vertex-google-auth: Google Cloud credentials; vertex-partner speaks OpenAI chat on a URL built from the project.
 const GOOGLE_CLOUD = new Set(["vertex", "vertex-partner"]);
-// provider.qoder-agent-transport: user decision (2026-09-26), not ported.
+// Qoder CN's older agent transport remains outside the International integration.
 const NOT_PORTED = new Map([
-  ["qoder", "Not supported: needs Qoder CLI impersonation"],
   ["qoder-cn", "Not supported: needs Qoder CLI impersonation"],
 ]);
 // (IMPLEMENTATION_ACCIDENT for OpenAI: the API accepts stream:false; SP3 tapes replay that way).
@@ -54,6 +53,7 @@ const EXECUTOR_QUIRKS: Readonly<Record<string, readonly string[]>> = {
   "grok-cli": ["grokCli"],
   kimi: ["kimi"],
   iflow: ["iflow"],
+  qoder: ["qoder"],
 };
 // itself). ponytail: AIGate has no release version yet; 0.1.0 until it does.
 const CLIENT_VERSION = "0.1.0";
@@ -108,6 +108,7 @@ const PER_CONNECTION: Readonly<Record<string, (provider: CatalogProvider) => Par
   // provider.cursor-protobuf: both paths are ConnectRPC HTTP/2; CursorAdapter builds their protobuf body and headers.
   cursor: () => ({ chatUrl: "https://api2.cursor.sh/aiserver.v1.ChatService/StreamUnifiedChatWithTools", modelsUrl: "https://agent.api5.cursor.sh/agent.v1.AgentService/GetUsableModels" }),
   trae: () => ({ testByExpiry: true }),
+  qoder: () => ({ chatUrl: "https://api2-v2.qoder.sh/model/v1/chat/completions", modelsUrl: "https://api3.qoder.sh/algo/api/v2/model/list" }),
 };
 // provider.gemini-cli-oauth: Cloud Code speaks the Gemini protocol inside its own envelope.
 const CLOUD_CODE_PROTOCOLS: Readonly<Record<string, ProviderProtocol>> = { "gemini-cli": "gemini" };

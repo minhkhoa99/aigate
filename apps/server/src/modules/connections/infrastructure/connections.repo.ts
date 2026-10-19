@@ -71,10 +71,10 @@ export interface OAuthState {
 }
 // The key (or access token) routing and the connection test use, with the row it came from. SP16c: projectId is the
 // Google Cloud Code project a gemini-cli sign-in found.
-export type StoredCredential = { id: string; apiKey: string; proxyPoolId: string | null; oauth?: OAuthState; projectId?: string; providerData?: Readonly<Record<string, string>> } & ConnectionData;
+export type StoredCredential = { id: string; apiKey: string; proxyPoolId: string | null; oauth?: OAuthState; projectId?: string; providerData?: Readonly<Record<string, string>>; credentialVersion?: { sealed: string; refreshSealed: string | null; updatedAt: Date } } & ConnectionData;
 
 const secret = {
-  id: t.id, sealed: t.apiKeySealed, authType: t.authType, refreshSealed: t.refreshTokenSealed, expiresAt: t.expiresAt, lastRefreshAt: t.lastRefreshAt, oauthData: t.oauthData, proxyPoolId: t.proxyPoolId, ...data,
+  id: t.id, sealed: t.apiKeySealed, authType: t.authType, refreshSealed: t.refreshTokenSealed, expiresAt: t.expiresAt, lastRefreshAt: t.lastRefreshAt, oauthData: t.oauthData, proxyPoolId: t.proxyPoolId, updatedAt: t.updatedAt, ...data,
 };
 
 const toView = (row: Row): ConnectionView => ({
@@ -145,23 +145,29 @@ export class ConnectionsRepository {
 
   // oauth.token-storage: create the oauth connection, or refresh the tokens of the same account's connection. The read
   // and the write share one transaction; no network I/O happens inside it.
-  saveOAuth(input: { provider: string; name: string; tokens: OAuthTokens; organization?: string; accountId?: string }): Promise<ConnectionView | "conflict"> {
+  saveOAuth(input: { provider: string; name: string; tokens: OAuthTokens; organization?: string; accountId?: string; signal?: AbortSignal }): Promise<ConnectionView | "conflict"> {
     return this.database.db.transaction(async (tx) => {
-      const existing = (await tx.select({ id: t.id, authType: t.authType, email: t.email, oauthData: t.oauthData }).from(t).where(eq(t.provider, input.provider)).limit(MAX_CONNECTIONS)).find((row) => sameAccount(row, input.tokens));
+      input.signal?.throwIfAborted();
+      const rows = await tx.select({ id: t.id, authType: t.authType, email: t.email, oauthData: t.oauthData }).from(t).where(eq(t.provider, input.provider)).limit(MAX_CONNECTIONS);
+      const existing = rows.find((row) => input.provider === "qoder"
+        ? row.authType === "oauth" && !!input.tokens.data.userId && oauthField(row.oauthData, "userId") === input.tokens.data.userId
+        : sameAccount(row, input.tokens));
+      if (!existing && rows.length >= MAX_CONNECTIONS) return "conflict";
       const id = existing?.id ?? randomUUID();
       const now = new Date();
       const { tokens } = input;
       const values = {
         apiKeySealed: this.cipher.seal(tokens.apiKey ?? tokens.accessToken, sealContext(id)), keyHint: keyHint(tokens.apiKey ?? tokens.accessToken), authType: "oauth" as const,
         refreshTokenSealed: tokens.refreshToken ? this.cipher.seal(tokens.refreshToken, refreshContext(id)) : null,
-        expiresAt: expiry(now, tokens.expiresIn), email: tokens.email ?? null, oauthData: JSON.stringify(tokens.data), organization: input.organization ?? null,
+        expiresAt: expiry(now, tokens.expiresIn), email: tokens.email ?? null, oauthData: JSON.stringify(input.provider === "qoder" ? Object.fromEntries(Object.entries(tokens.data).filter(([key]) => ["userId", "machineId", "clientId"].includes(key))) : tokens.data), organization: input.organization ?? null,
         accountId: input.accountId ?? null, lastRefreshAt: now,
-        isActive: true, testStatus: "active" as const, lastError: null, lastErrorCode: null, lastTestedAt: null, updatedAt: now,
+        isActive: true, testStatus: input.provider === "qoder" ? "untested" as const : "active" as const, lastError: null, lastErrorCode: null, lastTestedAt: null, updatedAt: now,
       };
       const [row] = existing
         ? await tx.update(t).set(values).where(eq(t.id, id)).returning(columns)
         : await tx.insert(t).values({ id, provider: input.provider, name: input.name, priority: Math.max(0, ...(await tx.select({ priority: t.priority }).from(t).where(eq(t.provider, input.provider)).limit(MAX_CONNECTIONS)).map((row) => row.priority)) + 1, createdAt: now, ...values }).returning(columns);
       if (!row) throw new Error("the oauth connection was not saved");
+      input.signal?.throwIfAborted();
       return toView(row);
     });
   }
@@ -175,6 +181,26 @@ export class ConnectionsRepository {
       ...(tokens.expiresIn !== undefined ? { expiresAt: expiry(now, tokens.expiresIn) } : {}),
       lastRefreshAt: now, updatedAt: now,
     }).where(and(eq(t.id, id), eq(t.authType, "oauth")));
+  }
+
+  async storeQoderRefresh(stored: StoredCredential, tokens: OAuthTokens): Promise<boolean> {
+    const version = stored.credentialVersion;
+    if (!version || !version.refreshSealed) return false;
+    const now = new Date();
+    const rows = await this.database.db.update(t).set({
+      apiKeySealed: this.cipher.seal(tokens.accessToken, sealContext(stored.id)), keyHint: keyHint(tokens.accessToken),
+      refreshTokenSealed: this.cipher.seal(tokens.refreshToken ?? stored.oauth?.refreshToken ?? "", refreshContext(stored.id)),
+      expiresAt: expiry(now, tokens.expiresIn), lastRefreshAt: now, updatedAt: now,
+    }).where(and(eq(t.id, stored.id), eq(t.provider, "qoder"), eq(t.authType, "oauth"), eq(t.isActive, true), eq(t.apiKeySealed, version.sealed), eq(t.refreshTokenSealed, version.refreshSealed), eq(t.updatedAt, version.updatedAt))).returning({ id: t.id });
+    return rows.length === 1;
+  }
+
+  async invalidateQoderRefresh(stored: StoredCredential): Promise<void> {
+    const version = stored.credentialVersion;
+    if (!version?.refreshSealed) return;
+    // A rotating refresh with an uncertain result requires sign-in, never a second use of that grant.
+    await this.database.db.update(t).set({ refreshTokenSealed: null, testStatus: "invalid", lastError: "Qoder: QODER_REFRESH_UNCERTAIN", lastErrorCode: "AUTH_ERROR", updatedAt: new Date() })
+      .where(and(eq(t.id, stored.id), eq(t.apiKeySealed, version.sealed), eq(t.refreshTokenSealed, version.refreshSealed)));
   }
 
   // The active oauth connections with a refresh token that expire before `before` (the background refresh).
@@ -255,7 +281,7 @@ export class ConnectionsRepository {
       if (!choice) return {};
       const chosen = choice.account;
       if (choice.nextUseCount !== null) {
-        await tx.update(t).set({ lastUsedAt: now, consecutiveUseCount: choice.nextUseCount, updatedAt: now }).where(eq(t.id, chosen.id));
+        await tx.update(t).set({ lastUsedAt: now, consecutiveUseCount: choice.nextUseCount, ...(provider === "qoder" ? {} : { updatedAt: now }) }).where(eq(t.id, chosen.id));
       }
       return { credential: this.open(chosen) };
     });
@@ -328,9 +354,9 @@ export class ConnectionsRepository {
   }
 
   private open(row: {
-    id: string; sealed: string; authType: AuthType; refreshSealed: string | null; expiresAt: Date | null; lastRefreshAt: Date | null; oauthData: string | null; proxyPoolId: string | null;
+    id: string; sealed: string; authType: AuthType; refreshSealed: string | null; expiresAt: Date | null; lastRefreshAt: Date | null; oauthData: string | null; proxyPoolId: string | null; updatedAt: Date;
   } & ConnectionData): StoredCredential {
-    const { id, sealed, authType, refreshSealed, expiresAt, lastRefreshAt, oauthData, ...rest } = row;
+    const { id, sealed, authType, refreshSealed, expiresAt, lastRefreshAt, oauthData, updatedAt, ...rest } = row;
     const refreshToken = refreshSealed ? this.cipher.open(refreshSealed, refreshContext(id)) : undefined;
     const oauth = authType === "oauth" ? { oauth: { refreshToken, expiresAt, lastRefreshAt } } : {};
     const projectId = oauthField(oauthData, "projectId");
@@ -344,6 +370,6 @@ export class ConnectionsRepository {
         }
       } catch { providerData = undefined; }
     }
-    return { id, apiKey: this.cipher.open(sealed, sealContext(id)), ...oauth, ...(projectId ? { projectId } : {}), ...(providerData ? { providerData } : {}), ...rest };
+    return { id, apiKey: this.cipher.open(sealed, sealContext(id)), credentialVersion: { sealed, refreshSealed, updatedAt }, ...oauth, ...(projectId ? { projectId } : {}), ...(providerData ? { providerData } : {}), ...rest };
   }
 }

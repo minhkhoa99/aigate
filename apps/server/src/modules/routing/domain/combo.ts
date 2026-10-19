@@ -1,5 +1,5 @@
 import { COMBO_STRATEGIES, type ComboStrategy } from "@aigate/database";
-import type { CanonicalMessage, CanonicalRequest, CanonicalResponse, ContentPart } from "@aigate/engine";
+import { EngineError, type CanonicalMessage, type CanonicalRequest, type CanonicalResponse, type ContentPart } from "@aigate/engine";
 
 // Model combos (docs/contracts/combos.md): the fields a combo is saved with, and the pure rules the chat lane applies.
 
@@ -188,7 +188,10 @@ export async function collectPanel(
     while (next < panel.length && !linked.aborted) {
       const index = next++;
       // A member that fails, times out, or is cancelled is dropped (combo.mode-fusion-degrade).
-      const response = await ask(panel[index], linked).catch(() => undefined);
+      const response = await ask(panel[index], linked).catch((error: unknown) => {
+        if (error instanceof EngineError && error.details.noReplay === true) { close(); throw error; }
+        return undefined;
+      });
       const text = response && !closed.signal.aborted ? answerText(response) : "";
       if (text.trim() === "") continue;
       texts[index] = text;

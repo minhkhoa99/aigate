@@ -218,7 +218,7 @@ export function exhausted(last: unknown, retryAfter: number | undefined): Error 
 const MAX_RESET_COOLDOWN_MS = 30 * 60_000;
 
 export function fallbackCooldown(error: unknown, now = Date.now()): number | undefined {
-  if (!(error instanceof EngineError)) return undefined;
+  if (!(error instanceof EngineError) || error.details.noReplay === true) return undefined;
   const resetsAtMs = error.details.resetsAtMs;
   if (typeof resetsAtMs === "number" && resetsAtMs > now) return Math.min(resetsAtMs - now, MAX_RESET_COOLDOWN_MS);
   if (error.code === "AUTH_ERROR") return 120_000;
@@ -867,7 +867,7 @@ export class ChatLane {
       try {
         return await run(model);
       } catch (error) {
-        if (call.signal.aborted || call.reply.sent) throw error;
+        if (call.signal.aborted || call.reply.sent || error instanceof EngineError && error.details.noReplay === true) throw error;
         this.logUnexpected(error, call.requestId);
         const { status, body } = errorOf(error);
         const waitMs = memberFailover(status, body.error.message);
@@ -902,7 +902,7 @@ export class ChatLane {
     // ponytail: the repository caps a provider at 100 accounts; raise both bounds together.
     // eslint-disable-next-line aigate/retry-through-helper -- candidates change account; this is not an in-place retry.
     for (let attempts = 0; attempts < 100; attempts += 1) {
-      const resolved = await this.resolve(request, excluded);
+      const resolved = await this.resolve(request, excluded, "chat", call.signal);
       const prepared = await this.thought(call.parsed.prepare(resolved.request, resolved.provider, call.rewritten), resolved.provider);
       const target = { ...resolved, request: call.protocol === ANTHROPIC_MESSAGES ? prepared : claudeCodePrompt(prepared, resolved.provider) };
       let transport = this.transport;
@@ -966,7 +966,7 @@ export class ChatLane {
     const budget = deadline(PROBE_TIMEOUT_MS, `The model did not answer within ${PROBE_TIMEOUT_MS / 1000} s`);
     try {
       const { request } = parseOpenAIChatRequest({ model, max_tokens: 1024, stream: false, messages: [{ role: "user", content: "hi" }] });
-      const resolved = await this.resolve(request);
+      const resolved = await this.resolve(request, new Set(), "chat", budget.signal);
       const target = { ...resolved, request: claudeCodePrompt(await this.thought(resolved.request, resolved.provider), resolved.provider) };
       const adapter = createAdapter(target.provider, this.transport);
       const response = await this.withRefresh(target, (credential) => adapter.execute(target.request, credential, { signal: budget.signal, requestId, proxy: target.proxy }), () => true);
@@ -1033,7 +1033,7 @@ export class ChatLane {
     try {
       return await run(target.credential);
     } catch (error) {
-      if (!upstreamAuthFailure(error) || !canRetry()) throw error;
+      if (!upstreamAuthFailure(error) || !canRetry() || error instanceof EngineError && error.details.noReplay === true) throw error;
       const token = await this.refresher.reactive(target.provider.id, target.connection, this.limits.refreshRetryDelayMs);
       if (!token) throw error;
       return run({ ...target.credential, apiKey: token });
@@ -1110,7 +1110,7 @@ export class ChatLane {
 
   // docs/contracts/catalog-providers.md "Resolving a model": "<provider or alias>/<model>" names the provider;
   // a bare id goes to the first catalog provider that declares it and has an active connection.
-  private async resolve(request: CanonicalRequest, excluded = new Set<string>(), expectedKind: "chat" | "embedding" | "image" | "tts" | "stt" | "video" = "chat"): Promise<Target> {
+  private async resolve(request: CanonicalRequest, excluded = new Set<string>(), expectedKind: "chat" | "embedding" | "image" | "tts" | "stt" | "video" = "chat", signal?: AbortSignal): Promise<Target> {
     const ref = request.model;
     const slash = ref.indexOf("/");
     const prefix = slash > 0 ? ref.slice(0, slash) : undefined;
@@ -1144,7 +1144,7 @@ export class ChatLane {
       throw new GatewayError(404, "not_found_error", "no_active_connection", `${provider.name} has no active connection. Add or enable one in AIGate: Providers → Connections.`);
     }
     // oauth.refresh-lifecycle: an oauth token about to expire is refreshed first.
-    const stored = await this.refresher.fresh(provider.id, selected.credential);
+    const stored = await this.refresher.fresh(provider.id, selected.credential, signal);
     // connection.ollama-local-host: a connection may point the provider at its own host.
     // the project its sign-in found.
     const credential: Credential = { kind: "api-key", apiKey: stored.apiKey, sessionId: stored.id, ...(stored.projectId ? { projectId: stored.projectId } : {}), ...(stored.providerData ? { providerData: stored.providerData } : {}) };

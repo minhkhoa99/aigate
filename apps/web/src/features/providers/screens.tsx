@@ -136,6 +136,7 @@ function CatalogProvider({ providerId }: { providerId: string }) {
   const provider = detail.data;
   const group = groupOf(provider.category);
   return <><PageHeading eyebrow={`${t("providers.catalogEyebrow").split(" /")[0]} / ${t(group.titleKey)}`} title={provider.name} description={t("providers.detailDescription")} />
+    {provider.id === "qoder" && <div className="stack"><Warning tone="warning">{t("providers.qoderValidation")}</Warning><p className="muted">{t("providers.qoderTestHint")}</p></div>}
     <div className="grid grid-2"><Panel title={t("providers.providerType")}><Pill tone="info">{t(group.titleKey)}</Pill><p className="muted">{t("providers.builtInEntry")} <code>{provider.id}</code></p>{provider.chatUrl && <p className="muted" style={{ overflowWrap: "anywhere" }}>{t("providers.endpoint")} <code>{provider.chatUrl}</code></p>}</Panel><Panel title={t("providers.connection")}><ProviderConnection provider={provider} /></Panel></div>
     <ProviderThinking provider={provider} />
     <ProviderModels providerId={provider.id} prefix={provider.id} catalog={provider.models} thinking={provider.thinking.level} />
@@ -298,9 +299,9 @@ export function Connections() {
               c.authType === "oauth"
                 ? <div>{t("providers.signedIn")}{c.email && <>{t("providers.signedInAs", { email: c.email })}</>}{c.expiresAt && <small className="muted"> · {t("providers.tokenUntil", { time: new Date(c.expiresAt).toLocaleString() })}</small>}</div>
                 : <code>{c.keyHint}</code>,
-              <div><Pill tone={pill.tone}>{c.isActive ? t(STATUS_KEYS[c.testStatus]) : t("providers.statusDisabled")}</Pill>{c.isActive && c.testStatus !== "active" && c.lastError && <small className="muted"> {c.lastError}</small>}</div>,
+              <div><Pill tone={pill.tone}>{!c.isActive ? t("providers.statusDisabled") : c.provider === "qoder" && c.testStatus === "active" ? t("providers.qoderAccountVerified") : t(STATUS_KEYS[c.testStatus])}</Pill>{c.isActive && c.testStatus !== "active" && c.lastError && <small className="muted"> {c.lastError}</small>}</div>,
               c.lastTestedAt ? new Date(c.lastTestedAt).toLocaleString() : t("providers.never"),
-              <><Button variant="ghost" disabled={testConnection.isPending} onClick={() => runTest(c.id)}>{testing(c.id) ? t("providers.testing") : t("providers.test")}</Button>
+              <><Button variant="ghost" disabled={testConnection.isPending} onClick={() => runTest(c.id)}>{testing(c.id) ? t("providers.testing") : c.provider === "qoder" ? t("providers.qoderAccountTest") : t("providers.test")}</Button>
                 <Button variant="ghost" disabled={update.isPending || c.priority === 1} onClick={() => update.mutate({ id: c.id, priority: c.priority - 1 }, { onError: fail })}>{t("providers.priorityUp")}</Button>
                 <Button variant="ghost" disabled={update.isPending || c.priority === providerCounts.get(c.provider)} onClick={() => update.mutate({ id: c.id, priority: c.priority + 1 }, { onError: fail })}>{t("providers.priorityDown")}</Button>
                 {c.authType === "oauth"

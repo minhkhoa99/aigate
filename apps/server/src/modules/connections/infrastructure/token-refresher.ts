@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
-import { OAUTH_PROVIDERS, withRetry, type HttpTransportPort, type OAuthTokens } from "@aigate/engine";
+import { EngineError, OAUTH_PROVIDERS, withRetry, type HttpTransportPort, type OAuthTokens } from "@aigate/engine";
 import { HTTP_TRANSPORT } from "../../transport/transport.module.js";
 import { ConnectionsRepository, type StoredCredential } from "./connections.repo.js";
+import { ProxyPoolsRepository } from "../../transport/infrastructure/proxy-pools.repo.js";
 
 // one in-flight promise; the reactive refresh after a 401/403 tries three times (1 s, then 2 s apart) without that lock,
 // even for a connection that cannot refresh; every 5 minutes the tokens that expire within 30 minutes are refreshed.
@@ -20,10 +21,13 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
   // At most one entry per connection, removed when its refresh settles.
   private readonly inflight = new Map<string, Promise<OAuthTokens | undefined>>();
   private timer: NodeJS.Timeout | undefined;
+  private readonly qoderInflight = new Map<string, Promise<StoredCredential>>();
+  private readonly qoderShutdown = new AbortController();
 
   constructor(
     private readonly connections: ConnectionsRepository,
     @Inject(HTTP_TRANSPORT) private readonly transport: HttpTransportPort,
+    private readonly pools: ProxyPoolsRepository,
   ) {}
 
   onModuleInit(): void {
@@ -33,12 +37,14 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
 
   onModuleDestroy(): void {
     clearInterval(this.timer);
+    this.qoderShutdown.abort();
   }
 
   // Proactive (checkAndRefreshToken): a token that expires within the provider's lead (5 minutes unless it names one:
   // claude 4 h, codex 5 days) or whose last refresh is older than its maximum age (codex 8 days) is refreshed before it is
   // used; a failed refresh leaves the old token.
-  async fresh<T extends StoredCredential>(provider: string, stored: T): Promise<T> {
+  async fresh<T extends StoredCredential>(provider: string, stored: T, signal?: AbortSignal): Promise<T> {
+    if (provider === "qoder" && stored.oauth) return { ...stored, ...await this.freshQoder(stored, signal) };
     const refreshToken = stored.oauth?.refreshToken;
     if (!refreshToken || !this.due(provider, stored)) return stored;
     const token = await this.locked(stored.id, provider, stored);
@@ -57,6 +63,7 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
 
   // Reactive (refreshWithRetry after a 401/403): three attempts, attempt × delayMs apart, without the lock. A connection
   async reactive(provider: string, stored: StoredCredential, delayMs: number): Promise<string | undefined> {
+    if (provider === "qoder") return undefined;
     const refreshToken = stored.oauth?.refreshToken;
     try {
       return await withRetry(async () => {
@@ -68,6 +75,47 @@ export class TokenRefresher implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`${provider} reactive refresh failed: ${error instanceof Error ? error.message : String(error)}`);
       return undefined;
     }
+  }
+
+  private async freshQoder(stored: StoredCredential, signal?: AbortSignal): Promise<StoredCredential> {
+    signal?.throwIfAborted();
+    const current = await this.connections.activeCredentialById("qoder", stored.id);
+    if (!current) throw new EngineError("AUTH_ERROR", "Qoder: QODER_AUTH_FAILED");
+    if (!this.due("qoder", current)) return current;
+    if (!current.oauth?.refreshToken) {
+      if (current.oauth?.expiresAt && current.oauth.expiresAt.getTime() <= Date.now()) throw new EngineError("AUTH_ERROR", "Qoder: QODER_AUTH_FAILED");
+      return current;
+    }
+    let work = this.qoderInflight.get(current.id);
+    if (!work) {
+      if (this.qoderInflight.size >= 100) throw new EngineError("PROVIDER_UNAVAILABLE", "Qoder: QODER_REFRESH_LIMIT");
+      work = this.refreshQoder(current).finally(() => this.qoderInflight.delete(current.id));
+      this.qoderInflight.set(current.id, work);
+    }
+    if (!signal) return work;
+    // Each waiter may leave without aborting another request's rotating refresh.
+    return new Promise((resolve, reject) => {
+      const abort = () => reject(signal.reason);
+      if (signal.aborted) { void work.catch(() => undefined); abort(); return; }
+      signal.addEventListener("abort", abort, { once: true });
+      work.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
+    });
+  }
+
+  private async refreshQoder(stored: StoredCredential): Promise<StoredCredential> {
+    const signal = AbortSignal.any([this.qoderShutdown.signal, AbortSignal.timeout(REFRESH_BUDGET_MS)]);
+    const io = { transport: this.transport, ctx: { signal, requestId: randomUUID(), proxy: await this.pools.resolve(stored.proxyPoolId) } };
+    const tokens = await OAUTH_PROVIDERS.qoder?.refresh?.(stored.oauth?.refreshToken ?? "", io, stored.apiKey, stored.providerData).catch(async (error: unknown) => {
+      await this.connections.invalidateQoderRefresh(stored);
+      throw error;
+    });
+    if (!tokens || signal.aborted || !(await this.connections.storeQoderRefresh(stored, tokens))) {
+      await this.connections.invalidateQoderRefresh(stored);
+      throw new EngineError("AUTH_ERROR", "Qoder: QODER_AUTH_FAILED");
+    }
+    const current = await this.connections.activeCredentialById("qoder", stored.id);
+    if (!current) throw new EngineError("AUTH_ERROR", "Qoder: QODER_AUTH_FAILED");
+    return current;
   }
 
   private locked(id: string, provider: string, stored: StoredCredential): Promise<OAuthTokens | undefined> {

@@ -4,6 +4,7 @@ import { Button, Field, Input, Warning } from "../../shared/ui";
 import { useToast } from "../../shared/toast";
 import { toProblem } from "../../shared/errors";
 import { useLocale } from "../../shared/locale";
+import { QoderSignIn } from "./qoder-sign-in";
 import { cursorAutoImport, kiroApiKeyImport, kiroAutoImport, kiroCliProxyImport, kiroImport, oauthAuthorize, oauthDeviceCode, oauthPoll, traeExchange, traePoll, traeStart, traeStop, useCursorImport, useOAuthExchange, type DeviceCode, type KiroImportHint, type OAuthStart, type ProviderSummary, type TraeStart } from "./api";
 
 // /callback, which hands the code back to this window; a remote dashboard pastes the callback URL instead. A device
@@ -30,6 +31,7 @@ function pasted(raw: string): CallbackData {
 }
 
 export function SignIn({ provider, onDone }: { provider: ProviderSummary; onDone: () => void }) {
+  if (provider.id === "qoder") return <QoderSignIn onDone={onDone} />;
   if (provider.signIn === "browser_token" && provider.id === "cursor") return <CursorSignIn onDone={onDone} />;
   if (provider.id === "kiro") return <KiroSignIn provider={provider} onDone={onDone} />;
   if (provider.id === "trae") return <TraeSignIn onDone={onDone} />;

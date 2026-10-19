@@ -4,6 +4,7 @@ import { isRecord, parseJson, record, text } from "./json.js";
 import type { CredentialStatus, ExecCtx, HttpTransportPort } from "./ports.js";
 import { cloudCodeCall, codeAssistMetadata, defaultTier, projectOf } from "./adapters/cloud-code.js";
 import { withRetry } from "./retry.js";
+import { qoderOAuth } from "./qoder.js";
 
 // 2026-09-27): cline, clinepass (whose tokens the ClinePass API rejects, #2333), gitlab (PKCE with the operator's own
 // app), kilocode (device code), kimchi (browser token). Every call goes through the transport port.
@@ -988,6 +989,7 @@ async function onboardAntigravity(token: string, tierId: string, transport: Http
 }
 
 export const OAUTH_PROVIDERS: Readonly<Record<string, OAuthProvider>> = {
+  qoder: qoderOAuth,
   cline: cline("Cline"), clinepass: cline("ClinePass"), gitlab, kilocode, kimchi, claude, codex, github, "gemini-cli": geminiCli, antigravity,
   "grok-cli": grokCli, kimi, "codebuddy-cn": codeBuddy("codebuddy-cn"), "codebuddy-intl": codeBuddy("codebuddy-intl"), iflow, kiro, cursor, trae,
 };

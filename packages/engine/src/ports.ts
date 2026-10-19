@@ -24,6 +24,8 @@ export interface HttpRequest {
   readonly url: string;
   readonly headers: Readonly<Record<string, string>>;
   readonly body?: string | Uint8Array;
+  // An uncertain send must never fall back to another transport path.
+  readonly noReplay?: boolean;
   // Bounds the whole exchange (headers and body), inside the ctx deadline. Required, so every call
   // site states its budget; 1..600000 ms.
   readonly timeoutMs: number;

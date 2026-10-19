@@ -6,6 +6,7 @@ import { CommandCodeAdapter } from "./commandcode.js";
 import { CursorAdapter } from "./cursor.js";
 import { KiroAdapter } from "./kiro.js";
 import { TraeAdapter } from "./trae.js";
+import { QoderAdapter } from "./qoder.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
 import { GeminiAdapter } from "./gemini.js";
 import { GeminiCliAdapter } from "./gemini-cli.js";
@@ -27,6 +28,7 @@ export function createAdapter(provider: ProviderDescriptor, transport: HttpTrans
 }
 
 function familyAdapter(provider: ProviderDescriptor, transport: HttpTransportPort): AIProviderPort {
+  if (provider.quirks?.includes("qoder")) return new QoderAdapter(provider, transport);
   if (provider.quirks?.includes("opencodeFree")) return new OpenCodeAdapter(provider, transport);
   if (provider.quirks?.includes("copilot")) return new GithubAdapter(provider, transport);
   // provider.gemini-cli-oauth: the Gemini protocol inside Cloud Code's envelope.

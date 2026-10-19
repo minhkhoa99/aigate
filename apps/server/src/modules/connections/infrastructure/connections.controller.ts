@@ -212,6 +212,7 @@ export class ConnectionsController {
       // models" for anything else. 502, not the upstream status, so that a provider's 401 does not read as the dashboard
       // session ending.
       const status = error instanceof EngineError ? error.details.status : undefined;
+      if (provider.id === "qoder" && error instanceof EngineError) throw new HttpException({ code: error.details.code ?? "QODER_PROTOCOL_ERROR", message: error.message }, HttpStatus.BAD_GATEWAY);
       throw new HttpException({ code: "MODELS_FETCH_FAILED", message: typeof status === "number" ? `Failed to fetch models: ${status}` : "Failed to fetch models" }, HttpStatus.BAD_GATEWAY);
     }
     return { provider: provider.id, connectionId: id, models: listed.map((m) => ({ id: m.id, inCatalog: builtinRegistry.model(provider.id, m.id) !== undefined })) };

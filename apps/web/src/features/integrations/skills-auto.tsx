@@ -40,12 +40,12 @@ export function AutoSkillsPanels() {
       action={config ? <Pill tone={config.skillsAutoEnabled ? "healthy" : "muted"}>{t(config.skillsAutoEnabled ? "skills.enabledState" : "skills.disabledState")}</Pill> : undefined}>
       {settings.isPending ? <StateBlock state="loading" /> : settings.isError || !config ? readError(settings.error, () => void settings.refetch()) : <div className="stack">
         {toggle(t("skills.autoEnabled"), t("skills.autoEnabledDetail"), config.skillsAutoEnabled, "skillsAutoEnabled")}
-        <div className="list-row"><div><strong>{t("skills.selection")}</strong><small>{t("skills.selectionDetail")}</small></div>
+        <div className="list-row skills-setting-row"><div><strong>{t("skills.selection")}</strong><small>{t("skills.selectionDetail")}</small></div>
           <select className="input" aria-label={t("skills.selection")} value={config.skillsSelection} disabled={save.isPending}
             onChange={(event) => patch({ skillsSelection: event.target.value === "lexical" ? "lexical" : "hybrid" })}>
             <option value="hybrid">{t("skills.selectionHybrid")}</option><option value="lexical">{t("skills.selectionLexical")}</option></select></div>
         {toggle(t("skills.catalogEnabled"), t("skills.catalogDetail"), config.skillsCatalogEnabled, "skillsCatalogEnabled")}
-        <div className="list-row"><strong>{t("skills.maxSelected")}</strong><select className="input" aria-label={t("skills.maxSelected")} value={config.skillsMaxSelected} disabled={save.isPending}
+        <div className="list-row skills-setting-row"><strong>{t("skills.maxSelected")}</strong><select className="input" aria-label={t("skills.maxSelected")} value={config.skillsMaxSelected} disabled={save.isPending}
           onChange={(event) => patch({ skillsMaxSelected: Number(event.target.value) })}>{[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}</select></div>
         <Field label={t("skills.budget")} hint={t("skills.budgetHint", { min: number(MIN_BUDGET), max: number(MAX_BUDGET) })}>
           <input className="input" type="number" min={MIN_BUDGET} max={MAX_BUDGET} step={500} value={budget ?? String(config.skillsBudgetChars)} disabled={save.isPending}

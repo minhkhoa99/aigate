@@ -2,6 +2,8 @@ export * from "./cip.js";
 export * from "./errors.js";
 export * from "./registry.js";
 export * from "./oauth.js";
+export { createQoderDeviceAttempt, pollQoderDevice, type QoderDeviceAttempt } from "./qoder.js";
+export { QoderAdapter } from "./adapters/qoder.js";
 export * from "./capabilities.js";
 export * from "./thinking.js";
 export * from "./retry.js";

@@ -92,7 +92,7 @@ test("every error code has an explicit fallback decision", () => {
 });
 
 test("the built-in registry is the connectable part of the catalog, with a reason for the rest", () => {
-  assert.equal(builtinRegistry.providers.length, 73);
+  assert.equal(builtinRegistry.providers.length, 74);
   assert.equal(builtinRegistry.model("openai", "gpt-4.1")?.contextWindow, 1_000_000);
   assert.equal(builtinRegistry.model("openai", "missing"), undefined);
   assert.equal(builtinRegistry.provider("ds")?.id, "deepseek", "aliases resolve");
@@ -100,7 +100,7 @@ test("the built-in registry is the connectable part of the catalog, with a reaso
   assert.deepEqual(builtinRegistry.status("anthropic"), { connectable: true });
   assert.deepEqual(builtinRegistry.status("gemini"), { connectable: true });
   assert.deepEqual(builtinRegistry.status("vertex"), { connectable: true });
-  assert.deepEqual(builtinRegistry.status("qoder"), { connectable: false, reason: "Not supported: needs Qoder CLI impersonation" });
+  assert.deepEqual(builtinRegistry.status("qoder"), { connectable: true });
   assert.deepEqual(builtinRegistry.status("openai"), { connectable: true });
   assert.equal(builtinRegistry.status("no-such-provider"), undefined);
   assert.equal(builtinRegistry.model("tencent", "hunyuan-turbos-latest")?.maxOutputTokens, null);

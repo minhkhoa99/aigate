@@ -2794,6 +2794,24 @@ Every item below is a capability AIGate must have. Derived from tracing
 - **Streaming:** yes
 - **Errors:** `AUTH_ERROR` (the PAT exchange fails or the token is not a pt- token)
 
+### Qoder International owned device login, token refresh and newer model-server text/tool chat
+
+- **id:** `provider.qoder-international-native` · **module:** `connections`
+- **Trigger:** Explicit dashboard Qoder sign-in, account/model Test/import, or /v1 chat request
+- **Input:** An owned device attempt or Bearer access token and canonical text/tool request
+- **Output:** Sealed connection, precise live model errors, canonical response or validated stream
+- **Rules:**
+  - REFERENCE_BEHAVIOR: S256 device challenge/nonce/machine ID; poll openapi /api/v1/deviceToken/poll; verify userinfo before confirming; current CLI corroborates /api/v1/deviceToken/refresh
+  - REFERENCE_BEHAVIOR: newer International model server api2-v2.qoder.sh/model/v1/chat/completions accepts a JSON/SSE native method; client-owned tools must preserve canonical IDs/results
+  - SUSPECTED_BUG: correct reference fake expiry, token-exists Test and success-on-stream-failure; only explicit expiry and validated terminal success count
+  - SUSPECTED_BUG: keep verifier/tokens server-side in bounded owner-bound attempts; canonical identity confirmation, sealed storage, conditional single-flight refresh and no generation replay
+  - IMPLEMENTATION_ACCIDENT: reuse native ports/router/UI; no reference WAF encoder, client impersonation, signing module, CN/PAT/vision or SDK subprocess substitution
+  - REFERENCE_BEHAVIOR: live model discovery attempts only the observed catalog endpoint; signature/refusal is an explicit import failure, never a successful static fallback
+- **Streaming:** yes
+- **Errors:** `AUTH_ERROR` (upstream rejects account/access token), `PROVIDER_UNAVAILABLE` (protocol/signature failure or truncated stream; no successful stop)
+- **AIGate required behavior:** Only explicit expiry, verified identity and terminal stream success count; submitted generation and uncertain rotating refresh are never replayed.
+- **Note:** 9router's mechanism here is an accident of its stack. Behavior required, mechanism not.
+
 ### vertex / vertex-partner: service-account JSON, authorized_user JSON, or a raw API key in the one apiKey field; access tokens
 
 - **id:** `provider.vertex-google-auth` · **module:** `routing`
@@ -5395,6 +5413,7 @@ Every item below is a capability AIGate must have. Derived from tracing
 | `provider.vertex-google-auth` | A 401 forces a new token, the cache follows the credential itself, ADC tokens are cached until they expire, and the key never goes in the URL | The retry reuses the cached token, a replaced key under the same client_email keeps the old token, ADC refreshes on every request, and the raw key is an unencoded query parameter | A revoked token keeps failing for up to 55 minutes, extra token round-trips, and the key leaks into logs |
 | `connection.vertex-credential-test` | The Test button works, a service account is checked by minting a token, and a bad key (400 API_KEY_INVALID) is invalid | Test always fails, a service account is valid on field presence, and any status but 401/403 is valid | Working connections look broken and broken ones look healthy |
 | `routing.vertex-endpoints` | A token request reaches every catalog model, including the global-only Gemini 3 previews | The token path defaults to locations/us-central1 on the global host, with no way to change it | Gemini 3 preview models may answer 404 for service-account connections |
+| `provider.qoder-international-native` | Only explicit expiry, verified identity and terminal stream success count; submitted generation and uncertain rotating refresh are never replayed. | Reference invents/clamps expiry, tests token presence and swallows stream failures; legacy shared paths can replay generation. | False connection success, stale credentials and duplicate billable inference or tool calls; corrected by the native Qoder slice. |
 | `connection.azure-openai-deployment` | A wrong deployment (404) or api-version (400) fails the test, Organization is optional, and a missing endpoint is refused | Only 401/403 fail, the form forces an Organization that is then sent on every request, and a missing endpoint sends the key to api.openai.com | Broken connections look healthy, and an Azure key can leak to another vendor |
 | `provider.clinepass-headers-envelope` | The Test button checks the key | It always fails with 'Provider test not supported', and validate's GET /models passes any key | Working ClinePass connections look broken, and wrong keys look valid when added |
 | `connection.commandcode-key-test` | The Test button checks the key, including an error event in a 200 answer | Test always fails; validate passes an in-band error | Working connections look broken and some bad keys look valid |

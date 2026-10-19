@@ -2198,7 +2198,7 @@
   performanceConcerns: []
   behavior: { streaming: true, cancellation: null, concurrency: null }
   edgeCases:
-    - "User decision 2026-09-26: AIGate does not port this transport (client impersonation and WAF-bypass encoding); qoder and qoder-cn stay unconnectable with that reason"
+    - "Historical decision 2026-09-26 excluded this reference transport. Superseded 2026-10-19 for legitimate Qoder International protocol research/integration: no WAF evasion, false access identity or protection bypass; see plans/plan_2026-10-19_zed-qoder.md. Plan approved 2026-10-19; access/protocol verification started. Runtime remains unimplemented/unconnectable, not newly excluded. CN/PAT/images remain backlog; do not infer direct-HTTP support or no-refresh from reference-only behavior."
   evidence:
     - { file: open-sse/executors/qoder.js, line: 614, note: "execute override, PAT flow" }
     - { file: open-sse/shared/qoder/encoding.js, line: 32, note: "body obfuscation" }
@@ -2207,6 +2207,48 @@
   newModule: routing
   parityStatus: traced
   labels: [REFERENCE_BEHAVIOR]
+
+# 2026-10-19: user prioritizes Qoder API + OAuth; Zed deferred. New native contract, not the old encoded agent transport.
+- id: provider.qoder-international-native
+  group: Providers
+  feature: Provider connections and transport
+  subFeature: "Qoder International owned device login, token refresh and newer model-server text/tool chat"
+  suspicion:
+    expected: "Only explicit expiry, verified identity and terminal stream success count; submitted generation and uncertain rotating refresh are never replayed."
+    actual: "Reference invents/clamps expiry, tests token presence and swallows stream failures; legacy shared paths can replay generation."
+    impact: "False connection success, stale credentials and duplicate billable inference or tool calls; corrected by the native Qoder slice."
+  trigger: "Explicit dashboard Qoder sign-in, account/model Test/import, or /v1 chat request"
+  input: "An owned device attempt or Bearer access token and canonical text/tool request"
+  output: "Sealed connection, precise live model errors, canonical response or validated stream"
+  businessRules:
+    - "REFERENCE_BEHAVIOR: S256 device challenge/nonce/machine ID; poll openapi /api/v1/deviceToken/poll; verify userinfo before confirming; current CLI corroborates /api/v1/deviceToken/refresh"
+    - "REFERENCE_BEHAVIOR: newer International model server api2-v2.qoder.sh/model/v1/chat/completions accepts a JSON/SSE native method; client-owned tools must preserve canonical IDs/results"
+    - "SUSPECTED_BUG: correct reference fake expiry, token-exists Test and success-on-stream-failure; only explicit expiry and validated terminal success count"
+    - "SUSPECTED_BUG: keep verifier/tokens server-side in bounded owner-bound attempts; canonical identity confirmation, sealed storage, conditional single-flight refresh and no generation replay"
+    - "IMPLEMENTATION_ACCIDENT: reuse native ports/router/UI; no reference WAF encoder, client impersonation, signing module, CN/PAT/vision or SDK subprocess substitution"
+    - "REFERENCE_BEHAVIOR: live model discovery attempts only the observed catalog endpoint; signature/refusal is an explicit import failure, never a successful static fallback"
+  state:
+    reads: ["provider_connections", "custom_models"]
+    writes: ["provider_connections"]
+    runtimeOnly: ["16 five-minute owner-bound attempts", "bounded refresh single-flight"]
+  dependencies: []
+  providerInteraction: "International device/userinfo/refresh/catalog/model-server URLs; ordinary HTTP port only"
+  fallback: { hasFallback: false, retry: "no submitted-generation replay", timeout: "15 s metadata; bounded stream and caller deadline", quota: "precise upstream error" }
+  errorCases:
+    - { code: AUTH_ERROR, when: "upstream rejects account/access token", partial: false }
+    - { code: PROVIDER_UNAVAILABLE, when: "protocol/signature failure or truncated stream; no successful stop", partial: true }
+  sideEffects: ["explicit browser login", "explicit chat/model-Test can bill upstream"]
+  persistence: ["existing sealed access/refresh token columns; no secrets in oauth_data"]
+  performanceConcerns: ["bounded bodies/streams/tools/attempts; no automatic vendor polling"]
+  behavior: { streaming: true, cancellation: "shared abort signal; deadline, owner cancellation and shutdown release pending work", concurrency: "bounded per-owner attempts and one poll per attempt" }
+  edgeCases:
+    - "User requested implementation before further vendor answers; source-supported integration is not a passed live acceptance/access gate. No vendor permission is inferred. docs/contracts/provider-qoder.md records remaining catalog/tool/client compatibility limits."
+  evidence:
+    - { file: src/lib/oauth/services/qoder.js, line: 90, note: "reference device flow; bugs intentionally corrected" }
+    - { file: open-sse/services/qoderModels.js, line: 4, note: "observed signed catalog; never bypass or fake live import" }
+  newModule: connections
+  parityStatus: implemented
+  labels: [REFERENCE_BEHAVIOR, SUSPECTED_BUG, IMPLEMENTATION_ACCIDENT]
 
 # 2026-09-26 SP14g: per-connection data (azure, cloudflare-ai) and the ClinePass headers and envelope.
 - id: connection.azure-openai-deployment

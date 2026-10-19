@@ -200,7 +200,7 @@ export class DirectTransport implements HttpTransportPort {
         try {
           response = await proxyFetch(url, { method: request.method, headers: request.headers, body: fetchBody(request.body), redirect: "manual", signal: AbortSignal.any([ctx.signal, AbortSignal.timeout(timeoutMs)]), dispatcher: dispatcher(proxy.url) });
         } catch (error) {
-          if (proxy.strict) throw error;
+          if (proxy.strict || request.noReplay || ctx.signal.aborted) throw error;
           const signal = AbortSignal.any([ctx.signal, AbortSignal.timeout(timeoutMs)]);
           response = MITM_BYPASS_HOSTS.has(url.hostname.toLowerCase())
             ? await mitmBypassRequest(request, url, signal)
